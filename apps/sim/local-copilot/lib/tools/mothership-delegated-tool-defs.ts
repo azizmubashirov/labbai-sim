@@ -133,6 +133,8 @@ const DELEGATED_TOOL_DESCRIPTIONS: Record<string, string> = {
     'Creates a workspace API key. REQUIRED: name (descriptive label). Returns the key once — share it carefully with the user.',
   restore_resource:
     'Restores an archived/deleted resource. REQUIRED: type (workflow|table|file|knowledgebase|folder|file_folder) and id.',
+  set_environment_variables:
+    'Stores secrets (API keys, tokens) as workspace environment variables. REQUIRED: variables [{name, value}] (scope defaults to workspace). Use UPPER_SNAKE_CASE names (e.g. OPENAI_API_KEY). Afterwards reference the secret in block fields as {{NAME}} — never write the raw value into a block.',
   get_platform_actions:
     'Lists available platform UI actions the agent can suggest or trigger (navigation and settings helpers).',
   user_memory:
@@ -213,6 +215,7 @@ export const MOTHERSHIP_DELEGATED_TOOL_NAMES = [
   'manage_mcp_tool',
   'generate_api_key',
   'restore_resource',
+  'set_environment_variables',
   'get_platform_actions',
   'user_memory',
 ] as const

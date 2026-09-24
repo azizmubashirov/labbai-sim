@@ -63,6 +63,8 @@ export const ALWAYS_ON_TOOL_NAMES = new Set<string>([
   'invoke_integration_tool',
   'open_resource',
   'get_platform_actions',
+  // Secrets pasted in chat must land in workspace env, not in block fields.
+  'set_environment_variables',
   'list_user_workspaces',
   'load_user_skill',
   'explain_error',
@@ -132,6 +134,7 @@ const DEPLOY_TOOLS = [
 ] as const
 
 const AUTH_TOOLS = [
+  'set_environment_variables',
   'manage_credential',
   'oauth_get_auth_link',
   'oauth_request_access',

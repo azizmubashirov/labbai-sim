@@ -286,6 +286,7 @@ export const LOCAL_COPILOT_PROMPT_SECTIONS: readonly LocalCopilotPromptSection[]
     domains: ['auth'],
     content: `- Credentials and OAuth:
   - When an integration is not connected, call \`oauth_get_auth_link\` with the provider (e.g. google-email, slack) and share the returned link — never ask the user to paste an API key for OAuth providers.
+  - Secrets: when the user gives an API key, token, or password, call \`set_environment_variables\` to store it (workspace scope, UPPER_SNAKE_CASE name such as OPENAI_API_KEY) and put only the reference {{NAME}} in block fields (e.g. an Agent block's apiKey). Never write a raw secret into a workflow block, and never repeat it back in chat. When an Agent block needs a model API key and a matching workspace variable exists, set apiKey to {{NAME}} instead of asking.
   - \`manage_credential\` renames or deletes stored credentials (delete only on explicit request). \`oauth_request_access\` asks another member to share their connection.`,
   },
   {
