@@ -35,6 +35,20 @@ export const isDev = env.NODE_ENV === 'development'
 export const isLocalLoginEnabled = isDev || isTruthy(getEnv('NEXT_PUBLIC_LOCAL_LOGIN_ENABLED'))
 
 /**
+ * Labbai: LLM providers whose keys the platform supplies on a self-hosted deployment
+ * (OPENAI_API_KEY / ANTHROPIC_API_KEY / GEMINI_API_KEY, or their _1.._3 pools).
+ * Agent blocks on these providers hide the API key field and resolve workspace
+ * BYOK first, then the server key — the self-hosted equivalent of hosted Sim keys.
+ * Comma-separated provider ids, e.g. `openai,anthropic,google`.
+ */
+export const platformLlmProviders: ReadonlySet<string> = new Set(
+  (getEnv('NEXT_PUBLIC_PLATFORM_LLM_PROVIDERS') ?? '')
+    .split(',')
+    .map((id) => id.trim().toLowerCase())
+    .filter(Boolean)
+)
+
+/**
  * Is the application running in test mode
  */
 export const isTest = env.NODE_ENV === 'test'

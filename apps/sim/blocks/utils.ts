@@ -5,6 +5,7 @@ import {
   isCohereConfigured,
   isHosted,
   isOllamaConfigured,
+  platformLlmProviders,
 } from '@/lib/core/config/env-flags'
 import { getScopesForService } from '@/lib/oauth/utils'
 import { containsReference } from '@/lib/workflows/sanitization/references'
@@ -230,6 +231,14 @@ function shouldRequireApiKeyForModel(model: string): boolean {
   }
   if (normalizedModel.startsWith('vllm/') || normalizedModel.startsWith('litellm/')) {
     return false
+  }
+
+  if (platformLlmProviders.size > 0) {
+    try {
+      if (platformLlmProviders.has(getProviderFromModel(normalizedModel))) return false
+    } catch {
+      // Unknown model id — fall through to the default rules.
+    }
   }
 
   const storeProvider = getProviderFromStore(normalizedModel)

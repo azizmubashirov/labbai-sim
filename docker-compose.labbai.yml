@@ -24,7 +24,26 @@ services:
       db: {condition: service_healthy}
       redis: {condition: service_healthy}
       realtime: {condition: service_started}
+      uploads-init: {condition: service_completed_successfully}
     deploy: {resources: {limits: {memory: 3G}}}
+
+  # Local storage expects these roots to exist and be owned by the app user (uid 1001).
+  uploads-init:
+    image: alpine:3.21
+    command: ['sh', '-c', 'mkdir -p /uploads/.staging /uploads/.multipart && chown -R 1001:1001 /uploads']
+    volumes: ['/root/labbai/uploads:/uploads']
+    restart: 'no'
+
+  # Scheduled workflows, polling triggers, resume polling, outbox, KB connector sync.
+  cron:
+    image: ghcr.io/azizmubashirov/labbai-sim-cron:${LABBAI_TAG:-latest}
+    restart: on-failure
+    environment:
+      - SIM_URL=http://simstudio:3000
+      - CRON_SECRET=${CRON_SECRET}
+      - TZ=Asia/Tashkent
+    depends_on:
+      simstudio: {condition: service_started}
 
   realtime:
     image: ghcr.io/azizmubashirov/labbai-sim-realtime:${LABBAI_TAG:-latest}

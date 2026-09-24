@@ -187,6 +187,7 @@ const RESEARCH_TOOLS = [
 const MEDIA_TOOLS = ['generate_image', 'generate_audio', 'generate_video', 'ffmpeg'] as const
 
 const FILE_TOOLS = [
+  'share_file',
   'read',
   'glob',
   'grep',

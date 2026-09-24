@@ -145,7 +145,7 @@ const CORE_LOCAL_COPILOT_TOOLS: LocalCopilotToolDefinition[] = [
   {
     name: 'get_available_integrations',
     description:
-      'Lists integration categories, connected OAuth integrations, configured env key names, and hosted-key availability. Use list_integration_tools for operations within a specific service.',
+      'Lists every integration block (integrationBlocks: type, name, authMode — e.g. telegram, slack, gmail), connected OAuth integrations, configured env key names, and hosted-key availability. Call this before telling the user a service is unsupported. Use list_integration_tools for operations within a specific service.',
     parameters: { type: 'object', properties: {}, additionalProperties: false },
   },
   {

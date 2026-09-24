@@ -720,6 +720,7 @@ export const env = createEnv({
     NEXT_PUBLIC_CHAT_DISABLED:             z.boolean().optional(),                   // Hide the Chat module (Chat is shown when unset)
     NEXT_PUBLIC_EMAIL_PASSWORD_SIGNUP_ENABLED: z.boolean().optional().default(true), // Control visibility of email/password login forms
     NEXT_PUBLIC_LOCAL_LOGIN_ENABLED:       z.boolean().optional(),                   // Serve /login instead of Arena SSO when the hub is unavailable
+    NEXT_PUBLIC_PLATFORM_LLM_PROVIDERS:    z.string().optional(),                    // Labbai: providers (openai,anthropic,google) whose keys are set server-side; Agent blocks use them without a per-block key
 
 
     // Firecrawl API Key            // Arena frontend app URL        z.string().url().optional(),            // Arena frontend app URL
@@ -777,6 +778,7 @@ export const env = createEnv({
     NEXT_PUBLIC_CHAT_DISABLED: process.env.NEXT_PUBLIC_CHAT_DISABLED,
     NEXT_PUBLIC_EMAIL_PASSWORD_SIGNUP_ENABLED: process.env.NEXT_PUBLIC_EMAIL_PASSWORD_SIGNUP_ENABLED,
     NEXT_PUBLIC_LOCAL_LOGIN_ENABLED: process.env.NEXT_PUBLIC_LOCAL_LOGIN_ENABLED,
+    NEXT_PUBLIC_PLATFORM_LLM_PROVIDERS: process.env.NEXT_PUBLIC_PLATFORM_LLM_PROVIDERS,
     NEXT_PUBLIC_TURNSTILE_SITE_KEY: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
     NEXT_PUBLIC_E2B_ENABLED: process.env.NEXT_PUBLIC_E2B_ENABLED,
     NEXT_PUBLIC_SANDBOXES_ENABLED: process.env.NEXT_PUBLIC_SANDBOXES_ENABLED,

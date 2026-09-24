@@ -35,6 +35,9 @@ jobs:
           - name: migrations
             dockerfile: docker/db.Dockerfile
             needs_swap: false
+          - name: cron
+            dockerfile: docker/cron.Dockerfile
+            needs_swap: false
     steps:
       - uses: actions/checkout@v4
 
