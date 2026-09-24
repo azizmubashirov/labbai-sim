@@ -11,7 +11,8 @@ ported in. We do not sync with upstream Sim; we develop it ourselves from here.
   `desktop-bridge`, desktop/browser/terminal settings, copilot browser_* / terminal tools
 - `packages/sim-cli`, `sim-setup`, `cli`, `ts-sdk`, `python-sdk`, `helm`, CLI/desktop APIs
 - Stripe billing: subscriptions, checkout, webhooks, upgrade and billing pages.
-  Keep the usage ledger (credits); payments (Click/Payme) come later.
+  No payments of any kind for now. Credit/balance screens are hidden and usage limits
+  stay off; the internal cost ledger (`usage_log`) keeps recording what runs cost.
 - Integrations: keep ~10% (list below), remove the rest with their tools, triggers,
   OAuth providers and knowledge connectors
 - LLM providers: replace all with a single Cloudflare AI Gateway provider (Unified Billing,
@@ -54,7 +55,7 @@ Databases: PostgreSQL, MySQL, Supabase ·
 Web/search: Firecrawl, Exa, Serper ·
 Commerce: Shopify, WordPress · Voice: ElevenLabs.
 Knowledge connectors: Google Drive, Google Docs, Notion.
-Later: amoCRM, Bitrix24, Exely (not in Sim) — our own or via Pipedream MCP.
+Later: amoCRM, Bitrix24, Exely (not in Sim) — our own integrations.
 
 ## Models (via Cloudflare AI Gateway)
 
@@ -69,18 +70,15 @@ Embeddings: `openai/text-embedding-3-small`.
   Telegram-like list + thread view, operator reply from the UI, per-conversation
   AI on/off (when off, the agent workflow skips that customer). Copilot-built channel
   agents feed this section automatically.
-- **Credits** — Sim's ledger (`usage_log`, dollars stored, 200 credits = $1) with our
-  markup via `COST_MULTIPLIER`; Click / Payme top-ups instead of Stripe.
 - **Cloudflare AI Gateway provider** for Agent blocks + copilot (`cf-aig-authorization`
   header); needs Account ID, Gateway ID, API token in server `.env`.
-- **Pipedream MCP** for OAuth apps we don't register ourselves.
 - **Branding** — Labbai name, logo, colors, emails; UZ / RU interface.
 - Own integrations: amoCRM, Bitrix24, Exely.
 
 ## Open issues found in testing
 
 - Google OAuth (Sheets/Drive/…): self-host needs our own Google OAuth client
-  (`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`), or Pipedream.
+  (`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`).
 - Secrets pasted into chat during testing (an OpenAI key, a Telegram bot token) must be
   rotated by the owner.
 - Local copilot file writes use the `workspace_file` tool name; the new Sim file preview
