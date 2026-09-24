@@ -50,12 +50,11 @@ afterEach(() => {
 
 describe('StandaloneSettingsShell', () => {
   it('filters its navigation by the server-resolved shape, not the env fallback', () => {
-    /** Inverts the fallback's hosted and billing switches, which decide the Billing and Chat keys items. */
+    /** Inverts the fallback's hosted switch, which decides the Chat keys item. */
     const fallback = resolveDeploymentShape()
     const deployment = {
       ...fallback,
       hosted: !fallback.hosted,
-      billingEnabled: !fallback.billingEnabled,
     }
 
     act(() =>
@@ -67,7 +66,6 @@ describe('StandaloneSettingsShell', () => {
     )
 
     const itemIds = mockSettingsSidebar.mock.calls[0][0].items.map((item) => item.id)
-    expect(itemIds.includes('billing')).toBe(deployment.billingEnabled)
     expect(itemIds.includes('chat-keys')).toBe(deployment.hosted)
     expect(getDeploymentShape()).toBe(deployment)
   })

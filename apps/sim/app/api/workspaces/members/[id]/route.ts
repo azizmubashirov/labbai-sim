@@ -8,7 +8,6 @@ import { removeWorkspaceMemberContract } from '@/lib/api/contracts/invitations'
 import { parseRequest } from '@/lib/api/server'
 import { getSession } from '@/lib/auth'
 import { removeUserFromOrganization } from '@/lib/billing/organizations/membership'
-import { reconcileOrganizationSeats } from '@/lib/billing/organizations/seats'
 import { withRouteHandler } from '@/lib/core/utils/with-route-handler'
 import { captureServerEvent } from '@/lib/posthog/server'
 import { revokeWorkspaceAccessTx } from '@/lib/workspaces/access/workspace-access'
@@ -156,7 +155,6 @@ export const DELETE = withRouteHandler(
        * keep their membership and seat.
        */
       let organizationRemoval = false
-      let seatReduction: Awaited<ReturnType<typeof reconcileOrganizationSeats>> | null = null
 
       if (organizationId && userId !== workspaceRow[0].billedAccountUserId) {
         const [orgMembership] = await db
@@ -185,20 +183,6 @@ export const DELETE = withRouteHandler(
 
           if (removal.success && removal.removed) {
             organizationRemoval = true
-            try {
-              seatReduction = await reconcileOrganizationSeats({
-                organizationId,
-                reason: 'member-removed',
-                actorId: session.user.id,
-              })
-            } catch (seatError) {
-              logger.error('Failed to reduce seats after workspace member removal', {
-                organizationId,
-                workspaceId,
-                removedUserId: userId,
-                error: seatError,
-              })
-            }
           } else if (!removal.success) {
             logger.error('Failed to remove org membership after last workspace removal', {
               organizationId,
@@ -238,7 +222,6 @@ export const DELETE = withRouteHandler(
           selfRemoval: isSelf,
           ownershipTransferred,
           organizationRemoval,
-          seatReduction,
         },
         request: req,
       })

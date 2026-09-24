@@ -158,9 +158,7 @@ describe('runLocalCopilotAgent billing turn id', () => {
     })
   })
 
-  // Skipped until the Stripe/billing removal step rewrites billing attribution for Labbai
-  // (needs a resolvable workspace payer; see LABBAI_PLAN.md).
-  it.skip('passes message-scoped usageTurnId to recordLocalCopilotTurnUsage and done event', async () => {
+  it('passes message-scoped usageTurnId to recordLocalCopilotTurnUsage and done event', async () => {
     const messageId = 'turn-message-abc'
     const { events } = await drainAgent(
       runLocalCopilotAgent({

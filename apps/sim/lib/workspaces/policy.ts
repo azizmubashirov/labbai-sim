@@ -1,18 +1,11 @@
 import { db } from '@sim/db'
 import { member, type WorkspaceMode, workspace } from '@sim/db/schema'
 import { createLogger } from '@sim/logger'
-import { isOrgAdminRole } from '@sim/platform-authz/workspace'
 import { and, count, eq, isNull } from 'drizzle-orm'
-import { getOrganizationSubscription } from '@/lib/billing/core/billing'
-import { getHighestPrioritySubscription } from '@/lib/billing/core/plan'
 import {
   acquireOrganizationUserMutationLocks,
   getUserOrganization,
 } from '@/lib/billing/organizations/membership'
-import type { PlanCategory } from '@/lib/billing/plan-helpers'
-import { getPlanType, isEnterprise, isMaxTier, isPro, isTeam } from '@/lib/billing/plan-helpers'
-import { hasUsableSubscriptionStatus } from '@/lib/billing/subscriptions/utils'
-import { isBillingEnabled } from '@/lib/core/config/env-flags'
 import type { DbOrTx } from '@/lib/db/types'
 import {
   capabilityRefusal,
@@ -108,7 +101,7 @@ export interface WorkspaceCreationPolicy {
    */
   governingPermissionGroupOrganizationId: string | null
   /** Discriminant for blocked states the workspace mode cannot distinguish. */
-  blockedReasonCode?: 'organization-subscription-inactive' | 'permission-group-denied'
+  blockedReasonCode?: 'permission-group-denied'
 }
 
 /**
@@ -234,24 +227,6 @@ export async function lockWorkspaceCreationContext(
 
   let billedAccountUserId = userId
   if (organizationId) {
-    if (isBillingEnabled) {
-      if (!currentMembership || !isOrgAdminRole(currentMembership.role)) {
-        throw new WorkspaceCreationContextChangedError()
-      }
-      const currentSubscription = await getOrganizationSubscription(organizationId, {
-        executor: tx,
-        onError: 'throw',
-        forUpdate: true,
-      })
-      if (
-        !currentSubscription ||
-        !hasUsableSubscriptionStatus(currentSubscription.status) ||
-        (!isTeam(currentSubscription.plan) && !isEnterprise(currentSubscription.plan))
-      ) {
-        throw new WorkspaceCreationContextChangedError()
-      }
-    }
-
     const currentOwnerId = await getOrganizationOwnerId(organizationId, tx)
     if (!currentOwnerId) throw new WorkspaceCreationContextChangedError()
     billedAccountUserId = currentOwnerId
@@ -298,154 +273,31 @@ export function isOrganizationWorkspace(
 }
 
 /**
- * Computes whether new members can be invited to the given workspace
- * under the active product policy.
+ * Computes whether new members can be invited to the given workspace.
  *
- * Any paid billed account (Pro, Team, or Enterprise) may invite — the
- * seat, and any Pro→Team upgrade, is provisioned when the invitee
- * accepts, so invites are no longer seat-gated at this layer. Free
- * accounts are blocked with an upgrade tooltip because there is no
- * payment method to charge at acceptance.
- *
- * - `organization`: allowed; the org already holds a Team/Enterprise
- *   subscription. Only Enterprise keeps an invite-time `requiresSeat`
- *   gate (fixed seats).
- * - `personal` / `grandfathered_shared`: allowed when the billed user is
- *   Pro/Team/Enterprise. For Pro, acceptance creates the org and moves the
- *   subscription to the Team tier.
- *
- * Billing-disabled deployments always allow invites. Existing members
+ * Labbai has no paid plans, so inviting is always allowed. Existing members
  * keep their access — this policy only governs *new* invitations.
  */
 export async function getWorkspaceInvitePolicy(
   workspaceState: WorkspaceOwnershipState,
-  executor: DbOrTx = db
+  _executor: DbOrTx = db
 ): Promise<WorkspaceInvitePolicy> {
-  const billedPlanCategory = isBillingEnabled
-    ? await resolveBilledPlanCategory(workspaceState, executor)
-    : 'free'
-  return evaluateWorkspaceInvitePolicy(workspaceState, { billedPlanCategory })
+  return evaluateWorkspaceInvitePolicy(workspaceState)
 }
 
 /**
- * Pure evaluator — given the billed account's resolved plan category,
- * returns the policy synchronously. Exposed so bulk callers (e.g. listing
- * every workspace a user can see) can batch the subscription lookups by
- * unique billed account user rather than re-querying per workspace.
+ * Pure evaluator of the invite policy. Exposed so bulk callers (e.g. listing
+ * every workspace a user can see) can evaluate it without any lookups.
  */
 export function evaluateWorkspaceInvitePolicy(
-  workspaceState: WorkspaceOwnershipState,
-  context: { billedPlanCategory: PlanCategory }
+  workspaceState: WorkspaceOwnershipState
 ): WorkspaceInvitePolicy {
-  if (!isBillingEnabled) {
-    return {
-      allowed: true,
-      reason: null,
-      requiresSeat: false,
-      organizationId: workspaceState.organizationId,
-      upgradeRequired: false,
-    }
-  }
-
-  if (workspaceState.workspaceMode === WORKSPACE_MODE.ORGANIZATION) {
-    if (workspaceState.organizationId === null || context.billedPlanCategory === 'free') {
-      return blockInvite(workspaceState.organizationId)
-    }
-
-    return {
-      allowed: true,
-      reason: null,
-      requiresSeat: context.billedPlanCategory === 'enterprise',
-      organizationId: workspaceState.organizationId,
-      upgradeRequired: false,
-    }
-  }
-
-  switch (context.billedPlanCategory) {
-    case 'pro':
-    case 'team':
-      return {
-        allowed: true,
-        reason: null,
-        requiresSeat: false,
-        organizationId: workspaceState.organizationId,
-        upgradeRequired: false,
-      }
-    case 'enterprise':
-      return {
-        allowed: true,
-        reason: null,
-        requiresSeat: true,
-        organizationId: workspaceState.organizationId,
-        upgradeRequired: false,
-      }
-    default:
-      return blockInvite(workspaceState.organizationId)
-  }
-}
-
-function blockInvite(organizationId: string | null): WorkspaceInvitePolicy {
   return {
-    allowed: false,
-    reason: UPGRADE_TO_INVITE_REASON,
+    allowed: true,
+    reason: null,
     requiresSeat: false,
-    organizationId,
-    upgradeRequired: true,
-  }
-}
-
-async function resolveBilledPlanCategory(
-  workspaceState: WorkspaceOwnershipState,
-  executor: DbOrTx
-): Promise<PlanCategory> {
-  if (
-    workspaceState.workspaceMode === WORKSPACE_MODE.ORGANIZATION &&
-    workspaceState.organizationId
-  ) {
-    return getInvitePlanCategoryForOrganization(workspaceState.organizationId, executor)
-  }
-  return getInvitePlanCategoryForUser(workspaceState.billedAccountUserId, executor)
-}
-
-/**
- * Resolve the invite-governing plan category for an organization from its
- * subscription. Exposed so bulk callers can batch by unique organization id.
- * Returns `'free'` when there is no usable subscription so lapsed orgs are
- * blocked consistently with accept-time provisioning.
- */
-export async function getInvitePlanCategoryForOrganization(
-  organizationId: string,
-  executor: DbOrTx = db
-): Promise<PlanCategory> {
-  try {
-    const orgSub = await getOrganizationSubscription(organizationId, { executor })
-    if (!orgSub || !hasUsableSubscriptionStatus(orgSub.status)) return 'free'
-    return getPlanType(orgSub.plan)
-  } catch (error) {
-    logger.error('Failed to resolve organization subscription for invite policy', {
-      organizationId,
-      error,
-    })
-    return 'free'
-  }
-}
-
-/**
- * Resolve the invite-governing plan category for a single billed account
- * user. Exposed so bulk callers can batch by unique user id. Returns
- * `'free'` when there is no usable paid subscription.
- */
-export async function getInvitePlanCategoryForUser(
-  userId: string,
-  executor: DbOrTx = db
-): Promise<PlanCategory> {
-  try {
-    const sub = await getHighestPrioritySubscription(userId, { executor })
-    if (!sub || !hasUsableSubscriptionStatus(sub.status)) return 'free'
-    return getPlanType(sub.plan)
-  } catch (error) {
-    logger.error('Failed to resolve subscription for invite policy', { userId, error })
-    return 'free'
+    organizationId: workspaceState.organizationId,
+    upgradeRequired: false,
   }
 }
 
@@ -537,46 +389,21 @@ export async function getWorkspaceCreationPolicy({
     }
   }
 
-  if (!isBillingEnabled) {
-    if (organizationId && orgRole) {
-      const billedAccountUserId = await requireOrganizationOwnerId(organizationId)
+  if (organizationId && orgRole) {
+    const billedAccountUserId = await requireOrganizationOwnerId(organizationId)
 
-      /**
-       * Members may create organization workspaces once billing is off.
-       *
-       * The admin-only rule exists because an organization workspace draws on
-       * the organization's paid seats and usage. Without billing there is
-       * nothing to draw on, and the rule instead produces a dead end: a user
-       * auto-joined as a plain member — by instance-organization mode, or by
-       * SSO organization provisioning — resolves to an organization context and
-       * is then refused any workspace at all, including the personal one they
-       * would have received before joining. Members could always create
-       * personal workspaces here, so this changes where a new workspace lands,
-       * not whether they may make one.
-       */
-      return {
-        canCreate: true,
-        workspaceMode: WORKSPACE_MODE.ORGANIZATION,
-        organizationId,
-        billedAccountUserId,
-        maxWorkspaces: null,
-        currentWorkspaceCount: 0,
-        reason: null,
-        status: 200,
-        observedOrganizationId: membership?.organizationId ?? null,
-        governingPermissionGroupOrganizationId,
-      }
-    }
-
-    const currentWorkspaceCount = await countNonOrganizationOwnedWorkspaces(userId)
-
+    /**
+     * Members may create organization workspaces: Labbai has no paid seats or
+     * usage for an organization workspace to draw on. Personal workspaces are
+     * uncapped for the same reason.
+     */
     return {
       canCreate: true,
-      workspaceMode: WORKSPACE_MODE.PERSONAL,
-      organizationId: null,
-      billedAccountUserId: userId,
+      workspaceMode: WORKSPACE_MODE.ORGANIZATION,
+      organizationId,
+      billedAccountUserId,
       maxWorkspaces: null,
-      currentWorkspaceCount,
+      currentWorkspaceCount: 0,
       reason: null,
       status: 200,
       observedOrganizationId: membership?.organizationId ?? null,
@@ -584,108 +411,14 @@ export async function getWorkspaceCreationPolicy({
     }
   }
 
-  if (organizationId && orgRole) {
-    const organizationSubscription = await getOrganizationSubscription(organizationId)
-
-    if (
-      organizationSubscription &&
-      hasUsableSubscriptionStatus(organizationSubscription.status) &&
-      (isTeam(organizationSubscription.plan) || isEnterprise(organizationSubscription.plan))
-    ) {
-      const billedAccountUserId = await requireOrganizationOwnerId(organizationId)
-
-      if (!isOrgAdminRole(orgRole)) {
-        return {
-          canCreate: false,
-          workspaceMode: WORKSPACE_MODE.ORGANIZATION,
-          organizationId,
-          billedAccountUserId,
-          maxWorkspaces: null,
-          currentWorkspaceCount: 0,
-          reason: 'Only organization owners and admins can create organization workspaces.',
-          status: 403,
-          observedOrganizationId: membership?.organizationId ?? null,
-          governingPermissionGroupOrganizationId,
-        }
-      }
-
-      return {
-        canCreate: true,
-        workspaceMode: WORKSPACE_MODE.ORGANIZATION,
-        organizationId,
-        billedAccountUserId,
-        maxWorkspaces: null,
-        currentWorkspaceCount: 0,
-        reason: null,
-        status: 200,
-        observedOrganizationId: membership?.organizationId ?? null,
-        governingPermissionGroupOrganizationId,
-      }
-    }
-
-    /**
-     * Lapsed organization (no usable Team/Enterprise plan). A plain member
-     * gets NO personal fallback: letting them create workspaces here would
-     * hand them an estate outside every admin's view purely because billing
-     * lapsed — exactly the purview escape this regime closes. Owners and
-     * admins DO fall through to the personal regime below: they sit at the top
-     * of the hierarchy, so there is no purview to escape, and after a
-     * downgrade they are usually back on a personal plan they still pay for.
-     */
-    if (!isOrgAdminRole(orgRole)) {
-      return {
-        canCreate: false,
-        workspaceMode: WORKSPACE_MODE.ORGANIZATION,
-        organizationId,
-        billedAccountUserId: (await getOrganizationOwnerId(organizationId)) ?? userId,
-        maxWorkspaces: null,
-        currentWorkspaceCount: 0,
-        reason:
-          "Your organization's subscription is inactive. Ask an organization owner to reactivate it before creating workspaces.",
-        status: 403,
-        observedOrganizationId: membership?.organizationId ?? null,
-        governingPermissionGroupOrganizationId,
-        blockedReasonCode: 'organization-subscription-inactive',
-      }
-    }
-  }
-
-  const highestPrioritySubscription = await getHighestPrioritySubscription(userId)
-  const plan = highestPrioritySubscription?.plan
-  /**
-   * Personal (non-organization) workspace cap. Organization workspaces are
-   * uncapped and returned above, so this is only reached when the org branch does
-   * not apply — including when a Team/Enterprise org's subscription is `past_due`
-   * and therefore not `hasUsableSubscriptionStatus`.
-   *
-   * Deliberately tier-only: `getHighestPrioritySubscription` already admits
-   * `past_due`, and delinquency is enforced by the billing-blocked gates rather
-   * than by shrinking the cap, which would only obstruct recovery.
-   */
-  const maxWorkspaces = isMaxTier(plan) ? 10 : isPro(plan) ? 3 : 1
   const currentWorkspaceCount = await countNonOrganizationOwnedWorkspaces(userId)
-
-  if (currentWorkspaceCount >= maxWorkspaces) {
-    return {
-      canCreate: false,
-      workspaceMode: WORKSPACE_MODE.PERSONAL,
-      organizationId: null,
-      billedAccountUserId: userId,
-      maxWorkspaces,
-      currentWorkspaceCount,
-      reason: `This plan supports up to ${maxWorkspaces} personal workspace${maxWorkspaces === 1 ? '' : 's'}.`,
-      status: 403,
-      observedOrganizationId: membership?.organizationId ?? null,
-      governingPermissionGroupOrganizationId,
-    }
-  }
 
   return {
     canCreate: true,
     workspaceMode: WORKSPACE_MODE.PERSONAL,
     organizationId: null,
     billedAccountUserId: userId,
-    maxWorkspaces,
+    maxWorkspaces: null,
     currentWorkspaceCount,
     reason: null,
     status: 200,

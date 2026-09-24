@@ -1,15 +1,13 @@
-import { requirePrincipalSubjectUserId } from '@sim/auth/principal'
 import { NextResponse } from 'next/server'
 import { speechTokenContract } from '@/lib/api/contracts/media/speech'
 import {
   defineInternalJsonRoute,
   internalErrorResponse,
+  internalRateLimits,
   internalSessionAuth,
 } from '@/lib/api/server/routes'
 import { NoWorkspaceAccessError } from '@/lib/core/application/workspace-authorization'
-import { isBillingEnabled } from '@/lib/core/config/env-flags'
 import { asOrchestrationError } from '@/lib/core/orchestration/types'
-import { RateLimiter } from '@/lib/core/rate-limiter'
 import {
   createSpeechToken,
   SpeechTokenError,
@@ -18,39 +16,13 @@ import {
 
 export const dynamic = 'force-dynamic'
 
-const STT_TOKEN_RATE_LIMIT = {
-  maxTokens: 30,
-  refillRate: 3,
-  refillIntervalMs: 72 * 1000,
-} as const
-const rateLimiter = new RateLimiter()
-
 export const POST = defineInternalJsonRoute({
   contract: speechTokenContract,
   auth: internalSessionAuth,
   operation: speechTokenOperation,
-  rateLimit: {
-    kind: 'user',
-    bucketName: 'stt-token',
-    async enforce(_request, principal) {
-      if (!isBillingEnabled) return null
-      const rateCheck = await rateLimiter.checkRateLimitDirect(
-        `stt-token:user:${requirePrincipalSubjectUserId(principal)}`,
-        STT_TOKEN_RATE_LIMIT
-      )
-      return rateCheck.allowed
-        ? null
-        : NextResponse.json(
-            { error: 'Voice input rate limit exceeded. Please try again later.' },
-            {
-              status: 429,
-              headers: {
-                'Retry-After': String(Math.ceil((rateCheck.retryAfterMs ?? 60000) / 1000)),
-              },
-            }
-          )
-    },
-  },
+  rateLimit: internalRateLimits.none({
+    reason: 'Voice tokens are not rate limited: Labbai has no plan-based limits.',
+  }),
   parseOptions: {
     maxBodyBytes: 16 * 1024,
     validationErrorResponse: () =>

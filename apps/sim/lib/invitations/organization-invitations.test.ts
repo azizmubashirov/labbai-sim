@@ -9,14 +9,12 @@ import {
   queueTableRows,
   resetDbChainMock,
   resetEnvFlagsMock,
-  setEnvFlags,
 } from '@sim/testing'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CreatePendingInvitationInput } from '@/lib/invitations/send'
 
 const mocks = vi.hoisted(() => ({
   admin: vi.fn(),
-  plan: vi.fn(),
   policy: vi.fn(),
   membership: vi.fn(),
   lockOrg: vi.fn(),
@@ -29,7 +27,6 @@ const mocks = vi.hoisted(() => ({
 }))
 vi.mock('@sim/audit', () => auditMock)
 vi.mock('@/lib/billing/core/organization', () => ({ isOrganizationOwnerOrAdmin: mocks.admin }))
-vi.mock('@/lib/billing/core/subscription', () => ({ resolveOrganizationPlan: mocks.plan }))
 vi.mock('@/lib/billing/organizations/membership', () => ({
   acquireOrganizationMutationLock: mocks.lockOrg,
   acquireOrganizationUserMutationLocks: mocks.lockUser,
@@ -66,9 +63,7 @@ const create = () =>
 beforeEach(() => {
   vi.clearAllMocks()
   resetDbChainMock()
-  setEnvFlags({ isBillingEnabled: true })
   mocks.admin.mockResolvedValue(true)
-  mocks.plan.mockResolvedValue(true)
   mocks.policy.mockResolvedValue(undefined)
   mocks.membership.mockResolvedValue(null)
   mocks.pending.mockResolvedValue(null)
@@ -98,22 +93,18 @@ afterEach(() => {
 })
 
 describe('organization-only invitations', () => {
-  it('requires authority in the explicitly routed organization before policy or plan reads', async () => {
+  it('requires authority in the explicitly routed organization before policy reads', async () => {
     mocks.admin.mockResolvedValue(false)
     await expect(prepareOrganizationInvitationContext(context)).rejects.toThrow(
       'Only organization owners and admins'
     )
     expect(mocks.admin).toHaveBeenCalledWith('admin-user', 'org-target')
     expect(mocks.policy).not.toHaveBeenCalled()
-    expect(mocks.plan).not.toHaveBeenCalled()
   })
 
-  it('enforces organization invitation policy and active plan', async () => {
-    mocks.plan.mockResolvedValue(false)
-    await expect(prepareOrganizationInvitationContext(context)).rejects.toThrow('active paid plan')
-    expect(mocks.policy).toHaveBeenCalledWith('admin-user', { organizationId: 'org-target' })
-    setEnvFlags({ isBillingEnabled: false })
+  it('enforces organization invitation policy without any plan requirement', async () => {
     await expect(prepareOrganizationInvitationContext(context)).resolves.toEqual(context)
+    expect(mocks.policy).toHaveBeenCalledWith('admin-user', { organizationId: 'org-target' })
   })
 
   it('creates no workspace grants and rechecks target-org admin and seats under the lock', async () => {
@@ -192,13 +183,6 @@ describe('organization-only invitations', () => {
     await expect(create()).rejects.toThrow('already has a pending invitation')
     expect(mocks.send).not.toHaveBeenCalled()
     expect(mocks.cancel).not.toHaveBeenCalled()
-  })
-
-  it('refuses exhausted seats before delivery', async () => {
-    queueTableRows(member, [{ role: 'owner' }])
-    mocks.seats.mockResolvedValue({ canInvite: false, reason: 'Seat capacity exhausted' })
-    await expect(create()).rejects.toThrow('Seat capacity exhausted')
-    expect(mocks.send).not.toHaveBeenCalled()
   })
 
   it.each(['returned', 'thrown'])(

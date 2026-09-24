@@ -7,11 +7,6 @@ import type { AccountSettingsSection } from '@/components/settings/navigation'
 import { captureEvent } from '@/lib/posthog/client'
 import { General } from '@/app/workspace/[workspaceId]/settings/components/general/general'
 
-const Billing = dynamic(() =>
-  import('@/app/workspace/[workspaceId]/settings/components/billing/billing').then(
-    (module) => module.Billing
-  )
-)
 const ApiKeys = dynamic(() =>
   import('@/app/workspace/[workspaceId]/settings/components/api-keys/api-keys').then(
     (module) => module.ApiKeys
@@ -35,7 +30,6 @@ export function AccountSettingsRenderer({ section }: AccountSettingsRendererProp
   }, [posthog, section])
 
   if (section === 'general') return <General />
-  if (section === 'billing') return <Billing scope='account' />
   if (section === 'api-keys') return <ApiKeys scope='personal' />
   return <Admin />
 }

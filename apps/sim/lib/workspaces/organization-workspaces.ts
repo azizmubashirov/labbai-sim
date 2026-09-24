@@ -8,13 +8,11 @@ import { syncUsageLimitsFromSubscription } from '@/lib/billing/core/usage'
 import {
   acquireOrganizationMutationLock,
   ensureUserInOrganizationTx,
-  reapplyPaidOrgJoinBillingForExistingMemberTx,
 } from '@/lib/billing/organizations/membership'
 import { changeWorkspaceStoragePayersInTx } from '@/lib/billing/storage/payer-transfer'
 import { OrchestrationError } from '@/lib/core/orchestration/types'
 import type { DbOrTx } from '@/lib/db/types'
 import { acquireInvitationMutationLocks } from '@/lib/invitations/locks'
-import { invalidateWorkspaceTableLimitsCache } from '@/lib/table/billing'
 import { getOrganizationOwnerId, WORKSPACE_MODE } from '@/lib/workspaces/policy'
 
 const logger = createLogger('OrganizationWorkspaces')
@@ -161,7 +159,6 @@ export async function attachOwnedWorkspacesToOrganization({
   })
 
   for (const workspaceId of attached.attachedWorkspaceIds) {
-    invalidateWorkspaceTableLimitsCache(workspaceId)
   }
   for (const userId of attached.usageLimitUserIds) {
     try {
@@ -343,9 +340,7 @@ export async function attachOwnedWorkspacesToOrganizationTx(
     if (!result.success) {
       throw new Error(result.error || 'Failed to sync workspace member into organization')
     }
-    if (result.alreadyMember) {
-      await reapplyPaidOrgJoinBillingForExistingMemberTx(tx, userId, organizationId)
-    } else {
+    if (!result.alreadyMember) {
       addedMemberIds.push(userId)
       usageLimitUserIds.push(userId)
     }

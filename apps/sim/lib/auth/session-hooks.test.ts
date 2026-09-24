@@ -48,7 +48,7 @@ function transactionExecutor() {
 describe('prepareSessionForCreation', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    setEnvFlags({ isBillingEnabled: true, isHosted: true, isAccessControlEnabled: false })
+    setEnvFlags({ isHosted: true, isAccessControlEnabled: false })
     invalidateSessionPolicyCache('org-1')
     isBlocked.mockReturnValue(false)
     vi.spyOn(db, 'select').mockImplementation(() => {
@@ -72,13 +72,11 @@ describe('prepareSessionForCreation', () => {
     expect(db.select).not.toHaveBeenCalled()
   })
 
-  it('clamps a member session using transaction-scoped policy, billing block, and plan reads', async () => {
+  it('clamps a member session using transaction-scoped policy reads', async () => {
     const { executor, limit } = transactionExecutor()
     limit.mockResolvedValueOnce([{ email: 'member@example.com', suspendedAt: null }])
     limit.mockResolvedValueOnce([{ organizationId: 'org-1' }])
     limit.mockResolvedValueOnce([{ settings: { maxSessionHours: 24 } }])
-    limit.mockResolvedValueOnce([{ billingBlocked: false, billingBlockedReason: null }])
-    limit.mockResolvedValueOnce([{ plan: 'enterprise', status: 'active' }])
 
     await expect(
       runWithAuthDatabase(executor, () => prepareSessionForCreation(session))
@@ -89,12 +87,12 @@ describe('prepareSessionForCreation', () => {
         expiresAt: new Date('2026-09-09T00:00:00Z'),
       },
     })
-    expect(limit).toHaveBeenCalledTimes(5)
+    expect(limit).toHaveBeenCalledTimes(3)
     expect(db.select).not.toHaveBeenCalled()
   })
 
   it('refuses a member signing in with a password when the organization requires SSO', async () => {
-    setEnvFlags({ isBillingEnabled: false, isSsoEnabled: true })
+    setEnvFlags({ isSsoEnabled: true })
     const { executor, limit } = transactionExecutor()
     limit.mockResolvedValueOnce([{ email: 'member@example.com', suspendedAt: null }])
     limit.mockResolvedValueOnce([{ organizationId: 'org-1', role: 'member' }])
@@ -109,7 +107,7 @@ describe('prepareSessionForCreation', () => {
   })
 
   it('still signs in through the identity provider when the membership read fails', async () => {
-    setEnvFlags({ isBillingEnabled: false, isSsoEnabled: true })
+    setEnvFlags({ isSsoEnabled: true })
     const { executor, limit } = transactionExecutor()
     limit.mockResolvedValueOnce([{ email: 'member@example.com', suspendedAt: null }])
     limit.mockRejectedValueOnce(new Error('connection reset'))
@@ -123,7 +121,7 @@ describe('prepareSessionForCreation', () => {
   })
 
   it('refuses a password sign-in when the membership itself cannot be read', async () => {
-    setEnvFlags({ isBillingEnabled: false, isSsoEnabled: true })
+    setEnvFlags({ isSsoEnabled: true })
     const { executor, limit } = transactionExecutor()
     limit.mockResolvedValueOnce([{ email: 'member@example.com', suspendedAt: null }])
     limit.mockRejectedValueOnce(new Error('connection reset'))
@@ -137,7 +135,7 @@ describe('prepareSessionForCreation', () => {
   })
 
   it('refuses the sign-in when the requirement itself cannot be read', async () => {
-    setEnvFlags({ isBillingEnabled: false, isSsoEnabled: true })
+    setEnvFlags({ isSsoEnabled: true })
     const { executor, limit } = transactionExecutor()
     limit.mockResolvedValueOnce([{ email: 'member@example.com', suspendedAt: null }])
     limit.mockResolvedValueOnce([{ organizationId: 'org-1', role: 'member' }])
@@ -152,7 +150,7 @@ describe('prepareSessionForCreation', () => {
   })
 
   it('admits the same member through the identity provider', async () => {
-    setEnvFlags({ isBillingEnabled: false, isSsoEnabled: true })
+    setEnvFlags({ isSsoEnabled: true })
     const { executor, limit } = transactionExecutor()
     limit.mockResolvedValueOnce([{ email: 'member@example.com', suspendedAt: null }])
     limit.mockResolvedValueOnce([{ organizationId: 'org-1', role: 'member' }])

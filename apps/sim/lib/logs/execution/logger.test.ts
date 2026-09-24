@@ -86,7 +86,6 @@ vi.mock('@/lib/billing/calculations/usage-monitor', () => ({
 
 vi.mock('@/lib/billing/core/usage', () => ({
   getOrgUsageLimit: vi.fn(() => Promise.resolve({ limit: 1000 })),
-  maybeSendUsageThresholdEmail: vi.fn(() => Promise.resolve()),
 }))
 
 vi.mock('@/lib/billing/core/usage-log', () => ({
@@ -96,11 +95,6 @@ vi.mock('@/lib/billing/core/usage-log', () => ({
     billingEntity: { type: 'user', id: userId },
     billingPeriod: { start: new Date('2024-01-01'), end: new Date('2024-02-01') },
   })),
-}))
-
-vi.mock('@/lib/billing/threshold-billing', () => ({
-  checkAndBillOverageThreshold: vi.fn(() => Promise.resolve()),
-  checkAndBillPayerOverageThreshold: vi.fn(() => Promise.resolve()),
 }))
 
 // Mock security module

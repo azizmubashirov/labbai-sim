@@ -5,7 +5,6 @@ import {
   toBillingContext,
 } from '@/lib/billing/core/billing-attribution'
 import { recordUsage } from '@/lib/billing/core/usage-log'
-import { checkAndBillPayerOverageThreshold } from '@/lib/billing/threshold-billing'
 import { env, envNumber } from '@/lib/core/config/env'
 import { OrchestrationError } from '@/lib/core/orchestration/types'
 import { embedKnowledge } from '@/lib/embeddings'
@@ -287,7 +286,6 @@ export async function recordSearchEmbeddingUsage(params: {
         },
       ],
     })
-    await checkAndBillPayerOverageThreshold(billingAttribution.billingEntity)
   } catch (error) {
     logger.warn('Failed to record search embedding usage', { error: getErrorMessage(error) })
   }

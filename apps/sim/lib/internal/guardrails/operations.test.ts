@@ -32,9 +32,6 @@ vi.mock('@/lib/billing/core/billing-attribution', () => ({
 vi.mock('@/lib/billing/core/usage-gate-cache', () => ({
   checkExecutionUsageLimits: mocks.checkAttributedUsageLimits,
 }))
-vi.mock('@/lib/billing/threshold-billing', () => ({
-  checkAndBillPayerOverageThreshold: vi.fn(),
-}))
 vi.mock('@/lib/copilot/environment-context', () => ({
   prepareCopilotEnvironmentContext: mocks.prepareEnvironment,
 }))

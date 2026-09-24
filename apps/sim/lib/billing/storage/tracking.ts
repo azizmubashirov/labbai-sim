@@ -22,14 +22,12 @@ import { createLogger } from '@sim/logger'
 import { generateId } from '@sim/utils/id'
 import { isRecordLike } from '@sim/utils/object'
 import { and, asc, eq, inArray, sql } from 'drizzle-orm'
-import { maybeNotifyLimit } from '@/lib/billing/core/limit-notifications'
 import type { HighestPrioritySubscription } from '@/lib/billing/core/plan'
 import type { BillingEntity } from '@/lib/billing/core/usage-log'
 import type { StorageBillingContext } from '@/lib/billing/storage/context'
 import { getLegacyStorageBillingEntity } from '@/lib/billing/storage/entity'
 import {
   getStorageLimitForBillingContext,
-  getStorageUsageForBillingContext,
   getUserStorageLimit,
   getUserStorageUsage,
   isStorageEnforcementEnabled,
@@ -515,41 +513,6 @@ async function mutateWorkspaceStorageUsage(
   }
 
   return { updatedUsage: currentPayerUsage }
-}
-
-/**
- * Evaluates storage notifications against the same immutable payer used for
- * the counter mutation.
- */
-export async function maybeNotifyStorageLimitForBillingContext(
-  context: StorageBillingContext,
-  updatedUsage?: number,
-  rearmOnly = false
-): Promise<void> {
-  if (!isStorageEnforcementEnabled()) return
-
-  try {
-    const [usage, limit] = await Promise.all([
-      updatedUsage === undefined
-        ? getStorageUsageForBillingContext(context)
-        : Promise.resolve(updatedUsage),
-      Promise.resolve(getStorageLimitForBillingContext(context)),
-    ])
-
-    await maybeNotifyLimit({
-      category: 'storage',
-      billedUserId: context.billedAccountUserId,
-      billingEntity: context.billingEntity,
-      workspaceId: context.workspaceId,
-      currentUsage: usage,
-      limit,
-      usageLabel: formatGb(usage, 2),
-      limitLabel: formatGb(limit, 0),
-      rearmOnly,
-    })
-  } catch (error) {
-    logger.error('Error evaluating workspace payer storage notification:', error)
-  }
 }
 
 /**

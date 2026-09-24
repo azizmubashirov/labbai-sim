@@ -15,13 +15,10 @@ import {
 import { createLogger } from '@sim/logger'
 import type { BatchInvitationResult } from '@/lib/api/contracts/invitations'
 import { useSession } from '@/lib/auth/auth-client'
-import { isEnterprise } from '@/lib/billing/plan-helpers'
-import { useDeploymentShape } from '@/lib/core/config/deployment-shape'
 import { quickValidateEmail } from '@/lib/messaging/email/validation'
 import type { PermissionType } from '@/lib/workspaces/permissions/utils'
 import { useOptionalWorkspaceHostContext } from '@/app/workspace/[workspaceId]/providers/workspace-host-provider'
 import { useSendWorkspaceInvitations } from '@/hooks/queries/invitations'
-import { useOrganizationBilling } from '@/hooks/queries/organization'
 import { useAdminWorkspaces } from '@/hooks/queries/workspace'
 
 const logger = createLogger('InviteModal')
@@ -41,9 +38,9 @@ const MEMBERSHIP_OPTIONS = [
 type Membership = (typeof MEMBERSHIP_OPTIONS)[number]['value']
 
 const MEMBERSHIP_HINTS: Partial<Record<Membership, string>> = {
-  admin: 'Joins your organization and can manage it. Adds a seat.',
+  admin: 'Joins your organization and can manage it.',
   external:
-    'Access to the selected workspaces only — no seat. Only available for people already on a paid Sim plan.',
+    'Access to the selected workspaces only, without joining the organization.',
 }
 
 const EMPTY_WORKSPACE_IDS: string[] = []
@@ -144,7 +141,6 @@ export function InviteModal({
   }
 
   const { data: session } = useSession()
-  const { billingEnabled } = useDeploymentShape()
   const isOrganizationInvite = Boolean(organizationId)
   const organizationOnly = isOrganizationInvite && !workspaceId
 
@@ -170,11 +166,6 @@ export function InviteModal({
       .map((workspace) => ({ value: workspace.id, label: workspace.name }))
   }, [isOrganizationInvite, adminWorkspaces, workspaceId, workspaceName])
 
-  /**
-   * Seat data is organization-admin-only, and the prop can lag the route, so
-   * it is fetched solely when the viewer administers the organization the page
-   * is actually hosted by.
-   */
   const hostContext = useOptionalWorkspaceHostContext()
   /**
    * Organization Admin is an organization-level grant — it carries admin on every
@@ -192,34 +183,6 @@ export function InviteModal({
       (option.value !== 'admin' || canGrantOrganizationAdmin) &&
       (option.value !== 'external' || !organizationOnly)
   )
-  const canViewOrganizationBilling = canGrantOrganizationAdmin
-
-  const { data: organizationBillingData } = useOrganizationBilling(organizationId ?? '', {
-    enabled: open && billingEnabled && canViewOrganizationBilling,
-  })
-
-  const totalSeats = organizationBillingData?.data?.totalSeats ?? 0
-  const usedSeats = organizationBillingData?.data?.usedSeats ?? 0
-  const availableSeats = Math.max(0, totalSeats - usedSeats)
-  /**
-   * Only Enterprise plans have a fixed seat cap that gates invites. Team seats
-   * are provisioned when an invitee accepts, and externals never take one.
-   */
-  const isEnterpriseOrg = isEnterprise(organizationBillingData?.data?.subscriptionPlan)
-  const hasSeatData = canViewOrganizationBilling && isEnterpriseOrg && totalSeats > 0
-  /**
-   * Advisory only. The server decides per email and does not charge a seat for
-   * everyone: an existing organization member is granted access directly, and an
-   * invitee who already belongs to another organization is forced external. A
-   * hard block here refused batches the API would have accepted, so this warns
-   * and lets the send proceed — per-email failures come back with reasons.
-   */
-  const mayExceedSeatCapacity =
-    hasSeatData && membership !== 'external' && emails.length > availableSeats
-  const seatLimitReason = mayExceedSeatCapacity
-    ? `Only ${availableSeats} seat${availableSeats === 1 ? '' : 's'} available — invites beyond that may fail. External collaborators and existing members do not use seats.`
-    : null
-
   const validateEmail = useCallback(
     (email: string): string | null => {
       const formatResult = quickValidateEmail(email)
@@ -306,7 +269,7 @@ export function InviteModal({
           value={emails}
           onChange={handleEmailsChange}
           validate={validateEmail}
-          hint={inviteDisabledReason ?? seatLimitReason}
+          hint={inviteDisabledReason}
           placeholder={
             canInvite
               ? 'Enter emails'

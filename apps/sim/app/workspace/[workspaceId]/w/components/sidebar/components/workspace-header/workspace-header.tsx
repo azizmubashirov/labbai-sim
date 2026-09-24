@@ -31,7 +31,6 @@ import { useQueryClient } from '@tanstack/react-query'
 import { IdentityTile } from '@/components/identity-tile/identity-tile'
 import { SettingsGuardedLink } from '@/components/settings/settings-guarded-link'
 import { WorkspaceContextMenu } from '@/components/workspaces/workspace-context-menu'
-import { useDeploymentShape } from '@/lib/core/config/deployment-shape'
 import { WORKSPACE_SEARCH_THRESHOLD } from '@/lib/workspaces/constants'
 import { getWorkspaceInitial } from '@/lib/workspaces/initials'
 import { getWorkspaceOrganizationHref } from '@/lib/workspaces/organization-navigation'
@@ -51,7 +50,6 @@ import {
   workspaceKeys,
 } from '@/hooks/queries/workspace'
 import { usePermissionConfig } from '@/hooks/use-permission-config'
-import { useSettingsNavigation } from '@/hooks/use-settings-navigation'
 
 const logger = createLogger('WorkspaceHeader')
 
@@ -150,7 +148,6 @@ function WorkspaceHeaderImpl({
   onExpandSidebar,
 }: WorkspaceHeaderProps) {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
-  const { billingEnabled } = useDeploymentShape()
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false)
   const [isViewInvitationsOpen, setIsViewInvitationsOpen] = useState(false)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
@@ -271,7 +268,6 @@ function WorkspaceHeaderImpl({
     setIsKeyboardNav(false)
   }, [isWorkspaceMenuOpen])
 
-  const { navigateToSettings } = useSettingsNavigation()
   const queryClient = useQueryClient()
   const hostContext = useWorkspaceHostContext()
   const organizationHref = getWorkspaceOrganizationHref(hostContext)
@@ -768,10 +764,7 @@ function WorkspaceHeaderImpl({
                         size='lg'
                         onSelect={() => {
                           setIsWorkspaceMenuOpen(false)
-                          if (isInvitationsDisabled) {
-                            if (billingEnabled) navigateToSettings({ section: 'billing' })
-                            return
-                          }
+                          if (isInvitationsDisabled) return
                           setIsInviteModalOpen(true)
                         }}
                       >

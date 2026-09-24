@@ -12,7 +12,6 @@ import {
 } from '@/components/settings/navigation'
 import { prefetchStandaloneGeneral } from '@/components/settings/prefetch-standalone-general'
 import { getSession } from '@/lib/auth'
-import { isBillingEnabled } from '@/lib/core/config/env-flags'
 import { isPlatformAdmin } from '@/lib/permissions/super-user'
 import { getQueryClient } from '@/app/_shell/providers/get-query-client'
 
@@ -51,7 +50,6 @@ export default async function AccountSettingsSectionPage({
     aliases: ACCOUNT_SETTINGS_PATH_ALIASES,
   })
   if (!parsed) notFound()
-  if (parsed === 'billing' && !isBillingEnabled) redirect(getAccountSettingsHref('general'))
   if (parsed === 'admin') {
     const isSuperUser = await isPlatformAdmin(session.user.id)
     if (!isSuperUser) notFound()

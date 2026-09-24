@@ -2,16 +2,15 @@
  * @vitest-environment jsdom
  */
 import { act, type ChangeEventHandler, type ReactNode } from 'react'
-import { resetEnvFlagsMock, setEnvFlags } from '@sim/testing'
+import { resetEnvFlagsMock } from '@sim/testing'
 import { getErrorMessage } from '@sim/utils/errors'
 import { NuqsTestingAdapter } from 'nuqs/adapters/testing'
 import { createRoot, type Root } from 'react-dom/client'
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const {
   mockUseConfigureSSO,
   mockUseDeleteSSOProvider,
-  mockUseOrganizationBilling,
   mockUseSession,
   mockUseSetPrimarySSOProvider,
   mockUseSSOProviders,
@@ -19,7 +18,6 @@ const {
   mockUseConfigureSSO: vi.fn(),
   mockUseDeleteSSOProvider: vi.fn(),
   mockUseSetPrimarySSOProvider: vi.fn(),
-  mockUseOrganizationBilling: vi.fn(),
   mockUseSession: vi.fn(),
   mockUseSSOProviders: vi.fn(),
 }))
@@ -264,10 +262,6 @@ vi.mock('@/app/workspace/[workspaceId]/settings/components/settings-resource-row
   ),
 }))
 
-vi.mock('@/hooks/queries/organization', () => ({
-  useOrganizationBilling: mockUseOrganizationBilling,
-}))
-
 import { SSO } from '@/ee/sso/components/sso-settings'
 
 function provider(organizationId: string) {
@@ -323,10 +317,6 @@ function renderSso(organizationId: string, searchParams = '') {
   })
 }
 
-beforeAll(() => {
-  setEnvFlags({ isBillingEnabled: true })
-})
-
 afterAll(resetEnvFlagsMock)
 
 beforeEach(() => {
@@ -337,13 +327,6 @@ beforeEach(() => {
   document.body.appendChild(container)
   root = createRoot(container)
   mockUseSession.mockReturnValue({ data: { user: { id: 'user-1' } } })
-  mockUseOrganizationBilling.mockReturnValue({
-    data: { data: { subscriptionPlan: 'enterprise' } },
-    error: null,
-    isFetching: false,
-    isLoading: false,
-    refetch: vi.fn(),
-  })
   mockUseConfigureSSO.mockReturnValue({
     isPending: false,
     mutateAsync: vi.fn(),
@@ -387,44 +370,8 @@ describe('SSO organization transitions', () => {
     expect(container.querySelector('input[value="client-a"]')).toBeNull()
   })
 
-  it('shows a billing failure instead of an Enterprise upsell', () => {
-    const refetch = vi.fn()
-    const refetchProviders = vi.fn()
-    mockUseSSOProviders.mockReturnValue({
-      data: { providers: [provider('org-a')] },
-      error: null,
-      isFetching: true,
-      isLoading: false,
-      refetch: refetchProviders,
-    })
-    mockUseOrganizationBilling.mockReturnValue({
-      data: undefined,
-      error: new Error('Billing entitlement failed'),
-      isFetching: false,
-      isLoading: false,
-      refetch,
-    })
-
-    renderSso('org-a')
-
-    expect(container).toHaveTextContent('Billing entitlement failed')
-    expect(container).not.toHaveTextContent('available on Enterprise plans only')
-    expect(findButton('Try again')).not.toBeDisabled()
-    act(() => findButton('Try again')?.click())
-    expect(refetch).toHaveBeenCalledOnce()
-    expect(refetchProviders).not.toHaveBeenCalled()
-  })
-
   it('retries an initial provider failure without leaving the page', () => {
     const refetch = vi.fn()
-    const refetchBilling = vi.fn()
-    mockUseOrganizationBilling.mockReturnValue({
-      data: { data: { subscriptionPlan: 'enterprise' } },
-      error: null,
-      isFetching: true,
-      isLoading: false,
-      refetch: refetchBilling,
-    })
     mockUseSSOProviders.mockReturnValue({
       data: undefined,
       error: new Error('Provider lookup failed'),
@@ -439,7 +386,6 @@ describe('SSO organization transitions', () => {
     expect(findButton('Try again')).not.toBeDisabled()
     act(() => findButton('Try again')?.click())
     expect(refetch).toHaveBeenCalledOnce()
-    expect(refetchBilling).not.toHaveBeenCalled()
   })
 })
 

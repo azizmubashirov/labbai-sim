@@ -32,7 +32,7 @@ export async function authorizeOrganizationSettingsSection({
 
   const deployment = getDeploymentShape()
   const needsEnterprisePlan =
-    deployment.hosted && section !== 'members' && section !== 'billing' && section !== 'requests'
+    deployment.hosted && section !== 'members' && section !== 'requests'
   /** Access Control follows the permission regime rather than the plan gate. */
   const readsRegime = needsEnterprisePlan && section === 'access-control'
   const [hasEnterprisePlan, governanceActive] = await Promise.all([

@@ -12,9 +12,7 @@ import {
 import { parseRequest, validationErrorResponse } from '@/lib/api/server'
 import { getSession } from '@/lib/auth'
 import { CLEANUP_CONFIG } from '@/lib/billing/cleanup-dispatcher'
-import { isOrganizationOnEnterprisePlan } from '@/lib/billing/core/subscription'
 import { getForeignWorkspaceTargetsReason } from '@/lib/billing/retention'
-import { isBillingEnabled } from '@/lib/core/config/env-flags'
 import { withRouteHandler } from '@/lib/core/utils/with-route-handler'
 
 const logger = createLogger('DataRetentionAPI')
@@ -78,7 +76,7 @@ export const GET = withRouteHandler(
       return NextResponse.json({ error: 'Organization not found' }, { status: 404 })
     }
 
-    const isEnterprise = !isBillingEnabled || (await isOrganizationOnEnterprisePlan(organizationId))
+    const isEnterprise = true
     const configured = normalizeConfigured(org.dataRetentionSettings)
     const defaults = enterpriseDefaults()
 
@@ -132,16 +130,6 @@ export const PUT = withRouteHandler(
         { error: 'Forbidden - Only organization owners and admins can update data retention' },
         { status: 403 }
       )
-    }
-
-    if (isBillingEnabled) {
-      const hasEnterprise = await isOrganizationOnEnterprisePlan(organizationId)
-      if (!hasEnterprise) {
-        return NextResponse.json(
-          { error: 'Data Retention is available on Enterprise plans only' },
-          { status: 403 }
-        )
-      }
     }
 
     const [currentOrg] = await db

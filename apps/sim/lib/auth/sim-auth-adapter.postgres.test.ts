@@ -18,9 +18,6 @@ vi.unmock('drizzle-orm')
 vi.mock('@/lib/auth/oauth-provider-adapter-guard', () => ({
   guardOAuthProviderWrites: (adapter: object) => adapter,
 }))
-vi.mock('@/lib/auth/stripe-adapter-guard', () => ({
-  guardSubscriptionPlanWrites: (adapter: object) => adapter,
-}))
 
 const OPTIONS: BetterAuthOptions = { plugins: [organization()] }
 const databaseUrl = process.env.OAUTH_TOKEN_FAMILY_TEST_DATABASE_URL

@@ -80,11 +80,7 @@ describe('user permission policy shared read', () => {
   ])(
     'matches the active permission regime ($hosted, $accessControl)',
     async ({ hosted, accessControl, entitled }) => {
-      setEnvFlags({
-        isHosted: hosted,
-        isAccessControlEnabled: accessControl,
-        isBillingEnabled: false,
-      })
+      setEnvFlags({ isHosted: hosted, isAccessControlEnabled: accessControl })
       mocks.admin.mockResolvedValue(true)
       const group = {
         permissionGroupId: 'group',

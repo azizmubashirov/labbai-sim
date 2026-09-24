@@ -32,7 +32,6 @@ import { getAutoAllowedTools } from '@/lib/copilot/persistence/tool-permission/a
 import { createStreamingContext } from '@/lib/copilot/request/context/request-context'
 import { buildToolCallSummaries } from '@/lib/copilot/request/context/result'
 import {
-  BillingLimitError,
   CopilotBackendError,
   runStreamLoop,
   StreamEndedWithoutTerminalError,
@@ -48,7 +47,6 @@ import {
   requireToolCallStateResult,
   setTerminalToolCallState,
 } from '@/lib/copilot/request/tool-call-state'
-import { handleBillingLimitResponse } from '@/lib/copilot/request/tools/billing'
 import {
   executeToolAndReport,
   forceFailHungToolCall,
@@ -1131,10 +1129,6 @@ async function runCheckpointLoop(
     } catch (streamError) {
       context.trace.endSpan(streamSpan, RequestTraceV1SpanStatus.error)
       context.trace.setActiveSpan(undefined)
-      if (streamError instanceof BillingLimitError) {
-        await handleBillingLimitResponse(streamError.userId, context, execContext, options)
-        break
-      }
       const attempt = isResume ? resumeAttempt : initialAttempt
       const retryable = isResume
         ? isRetryableStreamError(streamError)

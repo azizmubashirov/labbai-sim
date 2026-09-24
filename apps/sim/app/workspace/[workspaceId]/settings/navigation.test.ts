@@ -26,7 +26,6 @@ describe('unified settings navigation', () => {
       { id: 'access-control', label: 'Permission groups', section: 'organization' },
       { id: 'audit-logs', label: 'Audit logs', section: 'organization' },
       { id: 'forks', label: 'Workspace forks', section: 'workspace' },
-      { id: 'billing', label: 'Subscription', section: 'account' },
       { id: 'teammates', label: 'Teammates', section: 'workspace' },
       { id: 'organization', label: 'Members', section: 'organization' },
       { id: 'usage', label: 'Insights', section: 'organization' },
@@ -54,7 +53,7 @@ describe('unified settings navigation', () => {
         .sort((left, right) => left.order - right.order)
         .map(({ id }) => id)
 
-    expect(idsForSection('account')).toEqual(['general', 'billing'])
+    expect(idsForSection('account')).toEqual(['general'])
     expect(idsForSection('workspace')).toEqual([
       'teammates',
       'secrets',
@@ -105,7 +104,6 @@ describe('unified settings navigation', () => {
 
 describe('resolveSettingsSection', () => {
   const LEGACY_SEGMENTS = {
-    subscription: 'billing',
     team: 'organization',
     'api-keys': 'apikeys',
     domains: 'sso',
@@ -138,10 +136,10 @@ describe('resolveSettingsSection', () => {
   })
 
   it('carries the catalog label through as the header title', () => {
-    // `billing` is the case where id and label visibly differ, and the title feeds both the
+    // `apikeys` is a case where id and label visibly differ, and the title feeds both the
     // shell heading and the document title via generateMetadata.
-    const billing = allNavigationItems.find((item) => item.id === 'billing')
-    expect(resolveSettingsSection('subscription')?.meta.title).toBe(billing?.label)
-    expect(billing?.label).not.toBe('billing')
+    const apiKeys = allNavigationItems.find((item) => item.id === 'apikeys')
+    expect(resolveSettingsSection('apikeys')?.meta.title).toBe(apiKeys?.label)
+    expect(apiKeys?.label).not.toBe('apikeys')
   })
 })

@@ -73,7 +73,8 @@ export const ENTERPRISE_FEATURE_LEGACY_DEFAULTS: Readonly<Record<EnterpriseFeatu
   dataDrains: false,
   dataRetention: false,
   forking: false,
-  organizations: false,
+  /** Labbai: organizations (members + roles) are part of the product, not a paid tier. */
+  organizations: true,
   scim: false,
   sessionPolicies: true,
   sso: false,

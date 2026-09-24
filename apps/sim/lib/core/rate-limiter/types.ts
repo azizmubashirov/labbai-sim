@@ -1,6 +1,4 @@
-import { getPlanTypeForLimits } from '@/lib/billing/plan-helpers'
 import { env } from '@/lib/core/config/env'
-import { isBillingEnabled } from '@/lib/core/config/env-flags'
 import type { CoreTriggerType } from '@/stores/logs/filters/types'
 import type { TokenBucketConfig } from './storage'
 
@@ -101,20 +99,17 @@ function freeRateLimitOverride(type: RateLimitConfigKey): string | undefined {
 }
 
 /**
- * Billing-enabled deployments enforce per-plan limits. Billing-disabled
- * deployments are unlimited unless the operator explicitly set the free-tier
- * env var for that counter, which opts back into enforcement at that rate.
+ * Labbai has no plans: rate limits are unlimited unless the operator explicitly
+ * set the free-tier env var for that counter, which opts into enforcement at that
+ * rate for everyone.
  */
 export function getRateLimit(
-  plan: SubscriptionPlan | string | undefined,
+  _plan: SubscriptionPlan | string | undefined,
   type: RateLimitCounterType
 ): TokenBucketConfig {
   const key = toConfigKey(type)
-  if (!isBillingEnabled) {
-    const override = Number.parseInt(freeRateLimitOverride(key) || '')
-    return Number.isFinite(override) && override > 0 ? RATE_LIMITS.free[key] : UNLIMITED_RATE_LIMIT
-  }
-  return RATE_LIMITS[getPlanTypeForLimits(plan)][key]
+  const override = Number.parseInt(freeRateLimitOverride(key) || '')
+  return Number.isFinite(override) && override > 0 ? RATE_LIMITS.free[key] : UNLIMITED_RATE_LIMIT
 }
 
 export class RateLimitError extends Error {

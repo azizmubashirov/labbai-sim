@@ -15,7 +15,6 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query'
-import { useRouter } from 'next/navigation'
 import {
   extractValidationIssues,
   isApiClientError,
@@ -90,7 +89,6 @@ import {
   updateWorkflowGroupContract,
 } from '@/lib/api/contracts/tables'
 import type { V2TableImportSource, V2TableImportTarget } from '@/lib/api/contracts/v2/tables'
-import { buildUpgradeHref } from '@/lib/billing/upgrade-reasons'
 import type {
   CsvHeaderMapping,
   RowData,
@@ -753,14 +751,8 @@ export function useDeleteTable(workspaceId: string) {
  * other errors are a plain auto-dismissing toast. Validation errors are surfaced
  * inline, not here.
  */
-function notifyRowWriteError(error: Error, onUpgrade: () => void): void {
+function notifyRowWriteError(error: Error): void {
   if (isValidationError(error)) return
-  if (error.message.toLowerCase().includes('row limit')) {
-    toast.error(error.message, {
-      action: { label: 'Upgrade', onClick: onUpgrade },
-    })
-    return
-  }
   toast.error(error.message, { duration: 5000 })
 }
 
@@ -792,7 +784,6 @@ export function useCreateTableRow({
   suppressErrorToast,
 }: RowMutationContext) {
   const queryClient = useQueryClient()
-  const router = useRouter()
 
   return useMutation({
     mutationFn: async (
@@ -841,7 +832,7 @@ export function useCreateTableRow({
       if (handleTableLockRejection(error, queryClient, tableId, { silent: suppressErrorToast }))
         return
       if (suppressErrorToast) return
-      notifyRowWriteError(error, () => router.push(buildUpgradeHref(workspaceId, 'tables')))
+      notifyRowWriteError(error)
     },
     onSettled: () => {
       // `reconcileCreatedRow` (onSuccess) is the source of truth for the rows
@@ -1010,7 +1001,6 @@ type BatchCreateTableRowsResponse = ContractJsonResponse<typeof batchCreateTable
  */
 export function useBatchCreateTableRows({ workspaceId, tableId }: RowMutationContext) {
   const queryClient = useQueryClient()
-  const router = useRouter()
 
   return useMutation({
     mutationFn: async (
@@ -1027,7 +1017,7 @@ export function useBatchCreateTableRows({ workspaceId, tableId }: RowMutationCon
     },
     onError: (error) => {
       if (handleTableLockRejection(error, queryClient, tableId)) return
-      notifyRowWriteError(error, () => router.push(buildUpgradeHref(workspaceId, 'tables')))
+      notifyRowWriteError(error)
     },
     onSettled: () => {
       invalidateRowCount(queryClient, tableId)

@@ -12,36 +12,6 @@ import {
 afterEach(resetEnvFlagsMock)
 
 describe('resolveDeploymentShape', () => {
-  it('packages the resolved env flags', () => {
-    setEnvFlags({
-      isHosted: true,
-      isBillingEnabled: true,
-      isChatEnabled: false,
-      isAzureConfigured: true,
-      isSsoEnabled: true,
-    })
-
-    expect(resolveDeploymentShape()).toEqual({
-      hosted: true,
-      billingEnabled: true,
-      chatEnabled: false,
-      azureConfigured: true,
-      cohereConfigured: false,
-      features: {
-        accessControl: false,
-        auditLogs: false,
-        customBlocks: false,
-        dataDrains: false,
-        dataRetention: false,
-        scim: false,
-        sessionPolicies: true,
-        sso: true,
-        usageMonitoring: false,
-        whitelabeling: true,
-      },
-    })
-  })
-
   it('reads the flags at call time rather than at module init', () => {
     expect(resolveDeploymentShape().hosted).toBe(false)
 

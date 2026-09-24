@@ -39,7 +39,6 @@ for (const item of allNavigationItems) {
  * access gate, and `generateMetadata` all have to normalize a segment identically.
  */
 const SECTION_ALIASES: Readonly<Record<string, SettingsSection>> = {
-  subscription: 'billing',
   team: 'organization',
   'api-keys': 'apikeys',
   /** Verified domains moved into the SSO page. */

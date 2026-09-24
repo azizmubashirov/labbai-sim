@@ -2,8 +2,8 @@
  * @vitest-environment node
  */
 import { organization } from '@sim/db/schema'
-import { queueTableRows, resetDbChainMock, resetEnvFlagsMock, setEnvFlags } from '@sim/testing'
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { queueTableRows, resetDbChainMock, resetEnvFlagsMock } from '@sim/testing'
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { mockIsEntitled, mockHasProvider } = vi.hoisted(() => ({
   mockIsEntitled: vi.fn(),
@@ -27,10 +27,6 @@ import {
 } from '@/lib/auth/sso-policy'
 
 const ORG_ID = 'org-1'
-
-beforeAll(() => {
-  setEnvFlags({ isBillingEnabled: true })
-})
 
 afterAll(resetEnvFlagsMock)
 

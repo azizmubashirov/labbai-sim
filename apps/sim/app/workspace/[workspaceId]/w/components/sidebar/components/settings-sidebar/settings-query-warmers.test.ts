@@ -16,7 +16,7 @@ import { warmSettingsSectionQuery } from '@/app/workspace/[workspaceId]/w/compon
 import { workspaceCredentialListQueryOptions } from '@/hooks/queries/utils/fetch-workspace-credentials'
 
 let queryClient: QueryClient
-const personalContext = { workspaceId: 'workspace-1', billingOrganizationId: null }
+const personalContext = { workspaceId: 'workspace-1' }
 
 describe('settings query warmers', () => {
   beforeEach(() => {
@@ -26,12 +26,6 @@ describe('settings query warmers', () => {
     mockRequestJson.mockImplementation((contract: { path: string }) => {
       if (contract.path === '/api/credentials') {
         return Promise.resolve({ credentials: [] })
-      }
-      if (
-        contract.path === '/api/billing' ||
-        contract.path === '/api/organizations/[id]/billing-summary'
-      ) {
-        return Promise.resolve({})
       }
       throw new Error(`Unexpected settings warmer contract: ${contract.path}`)
     })
@@ -63,28 +57,6 @@ describe('settings query warmers', () => {
     expect(warmSettingsSectionQuery(queryClient, personalContext, 'custom-tools')).toBe(false)
 
     expect(mockRequestJson).not.toHaveBeenCalled()
-  })
-
-  it('warms only the exact payer summary needed by Billing', async () => {
-    expect(warmSettingsSectionQuery(queryClient, personalContext, 'billing')).toBe(true)
-    await vi.waitFor(() => expect(mockRequestJson).toHaveBeenCalledTimes(1))
-    expect(mockRequestJson.mock.calls[0][0].path).toBe('/api/billing')
-
-    queryClient.clear()
-    mockRequestJson.mockClear()
-
-    expect(
-      warmSettingsSectionQuery(
-        queryClient,
-        { workspaceId: 'workspace-1', billingOrganizationId: 'org-1' },
-        'billing'
-      )
-    ).toBe(true)
-    await vi.waitFor(() => expect(mockRequestJson).toHaveBeenCalledTimes(1))
-    expect(mockRequestJson.mock.calls[0][0].path).toBe('/api/organizations/[id]/billing-summary')
-    expect(mockRequestJson.mock.calls[0][1]).toEqual(
-      expect.objectContaining({ params: { id: 'org-1' } })
-    )
   })
 
   it('keeps the Secrets warmer and consumer on mount-recoverable shared options', () => {

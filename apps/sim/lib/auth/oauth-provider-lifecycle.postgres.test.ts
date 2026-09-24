@@ -14,7 +14,6 @@ vi.mock('@sim/audit', () => auditMock)
 vi.mock('@/lib/core/config/env-flags', () => ({
   ...envFlagsMock,
   isHosted: true,
-  isBillingEnabled: true,
 }))
 
 const databaseUrl = process.env.OAUTH_TOKEN_FAMILY_TEST_DATABASE_URL

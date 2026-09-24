@@ -15,7 +15,6 @@ import { SettingsSectionProvider } from '@/components/settings/settings-panel'
 import { SettingsSidebar } from '@/components/settings/settings-sidebar'
 import { useSettingsBeforeUnload } from '@/components/settings/use-settings-before-unload'
 import type { DeploymentShape } from '@/lib/api/contracts/workspaces'
-import { useDeploymentShape } from '@/lib/core/config/deployment-shape'
 import { useSeedDeploymentShape } from '@/hooks/use-seed-deployment-shape'
 import { SIDEBAR_WIDTH } from '@/stores/constants'
 
@@ -32,11 +31,9 @@ export function StandaloneSettingsShell(props: StandaloneSettingsShellProps) {
   useSeedDeploymentShape(props.deployment)
   useSettingsBeforeUnload()
   const pathname = usePathname()
-  const { billingEnabled } = useDeploymentShape()
   const isSuperUser = props.isSuperUser ?? false
 
   const accountItems = ACCOUNT_SETTINGS_ITEMS.filter((item) => {
-    if (item.id === 'billing' && !billingEnabled) return false
     if (item.id === 'admin' && !isSuperUser) return false
     return true
   })

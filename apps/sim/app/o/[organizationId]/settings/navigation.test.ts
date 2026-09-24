@@ -16,7 +16,6 @@ import {
 } from '@/app/o/[organizationId]/settings/navigation'
 
 const enterprise: OrganizationSettingsFeatures = {
-  billingEnabled: true,
   hasEnterprisePlan: true,
   governanceActive: true,
   hosted: true,
@@ -43,14 +42,14 @@ describe('organization settings navigation', () => {
     ).toBe('Sources')
   })
 
-  it('keeps members and billing reachable without an enterprise plan', () => {
+  it('keeps members reachable without an enterprise plan', () => {
     expect(
       organizationSettingsNavigation(
         true,
         { ...enterprise, hasEnterprisePlan: false, governanceActive: false },
         available
       ).map(({ id }) => id)
-    ).toEqual(['billing', 'members', 'recently-deleted', 'requests', 'search-mcp'])
+    ).toEqual(['members', 'recently-deleted', 'requests', 'search-mcp'])
   })
 
   /**
@@ -66,7 +65,6 @@ describe('organization settings navigation', () => {
         available
       ).map(({ id }) => id)
     ).toEqual([
-      'billing',
       'members',
       'recently-deleted',
       'requests',
@@ -75,14 +73,13 @@ describe('organization settings navigation', () => {
     ])
   })
 
-  it('honors individual self-hosted feature flags and hides billing when disabled', () => {
+  it('honors individual self-hosted feature flags', () => {
     expect(
       organizationSettingsNavigation(
         true,
         {
           ...enterprise,
           hosted: false,
-          billingEnabled: false,
           selfHosted: { sso: true },
         },
         available
@@ -102,7 +99,6 @@ describe('organization settings navigation', () => {
     expect(resolveOrganizationSettingsSection('/o/one/settings/organization?query=person')).toBe(
       'members'
     )
-    expect(resolveOrganizationSettingsSection('subscription')).toBe('billing')
     expect(resolveOrganizationSettingsSection('domains')).toBe('sso')
     expect(resolveOrganizationSettingsSection('sessions')).toBe('security')
     expect(resolveOrganizationSettingsSection('/o/one/settings/network')).toBeNull()
@@ -116,7 +112,6 @@ describe('organization settings navigation', () => {
 
   it('groups the sections as account, organization, governance, and Sim Search, in order', () => {
     expect(ORGANIZATION_SETTINGS_ITEMS.map(({ id, group }) => `${group}:${id}`)).toEqual([
-      'account:billing',
       'organization:members',
       'organization:connected-accounts',
       'organization:usage',
@@ -147,16 +142,13 @@ describe('organization settings navigation', () => {
     ])
   })
 
-  it('resolves a surface path to the plane that owns it, the organization winning billing', () => {
+  it('resolves a surface path to the plane that owns it', () => {
     expect(resolveOrganizationSurfaceSection('/o/one/settings/general')).toEqual({
       plane: 'account',
       section: 'general',
     })
     expect(resolveOrganizationSurfaceSection('api-keys')).toBeNull()
-    expect(resolveOrganizationSurfaceSection('billing')).toEqual({
-      plane: 'organization',
-      section: 'billing',
-    })
+    expect(resolveOrganizationSurfaceSection('billing')).toBeNull()
     expect(resolveOrganizationSurfaceSection('skills')).toBeNull()
     expect(resolveOrganizationSurfaceSection('recently-deleted')).toEqual({
       plane: 'organization',

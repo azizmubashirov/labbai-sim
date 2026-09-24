@@ -59,7 +59,6 @@ const ENTERPRISE_GATED_SECTION_LABELS: Record<OrganizationSettingsSection, strin
   'search-mcp': null,
   'connected-accounts': 'organization connected accounts',
   members: null,
-  billing: null,
   usage: 'organization usage monitoring',
   'access-control': 'permission groups',
   requests: null,

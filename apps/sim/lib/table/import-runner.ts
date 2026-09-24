@@ -19,7 +19,7 @@ import {
   type TableSchema,
   validateMapping,
 } from '@/lib/table'
-import { assertRowCapacity, notifyTableRowUsage } from '@/lib/table/billing'
+import { assertRowCapacity } from '@/lib/table/billing'
 import { withGeneratedColumnIds } from '@/lib/table/column-keys'
 import { sniffCsvDelimiterFromStream } from '@/lib/table/csv-delimiter-stream'
 import { appendTableEvent } from '@/lib/table/events'
@@ -324,12 +324,6 @@ export async function runTableImport(payload: TableImportPayload): Promise<void>
         requestId,
         revalidateInsert
       )
-      notifyTableRowUsage({
-        workspaceId,
-        currentRowCount: existingRowCount + inserted,
-        addedRows: result.inserted,
-        limit: rowLimit,
-      })
       inserted += result.inserted
       lastOrderKey = result.lastOrderKey
       cellsRejected += batchCellsRejected

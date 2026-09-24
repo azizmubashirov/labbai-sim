@@ -11,10 +11,8 @@ import {
   loggerMock,
   loggingSessionMock,
   loggingSessionMockFns,
-  redisConfigMockFns,
   resetEnvFlagsMock,
   resetEnvironmentUtilsMock,
-  setEnvFlags,
 } from '@sim/testing'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -741,48 +739,6 @@ describe('executeWebhookJob fault vs error handling', () => {
     expect(mockExecuteWorkflowCore).not.toHaveBeenCalled()
     // No terminal failure row for an attempt that will be retried.
     expect(loggingSessionMockFns.mockSafeCompleteWithError).not.toHaveBeenCalled()
-  })
-
-  it('recovers from the uncoded Redis command timeout without running the first attempt', async () => {
-    setEnvFlags({ isHosted: true, isBillingEnabled: true })
-    const timeoutError = new Error('Command timed out')
-    const redisGet = vi.fn().mockRejectedValueOnce(timeoutError)
-    redisConfigMockFns.mockGetRedisClient.mockReturnValue({ get: redisGet })
-    mockRefreshExecutionSlotExpiry.mockImplementationOnce(actualRefreshExecutionSlotExpiry)
-
-    const result = await executeWebhookJob(payload)
-
-    expect(redisGet).toHaveBeenCalledWith('usage:reservation:execution-1')
-    expect(result).toMatchObject({ success: false, requeued: true })
-    expect(mockExecuteWithIdempotency).not.toHaveBeenCalled()
-    expect(mockExecuteWorkflowCore).not.toHaveBeenCalled()
-    expect(loggingSessionMockFns.mockSafeCompleteWithError).not.toHaveBeenCalled()
-    expect(mockReleaseExecutionSlot).toHaveBeenCalledExactlyOnceWith('execution-1')
-    expect(mockEnqueue).toHaveBeenCalledTimes(1)
-    expect(mockReleaseExecutionSlot.mock.invocationCallOrder[0]).toBeLessThan(
-      mockEnqueue.mock.invocationCallOrder[0]
-    )
-    const [jobType, retryPayload, options] = mockEnqueue.mock.calls[0]
-    expect(jobType).toBe('webhook-execution')
-    expect(retryPayload).toMatchObject({ ...payload, infraRetryCount: 1 })
-    expect(options.delayMs).toBeGreaterThan(0)
-    expect(options.delayMs).toBeLessThanOrEqual(300_000)
-
-    mockRefreshExecutionSlotExpiry.mockResolvedValueOnce(false)
-    mockExecuteWorkflowCore.mockResolvedValueOnce({
-      success: true,
-      status: 'completed',
-      output: {},
-      logs: [],
-    })
-
-    await expect(executeWebhookJob(retryPayload)).resolves.toMatchObject({ success: true })
-
-    expect(executionPreprocessingMockFns.mockPreprocessExecution).toHaveBeenCalledWith(
-      expect.objectContaining({ executionId: 'execution-1', skipUsageLimits: false })
-    )
-    expect(mockExecuteWorkflowCore).toHaveBeenCalledTimes(1)
-    expect(mockEnqueue).toHaveBeenCalledTimes(1)
   })
 
   it('records a terminal refresh failure when the retry budget is exhausted', async () => {

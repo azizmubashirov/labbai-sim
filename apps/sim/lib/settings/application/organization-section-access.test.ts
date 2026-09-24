@@ -30,7 +30,7 @@ import { authorizeOrganizationSettingsSection } from '@/lib/settings/application
 describe('organization settings authorization', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    setEnvFlags({ isHosted: true, isBillingEnabled: true })
+    setEnvFlags({ isHosted: true })
     mocks.canOpen.mockResolvedValue(true)
     mocks.enterprise.mockResolvedValue(true)
     mocks.governance.mockResolvedValue(true)

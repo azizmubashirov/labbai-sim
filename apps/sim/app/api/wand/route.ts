@@ -15,9 +15,8 @@ import {
   toBillingContext,
 } from '@/lib/billing/core/billing-attribution'
 import { recordUsage } from '@/lib/billing/core/usage-log'
-import { checkAndBillPayerOverageThreshold } from '@/lib/billing/threshold-billing'
 import { env } from '@/lib/core/config/env'
-import { getCostMultiplier, isBillingEnabled } from '@/lib/core/config/env-flags'
+import { getCostMultiplier } from '@/lib/core/config/env-flags'
 import { generateRequestId } from '@/lib/core/utils/request'
 import { withRouteHandler } from '@/lib/core/utils/with-route-handler'
 import { enrichTableSchema } from '@/lib/table/llm/wand'
@@ -94,10 +93,6 @@ async function updateUserStatsForWand(
   requestId: string,
   isBYOK = false
 ): Promise<void> {
-  if (!isBillingEnabled) {
-    return
-  }
-
   if (!usage.total_tokens || usage.total_tokens <= 0) {
     return
   }
@@ -140,8 +135,6 @@ async function updateUserStatsForWand(
         },
       ],
     })
-
-    await checkAndBillPayerOverageThreshold(billingAttribution.billingEntity)
   } catch (error) {
     logger.error(`[${requestId}] Failed to update user stats for wand usage`, error)
   }

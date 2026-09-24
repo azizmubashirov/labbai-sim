@@ -36,7 +36,6 @@ import {
 import {
   decrementStorageUsageForBillingContextInTx,
   incrementStorageUsageForBillingContextInTx,
-  maybeNotifyStorageLimitForBillingContext,
   resolveStorageBillingContext,
 } from '@/lib/billing/storage'
 import {
@@ -542,8 +541,6 @@ export async function uploadWorkspaceFile(
         throw finalizationError
       }
 
-      void maybeNotifyStorageLimitForBillingContext(storageBillingContext, finalized.updatedUsage)
-
       logger.info(
         `Successfully uploaded workspace file: ${uniqueName} with key: ${uploadResult.key}`
       )
@@ -819,10 +816,6 @@ export async function registerUploadedWorkspaceFile(params: {
         `Unique name conflict on register (attempt ${attempt + 1}/${MAX_UPLOAD_UNIQUE_RETRIES}), retrying with a new name`
       )
       continue
-    }
-
-    if (finalized.kind === 'created') {
-      void maybeNotifyStorageLimitForBillingContext(storageBillingContext, finalized.updatedUsage)
     }
 
     await commitPageRestoreRewrite()
@@ -2050,13 +2043,6 @@ export async function updateWorkspaceFileContent(
       throw finalizationError
     }
 
-    if (finalized.sizeDiff !== 0) {
-      void maybeNotifyStorageLimitForBillingContext(
-        storageBillingContext,
-        finalized.updatedUsage,
-        finalized.sizeDiff < 0
-      )
-    }
     await processWorkspaceFileStorageCleanupsNow(finalized.storageCleanupEventIds, {
       workspaceId,
       fileId,

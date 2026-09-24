@@ -1,12 +1,11 @@
 /**
  * @vitest-environment node
  */
-import { resetEnvFlagsMock, setEnvFlags } from '@sim/testing'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 /**
  * Free-tier timeouts are baked into EXECUTION_TIMEOUTS at module load, while
- * the billing-disabled opt-in check reads the env at call time. Seeding here
+ * the opt-in check reads the env at call time. Seeding here
  * mirrors production, where both reads observe the same process env.
  */
 const { mockEnv } = vi.hoisted(() => ({
@@ -44,31 +43,17 @@ import {
   toTriggerMaxDurationSeconds,
 } from '@/lib/core/execution-limits/types?execution-limits-test'
 
-afterAll(resetEnvFlagsMock)
-
 describe('getExecutionTimeout', () => {
   beforeEach(() => {
-    setEnvFlags({ isBillingEnabled: true })
     mockEnv.EXECUTION_TIMEOUT_FREE = '120'
     mockEnv.EXECUTION_TIMEOUT_ASYNC_FREE = '240'
   })
 
-  it('applies per-tier timeouts when billing is enabled', () => {
-    expect(getExecutionTimeout('pro_6000', 'sync')).toBe(3000 * 1000)
-    expect(getExecutionTimeout('team_25000', 'sync')).toBe(3000 * 1000)
-    expect(getExecutionTimeout('free', 'sync')).toBe(120 * 1000)
-  })
+  it('caps async request overrides at the policy timeout', () => {
+    const policyTimeoutMs = 86_400_000
 
-  it('uses Enterprise metadata for async workflows and caps request overrides', () => {
-    const policyTimeoutMs = getExecutionTimeout('enterprise', 'async', 86_400)
-
-    expect(policyTimeoutMs).toBe(86_400_000)
     expect(resolveAsyncExecutionTimeout(policyTimeoutMs, 3_600)).toBe(3_600_000)
     expect(resolveAsyncExecutionTimeout(policyTimeoutMs, 172_800)).toBe(86_400_000)
-  })
-
-  it('falls back to 90 minutes when the Enterprise env default exceeds seven days', () => {
-    expect(getExecutionTimeout('enterprise', 'async')).toBe(5_400_000)
   })
 
   it('uses a seven-day hosted ceiling and adds five minutes of Trigger cleanup grace', () => {
@@ -77,8 +62,7 @@ describe('getExecutionTimeout', () => {
     expect(toTriggerMaxDurationSeconds(604_800_000)).toBe(605_100)
   })
 
-  it('disables timeouts when billing is disabled and no free env is set', () => {
-    setEnvFlags({ isBillingEnabled: false })
+  it('disables timeouts when no free env is set', () => {
     mockEnv.EXECUTION_TIMEOUT_FREE = undefined
     mockEnv.EXECUTION_TIMEOUT_ASYNC_FREE = undefined
 
@@ -86,9 +70,7 @@ describe('getExecutionTimeout', () => {
     expect(getExecutionTimeout('free', 'async')).toBe(0)
   })
 
-  it('opts back into the free timeout when the env var is explicitly set', () => {
-    setEnvFlags({ isBillingEnabled: false })
-
+  it('opts into the free timeout when the env var is explicitly set', () => {
     expect(getExecutionTimeout('free', 'sync')).toBe(120 * 1000)
     expect(getExecutionTimeout('free', 'async')).toBe(240 * 1000)
   })

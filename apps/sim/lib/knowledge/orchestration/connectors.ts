@@ -20,7 +20,6 @@ import {
 } from '@/lib/billing/core/subscription'
 import {
   incrementStorageUsageForBillingContextInTx,
-  maybeNotifyStorageLimitForBillingContext,
   resolveStorageBillingContext,
   type StorageBillingContext,
 } from '@/lib/billing/storage'
@@ -1328,13 +1327,6 @@ export async function performDeleteKnowledgeConnector(
       return fail('Connection is busy. Try removing it again in a moment.', 'conflict')
     }
     return classifyKnowledgeFailure(error, requestId, `Delete connector ${connectorId}`)
-  }
-
-  if (storageNotification) {
-    await maybeNotifyStorageLimitForBillingContext(
-      storageNotification.context,
-      storageNotification.updatedUsage
-    )
   }
 
   /** The detach worker revokes durably once released; revoking now closes access immediately. */

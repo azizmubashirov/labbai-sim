@@ -52,7 +52,6 @@ import { useFileAttachments } from '@/app/workspace/[workspaceId]/w/[workflowId]
 import type { AttachedFile } from '@/app/workspace/[workspaceId]/w/[workflowId]/components/panel/components/copilot/components/user-input/hooks/use-file-attachments'
 import { mentionifyIntegrations } from '@/blocks/integration-matcher'
 import { useChatInputFocus } from '@/hooks/use-chat-input-focus'
-import { useSettingsNavigation } from '@/hooks/use-settings-navigation'
 import { useVoiceInput } from '@/hooks/use-voice-input'
 import { SessionMemoryInspector } from '@/local-copilot/components/session-memory-inspector'
 import {
@@ -169,7 +168,6 @@ const UserInputImpl = forwardRef<UserInputHandle, UserInputProps>(function UserI
   ref
 ) {
   const { workspaceId } = useParams<{ workspaceId: string }>()
-  const { navigateToSettings } = useSettingsNavigation()
   const {
     chatId,
     userId,
@@ -384,20 +382,8 @@ const UserInputImpl = forwardRef<UserInputHandle, UserInputProps>(function UserI
     if (defaultValue) editorRef.current.setValue(defaultValue)
   }, [defaultValue])
 
-  function handleUsageLimitExceeded(message?: string, isMemberLimit?: boolean) {
-    // A per-member cap can only be raised by an org admin, so don't offer Upgrade
-    // (the member can't act on it) — the message already tells them to ask an admin.
-    toast.error(
-      message || 'You are out of credits.',
-      isMemberLimit
-        ? undefined
-        : {
-            action: {
-              label: 'Upgrade',
-              onClick: () => navigateToSettings({ section: 'billing' }),
-            },
-          }
-    )
+  function handleUsageLimitExceeded(message?: string) {
+    toast.error(message || 'Usage limit reached.')
   }
 
   const {

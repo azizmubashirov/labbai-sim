@@ -34,7 +34,7 @@ import { generateRestoreName } from '@/lib/core/utils/restore-name'
 import type { DbOrTx } from '@/lib/db/types'
 import { resolveRestoredFolderId } from '@/lib/folders/queries'
 import { notifyWorkspaceTablesChanged } from '@/lib/realtime/notify'
-import { assertRowCapacity, notifyTableRowUsage } from '@/lib/table/billing'
+import { assertRowCapacity } from '@/lib/table/billing'
 import { generateColumnId, getColumnId, withGeneratedColumnIds } from '@/lib/table/column-keys'
 import {
   COLUMN_TYPES,
@@ -721,15 +721,6 @@ export async function createTable(
       throw new TableConflictError(data.name)
     }
     throw error
-  }
-
-  if (initialRowCount > 0 && rowLimit !== undefined) {
-    notifyTableRowUsage({
-      workspaceId: data.workspaceId,
-      currentRowCount: 0,
-      addedRows: initialRowCount,
-      limit: rowLimit,
-    })
   }
 
   logger.info(`[${requestId}] Created table ${tableId} in workspace ${data.workspaceId}`)

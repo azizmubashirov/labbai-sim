@@ -25,8 +25,6 @@ vi.mock('@/lib/billing/core/subscription', () => ({
   isOrganizationOnEnterprisePlan: mockIsEnterprise,
 }))
 
-vi.mock('@/lib/core/config/env-flags', () => ({ isBillingEnabled: true }))
-
 vi.mock('@sim/audit', () => ({
   recordAudit: mockRecordAudit,
   AuditAction: { ORGANIZATION_DOMAIN_REMOVED: 'organization.domain.removed' },
@@ -57,14 +55,6 @@ describe('remove org domain route', () => {
     queueTableRows(member, [{ role: 'member' }])
     const res = await DELETE(createMockRequest('DELETE'), routeContext)
     expect(res.status).toBe(403)
-  })
-
-  it('403s for non-Enterprise orgs', async () => {
-    queueTableRows(member, [{ role: 'owner' }])
-    mockIsEnterprise.mockResolvedValue(false)
-    const res = await DELETE(createMockRequest('DELETE'), routeContext)
-    expect(res.status).toBe(403)
-    expect(mockRecordAudit).not.toHaveBeenCalled()
   })
 
   it('404s when the domain does not exist', async () => {

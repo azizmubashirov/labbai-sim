@@ -3,12 +3,6 @@ import { member, workspace } from '@sim/db/schema'
 import { generateId, isValidUuid } from '@sim/utils/id'
 import { isRecordLike } from '@sim/utils/object'
 import { and, eq } from 'drizzle-orm'
-import {
-  checkBillingBlocked,
-  checkBillingEntityBlocked,
-  checkOrganizationMemberUsageLimit,
-  checkUsageStatus,
-} from '@/lib/billing/calculations/usage-monitor'
 import { parseBillingConcurrencyLimit } from '@/lib/billing/concurrency-defaults'
 import { getOrganizationSubscription } from '@/lib/billing/core/billing'
 import { defaultBillingPeriod } from '@/lib/billing/core/billing-period'
@@ -31,7 +25,6 @@ import {
   COPILOT_BILLING_PROTOCOL_HEADER,
   type CopilotBillingProtocol,
 } from '@/lib/copilot/generated/billing-protocol-v1'
-import { isBillingEnabled, isHosted } from '@/lib/core/config/env-flags'
 import { type ResourceOwner, resourceScopeFromOwner } from '@/lib/core/resource-scope'
 
 export {
@@ -130,6 +123,12 @@ export interface AttributedBillingBlockResult {
 type ResolvedPayerSubscription =
   | Awaited<ReturnType<typeof getOrganizationSubscription>>
   | Awaited<ReturnType<typeof getHighestPriorityPersonalSubscription>>
+
+/**
+ * Labbai has no payments, so a payer never carries a subscription: every payer
+ * resolves to the same permissive, plan-less attribution.
+ */
+const NO_PAYER_SUBSCRIPTION: ResolvedPayerSubscription = null
 
 function serializeSubscription(
   subscription: NonNullable<ResolvedPayerSubscription> | null
@@ -670,21 +669,10 @@ export async function resolveWorkspaceBillingPayer(
   }
 
   const { billedAccountUserId, organizationId } = workspacePayer
-  const payerSubscription = organizationId
-    ? await getOrganizationSubscription(organizationId, { onError: 'throw' })
-    : await getHighestPriorityPersonalSubscription(billedAccountUserId, { onError: 'throw' })
-
-  const expectedReferenceId = organizationId ?? billedAccountUserId
-  if (payerSubscription && payerSubscription.referenceId !== expectedReferenceId) {
-    throw new Error(
-      `Resolved subscription ${payerSubscription.id} does not belong to workspace payer ${expectedReferenceId}`
-    )
-  }
-
   return {
     billedAccountUserId,
     organizationId,
-    payerSubscription,
+    payerSubscription: NO_PAYER_SUBSCRIPTION,
   }
 }
 
@@ -728,9 +716,17 @@ export async function resolveBillingAttribution({
   actorUserId,
   workspaceId,
 }: ResolveBillingAttributionParams): Promise<BillingAttributionSnapshot> {
-  const payer = await resolveWorkspaceBillingPayer(workspaceId)
-  if (!payer) {
-    throw new Error(`Unable to resolve billing payer for workspace ${workspaceId}`)
+  /**
+   * A workspace without a billed account (or a row the caller cannot see yet)
+   * falls back to the actor as the payer: Labbai has no payments, so the payer
+   * only decides whose ledger the usage is recorded against.
+   */
+  const payer = (await resolveWorkspaceBillingPayer(workspaceId, {
+    onMissing: 'return-null',
+  })) ?? {
+    billedAccountUserId: actorUserId,
+    organizationId: null,
+    payerSubscription: NO_PAYER_SUBSCRIPTION,
   }
 
   return buildBillingAttributionSnapshot({
@@ -742,19 +738,17 @@ export async function resolveBillingAttribution({
 
 /** The organization payer is independent of the person making the request. */
 export async function resolveOrganizationBillingPayer(organizationId: string) {
-  /** The owner and the subscription are independent reads; neither waits on the other. */
-  const [[owner], payerSubscription] = await Promise.all([
-    db
-      .select({ userId: member.userId })
-      .from(member)
-      .where(and(eq(member.organizationId, organizationId), eq(member.role, 'owner')))
-      .limit(1),
-    getOrganizationSubscription(organizationId, { onError: 'throw' }),
-  ])
+  const [owner] = await db
+    .select({ userId: member.userId })
+    .from(member)
+    .where(and(eq(member.organizationId, organizationId), eq(member.role, 'owner')))
+    .limit(1)
   if (!owner) throw new Error('Organization billing owner is unavailable')
-  if (payerSubscription && payerSubscription.referenceId !== organizationId)
-    throw new Error('Organization subscription belongs to a different payer')
-  return { organizationId, billedAccountUserId: owner.userId, payerSubscription }
+  return {
+    organizationId,
+    billedAccountUserId: owner.userId,
+    payerSubscription: NO_PAYER_SUBSCRIPTION,
+  }
 }
 
 /** Captures the routed organization's payer without consulting the actor's personal plan. */
@@ -864,126 +858,23 @@ export function toBillingContext(attribution: BillingAttributionSnapshot): Billi
 }
 
 /**
- * Applies hosted freeze checks only to the actor's own user account and the
- * exact immutable workspace payer. Metered usage caps are intentionally absent
- * so BYOK and other exempt paths can still enforce account standing.
+ * Billing-block gate for an attributed call. Labbai has no payments, so no
+ * account or payer is ever billing-blocked.
  */
 export async function checkAttributedBillingBlocks(
   attribution: BillingAttributionSnapshot
 ): Promise<AttributedBillingBlockResult> {
-  const validatedAttribution = assertBillingAttributionSnapshot(attribution)
-  if (!isHosted || !isBillingEnabled) {
-    return { blocked: false }
-  }
-
-  const actorBlock = await checkBillingBlocked(validatedAttribution.actorUserId)
-  if (actorBlock.blocked) {
-    return {
-      blocked: true,
-      message: actorBlock.message,
-      scope: 'actor',
-    }
-  }
-
-  const payerBlock =
-    validatedAttribution.billingEntity.type === 'user' &&
-    validatedAttribution.billingEntity.id === validatedAttribution.actorUserId
-      ? actorBlock
-      : await checkBillingEntityBlocked(validatedAttribution.billingEntity)
-  if (payerBlock.blocked) {
-    return {
-      blocked: true,
-      message: payerBlock.message,
-      scope: 'payer',
-    }
-  }
-
+  assertBillingAttributionSnapshot(attribution)
   return { blocked: false }
 }
 
 /**
- * Applies hosted billing gates in canonical order: actor account, workspace
- * payer pool, then `(organizationId, actorUserId)` member cap.
+ * Usage-limit gate for an attributed call. Labbai has no usage limits, so the
+ * call is never over its limit. Usage is still recorded to the cost ledger.
  */
 export async function checkAttributedUsageLimits(
   attribution: BillingAttributionSnapshot
 ): Promise<AttributedUsageLimitsResult> {
-  const validatedAttribution = assertBillingAttributionSnapshot(attribution)
-  if (!isHosted || !isBillingEnabled) {
-    return { isExceeded: false }
-  }
-
-  const billingBlock = await checkAttributedBillingBlocks(validatedAttribution)
-  if (billingBlock.blocked) {
-    return {
-      isExceeded: true,
-      message: billingBlock.message,
-      scope: billingBlock.scope,
-    }
-  }
-
-  const payerUsage = await checkUsageStatus(
-    validatedAttribution.billedAccountUserId,
-    toUsageLimitSubscription(validatedAttribution)
-  )
-  const payerSnapshot = {
-    currentUsage: payerUsage.currentUsage,
-    limit: payerUsage.limit,
-  }
-
-  if (payerUsage.isExceeded) {
-    const formattedUsage = payerUsage.currentUsage.toFixed(2)
-    const formattedLimit = payerUsage.limit.toFixed(2)
-    const message =
-      validatedAttribution.billingEntity.type === 'organization'
-        ? `Organization usage limit exceeded: $${formattedUsage} pooled of $${formattedLimit} organization limit. Ask a team admin to raise the organization usage limit to continue.`
-        : `Usage limit exceeded: $${formattedUsage} used of $${formattedLimit} limit. Please upgrade your plan or raise your usage limit to continue.`
-
-    return {
-      isExceeded: true,
-      message,
-      scope: 'payer',
-      payerUsage: payerSnapshot,
-    }
-  }
-
-  if (validatedAttribution.organizationId) {
-    const memberUsage = await checkOrganizationMemberUsageLimit(
-      validatedAttribution.actorUserId,
-      validatedAttribution.organizationId,
-      {
-        start: new Date(validatedAttribution.billingPeriod.start),
-        end: new Date(validatedAttribution.billingPeriod.end),
-        ...(validatedAttribution.billingPeriod.source
-          ? { source: validatedAttribution.billingPeriod.source }
-          : {}),
-      }
-    )
-    if (memberUsage.isExceeded) {
-      return {
-        isExceeded: true,
-        message: memberUsage.message,
-        scope: 'member',
-        payerUsage: payerSnapshot,
-        memberUsage: {
-          currentUsage: memberUsage.currentUsage,
-          limit: memberUsage.limit,
-        },
-      }
-    }
-
-    return {
-      isExceeded: false,
-      payerUsage: payerSnapshot,
-      memberUsage: {
-        currentUsage: memberUsage.currentUsage,
-        limit: memberUsage.limit,
-      },
-    }
-  }
-
-  return {
-    isExceeded: false,
-    payerUsage: payerSnapshot,
-  }
+  assertBillingAttributionSnapshot(attribution)
+  return { isExceeded: false }
 }

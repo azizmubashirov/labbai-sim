@@ -5,7 +5,6 @@ import dynamic from 'next/dynamic'
 import { usePostHog } from 'posthog-js/react'
 import { getSettingsPermissionConfigKey } from '@/components/settings/navigation'
 import { useSession } from '@/lib/auth/auth-client'
-import { useDeploymentShape } from '@/lib/core/config/deployment-shape'
 import { captureEvent } from '@/lib/posthog/client'
 import { useWorkspaceHostContext } from '@/app/workspace/[workspaceId]/providers/workspace-host-provider'
 import { General } from '@/app/workspace/[workspaceId]/settings/components/general/general'
@@ -45,9 +44,6 @@ const RecentlyDeleted = dynamic(() =>
   import(
     '@/app/workspace/[workspaceId]/settings/components/recently-deleted/recently-deleted'
   ).then((m) => m.RecentlyDeleted)
-)
-const Billing = dynamic(() =>
-  import('@/app/workspace/[workspaceId]/settings/components/billing/billing').then((m) => m.Billing)
 )
 const Teammates = dynamic(() =>
   import('@/app/workspace/[workspaceId]/settings/components/teammates/teammates').then(
@@ -116,18 +112,11 @@ export function SettingsPage(props: SettingsPageProps) {
 function SettingsPageContent({ section }: SettingsPageProps) {
   const { data: session, isPending: sessionLoading } = useSession()
   const hostContext = useWorkspaceHostContext()
-  const { billingEnabled } = useDeploymentShape()
   const posthog = usePostHog()
 
   const isAdminRole = session?.user?.role === 'admin'
-  const normalizedSection: SettingsSection =
-    (section as string) === 'subscription' ? 'billing' : section
-  const effectiveSection =
-    !billingEnabled && normalizedSection === 'billing'
-      ? 'general'
-      : normalizedSection === 'admin' && !sessionLoading && !isAdminRole
-        ? 'general'
-        : normalizedSection
+  const effectiveSection: SettingsSection =
+    section === 'admin' && !sessionLoading && !isAdminRole ? 'general' : section
   const organizationId = hostContext.hostOrganizationId
   const meta = getSettingsSectionMeta(effectiveSection)
 
@@ -173,19 +162,9 @@ function SettingsPageContent({ section }: SettingsPageProps) {
         />
       )}
       {effectiveSection === 'apikeys' && <ApiKeys scope='combined' />}
-      {billingEnabled && effectiveSection === 'billing' && (
-        <Billing
-          scope={organizationId ? 'organization' : 'account'}
-          organizationId={organizationId ?? undefined}
-          creditUsageHref={`/workspace/${hostContext.workspace.id}/settings/billing/credit-usage`}
-        />
-      )}
       {effectiveSection === 'teammates' && <Teammates />}
       {effectiveSection === 'organization' && organizationId && (
-        <TeamManagement
-          organizationId={organizationId}
-          billingHref={`/workspace/${hostContext.workspace.id}/settings/billing`}
-        />
+        <TeamManagement organizationId={organizationId} />
       )}
       {effectiveSection === 'sso' && organizationId && <SSO organizationId={organizationId} />}
       {effectiveSection === 'data-retention' && organizationId && (

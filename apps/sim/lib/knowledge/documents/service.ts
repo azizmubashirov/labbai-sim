@@ -43,12 +43,10 @@ import {
   applyStorageUsageDeltasInTx,
   checkStorageQuotaForBillingContext,
   incrementStorageUsageForBillingContextInTx,
-  maybeNotifyStorageLimitForBillingContext,
   resolveStorageBillingContext,
   type StorageBillingContext,
   StorageLimitExceededError,
 } from '@/lib/billing/storage'
-import { checkAndBillPayerOverageThreshold } from '@/lib/billing/threshold-billing'
 import type { ChunkingStrategy, StrategyOptions } from '@/lib/chunkers/types'
 import { resolveTriggerRegion } from '@/lib/core/async-jobs/region'
 import { env, envNumber } from '@/lib/core/config/env'
@@ -2217,7 +2215,6 @@ export async function processDocumentAsync(
                 },
               ],
             })
-            await checkAndBillPayerOverageThreshold(billingAttribution.billingEntity)
           } else {
             logger.warn(
               `[${documentId}] Embedding model "${embeddingModelName}" has no pricing entry — billing skipped`,
@@ -2688,13 +2685,6 @@ export async function createDocumentRecords(
 
     return { returnData, storageNotification }
   })
-
-  if (storageNotification) {
-    void maybeNotifyStorageLimitForBillingContext(
-      storageNotification.context,
-      storageNotification.updatedUsage
-    )
-  }
 
   return returnData
 }
@@ -3290,13 +3280,6 @@ export async function createSingleDocument(
 
     return storageNotification
   })
-
-  if (storageNotification) {
-    void maybeNotifyStorageLimitForBillingContext(
-      storageNotification.context,
-      storageNotification.updatedUsage
-    )
-  }
 
   logger.info(`[${requestId}] Document created: ${documentId} in knowledge base ${knowledgeBaseId}`)
 

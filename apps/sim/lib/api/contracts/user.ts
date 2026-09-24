@@ -444,36 +444,10 @@ export type UsageLogEntry = z.output<typeof usageLogEntrySchema>
 export type UsageLogsApiResponse = z.output<typeof usageLogsApiResponseSchema>
 export type ExportUsageLogsQuery = z.output<typeof exportUsageLogsQuerySchema>
 
-export const subscriptionTransferParamsSchema = z.object({
-  id: z.string({ error: 'Subscription ID is required' }).min(1, 'Subscription ID is required'),
-})
-
-export const subscriptionTransferBodySchema = z.object({
-  organizationId: z
-    .string({ error: 'organizationId is required' })
-    .min(1, 'organizationId is required'),
-})
-
-export const subscriptionTransferContract = defineRouteContract({
-  method: 'POST',
-  path: '/api/users/me/subscription/[id]/transfer',
-  params: subscriptionTransferParamsSchema,
-  body: subscriptionTransferBodySchema,
-  response: {
-    mode: 'json',
-    schema: z.object({
-      success: z.literal(true),
-      message: z.string(),
-    }),
-  },
-})
-
 /** Every reason an account cannot be erased on its own, as rendered to its owner. */
 export const accountDeletionBlockerSchema = z.object({
   code: z.enum([
-    'paid_organization_owner',
     'organization_member',
-    'active_subscription',
     'shared_workspace',
     'organization_workspace',
     'data_drain_owner',

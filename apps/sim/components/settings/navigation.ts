@@ -2,7 +2,6 @@ import type { ComponentType } from 'react'
 import {
   ChartColumn,
   ClipboardList,
-  Credit,
   Database,
   GridOffset,
   HexSimple,
@@ -30,7 +29,7 @@ import { organizationRoutes } from '@/lib/navigation/paths'
 
 export type SettingsPlane = 'account' | 'workspace'
 
-export type AccountSettingsSection = 'general' | 'billing' | 'api-keys' | 'admin'
+export type AccountSettingsSection = 'general' | 'api-keys' | 'admin'
 
 export type OrganizationSettingsSection =
   | 'recently-deleted'
@@ -38,7 +37,6 @@ export type OrganizationSettingsSection =
   | 'connected-accounts'
   | 'search-mcp'
   | 'members'
-  | 'billing'
   | 'usage'
   | 'access-control'
   | 'requests'
@@ -84,7 +82,6 @@ export type UnifiedSettingsSection =
   | 'custom-blocks'
   | 'audit-logs'
   | 'apikeys'
-  | 'billing'
   | 'teammates'
   | 'organization'
   | 'usage'
@@ -109,7 +106,6 @@ export interface UnifiedSettingsNavigationItem {
   icon: ComponentType<{ className?: string }>
   section: UnifiedNavigationSection
   order: number
-  hideWhenBillingDisabled?: boolean
   requiresEnterprise?: boolean
   requiresMax?: boolean
   requiresHosted?: boolean
@@ -359,26 +355,6 @@ export const SETTINGS_SECTION_REGISTRY: readonly SettingsSectionRegistryEntry[] 
     },
   },
   {
-    label: 'Subscription',
-    icon: Credit,
-    unified: {
-      id: 'billing',
-      description: 'Manage your plan, pricing, and invoices.',
-      group: 'account',
-      order: 1,
-      hideWhenBillingDisabled: true,
-      organizationSection: 'billing',
-    },
-    planes: {
-      account: {
-        id: 'billing',
-        description: 'Manage your personal plan, usage, and invoices.',
-        group: 'account',
-        order: 1,
-      },
-    },
-  },
-  {
     label: 'Teammates',
     icon: Users,
     unified: {
@@ -410,12 +386,7 @@ export const SETTINGS_SECTION_REGISTRY: readonly SettingsSectionRegistryEntry[] 
       description: 'Explore usage and activity across your organization.',
       group: 'organization',
       order: 1,
-      /**
-       * Do not add `hideWhenBillingDisabled`: the sidebar applies it before
-       * `selfHostedOverride`, which would hide usage monitoring on self-hosted
-       * deployments with billing disabled. Hosted deployments require the plan;
-       * self-hosted deployments require the feature flag.
-       */
+      /** Hosted deployments require the plan; self-hosted deployments require the feature flag. */
       requiresHosted: true,
       requiresEnterprise: true,
       selfHostedOverride: 'usageMonitoring',
@@ -634,7 +605,7 @@ export const SETTINGS_SECTION_REGISTRY: readonly SettingsSectionRegistryEntry[] 
 
 /**
  * Every unified section this build can render, including ones the current deployment
- * does not offer. Deployment filtering (`requiresHosted`, `requiresSelfHosted`, billing)
+ * does not offer. Deployment filtering (`requiresHosted`, `requiresSelfHosted`)
  * belongs to the sidebar and the section gate, which read the server-resolved shape.
  * Keeping an unavailable section in the catalog is what lets the route treat it as a
  * known segment and redirect to General rather than answer 404.
@@ -709,14 +680,12 @@ export const ORGANIZATION_SETTINGS_GROUPS = [
 type OrganizationSettingsGroup = (typeof ORGANIZATION_SETTINGS_GROUPS)[number]['key']
 
 /**
- * Every organization section under its sidebar group, in sidebar order. The
- * organization's Subscription sits under Account exactly where the workspace
- * plane keeps it; then what the organization is, how it is governed, and Sim
- * Search. A section added to the union without a row here fails to compile.
+ * Every organization section under its sidebar group, in sidebar order: what
+ * the organization is, how it is governed, and Sim Search. A section added to
+ * the union without a row here fails to compile.
  */
 const ORGANIZATION_SECTION_GROUPS: Record<OrganizationSettingsSection, OrganizationSettingsGroup> =
   {
-    billing: 'account',
     members: 'organization',
     'connected-accounts': 'organization',
     usage: 'organization',
@@ -840,7 +809,6 @@ export function resolveOrganizationSectionAccess({
 }
 
 export interface OrganizationSettingsFeatures {
-  billingEnabled: boolean
   hasEnterprisePlan: boolean
   /**
    * Whether the organization's permission-group regime is in force, which outlives the plan gate
@@ -860,7 +828,6 @@ export function getOrganizationSettingsFeatures(
 ): OrganizationSettingsFeatures {
   const { features } = deployment
   return {
-    billingEnabled: deployment.billingEnabled,
     hasEnterprisePlan,
     governanceActive,
     hosted: deployment.hosted,
@@ -893,7 +860,6 @@ export function isOrganizationSettingsSectionAvailable(
     section === 'requests'
   )
     return true
-  if (section === 'billing') return features.billingEnabled
   /* Sim Search itself is enterprise on the hosted product; self-hosted gates it by flag, not by section. */
   if (section === 'integrations')
     return !features.hosted || features.hasEnterprisePlan

@@ -99,13 +99,8 @@ async function canOpenOrganizationSection(
 ): Promise<boolean> {
   const organizationSection = UNIFIED_TO_ORGANIZATION_SECTION[input.section]
   if (!organizationSection) return true
+  if (!workspace.organizationId) return false
   const deployment = getDeploymentShape()
-  if (!deployment.billingEnabled && input.section === 'billing') {
-    return false
-  }
-  if (!workspace.organizationId) {
-    return input.section === 'billing' && workspace.billedAccountUserId === input.userId
-  }
 
   if (organizationSection === 'connected-accounts') {
     return authorizeOrganizationSettingsSection({
@@ -116,9 +111,7 @@ async function canOpenOrganizationSection(
   }
 
   const needsEnterprisePlan =
-    organizationSection !== 'members' &&
-    organizationSection !== 'billing' &&
-    organizationSection !== 'requests'
+    organizationSection !== 'members' && organizationSection !== 'requests'
   const readsRegime = needsEnterprisePlan && organizationSection === 'access-control'
   const [canOpenSection, isEnterpriseOrganization, governanceActive] = await Promise.all([
     canOpenOrganizationSettingsSection(workspace.organizationId, input.userId, organizationSection),

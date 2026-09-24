@@ -17,7 +17,6 @@ import {
   getUserOrganization,
 } from '@/lib/billing/organizations/membership'
 import { validateSeatAvailability } from '@/lib/billing/validation/seat-management'
-import { isBillingEnabled } from '@/lib/core/config/env-flags'
 import type { OrchestrationRequestContext } from '@/lib/core/orchestration/types'
 import { PlatformEvents } from '@/lib/core/telemetry'
 import type { DbOrTx } from '@/lib/db/types'
@@ -46,7 +45,6 @@ import {
   type WorkspaceWithOwner,
 } from '@/lib/workspaces/permissions/utils'
 import {
-  getInvitePlanCategoryForUser,
   getWorkspaceInvitePolicy,
   type WorkspaceInvitePolicy,
 } from '@/lib/workspaces/policy'
@@ -322,26 +320,6 @@ export async function prepareWorkspaceInvitationContext({
   }
 
   return { inviterId, inviterName, inviterEmail, targets, organizationId, auditActor }
-}
-
-/**
- * External collaborators hold workspace access without consuming a seat, so
- * the economics only work when the invitee already pays Sim somewhere else —
- * their own Pro/Max plan, or an organization that seats them. Admitting a free
- * account as external would be unmetered platform access nobody pays for, so
- * they must be invited as a Member or Admin instead.
- */
-async function inviteeCanBeExternal(userId: string | undefined): Promise<boolean> {
-  /**
-   * The requirement exists because an external collaborator consumes no seat, so
-   * somebody else must be paying for them. With billing disabled there are no
-   * seats and no subscriptions at all — every account resolves as `free` — so
-   * enforcing it would leave a self-hosted deployment no way to grant
-   * workspace-only access without an organization join and a workspace sweep.
-   */
-  if (!isBillingEnabled) return true
-  if (!userId) return false
-  return (await getInvitePlanCategoryForUser(userId)) !== 'free'
 }
 
 async function validateLockedWorkspaceInvitationContext({
@@ -736,13 +714,6 @@ export async function createWorkspaceInvitation({
     if (!organizationId) {
       throw new WorkspaceInvitationError({
         message: 'External collaborators are only available on organization workspaces.',
-        status: 400,
-        email: normalizedEmail,
-      })
-    }
-    if (!(await inviteeCanBeExternal(existingUser?.id))) {
-      throw new WorkspaceInvitationError({
-        message: `${normalizedEmail} is not on a paid Sim plan, so they cannot be added as an external collaborator. Invite them as a Member or Admin instead — that adds a seat.`,
         status: 400,
         email: normalizedEmail,
       })

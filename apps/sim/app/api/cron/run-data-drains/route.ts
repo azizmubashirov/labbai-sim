@@ -2,7 +2,7 @@ import { createLogger } from '@sim/logger'
 import { toError } from '@sim/utils/errors'
 import { type NextRequest, NextResponse } from 'next/server'
 import { verifyCronAuth } from '@/lib/auth/internal'
-import { isBillingEnabled, isDataDrainsEnabled } from '@/lib/core/config/env-flags'
+import { isDataDrainsEnabled } from '@/lib/core/config/env-flags'
 import { withRouteHandler } from '@/lib/core/utils/with-route-handler'
 import { dispatchDueDrains } from '@/lib/data-drains/dispatcher'
 
@@ -12,10 +12,8 @@ export const GET = withRouteHandler(async (request: NextRequest) => {
   const authError = verifyCronAuth(request, 'Data drain dispatcher')
   if (authError) return authError
 
-  // Self-hosted opt-in: skip dispatch entirely when the deployment hasn't
-  // enabled drains. Sim Cloud (billing enabled) gates per-org by enterprise
-  // plan inside the dispatcher's join.
-  if (!isBillingEnabled && !isDataDrainsEnabled) {
+  // Opt-in: skip dispatch entirely when the deployment hasn't enabled drains.
+  if (!isDataDrainsEnabled) {
     return NextResponse.json({ success: true, dispatched: 0, skipped: 'disabled' })
   }
 

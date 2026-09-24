@@ -96,7 +96,7 @@ describe('transaction-scoped session policies', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     resetDbChainMock()
-    setEnvFlags({ isBillingEnabled: false, isSessionPoliciesEnabled: true })
+    setEnvFlags({ isSessionPoliciesEnabled: true })
     invalidateSessionPolicyCache('org-1')
     invalidateMembershipCache('user-1')
   })

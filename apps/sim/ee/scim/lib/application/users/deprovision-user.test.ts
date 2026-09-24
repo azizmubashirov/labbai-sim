@@ -8,7 +8,6 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   removeUser: vi.fn(),
-  reconcileSeats: vi.fn(),
   endDirectoryMembership: vi.fn(),
   findScimUserById: vi.fn(),
   recordAudit: vi.fn(),
@@ -16,9 +15,6 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@/lib/billing/organizations/membership', () => ({
   removeUserFromOrganization: mocks.removeUser,
-}))
-vi.mock('@/lib/billing/organizations/seats', () => ({
-  reconcileOrganizationSeats: mocks.reconcileSeats,
 }))
 vi.mock('@/ee/scim/lib/identity/end-directory-membership', () => ({
   endDirectoryMembershipTx: mocks.endDirectoryMembership,
@@ -59,7 +55,6 @@ describe('deprovisionScimUser', () => {
     resetDbChainMock()
     mocks.removeUser.mockResolvedValue({ success: true })
     mocks.endDirectoryMembership.mockResolvedValue({ removed: 1 })
-    mocks.reconcileSeats.mockResolvedValue({ changed: false })
   })
 
   it('removes a member through the shared primitive and audits the removal', async () => {
@@ -81,10 +76,6 @@ describe('deprovisionScimUser', () => {
       (entry: { action: string }) => entry.action
     )
     expect(actions).toEqual(['scim_user.deprovisioned', 'org_member.removed'])
-    expect(mocks.reconcileSeats).toHaveBeenCalledWith({
-      organizationId: 'org-1',
-      reason: 'scim-member-removed',
-    })
   })
 
   it('refuses to deprovision the owner with a conflict that is not a duplicate', async () => {
@@ -111,7 +102,6 @@ describe('deprovisionScimUser', () => {
       organizationId: 'org-1',
     })
     expect(result.removedFromOrganization).toBe(false)
-    expect(mocks.reconcileSeats).not.toHaveBeenCalled()
     const actions = mocks.recordAudit.mock.calls[0][0].entries.map(
       (entry: { action: string }) => entry.action
     )

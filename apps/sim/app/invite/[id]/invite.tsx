@@ -127,8 +127,6 @@ type InviteErrorCode =
   | 'already-member'
   | 'already-in-organization'
   | 'no-seats-available'
-  | 'upgrade-required'
-  | 'external-requires-paid-plan'
   | 'invalid-invitation'
   | 'missing-invitation-id'
   | 'server-error'
@@ -196,18 +194,6 @@ function getInviteError(code: string): InviteError {
       code: 'no-seats-available',
       message:
         'This organization has reached its seat limit. Ask an admin to contact support to add seats, then try again.',
-      canRetry: true,
-    },
-    'upgrade-required': {
-      code: 'upgrade-required',
-      message:
-        'The workspace owner needs an active paid plan with billing set up before you can join. Ask them to update their plan, then try again.',
-      canRetry: true,
-    },
-    'external-requires-paid-plan': {
-      code: 'external-requires-paid-plan',
-      message:
-        'External collaborators need their own paid Sim plan. Upgrade your plan, or ask the organization to re-invite you as a member — that uses one of their seats instead.',
       canRetry: true,
     },
     'invalid-invitation': {

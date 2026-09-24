@@ -6,7 +6,6 @@ import {
   AvatarFallback,
   AvatarImage,
   Badge,
-  Banner,
   ChipConfirmModal,
   ChipInput,
   cn,
@@ -26,11 +25,7 @@ interface TransferOwnershipDialogProps {
   currentUserId: string
   isSubmitting: boolean
   error?: Error | null
-  portalError?: string | null
-  hasPaidSubscription: boolean
-  isOpeningBillingPortal: boolean
   onConfirm: (newOwnerUserId: string) => Promise<void>
-  onOpenBillingPortal: () => void
 }
 
 export function TransferOwnershipDialog({
@@ -41,11 +36,7 @@ export function TransferOwnershipDialog({
   currentUserId,
   isSubmitting,
   error,
-  portalError,
-  hasPaidSubscription,
-  isOpeningBillingPortal,
   onConfirm,
-  onOpenBillingPortal,
 }: TransferOwnershipDialogProps) {
   const [search, setSearch] = useState('')
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
@@ -117,32 +108,9 @@ export function TransferOwnershipDialog({
           <div className='space-y-3'>
             <p className='px-2 text-[var(--text-secondary)] text-sm'>
               As the owner, you need to hand off the organization before you can leave. Pick a
-              member to become the new owner. They'll inherit billing access, seat management, and
-              all owner-only permissions. You'll lose access to every shared workspace in this
+              member to become the new owner. They'll inherit all owner-only permissions. You'll lose access to every shared workspace in this
               organization.
             </p>
-
-            {hasPaidSubscription && (
-              <Banner
-                variant='default'
-                className='rounded-md px-3 py-2'
-                textClassName='text-[var(--text-primary)]'
-                actionLabel={isOpeningBillingPortal ? 'Opening...' : 'Open Stripe billing portal'}
-                actionDisabled={isOpeningBillingPortal}
-                onAction={onOpenBillingPortal}
-                text={
-                  <>
-                    <span className='block'>Your payment method stays on this organization</span>
-                    <span className='block text-[var(--text-secondary)]'>
-                      Future charges will keep hitting the card you added. Open the Stripe billing
-                      portal to remove it before you leave.
-                    </span>
-                  </>
-                }
-              />
-            )}
-
-            {portalError && <p className='px-2 text-[var(--text-error)] text-sm'>{portalError}</p>}
 
             <ChipInput
               icon={Search}

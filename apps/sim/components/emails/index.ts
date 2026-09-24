@@ -2,8 +2,6 @@
 export * from './_styles'
 // Auth emails
 export * from './auth'
-// Billing emails
-export * from './billing'
 // Shared components
 export * from './components'
 // Invitation emails

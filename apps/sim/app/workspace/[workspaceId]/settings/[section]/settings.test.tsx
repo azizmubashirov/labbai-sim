@@ -13,9 +13,6 @@ vi.mock('@/lib/posthog/client', () => ({ captureEvent: vi.fn() }))
 vi.mock('@/lib/auth/auth-client', () => ({
   useSession: () => ({ data: { user: { id: 'viewer-1', role: 'user' } }, isPending: false }),
 }))
-vi.mock('@/lib/core/config/deployment-shape', () => ({
-  useDeploymentShape: () => ({ billingEnabled: false }),
-}))
 vi.mock('@/app/workspace/[workspaceId]/providers/workspace-host-provider', () => ({
   useWorkspaceHostContext: () => ({
     hostOrganizationId: 'organization-1',
@@ -42,7 +39,7 @@ vi.mock('@/app/workspace/[workspaceId]/settings/navigation', () => ({
 
 import { SettingsPage } from '@/app/workspace/[workspaceId]/settings/[section]/settings'
 
-it('renders the inline member roster with billing disabled, while billing stays unavailable', async () => {
+it('renders the inline member roster', async () => {
   ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   const container = document.createElement('div')
   const root = createRoot(container)
@@ -56,9 +53,6 @@ it('renders the inline member roster with billing disabled, while billing stays 
     })
     expect(container).toHaveTextContent('Members of organization-1')
     expect(container).not.toHaveTextContent('General settings')
-
-    await act(async () => root.render(<SettingsPage section='billing' />))
-    expect(container).toHaveTextContent('General settings')
   } finally {
     act(() => root.unmount())
   }

@@ -36,7 +36,6 @@ import {
 } from '@/lib/api/contracts/copilot'
 import { getWorkflowNormalizedStateContract } from '@/lib/api/contracts/workflows'
 import { useSession } from '@/lib/auth/auth-client'
-import { getWorkspaceUsageLimitAction } from '@/lib/billing/workspace-permissions'
 import { useDeploymentShape } from '@/lib/core/config/deployment-shape'
 import {
   MOTHERSHIP_SEND_MESSAGE_EVENT,
@@ -49,7 +48,6 @@ import { MothershipChat } from '@/app/workspace/[workspaceId]/home/components'
 import { getWorkflowCopilotUseChatOptions, useChat } from '@/app/workspace/[workspaceId]/home/hooks'
 import type { FileAttachmentForApi } from '@/app/workspace/[workspaceId]/home/types'
 import { useRegisterGlobalCommands } from '@/app/workspace/[workspaceId]/providers/global-commands-provider'
-import { useWorkspaceHostContext } from '@/app/workspace/[workspaceId]/providers/workspace-host-provider'
 import { useUserPermissionsContext } from '@/app/workspace/[workspaceId]/providers/workspace-permissions-provider'
 import { createCommands } from '@/app/workspace/[workspaceId]/utils/commands-utils'
 import {
@@ -57,19 +55,13 @@ import {
   Editor,
   Toolbar,
 } from '@/app/workspace/[workspaceId]/w/[workflowId]/components/panel/components'
-import {
-  usePanelResize,
-  useUsageLimits,
-} from '@/app/workspace/[workspaceId]/w/[workflowId]/components/panel/hooks'
+import { usePanelResize } from '@/app/workspace/[workspaceId]/w/[workflowId]/components/panel/hooks'
 import { Variables } from '@/app/workspace/[workspaceId]/w/[workflowId]/components/variables/variables'
 import { useAutoLayout } from '@/app/workspace/[workspaceId]/w/[workflowId]/hooks/use-auto-layout'
 import { useCurrentWorkflow } from '@/app/workspace/[workspaceId]/w/[workflowId]/hooks/use-current-workflow'
 import { useWorkflowExecution } from '@/app/workspace/[workspaceId]/w/[workflowId]/hooks/use-workflow-execution'
 import { getWorkflowLockToggleIds } from '@/app/workspace/[workspaceId]/w/[workflowId]/utils'
 import { useDeleteWorkflow, useImportWorkflow } from '@/app/workspace/[workspaceId]/w/hooks'
-import { RequestAccessModal } from '@/ee/access-requests/components/request-access-action'
-import { getMyAccessRequestHref } from '@/ee/access-requests/lib/navigation'
-import { useDiscoverAccessRequests } from '@/hooks/queries/access-requests'
 import { useCopilotChatSelection } from '@/hooks/queries/copilot-chat-selection'
 import {
   type CopilotChatListItem,
@@ -81,7 +73,6 @@ import { isWorkflowEffectivelyLocked } from '@/hooks/queries/utils/folder-tree'
 import { useDuplicateWorkflowMutation, useWorkflowMap } from '@/hooks/queries/workflows'
 import { useCollaborativeWorkflow } from '@/hooks/use-collaborative-workflow'
 import { usePermissionConfig } from '@/hooks/use-permission-config'
-import { useSettingsNavigation } from '@/hooks/use-settings-navigation'
 import { useLocalCopilotCatalogSelection } from '@/local-copilot/hooks/use-copilot-backend-preference'
 import { useChatStore } from '@/stores/chat/store'
 import { useMothershipDraftsStore } from '@/stores/mothership-drafts/store'
@@ -160,7 +151,6 @@ export const Panel = memo(function Panel() {
     focusSearch: () => void
   } | null>(null)
   const { data: session } = useSession()
-  const hostContext = useWorkspaceHostContext()
 
   // State
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -202,7 +192,6 @@ export const Panel = memo(function Panel() {
   const hasBlocks = useWorkflowStore((state) => Object.keys(state.blocks).length > 0)
 
   const { collaborativeBatchToggleLocked } = useCollaborativeWorkflow()
-  const { navigateToSettings } = useSettingsNavigation()
 
   // Delete workflow hook
   const { isDeleting, handleDeleteWorkflow } = useDeleteWorkflow({
@@ -212,40 +201,11 @@ export const Panel = memo(function Panel() {
     onSuccess: () => setIsDeleteModalOpen(false),
   })
 
-  // Usage limits hook
-  const {
-    usageExceeded,
-    message: usageLimitMessage,
-    scope: usageLimitScope,
-    isLoading: isUsageGateLoading,
-  } = useUsageLimits({ workspaceId })
-  const isMemberLimitExceeded = usageExceeded && usageLimitScope === 'member'
-  const memberLimitRequest = useDiscoverAccessRequests(
-    { kind: 'workspace', workspaceId, targetKind: 'usage_limit', limit: 1, offset: 0 },
-    isMemberLimitExceeded
-  )
-  const [showLimitRequest, setShowLimitRequest] = useState(false)
-  const memberLimitTarget =
-    isMemberLimitExceeded && memberLimitRequest.isSuccess && memberLimitRequest.data.enabled
-      ? memberLimitRequest.data.entries.find((entry) => entry.state === 'requestable')
-      : undefined
-
-  if (showLimitRequest && !memberLimitTarget) {
-    setShowLimitRequest(false)
-  }
-
   // Workflow execution hook
   const { handleRunWorkflow, handleCancelExecution, isExecuting } = useWorkflowExecution()
 
   // Panel resize hook
   const { handlePointerDown } = usePanelResize()
-
-  /**
-   * Opens subscription settings modal
-   */
-  const openSubscriptionSettings = () => {
-    navigateToSettings({ section: 'billing' })
-  }
 
   /**
    * Cancels the currently executing workflow
@@ -255,36 +215,9 @@ export const Panel = memo(function Panel() {
   }, [handleCancelExecution])
 
   /**
-   * Runs the workflow with usage limit check
+   * Runs the workflow
    */
   const runWorkflow = async () => {
-    if (isUsageGateLoading) return
-
-    if (usageExceeded) {
-      if (usageLimitScope === 'member' && memberLimitTarget) {
-        if (memberLimitTarget.pendingRequestId) {
-          router.push(
-            getMyAccessRequestHref(
-              { kind: 'workspace', workspaceId },
-              memberLimitTarget.pendingRequestId
-            )
-          )
-        } else {
-          setShowLimitRequest(true)
-        }
-        return
-      }
-      const action = getWorkspaceUsageLimitAction(hostContext, session?.user?.id, {
-        message: usageLimitMessage,
-        scope: usageLimitScope,
-      })
-      if (action.type === 'manage-billing') {
-        openSubscriptionSettings()
-      } else {
-        toast.error(action.message)
-      }
-      return
-    }
     await handleRunWorkflow()
   }
 
@@ -698,8 +631,7 @@ export const Panel = memo(function Panel() {
 
   const canRun = userPermissions.canRead
   const isLoadingPermissions = userPermissions.isLoading
-  const isButtonDisabled =
-    !isExecuting && (isUsageGateLoading || (!canRun && !isLoadingPermissions))
+  const isButtonDisabled = !isExecuting && !canRun && !isLoadingPermissions
 
   /**
    * Register global keyboard shortcuts using the central commands registry.
@@ -737,14 +669,6 @@ export const Panel = memo(function Panel() {
 
   return (
     <>
-      {showLimitRequest && memberLimitTarget && (
-        <RequestAccessModal
-          scope={{ kind: 'workspace', workspaceId }}
-          target={memberLimitTarget.target}
-          label={memberLimitTarget.label}
-          onClose={() => setShowLimitRequest(false)}
-        />
-      )}
       <aside
         ref={panelRef}
         className='panel-container relative shrink-0 overflow-hidden bg-[var(--bg)]'

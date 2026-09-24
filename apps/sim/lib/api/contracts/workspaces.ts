@@ -51,9 +51,7 @@ export const workspaceCreationPolicySchema = z.object({
    * Machine-readable discriminant for blocked states whose correct user-facing
    * copy the workspace mode alone cannot determine.
    */
-  blockedReasonCode: z
-    .enum(['organization-subscription-inactive', 'permission-group-denied'])
-    .optional(),
+  blockedReasonCode: z.enum(['permission-group-denied']).optional(),
 })
 
 export type WorkspaceCreationPolicy = z.output<typeof workspaceCreationPolicySchema>
@@ -262,7 +260,6 @@ export type DeploymentFeatures = z.output<typeof deploymentFeaturesSchema>
  */
 export const deploymentShapeSchema = z.object({
   hosted: z.boolean(),
-  billingEnabled: z.boolean(),
   chatEnabled: z.boolean(),
   azureConfigured: z.boolean(),
   cohereConfigured: z.boolean(),

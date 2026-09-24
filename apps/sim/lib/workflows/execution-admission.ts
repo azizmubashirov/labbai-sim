@@ -1,7 +1,4 @@
-import {
-  reserveExecutionSlot,
-  UsageReservationUnavailableError,
-} from '@/lib/billing/calculations/usage-reservation'
+import { reserveExecutionSlot } from '@/lib/billing/calculations/usage-reservation'
 import {
   type BillingAttributionSnapshot,
   resolveBillingAttribution,
@@ -11,7 +8,6 @@ import {
   getReservationDenialDescriptor,
   type ReservationDenialReason,
 } from '@/lib/core/admission/transient-failure'
-import { isBillingEnabled, isHosted } from '@/lib/core/config/env-flags'
 
 export interface WorkflowExecutionActorContext {
   userId: string
@@ -91,11 +87,6 @@ export async function prepareWorkflowExecutionAdmission(
     throw new WorkflowExecutionAdmissionError(
       usage.message ?? 'Target workspace usage limit exceeded',
       descriptor
-    )
-  }
-  if (isHosted && isBillingEnabled && !usage.payerUsage) {
-    throw new UsageReservationUnavailableError(
-      'Target workspace usage admission is temporarily unavailable. Please retry.'
     )
   }
 

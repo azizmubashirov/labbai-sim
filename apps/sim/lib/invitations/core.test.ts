@@ -7,7 +7,6 @@ import {
   dbChainMockFns,
   resetDbChainMock,
   resetEnvFlagsMock,
-  setEnvFlags,
 } from '@sim/testing'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -16,30 +15,22 @@ const {
   mockGetUserOrganization,
   mockAcquireOrganizationMutationLock,
   mockAcquireOrgMembershipLock,
-  mockEnsureTeamOrganizationForAcceptance,
-  mockReconcileOrganizationSeats,
   mockGetWorkspaceWithOwner,
   mockSetActiveOrganizationForCurrentSession,
   mockSyncUsageLimitsFromSubscription,
   mockSyncWorkspaceEnvCredentials,
-  mockIsWorkspaceOnEnterprisePlan,
   mockAttachOwnedWorkspacesToOrganizationTx,
-  mockGetInvitePlanCategoryForUser,
 } = vi.hoisted(() => ({
   mockEnsureUserInOrganization: vi.fn(),
   mockGetUserOrganization: vi.fn(),
   mockAcquireOrganizationMutationLock: vi.fn(),
   mockAcquireOrgMembershipLock: vi.fn(),
-  mockEnsureTeamOrganizationForAcceptance: vi.fn(),
-  mockReconcileOrganizationSeats: vi.fn(),
   mockGetWorkspaceWithOwner: vi.fn(),
   mockSetActiveOrganizationForCurrentSession: vi.fn(),
   mockSyncUsageLimitsFromSubscription: vi.fn(),
   mockSyncWorkspaceEnvCredentials: vi.fn(),
-  mockIsWorkspaceOnEnterprisePlan: vi.fn(async () => true),
   mockAttachOwnedWorkspacesToOrganizationTx: vi.fn(),
   /** Externals must be on a paid plan; invite-time enforces it, accept re-checks. */
-  mockGetInvitePlanCategoryForUser: vi.fn(async () => 'pro'),
 }))
 
 vi.mock('@/lib/billing/organizations/membership', () => ({
@@ -49,24 +40,12 @@ vi.mock('@/lib/billing/organizations/membership', () => ({
   acquireOrgMembershipLock: mockAcquireOrgMembershipLock,
 }))
 
-vi.mock('@/lib/billing/organizations/provision-seat', () => ({
-  ensureTeamOrganizationForAcceptance: mockEnsureTeamOrganizationForAcceptance,
-}))
-
-vi.mock('@/lib/billing/organizations/seats', () => ({
-  reconcileOrganizationSeats: mockReconcileOrganizationSeats,
-}))
-
 vi.mock('@/lib/workspaces/permissions/utils', () => ({
   getWorkspaceWithOwner: mockGetWorkspaceWithOwner,
 }))
 
 vi.mock('@/lib/auth/active-organization', () => ({
   setActiveOrganizationForCurrentSession: mockSetActiveOrganizationForCurrentSession,
-}))
-
-vi.mock('@/lib/billing/core/subscription', () => ({
-  isWorkspaceOnEnterprisePlan: mockIsWorkspaceOnEnterprisePlan,
 }))
 
 vi.mock('@/lib/billing/core/usage', () => ({
@@ -80,10 +59,6 @@ vi.mock('@/lib/credentials/environment', () => ({
 vi.mock('@/lib/workspaces/organization-workspaces', () => ({
   attachOwnedWorkspacesToOrganizationTx: mockAttachOwnedWorkspacesToOrganizationTx,
   ownedAttachableWorkspacesWhere: vi.fn(),
-}))
-
-vi.mock('@/lib/workspaces/policy', () => ({
-  getInvitePlanCategoryForUser: mockGetInvitePlanCategoryForUser,
 }))
 
 vi.mock('@sim/audit', () => auditMock)
@@ -166,19 +141,8 @@ describe('acceptInvitation', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     resetDbChainMock()
-    setEnvFlags({ isBillingEnabled: true })
     mockGetUserOrganization.mockResolvedValue(null)
     mockGetWorkspaceWithOwner.mockResolvedValue(null)
-    mockEnsureTeamOrganizationForAcceptance.mockResolvedValue({
-      success: true,
-      organizationId: 'org-1',
-      fixedSeats: false,
-    })
-    mockReconcileOrganizationSeats.mockResolvedValue({
-      changed: true,
-      previousSeats: 1,
-      seats: 2,
-    })
     mockEnsureUserInOrganization.mockResolvedValue({
       success: true,
       alreadyMember: false,
@@ -306,58 +270,6 @@ describe('acceptInvitation', () => {
 
     expect(result.success).toBe(true)
     expect(mockEnsureUserInOrganization).not.toHaveBeenCalled()
-    /** The plan requirement must not even be evaluated for imposed externality. */
-    expect(mockGetInvitePlanCategoryForUser).not.toHaveBeenCalled()
-  })
-
-  it('rejects an external invitation when the invitee is no longer on a paid plan', async () => {
-    mockGetInvitePlanCategoryForUser.mockResolvedValueOnce('free')
-    queueWhereResponses([
-      [
-        {
-          id: 'inv-1',
-          kind: 'workspace',
-          email: 'external@example.com',
-          organizationId: 'org-1',
-          membershipIntent: 'external',
-          inviterId: 'inviter-1',
-          role: 'member',
-          status: 'pending',
-          token: 'tok-1',
-          expiresAt: new Date(Date.now() + 60_000),
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-      ],
-      [
-        {
-          id: 'grant-1',
-          workspaceId: 'workspace-1',
-          permission: 'write',
-          workspaceName: 'Workspace',
-        },
-      ],
-      [{ name: 'Acme' }],
-      [{ name: 'Inviter', email: 'inviter@example.com' }],
-      [],
-      [],
-      [{ variables: {} }],
-    ])
-
-    const result = await acceptInvitation({
-      userId: 'external-user',
-      userEmail: 'external@example.com',
-      invitationId: 'inv-1',
-      token: 'tok-1',
-      actorName: 'External User',
-      request: new Request('http://localhost/api/invitations/inv-1/accept'),
-    })
-
-    expect(result.success).toBe(false)
-    if (!result.success) {
-      expect(result.kind).toBe('external-requires-paid-plan')
-    }
-    expect(mockEnsureUserInOrganization).not.toHaveBeenCalled()
   })
 
   it('accepts external workspace invitations without joining the organization', async () => {
@@ -413,7 +325,6 @@ describe('acceptInvitation', () => {
       expect(result.acceptedWorkspaceIds).toEqual(['workspace-1'])
       expect(result.membershipAlreadyExists).toBe(false)
     }
-    expect(mockEnsureTeamOrganizationForAcceptance).not.toHaveBeenCalled()
     expect(mockEnsureUserInOrganization).not.toHaveBeenCalled()
     expect(mockSetActiveOrganizationForCurrentSession).not.toHaveBeenCalled()
     expect(mockSyncUsageLimitsFromSubscription).not.toHaveBeenCalled()
@@ -444,7 +355,7 @@ describe('acceptInvitation', () => {
     )
   })
 
-  it('accepts a personal-workspace invite on a billing-disabled deployment', async () => {
+  it('accepts a personal-workspace invite without creating an organization', async () => {
     /**
      * With billing off and no organization on the workspace there is nothing to
      * provision and nothing to join, so the preview reports `external`. The
@@ -453,7 +364,6 @@ describe('acceptInvitation', () => {
      * alone rejected every self-hosted personal invite as `disclosure-outdated`,
      * with a retry that rendered the same preview.
      */
-    setEnvFlags({ isBillingEnabled: false })
     mockGetWorkspaceWithOwner.mockResolvedValue({
       id: 'workspace-1',
       name: 'Workspace',
@@ -623,7 +533,6 @@ describe('acceptInvitation', () => {
       expect(result.invitation.membershipIntent).toBe('external')
       expect(result.membershipAlreadyExists).toBe(false)
     }
-    expect(mockEnsureTeamOrganizationForAcceptance).not.toHaveBeenCalled()
     expect(mockEnsureUserInOrganization).not.toHaveBeenCalled()
     expect(mockSetActiveOrganizationForCurrentSession).not.toHaveBeenCalled()
     expect(dbChainMockFns.set).toHaveBeenCalledWith(expect.objectContaining({ status: 'accepted' }))
@@ -694,7 +603,6 @@ describe('acceptInvitation', () => {
       expect(result).toEqual({ success: false, kind: 'already-in-organization' })
       expect(dbChainMockFns.set).not.toHaveBeenCalled()
       expect(dbChainMockFns.values).not.toHaveBeenCalled()
-      expect(mockEnsureTeamOrganizationForAcceptance).not.toHaveBeenCalled()
       expect(mockEnsureUserInOrganization).not.toHaveBeenCalled()
       expect(mockSetActiveOrganizationForCurrentSession).not.toHaveBeenCalled()
       expect(auditMock.recordAudit).not.toHaveBeenCalled()
@@ -709,11 +617,6 @@ describe('acceptInvitation', () => {
       organizationId: null,
       workspaceMode: 'personal',
       billedAccountUserId: 'owner-1',
-    })
-    mockEnsureTeamOrganizationForAcceptance.mockResolvedValueOnce({
-      success: true,
-      organizationId: 'org-new',
-      fixedSeats: false,
     })
 
     queueWhereResponses([
@@ -763,14 +666,6 @@ describe('acceptInvitation', () => {
     })
 
     expect(result.success).toBe(true)
-    expect(mockEnsureTeamOrganizationForAcceptance).toHaveBeenCalledWith(
-      expect.objectContaining({
-        billingOwnerUserId: 'owner-1',
-        workspaceOrganizationId: null,
-        workspaceIdsToAttach: ['workspace-1'],
-        executor: dbChainMock.db,
-      })
-    )
     expect(mockGetWorkspaceWithOwner).toHaveBeenCalledWith('workspace-1', {
       executor: dbChainMock.db,
     })
@@ -786,11 +681,6 @@ describe('acceptInvitation', () => {
     )
     // Seats grow to match the new member; the Stripe charge is deferred to the
     // seat-sync outbox.
-    expect(mockReconcileOrganizationSeats).toHaveBeenCalledWith({
-      organizationId: 'org-new',
-      reason: 'member-accepted-invite',
-      actorId: 'invitee-user',
-    })
     expect(mockSetActiveOrganizationForCurrentSession).toHaveBeenCalledWith('org-new')
     expect(auditMock.recordAudit).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -801,137 +691,6 @@ describe('acceptInvitation', () => {
         metadata: expect.objectContaining({ invitationId: 'inv-1', memberRole: 'member' }),
       })
     )
-  })
-
-  it('rolls back when a billing-owner workspace is created after the acceptance lock plan', async () => {
-    mockGetWorkspaceWithOwner.mockResolvedValue({
-      id: 'workspace-1',
-      name: 'Workspace',
-      ownerId: 'owner-1',
-      organizationId: null,
-      workspaceMode: 'personal',
-      billedAccountUserId: 'owner-1',
-    })
-    mockEnsureTeamOrganizationForAcceptance.mockResolvedValueOnce({
-      success: true,
-      organizationId: 'org-new',
-      fixedSeats: false,
-    })
-
-    queueWhereResponses([
-      [
-        {
-          id: 'inv-1',
-          kind: 'workspace',
-          email: 'invitee@example.com',
-          organizationId: null,
-          membershipIntent: 'internal',
-          inviterId: 'owner-1',
-          role: 'member',
-          status: 'pending',
-          token: 'tok-1',
-          expiresAt: new Date(Date.now() + 60_000),
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-      ],
-      [
-        {
-          id: 'grant-1',
-          workspaceId: 'workspace-1',
-          permission: 'write',
-          workspaceName: 'Workspace',
-        },
-      ],
-      [{ name: 'Owner', email: 'owner@example.com' }],
-      // Invitee-owned personal workspaces for the acceptance lock plan.
-      [],
-      // Billing-owner workspaces included in the pre-lock conversion plan.
-      [{ id: 'workspace-1' }],
-      // A new personal workspace appeared before provisioning acquired the
-      // billing owner's identity lock, so it escaped the original plan.
-      [{ id: 'workspace-2' }],
-    ])
-
-    const result = await acceptInvitation({
-      userId: 'invitee-user',
-      userEmail: 'invitee@example.com',
-      invitationId: 'inv-1',
-      token: 'tok-1',
-    })
-
-    expect(result).toEqual({
-      success: false,
-      kind: 'server-error',
-      message: "The workspace owner's workspaces changed while accepting — please try again.",
-    })
-    expect(mockEnsureTeamOrganizationForAcceptance).toHaveBeenCalledWith(
-      expect.objectContaining({
-        billingOwnerUserId: 'owner-1',
-        workspaceOrganizationId: null,
-        workspaceIdsToAttach: ['workspace-1'],
-        executor: dbChainMock.db,
-      })
-    )
-    expect(mockEnsureUserInOrganization).not.toHaveBeenCalled()
-    expect(auditMock.recordAudit).not.toHaveBeenCalled()
-  })
-
-  it('maps an unexpected provisioning failure only after the acceptance transaction rejects', async () => {
-    mockGetWorkspaceWithOwner.mockResolvedValue({
-      id: 'workspace-1',
-      name: 'Workspace',
-      ownerId: 'owner-1',
-      organizationId: null,
-      workspaceMode: 'personal',
-      billedAccountUserId: 'owner-1',
-    })
-    mockEnsureTeamOrganizationForAcceptance.mockRejectedValueOnce(
-      new Error('subscription re-home failed')
-    )
-
-    queueWhereResponses([
-      [
-        {
-          id: 'inv-1',
-          kind: 'workspace',
-          email: 'invitee@example.com',
-          organizationId: null,
-          membershipIntent: 'internal',
-          inviterId: 'owner-1',
-          role: 'member',
-          status: 'pending',
-          token: 'tok-1',
-          expiresAt: new Date(Date.now() + 60_000),
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-      ],
-      [
-        {
-          id: 'grant-1',
-          workspaceId: 'workspace-1',
-          permission: 'write',
-          workspaceName: 'Workspace',
-        },
-      ],
-      [{ name: 'Owner', email: 'owner@example.com' }],
-      // Invitee-owned personal workspaces for the acceptance lock plan.
-      [],
-      // Billing-owner workspaces covered by the conversion lock plan.
-      [{ id: 'workspace-1' }],
-    ])
-
-    const result = await acceptInvitation({
-      userId: 'invitee-user',
-      userEmail: 'invitee@example.com',
-      invitationId: 'inv-1',
-      token: 'tok-1',
-    })
-
-    expect(result).toEqual({ success: false, kind: 'server-error' })
-    expect(mockEnsureUserInOrganization).not.toHaveBeenCalled()
-    expect(auditMock.recordAudit).not.toHaveBeenCalled()
   })
 
   it('re-reads the workspace after locking when another acceptance attaches it first', async () => {
@@ -1006,13 +765,6 @@ describe('acceptInvitation', () => {
     })
 
     expect(result.success).toBe(true)
-    expect(mockEnsureTeamOrganizationForAcceptance).toHaveBeenCalledWith(
-      expect.objectContaining({
-        billingOwnerUserId: 'destination-owner',
-        workspaceOrganizationId: 'org-1',
-        executor: dbChainMock.db,
-      })
-    )
     expect(mockGetWorkspaceWithOwner).toHaveBeenNthCalledWith(2, 'workspace-1', {
       executor: dbChainMock.db,
       forUpdate: true,
@@ -1034,11 +786,6 @@ describe('acceptInvitation', () => {
      * joined this collaborator moments earlier in the same transaction. The
      * sweep and the seat reconcile must still run.
      */
-    mockEnsureTeamOrganizationForAcceptance.mockResolvedValueOnce({
-      success: true,
-      organizationId: 'org-1',
-      fixedSeats: false,
-    })
     mockEnsureUserInOrganization.mockResolvedValueOnce({
       success: true,
       alreadyMember: true,
@@ -1098,7 +845,6 @@ describe('acceptInvitation', () => {
       expect.anything(),
       expect.objectContaining({ ownerUserId: 'invitee-user', workspaceIds: ['joiner-ws-1'] })
     )
-    expect(mockReconcileOrganizationSeats).toHaveBeenCalled()
   })
 
   it('attaches the invitee-owned personal workspaces when joining the organization', async () => {
@@ -1109,11 +855,6 @@ describe('acceptInvitation', () => {
       organizationId: 'org-1',
       workspaceMode: 'organization',
       billedAccountUserId: 'owner-1',
-    })
-    mockEnsureTeamOrganizationForAcceptance.mockResolvedValueOnce({
-      success: true,
-      organizationId: 'org-1',
-      fixedSeats: false,
     })
     mockAttachOwnedWorkspacesToOrganizationTx.mockResolvedValueOnce({
       attachedWorkspaceIds: ['joiner-ws-1'],
@@ -1365,11 +1106,6 @@ describe('acceptInvitation', () => {
       workspaceMode: 'organization',
       billedAccountUserId: 'owner-1',
     })
-    mockEnsureTeamOrganizationForAcceptance.mockResolvedValueOnce({
-      success: true,
-      organizationId: 'org-1',
-      fixedSeats: false,
-    })
 
     queueWhereResponses([
       [
@@ -1426,11 +1162,6 @@ describe('acceptInvitation', () => {
       organizationId: 'org-1',
       workspaceMode: 'organization',
       billedAccountUserId: 'owner-1',
-    })
-    mockEnsureTeamOrganizationForAcceptance.mockResolvedValueOnce({
-      success: true,
-      organizationId: 'org-1',
-      fixedSeats: false,
     })
 
     queueWhereResponses([
@@ -1544,7 +1275,6 @@ describe('acceptInvitation', () => {
       expect(result.invitation.membershipIntent).toBe('external')
       expect(result.acceptedWorkspaceIds).toEqual(['workspace-1'])
     }
-    expect(mockEnsureTeamOrganizationForAcceptance).not.toHaveBeenCalled()
     expect(mockEnsureUserInOrganization).not.toHaveBeenCalled()
     expect(mockAttachOwnedWorkspacesToOrganizationTx).not.toHaveBeenCalled()
     expect(mockSetActiveOrganizationForCurrentSession).not.toHaveBeenCalled()
@@ -1558,11 +1288,6 @@ describe('acceptInvitation', () => {
       organizationId: 'org-1',
       workspaceMode: 'organization',
       billedAccountUserId: 'owner-1',
-    })
-    mockEnsureTeamOrganizationForAcceptance.mockResolvedValueOnce({
-      success: true,
-      organizationId: 'org-1',
-      fixedSeats: false,
     })
 
     queueWhereResponses([
@@ -1620,11 +1345,6 @@ describe('acceptInvitation', () => {
   })
 
   it('accepts an organization-only invitation without creating workspace grants and lands in org Home', async () => {
-    mockEnsureTeamOrganizationForAcceptance.mockResolvedValueOnce({
-      success: true,
-      organizationId: 'org-1',
-      fixedSeats: false,
-    })
     queueWhereResponses([
       [
         {
@@ -1822,71 +1542,6 @@ describe('acceptInvitation', () => {
     }
   })
 
-  it('does not reconcile seats for an Enterprise organization (fixed seats)', async () => {
-    mockGetWorkspaceWithOwner.mockResolvedValue({
-      id: 'workspace-1',
-      name: 'Workspace',
-      ownerId: 'owner-1',
-      organizationId: 'org-1',
-      workspaceMode: 'organization',
-      billedAccountUserId: 'owner-1',
-    })
-    mockEnsureTeamOrganizationForAcceptance.mockResolvedValueOnce({
-      success: true,
-      organizationId: 'org-1',
-      fixedSeats: true,
-    })
-
-    queueWhereResponses([
-      [
-        {
-          id: 'inv-1',
-          kind: 'workspace',
-          email: 'invitee@example.com',
-          organizationId: 'org-1',
-          membershipIntent: 'internal',
-          inviterId: 'owner-1',
-          role: 'member',
-          status: 'pending',
-          token: 'tok-1',
-          expiresAt: new Date(Date.now() + 60_000),
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-      ],
-      [
-        {
-          id: 'grant-1',
-          workspaceId: 'workspace-1',
-          permission: 'write',
-          workspaceName: 'Workspace',
-        },
-      ],
-      [{ name: 'Acme' }],
-      [{ name: 'Owner', email: 'owner@example.com' }],
-      // Invitee-owned personal workspaces for the acceptance lock plan.
-      [],
-      // Post-join owned-set re-check under the billing-identity lock.
-      [],
-      // Grant-txn membership re-check under the lock: member still present.
-      [{ id: 'member-1' }],
-    ])
-
-    const result = await acceptInvitation({
-      userId: 'invitee-user',
-      userEmail: 'invitee@example.com',
-      invitationId: 'inv-1',
-      token: 'tok-1',
-    })
-
-    expect(result.success).toBe(true)
-    expect(mockEnsureUserInOrganization).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ organizationId: 'org-1', skipSeatValidation: false })
-    )
-    expect(mockReconcileOrganizationSeats).not.toHaveBeenCalled()
-  })
-
   it('does not run post-commit effects when the invitation transaction fails to commit', async () => {
     mockGetWorkspaceWithOwner.mockResolvedValue({
       id: 'workspace-1',
@@ -1895,22 +1550,6 @@ describe('acceptInvitation', () => {
       organizationId: 'org-1',
       workspaceMode: 'organization',
       billedAccountUserId: 'owner-1',
-    })
-    mockEnsureTeamOrganizationForAcceptance.mockResolvedValueOnce({
-      success: true,
-      organizationId: 'org-1',
-      fixedSeats: false,
-      postCommitEffects: {
-        planConversions: [
-          {
-            organizationId: 'org-1',
-            actorId: 'owner-1',
-            fromPlan: 'pro_6000',
-            toPlan: 'team_6000',
-          },
-        ],
-        usageLimitUserIds: ['collaborator-1'],
-      },
     })
 
     queueWhereResponses([
@@ -1962,71 +1601,9 @@ describe('acceptInvitation', () => {
     ).resolves.toEqual({ success: false, kind: 'server-error' })
 
     expect(auditMock.recordAudit).not.toHaveBeenCalled()
-    expect(mockReconcileOrganizationSeats).not.toHaveBeenCalled()
     expect(mockSetActiveOrganizationForCurrentSession).not.toHaveBeenCalled()
     expect(mockSyncWorkspaceEnvCredentials).not.toHaveBeenCalled()
     expect(mockSyncUsageLimitsFromSubscription).not.toHaveBeenCalled()
-    expect(mockEnsureTeamOrganizationForAcceptance).toHaveBeenCalledWith(
-      expect.objectContaining({ executor: dbChainMock.db })
-    )
-  })
-
-  it('blocks acceptance with upgrade-required when the owner has no usable plan', async () => {
-    mockGetWorkspaceWithOwner.mockResolvedValue({
-      id: 'workspace-1',
-      name: 'Workspace',
-      ownerId: 'owner-1',
-      organizationId: 'org-1',
-      workspaceMode: 'organization',
-      billedAccountUserId: 'owner-1',
-    })
-    mockEnsureTeamOrganizationForAcceptance.mockResolvedValueOnce({
-      success: false,
-      failureCode: 'upgrade-required',
-    })
-
-    queueWhereResponses([
-      [
-        {
-          id: 'inv-1',
-          kind: 'workspace',
-          email: 'invitee@example.com',
-          organizationId: 'org-1',
-          membershipIntent: 'internal',
-          inviterId: 'owner-1',
-          role: 'member',
-          status: 'pending',
-          token: 'tok-1',
-          expiresAt: new Date(Date.now() + 60_000),
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-      ],
-      [
-        {
-          id: 'grant-1',
-          workspaceId: 'workspace-1',
-          permission: 'write',
-          workspaceName: 'Workspace',
-        },
-      ],
-      [{ name: 'Acme' }],
-      [{ name: 'Owner', email: 'owner@example.com' }],
-    ])
-
-    const result = await acceptInvitation({
-      userId: 'invitee-user',
-      userEmail: 'invitee@example.com',
-      invitationId: 'inv-1',
-      token: 'tok-1',
-    })
-
-    expect(result.success).toBe(false)
-    if (!result.success) {
-      expect(result.kind).toBe('upgrade-required')
-    }
-    expect(mockEnsureUserInOrganization).not.toHaveBeenCalled()
-    expect(mockReconcileOrganizationSeats).not.toHaveBeenCalled()
   })
 
   it('aborts when the org membership is revoked concurrently during the grant', async () => {
@@ -2037,11 +1614,6 @@ describe('acceptInvitation', () => {
       organizationId: 'org-1',
       workspaceMode: 'organization',
       billedAccountUserId: 'owner-1',
-    })
-    mockEnsureTeamOrganizationForAcceptance.mockResolvedValueOnce({
-      success: true,
-      organizationId: 'org-1',
-      fixedSeats: false,
     })
 
     queueWhereResponses([

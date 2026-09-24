@@ -36,9 +36,6 @@ const TeamManagement = dynamic(() =>
     (m) => m.TeamManagement
   )
 )
-const Billing = dynamic(() =>
-  import('@/app/workspace/[workspaceId]/settings/components/billing/billing').then((m) => m.Billing)
-)
 const AccessControl = dynamic(() =>
   import('@/ee/access-control/components/access-control').then((m) => m.AccessControl)
 )
@@ -94,10 +91,8 @@ export function OrganizationSettings({ section }: OrganizationSettingsProps) {
         <TeamManagement
           organizationId={organizationId}
           canInviteMembers={viewer.canInviteMembers}
-          billingHref={getOrganizationSettingsHref(organizationId, 'billing')}
         />
       )}
-      {section === 'billing' && <Billing scope='organization' organizationId={organizationId} />}
       {section === 'access-control' && (
         <AccessControl
           organizationId={organizationId}

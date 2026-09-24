@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  */
-import { resetEnvFlagsMock, setEnvFlags } from '@sim/testing'
+import { resetEnvFlagsMock } from '@sim/testing'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { mockCreateOrganizationWithOwnerTx, mockEnsureUserInOrganization, mockSelect, mockExecute } =
@@ -71,7 +71,6 @@ describe('instance organization', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     queuedRows.length = 0
-    setEnvFlags({ isBillingEnabled: false })
     mockSelect.mockImplementation(buildSelectChain)
     mockExecute.mockResolvedValue(undefined)
     setInstanceEnv({
@@ -104,11 +103,6 @@ describe('instance organization', () => {
     it('prefers an explicit slug', () => {
       setInstanceEnv({ INSTANCE_ORG_SLUG: 'custom-slug' })
       expect(getInstanceOrganizationConfig()?.slug).toBe('custom-slug')
-    })
-
-    it('stays off when billing is enabled, so paid orgs keep their own lifecycle', () => {
-      setEnvFlags({ isBillingEnabled: true })
-      expect(getInstanceOrganizationConfig()).toBeNull()
     })
   })
 

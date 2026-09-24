@@ -73,7 +73,7 @@ import {
   OrganizationSlugTakenError,
 } from '@/lib/billing/organizations/create-organization'
 import { ensureUserInOrganization } from '@/lib/billing/organizations/membership'
-import { isBillingEnabled, isOrganizationsEnabled } from '@/lib/core/config/env-flags'
+import { isOrganizationsEnabled } from '@/lib/core/config/env-flags'
 import { getInstanceOrganizationConfig } from '@/lib/organizations/instance-org'
 import { attachOwnedWorkspacesToOrganization } from '@/lib/workspaces/organization-workspaces'
 import { WORKSPACE_MODE } from '@/lib/workspaces/policy'
@@ -471,8 +471,7 @@ async function main(): Promise<void> {
         userId: candidate.id,
         organizationId,
         role: 'member',
-        skipBillingLogic: !isBillingEnabled,
-        skipSeatValidation: !isBillingEnabled,
+        skipSeatValidation: true,
       })
       if (!result.success) {
         memberFailures.push({ email: candidate.email, reason: result.error ?? 'unknown error' })

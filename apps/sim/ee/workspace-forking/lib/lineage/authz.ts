@@ -1,6 +1,4 @@
-import { isOrganizationOnEnterprisePlan } from '@/lib/billing/core/subscription'
-import { ForbiddenOperationError } from '@/lib/core/application/forbidden'
-import { isBillingEnabled, isForkingEnabled } from '@/lib/core/config/env-flags'
+import { isForkingEnabled } from '@/lib/core/config/env-flags'
 import { HttpError } from '@/lib/core/utils/http-error'
 import { checkWorkspaceAccess, type WorkspaceWithOwner } from '@/lib/workspaces/permissions/utils'
 import { getWorkspaceCreationPolicy, type WorkspaceCreationPolicy } from '@/lib/workspaces/policy'
@@ -18,19 +16,8 @@ export type PromoteDirection = 'push' | 'pull'
  *
  */
 export async function assertForkingEnabled(organizationId: string | null): Promise<void> {
-  if (!isBillingEnabled && !isForkingEnabled) {
+  if (!isForkingEnabled) {
     throw new ForkError('Workspace forking is not enabled on this deployment', 404)
-  }
-  if (isBillingEnabled) {
-    const hasEnterprise = organizationId
-      ? await isOrganizationOnEnterprisePlan(organizationId)
-      : false
-    if (!hasEnterprise) {
-      throw new ForbiddenOperationError(
-        'ENTERPRISE_PLAN_REQUIRED',
-        'Workspace forking is available on Enterprise plans only'
-      )
-    }
   }
 }
 

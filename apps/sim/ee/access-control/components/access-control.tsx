@@ -18,7 +18,6 @@ import { createLogger } from '@sim/logger'
 import { getErrorMessage } from '@sim/utils/errors'
 import { useParams } from 'next/navigation'
 import { useQueryState } from 'nuqs'
-import { isEnterprise } from '@/lib/billing/plan-helpers'
 import { useDeploymentShape } from '@/lib/core/config/deployment-shape'
 import {
   groupIdParam,
@@ -49,7 +48,6 @@ import {
   usePermissionGroups,
   useUserPermissionConfig,
 } from '@/ee/access-control/hooks/permission-groups'
-import { useOrganizationBilling } from '@/hooks/queries/organization'
 
 const logger = createLogger('AccessControl')
 
@@ -79,13 +77,6 @@ export function AccessControl({
     isPending: entitlementLoading,
     error: entitlementError,
   } = useUserPermissionConfig(workspaceId)
-  const {
-    data: organizationBillingData,
-    isPending: organizationBillingLoading,
-    error: organizationBillingError,
-  } = useOrganizationBilling(organizationId, {
-    enabled: !features.accessControl && !userPermissionConfig?.entitled,
-  })
   const currentUserIsOrgAdmin = isOrganizationAdmin
 
   const {
@@ -104,17 +95,11 @@ export function AccessControl({
    * reading the bare var here let a deployment with only `ENTERPRISE_ENABLED`
    * set show the section and then refuse to manage it.
    */
-  const isEntitled =
-    features.accessControl ||
-    !!userPermissionConfig?.entitled ||
-    isEnterprise(organizationBillingData?.data?.subscriptionPlan)
+  const isEntitled = features.accessControl || !!userPermissionConfig?.entitled
   const canManage = isEntitled && currentUserIsOrgAdmin && !!organizationId
-  const organizationEntitlementLoading =
-    !features.accessControl && !userPermissionConfig?.entitled && organizationBillingLoading
 
   const isLoading =
     (workspaceId ? entitlementLoading : false) ||
-    organizationEntitlementLoading ||
     (!!organizationId && currentUserIsOrgAdmin && groupsLoading)
 
   const createPermissionGroup = useCreatePermissionGroup()
@@ -231,8 +216,9 @@ export function AccessControl({
 
   const entitlementLoadError = isEntitled
     ? null
-    : ((userPermissionConfig === undefined ? entitlementError : null) ??
-      (organizationBillingData === undefined ? organizationBillingError : null))
+    : userPermissionConfig === undefined
+      ? entitlementError
+      : null
   if (entitlementLoadError) {
     return (
       <SettingsEmptyState tone='error'>
@@ -246,7 +232,7 @@ export function AccessControl({
       <SettingsEmptyState>
         {!organizationId
           ? "Access Control applies to organization workspaces. This workspace isn't part of an organization."
-          : 'Only organization admins on Enterprise plans can manage Access Control settings.'}
+          : 'Only organization admins can manage Access Control settings.'}
       </SettingsEmptyState>
     )
   }

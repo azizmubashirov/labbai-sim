@@ -1,4 +1,3 @@
-import { UPGRADE_REASON_COPY, type UpgradeReason } from '@/lib/billing/upgrade-reasons'
 import { getBrandConfig } from '@/ee/whitelabeling'
 
 /** Email subject type for all supported email templates */
@@ -15,13 +14,6 @@ export type EmailSubjectType =
   | 'workspace-added'
   | 'permission-access-request-created'
   | 'permission-access-request-decided'
-  | 'enterprise-subscription'
-  | 'usage-threshold'
-  | 'free-tier-upgrade'
-  | 'payment-failed'
-  | 'credit-purchase'
-  | 'abandoned-checkout'
-  | 'free-tier-exhausted'
   | 'schedule-disabled'
   | 'subprocessor-change'
   | 'onboarding-followup'
@@ -60,20 +52,6 @@ export function getEmailSubject(type: EmailSubjectType): string {
       return `An access request needs review on ${brandName}`
     case 'permission-access-request-decided':
       return `Your access request was updated on ${brandName}`
-    case 'enterprise-subscription':
-      return `Your Enterprise Plan is now active on ${brandName}`
-    case 'usage-threshold':
-      return `You're nearing your monthly budget on ${brandName}`
-    case 'free-tier-upgrade':
-      return `You're at 80% of your free credits on ${brandName}`
-    case 'payment-failed':
-      return `Payment failed on ${brandName} — action required`
-    case 'credit-purchase':
-      return `Credits added to your ${brandName} account`
-    case 'abandoned-checkout':
-      return `Quick question`
-    case 'free-tier-exhausted':
-      return `You've run out of free credits on ${brandName}`
     case 'schedule-disabled':
       return `A schedule was turned off on ${brandName}`
     case 'subprocessor-change':
@@ -85,23 +63,6 @@ export function getEmailSubject(type: EmailSubjectType): string {
     default:
       return brandName
   }
-}
-
-/**
- * Subject line for a per-category usage-limit email. Reuses the shared
- * {@link UPGRADE_REASON_COPY} so the subject matches the email body and the
- * upgrade-page header the user lands on.
- */
-export function getLimitEmailSubject(reason: UpgradeReason, kind: 'warning' | 'reached'): string {
-  const brandName = getBrandConfig().name
-  const copy = UPGRADE_REASON_COPY[reason]
-  const subject = kind === 'reached' ? copy.reachedSubject : copy.warningSubject
-  return `${subject} on ${brandName}`
-}
-
-/** The plan's display name is resolved at send time; it carries tier qualifiers. */
-export function getPlanWelcomeSubject(planDisplayName: string): string {
-  return `Your ${planDisplayName} plan is now active on ${getBrandConfig().name}`
 }
 
 /** Echoes the sender's own subject line so the reply threads correctly. */

@@ -5,9 +5,6 @@ import { Plus } from '@sim/emcn'
 import { createLogger } from '@sim/logger'
 import { getErrorMessage } from '@sim/utils/errors'
 import { useSession } from '@/lib/auth/auth-client'
-import { getSubscriptionAccessState } from '@/lib/billing/client/utils'
-import { useDeploymentShape } from '@/lib/core/config/deployment-shape'
-import { getBaseUrl } from '@/lib/core/utils/urls'
 import { APP_ENTRY_PATH } from '@/lib/navigation/paths'
 import { generateSlug, isAdminOrOwner, type Member } from '@/lib/workspaces/organization'
 import { InviteModal } from '@/app/workspace/[workspaceId]/components/invite-modal'
@@ -20,7 +17,6 @@ import {
   NoOrganizationView,
   OrganizationMemberLists,
   RemoveMemberDialog,
-  TeamSeatsOverview,
   TransferOwnershipDialog,
 } from '@/app/workspace/[workspaceId]/settings/components/team-management/components'
 import { useSettingsSearch } from '@/app/workspace/[workspaceId]/settings/components/use-settings-search'
@@ -28,12 +24,10 @@ import {
   useCreateOrganization,
   useMemberRemovalImpact,
   useOrganization,
-  useOrganizationBilling,
   useOrganizationRoster,
   useRemoveMember,
   useTransferOwnership,
 } from '@/hooks/queries/organization'
-import { useOpenBillingPortal, useSubscriptionData } from '@/hooks/queries/subscription'
 import { usePermissionConfig } from '@/hooks/use-permission-config'
 
 const logger = createLogger('TeamManagement')
@@ -41,20 +35,10 @@ const logger = createLogger('TeamManagement')
 interface TeamManagementProps {
   organizationId: string
   canInviteMembers?: boolean
-  /**
-   * The caller owns navigation so the same panel works in organization and
-   * legacy workspace settings.
-   */
-  billingHref: string
 }
 
-export function TeamManagement({
-  organizationId,
-  billingHref,
-  canInviteMembers,
-}: TeamManagementProps) {
+export function TeamManagement({ organizationId, canInviteMembers }: TeamManagementProps) {
   const { data: session } = useSession()
-  const { billingEnabled } = useDeploymentShape()
   const { isInvitationsDisabled } = usePermissionConfig()
   const invitationsDisabled =
     canInviteMembers === undefined ? isInvitationsDisabled : !canInviteMembers
@@ -68,30 +52,7 @@ export function TeamManagement({
     isFetching: isOrganizationFetching,
     refetch: refetchOrganization,
   } = useOrganization(organizationId)
-  /**
-   * Personal billing only supports the legacy missing-organization recovery view. A valid
-   * organization page derives its plan from organization billing, so avoid that unrelated read
-   * on the normal first paint.
-   */
-  const shouldLoadRecoverySubscription = billingEnabled && !isLoading && !orgError && !organization
-  const { data: userSubscriptionData, isPending: isRecoverySubscriptionPending } =
-    useSubscriptionData({
-      enabled: shouldLoadRecoverySubscription,
-    })
-  const subscriptionAccess = getSubscriptionAccessState(userSubscriptionData?.data)
-  const hasTeamPlan = subscriptionAccess.hasUsableTeamAccess
-  const hasEnterprisePlan = subscriptionAccess.hasUsableEnterpriseAccess
-
   const adminOrOwner = isAdminOrOwner(organization, session?.user?.email)
-
-  const {
-    data: organizationBillingData,
-    isLoading: isOrgBillingLoading,
-    error: organizationBillingError,
-    isFetchedAfterMount: isOrganizationBillingFetchedAfterMount,
-    isFetching: isOrganizationBillingFetching,
-    refetch: refetchOrganizationBilling,
-  } = useOrganizationBilling(organizationId, { enabled: billingEnabled && adminOrOwner })
 
   const {
     data: roster,
@@ -104,7 +65,6 @@ export function TeamManagement({
 
   const removeMemberMutation = useRemoveMember()
   const transferOwnershipMutation = useTransferOwnership()
-  const openBillingPortal = useOpenBillingPortal()
   const createOrgMutation = useCreateOrganization()
 
   const [inviteModalOpen, setInviteModalOpen] = useState(false)
@@ -117,7 +77,6 @@ export function TeamManagement({
     isExternalRemoval?: boolean
   }>({ open: false, memberId: '', memberName: '' })
   const [transferDialogOpen, setTransferDialogOpen] = useState(false)
-  const [transferPortalError, setTransferPortalError] = useState<string | null>(null)
   const [orgName, setOrgName] = useState('')
   const [orgSlug, setOrgSlug] = useState('')
 
@@ -138,35 +97,13 @@ export function TeamManagement({
     ...new Set(removalImpactCredentials?.map((credential) => credential.displayName) ?? []),
   ]
 
-  const totalSeats = organizationBillingData?.data?.totalSeats ?? 0
-  const usedSeats = organizationBillingData?.data?.membersTotal ?? 0
-  const reservedSeats = organizationBillingData?.data?.usedSeats ?? 0
-  const pendingSeats = Math.max(0, reservedSeats - usedSeats)
-
-  /**
-   * The org's active subscription, derived from DB-backed organization billing
-   * (`getOrganizationBillingData` only returns data when an entitled org
-   * subscription exists). We intentionally do not read this from better-auth's
-   * `client.subscription.list`, which does not reliably surface org-scoped
-   * subscriptions.
-   */
-  const orgBilling = billingEnabled ? (organizationBillingData?.data ?? null) : null
-  const orgSubscription = orgBilling
-    ? {
-        id: orgBilling.organizationId,
-        plan: orgBilling.subscriptionPlan,
-        status: orgBilling.subscriptionStatus ?? 'active',
-        referenceId: orgBilling.organizationId,
-      }
-    : null
-
   useEffect(() => {
-    if ((hasTeamPlan || hasEnterprisePlan) && session?.user?.name && !orgName) {
+    if (session?.user?.name && !orgName) {
       const defaultName = `${session.user.name}'s Team`
       setOrgName(defaultName)
       setOrgSlug(generateSlug(defaultName))
     }
-  }, [hasTeamPlan, hasEnterprisePlan, session?.user?.name, orgName])
+  }, [session?.user?.name, orgName])
 
   const handleOrgNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newName = e.target.value
@@ -242,13 +179,11 @@ export function TeamManagement({
     setTransferDialogOpen(next)
     if (!next) {
       transferOwnershipMutation.reset()
-      setTransferPortalError(null)
     }
   }
 
   const handleOpenTransferDialog = () => {
     transferOwnershipMutation.reset()
-    setTransferPortalError(null)
     setTransferDialogOpen(true)
   }
 
@@ -268,34 +203,6 @@ export function TeamManagement({
     } catch (error) {
       logger.error('Failed to transfer ownership', error)
     }
-  }
-
-  const handleOpenTransferBillingPortal = () => {
-    setTransferPortalError(null)
-    const portalWindow = window.open('', '_blank')
-    openBillingPortal.mutate(
-      {
-        context: 'organization',
-        organizationId,
-        returnUrl: `${getBaseUrl()}${APP_ENTRY_PATH}`,
-      },
-      {
-        onSuccess: (data) => {
-          if (portalWindow) {
-            portalWindow.location.href = data.url
-          } else {
-            window.location.href = data.url
-          }
-        },
-        onError: (error) => {
-          portalWindow?.close()
-          logger.error('Failed to open billing portal from transfer dialog', { error })
-          setTransferPortalError(
-            getErrorMessage(error, 'Failed to open Stripe billing portal. Please try again.')
-          )
-        },
-      }
-    )
   }
 
   const displayOrganization = organization
@@ -320,15 +227,9 @@ export function TeamManagement({
     )
   }
 
-  if (!displayOrganization && shouldLoadRecoverySubscription && isRecoverySubscriptionPending) {
-    return null
-  }
-
   if (!displayOrganization) {
     return (
       <NoOrganizationView
-        hasTeamPlan={hasTeamPlan}
-        hasEnterprisePlan={hasEnterprisePlan}
         orgName={orgName}
         orgSlug={orgSlug}
         setOrgSlug={setOrgSlug}
@@ -369,29 +270,6 @@ export function TeamManagement({
             : []
         }
       >
-        {billingEnabled &&
-          adminOrOwner &&
-          ((organizationBillingError ||
-            (isOrganizationBillingFetching && isOrganizationBillingFetchedAfterMount)) &&
-          organizationBillingData === undefined ? (
-            <SettingsQueryErrorState
-              error={organizationBillingError}
-              fallback='Failed to load seat information'
-              isRetrying={isOrganizationBillingFetching}
-              onRetry={() => void refetchOrganizationBilling()}
-              variant='inline'
-            />
-          ) : (
-            <TeamSeatsOverview
-              billingHref={billingHref}
-              subscriptionData={orgSubscription}
-              isLoadingSubscription={isOrgBillingLoading}
-              totalSeats={totalSeats}
-              usedSeats={usedSeats}
-              pendingSeats={pendingSeats}
-            />
-          ))}
-
         {isLoadingRoster && !isRosterFetchedAfterMount ? (
           <SettingsEmptyState variant='inline'>Loading members…</SettingsEmptyState>
         ) : (rosterError || (isRosterFetching && isRosterFetchedAfterMount)) &&
@@ -435,11 +313,7 @@ export function TeamManagement({
         currentUserId={session?.user?.id ?? ''}
         isSubmitting={transferOwnershipMutation.isPending}
         error={transferOwnershipMutation.error}
-        portalError={transferPortalError}
-        hasPaidSubscription={Boolean(orgSubscription)}
-        isOpeningBillingPortal={openBillingPortal.isPending}
         onConfirm={handleConfirmTransfer}
-        onOpenBillingPortal={handleOpenTransferBillingPortal}
       />
 
       <RemoveMemberDialog

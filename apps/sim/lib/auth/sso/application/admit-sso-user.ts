@@ -22,8 +22,6 @@ import {
   acquireOrganizationUserMutationLocks,
   ensureUserInOrganizationTx,
 } from '@/lib/billing/organizations/membership'
-import { resolveOrganizationSeatPolicyTx } from '@/lib/billing/organizations/seat-policy'
-import { reconcileOrganizationSeats } from '@/lib/billing/organizations/seats'
 import { assertOperationPrincipal, type OperationUseCase } from '@/lib/core/application/operation'
 import { captureServerEvent } from '@/lib/posthog/server'
 import { isScimEntitledForOrganization } from '@/ee/scim/lib/entitlement'
@@ -66,7 +64,6 @@ interface SuccessfulAdmission {
   providerId: string
   userName?: string
   userEmail?: string
-  organizationSubscriptionId?: string
 }
 
 async function runAdmissionTransaction(
@@ -253,12 +250,10 @@ async function runAdmissionTransaction(
       }
     }
 
-    const seatPolicy = await resolveOrganizationSeatPolicyTx(tx, provider.organizationId)
     const membershipResult = await ensureUserInOrganizationTx(tx, {
       userId,
       organizationId: provider.organizationId,
       role: 'member',
-      ...seatPolicy,
     })
 
     if (!membershipResult.success || !membershipResult.memberId) {
@@ -275,9 +270,6 @@ async function runAdmissionTransaction(
 
     return {
       ...attribution,
-      ...(seatPolicy.organizationSubscriptionId
-        ? { organizationSubscriptionId: seatPolicy.organizationSubscriptionId }
-        : {}),
       result: {
         kind: membershipResult.alreadyMember ? 'already-member' : 'provisioned',
         organizationId: provider.organizationId,
@@ -325,23 +317,6 @@ async function runProvisioningPostCommitEffects(
     )
   } catch (error) {
     logger.error('Failed to record SSO JIT admission telemetry', {
-      userId,
-      organizationId,
-      error,
-    })
-  }
-
-  try {
-    await reconcileOrganizationSeats({
-      organizationId,
-      reason: 'sso-jit-member-added',
-      actorId: userId,
-      ...(admission.organizationSubscriptionId
-        ? { subscriptionId: admission.organizationSubscriptionId }
-        : {}),
-    })
-  } catch (error) {
-    logger.error('Failed to reconcile organization seats after SSO JIT admission', {
       userId,
       organizationId,
       error,

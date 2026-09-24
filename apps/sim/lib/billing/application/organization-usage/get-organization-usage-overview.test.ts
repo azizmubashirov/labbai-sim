@@ -55,7 +55,7 @@ function run(input: Partial<Parameters<typeof getOrganizationUsageOverview.execu
 describe('getOrganizationUsageOverview', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    setEnvFlags({ isBillingEnabled: true, isHosted: true })
+    setEnvFlags({ isHosted: true })
     mocks.authorizeOrganizationOperation.mockResolvedValue(true)
     mocks.isOrganizationFeatureEntitled.mockResolvedValue(true)
     mocks.getOrganizationSubscription.mockResolvedValue({
@@ -94,7 +94,7 @@ describe('getOrganizationUsageOverview', () => {
   })
 
   afterAll(() => {
-    setEnvFlags({ isBillingEnabled: false, isHosted: false })
+    setEnvFlags({ isHosted: false })
   })
 
   it('reconciles the stack and the headline to one figure', async () => {

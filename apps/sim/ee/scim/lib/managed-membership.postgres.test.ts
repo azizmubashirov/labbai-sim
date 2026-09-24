@@ -12,7 +12,6 @@ vi.mock('@/lib/core/config/env-flags', () => ({
   ...envFlagsMock,
   isHosted: true,
   isScimEnabled: true,
-  isBillingEnabled: true,
 }))
 
 const databaseUrl = process.env.OAUTH_TOKEN_FAMILY_TEST_DATABASE_URL
@@ -179,28 +178,5 @@ describe.skipIf(!databaseUrl)('SCIM managed membership in PostgreSQL', () => {
         db.transaction((executor) => assertMembershipNotScimManaged({ ...input, executor }))
       ).resolves.toBeUndefined()
     }
-  })
-
-  it('allows a previously managed member when the real Enterprise subscription has ended', async () => {
-    const { db, schema, eq, assertMembershipNotScimManaged } = runtime
-    await db
-      .update(schema.subscription)
-      .set({ status: 'canceled' })
-      .where(eq(schema.subscription.referenceId, orgId))
-    await expect(
-      db.transaction((executor) =>
-        assertMembershipNotScimManaged({ organizationId: orgId, userId: managedUserId, executor })
-      )
-    ).resolves.toBeUndefined()
-  })
-
-  it('propagates a real billing query failure without relaxing directory policy', async () => {
-    const { db, sql, isScimEntitledForOrganization } = runtime
-    await expect(
-      db.transaction(async (executor) => {
-        await executor.execute(sql`set local search_path to pg_catalog`)
-        await isScimEntitledForOrganization(orgId, executor)
-      })
-    ).rejects.toMatchObject({ cause: { code: '42P01' } })
   })
 })

@@ -18,6 +18,5 @@ export const SECTION_PREFETCHERS: Partial<
   >
 > = {
   general: (queryClient) => prefetchCurrentUserSettings(queryClient),
-  billing: (queryClient) => prefetchCurrentUserSettings(queryClient),
   admin: (queryClient) => prefetchCurrentUserSettings(queryClient),
 }

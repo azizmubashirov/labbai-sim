@@ -41,7 +41,6 @@ import type { DbOrTx } from '@/lib/db/types'
 import { getInvitationById, isInvitationExpired } from '@/lib/invitations/core'
 import { acquireInvitationMutationLocks } from '@/lib/invitations/locks'
 import { PENDING_INVITATION_UNIQUE_INDEX, sendInvitationEmail } from '@/lib/invitations/send'
-import { invalidateWorkspaceTableLimitsCache } from '@/lib/table/billing'
 import { deleteCustomBlock } from '@/lib/workflows/custom-blocks/operations'
 import {
   type CrossOrgForkEdge,
@@ -1564,8 +1563,6 @@ export async function moveWorkspaceToOrganization(params: {
     })
     return result.summary
   }
-
-  invalidateWorkspaceTableLimitsCache(params.workspaceId)
 
   if (result.sourceOrganizationOutcome) {
     await recordSourceOrganizationMoveAudit({

@@ -8,9 +8,8 @@ import {
   resetDbChainMock,
   resetEnvFlagsMock,
   schemaMock,
-  setEnvFlags,
 } from '@sim/testing'
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const {
   mockAuthorize,
@@ -50,10 +49,6 @@ import { readSsoRequirement, setSsoRequirement } from '@/lib/auth/sso/applicatio
 
 const principal = { kind: 'session', userId: 'u1', sessionId: 's1' } as const
 const ORG_ID = 'org1'
-
-beforeAll(() => {
-  setEnvFlags({ isBillingEnabled: true })
-})
 
 afterAll(resetEnvFlagsMock)
 

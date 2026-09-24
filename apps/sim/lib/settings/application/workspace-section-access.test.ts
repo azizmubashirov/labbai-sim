@@ -8,7 +8,6 @@ const mocks = vi.hoisted(() => ({
   checkWorkspaceAccess: vi.fn(),
   deploymentShape: {
     hosted: true,
-    billingEnabled: true,
     chatEnabled: true,
     azureConfigured: false,
     cohereConfigured: false,
@@ -43,7 +42,6 @@ vi.mock('@/components/settings/navigation', () => ({
   resolveWorkspaceNavigation: mocks.resolveWorkspaceNavigation,
   UNIFIED_TO_ORGANIZATION_SECTION: {
     organization: 'members',
-    billing: 'billing',
     'connected-accounts': 'connected-accounts',
     'access-control': 'access-control',
   },
@@ -126,7 +124,6 @@ function authorize(section: Parameters<typeof authorizeWorkspaceSettingsSection>
 describe('authorizeWorkspaceSettingsSection', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mocks.deploymentShape.billingEnabled = true
     mocks.checkWorkspaceAccess.mockResolvedValue(PERSONAL_ACCESS)
     mocks.isCustomBlocksEligibleForOrganization.mockResolvedValue(true)
     mocks.isForkingAvailableForWorkspace.mockResolvedValue(true)
@@ -149,7 +146,7 @@ describe('authorizeWorkspaceSettingsSection', () => {
       workspace: PERSONAL_ACCESS.workspace,
     })
 
-    await expect(authorize('billing')).resolves.toEqual({
+    await expect(authorize('secrets')).resolves.toEqual({
       allowed: false,
       disposition: 'not-found',
     })
@@ -331,22 +328,7 @@ describe('authorizeWorkspaceSettingsSection', () => {
     expect(mocks.isCustomBlocksEligibleForOrganization).toHaveBeenCalledWith('organization-1')
   })
 
-  it('allows personal billing only to the billed account owner', async () => {
-    await expect(authorize('billing')).resolves.toEqual({
-      allowed: false,
-      disposition: 'redirect-general',
-    })
-
-    mocks.checkWorkspaceAccess.mockResolvedValue({
-      ...PERSONAL_ACCESS,
-      workspace: { ...PERSONAL_ACCESS.workspace, billedAccountUserId: 'viewer-1' },
-    })
-    await expect(authorize('billing')).resolves.toEqual({ allowed: true })
-    expect(mocks.canOpenOrganizationSettingsSection).not.toHaveBeenCalled()
-  })
-
-  it('allows the member roster with billing disabled while keeping billing unavailable', async () => {
-    mocks.deploymentShape.billingEnabled = false
+  it('allows the member roster', async () => {
     mocks.checkWorkspaceAccess.mockResolvedValue(ORGANIZATION_ACCESS)
 
     await expect(authorize('organization')).resolves.toEqual({ allowed: true })
@@ -355,14 +337,9 @@ describe('authorizeWorkspaceSettingsSection', () => {
       'viewer-1',
       'members'
     )
-    await expect(authorize('billing')).resolves.toEqual({
-      allowed: false,
-      disposition: 'redirect-general',
-    })
   })
 
-  it('requires current organization membership for the roster with billing disabled', async () => {
-    mocks.deploymentShape.billingEnabled = false
+  it('requires current organization membership for the roster', async () => {
     mocks.checkWorkspaceAccess.mockResolvedValue(ORGANIZATION_ACCESS)
     mocks.canOpenOrganizationSettingsSection.mockResolvedValue(false)
 

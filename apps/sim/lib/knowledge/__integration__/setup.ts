@@ -33,7 +33,6 @@ Object.assign(process.env, {
   NEXT_PUBLIC_APP_URL: 'http://localhost:3000',
   NEXT_PUBLIC_FORCE_HOSTED: 'false',
   INTERNAL_API_BASE_URL: 'http://localhost:3000',
-  BILLING_ENABLED: 'false',
   KNOWLEDGE_MEMBER_ACCESS: 'true',
   CREDENTIAL_GROUPS: 'true',
   ACCESS_CONTROL_ENABLED: 'true',

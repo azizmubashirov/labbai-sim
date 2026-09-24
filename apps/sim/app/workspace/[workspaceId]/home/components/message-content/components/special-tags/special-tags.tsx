@@ -2,19 +2,10 @@
 
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { cn, Expandable, ExpandableContent, SecretReveal, Tooltip, toast } from '@sim/emcn'
-import {
-  ArrowRight,
-  Check,
-  ChevronDown,
-  Lock,
-  SquareArrowUpRight,
-} from '@sim/emcn/icons'
+import { ArrowRight, Check, ChevronDown, Lock } from '@sim/emcn/icons'
 import { isRecordLike } from '@sim/utils/object'
 import { useParams } from 'next/navigation'
 import { useSession } from '@/lib/auth/auth-client'
-import { buildHostedUpgradeUrl, HOSTED_BILLING_SETTINGS_URL } from '@/lib/billing/upgrade-reasons'
-import { canManageWorkspaceBilling } from '@/lib/billing/workspace-permissions'
-import { useDeploymentShape } from '@/lib/core/config/deployment-shape'
 import { isSafeHttpUrl } from '@/lib/core/utils/urls'
 import { readLatestOAuthChatAttempt } from '@/lib/credentials/oauth-chat-attempt'
 import { resolveCredentialDisplay } from '@/lib/integrations/credential-display'
@@ -64,10 +55,8 @@ import type {
 // ConnectServiceAccountModal, and that edge would pull the modal into this
 // chunk and defeat the lazy() split below.
 import { useServiceAccountConnectTarget } from '@/app/workspace/[workspaceId]/integrations/components/connect-service-account-modal/use-service-account-connect'
-import { useWorkspaceHostContext } from '@/app/workspace/[workspaceId]/providers/workspace-host-provider'
 import { useUserPermissionsContext } from '@/app/workspace/[workspaceId]/providers/workspace-permissions-provider'
 import { BrandIcon } from '@/blocks/brand-icon'
-import { MemberLimitRequestAction } from '@/ee/access-requests/components/member-limit-request-action'
 import {
   useUpdateWorkspaceCredential,
   useWorkspaceCredential,
@@ -83,8 +72,6 @@ import { useTablesList } from '@/hooks/queries/tables'
 import { findWorkspaceFileByPath } from '@/hooks/queries/utils/find-workspace-file-by-src'
 import { useWorkflows } from '@/hooks/queries/workflows'
 import { useWorkspaceFiles } from '@/hooks/queries/workspace-files'
-import { useWorkspaceUsageGate } from '@/hooks/queries/workspace-usage'
-import { useSettingsNavigation } from '@/hooks/use-settings-navigation'
 
 export interface OptionsItemData {
   title: string
@@ -1926,7 +1913,7 @@ export function SpecialTags({
     case 'options':
       return <OptionsDisplay data={segment.data} onSelect={onOptionSelect} />
     case 'usage_upgrade':
-      return <UsageUpgradeDisplay data={segment.data} />
+      return null
     case 'credential':
       return (
         <CredentialDisplay
@@ -3121,76 +3108,3 @@ function MothershipErrorDisplay({ data }: { data: MothershipErrorTagData }) {
   )
 }
 
-function UsageUpgradeDisplay({ data }: { data: UsageUpgradeTagData }) {
-  const { data: session } = useSession()
-  const hostContext = useWorkspaceHostContext()
-  const { getSettingsHref } = useSettingsNavigation()
-  const { hosted } = useDeploymentShape()
-  const buttonLabel = data.action === 'upgrade_plan' ? 'Upgrade Plan' : 'Increase Limit'
-
-  // Self-hosted plan and limit both live on the hosted account, so local
-  // workspace billing roles say nothing about who may change them.
-  const href = hosted
-    ? getSettingsHref({ section: 'billing' })
-    : data.action === 'upgrade_plan'
-      ? buildHostedUpgradeUrl()
-      : HOSTED_BILLING_SETTINGS_URL
-  const canManageBilling = !hosted || canManageWorkspaceBilling(hostContext, session?.user?.id)
-  const usageGate = useWorkspaceUsageGate(
-    data.action === 'increase_limit' && !canManageBilling ? hostContext.workspace.id : undefined
-  )
-  const unavailableMessage = hostContext.hostOrganizationId
-    ? 'Contact an organization admin to manage this workspace’s usage limits.'
-    : 'Only the workspace owner can manage this workspace’s usage limits.'
-
-  return (
-    <div className='rounded-2xl border border-amber-300/40 bg-amber-50/50 px-4 py-3 dark:border-amber-500/20 dark:bg-amber-950/20'>
-      <div className='flex items-center gap-2'>
-        <svg
-          className='size-4 shrink-0 text-amber-600 dark:text-amber-400'
-          viewBox='0 0 16 16'
-          fill='none'
-          xmlns='http://www.w3.org/2000/svg'
-        >
-          <path
-            d='M8 1.5L1 14h14L8 1.5z'
-            stroke='currentColor'
-            strokeWidth='1.3'
-            strokeLinejoin='round'
-          />
-          <path d='M8 6.5v3' stroke='currentColor' strokeWidth='1.3' strokeLinecap='round' />
-          <circle cx='8' cy='11.5' r='0.75' fill='currentColor' />
-        </svg>
-        <span className='text-amber-800 text-sm leading-5 dark:text-amber-300'>
-          Usage Limit Reached
-        </span>
-      </div>
-      <p className='mt-1.5 text-amber-700/90 text-small leading-[20px] dark:text-amber-400/80'>
-        {data.message}
-      </p>
-      {canManageBilling ? (
-        <a
-          href={href}
-          target={hosted ? undefined : '_blank'}
-          rel={hosted ? undefined : 'noopener noreferrer'}
-          aria-label={hosted ? undefined : `${buttonLabel} (opens in a new tab)`}
-          className='mt-2 inline-flex items-center gap-1 text-amber-700 text-small underline decoration-dashed underline-offset-2 transition-colors hover-hover:text-amber-900 dark:text-amber-300 dark:hover-hover:text-amber-200'
-        >
-          {buttonLabel}
-          {hosted ? <ArrowRight className='size-3' /> : <SquareArrowUpRight className='size-3' />}
-        </a>
-      ) : (
-        <div className='mt-2 flex flex-col items-start gap-2'>
-          <p className='text-amber-700 text-small dark:text-amber-300'>{unavailableMessage}</p>
-          {usageGate.isSuccess &&
-            usageGate.data.isExceeded &&
-            usageGate.data.scope === 'member' && (
-              <MemberLimitRequestAction
-                scope={{ kind: 'workspace', workspaceId: hostContext.workspace.id }}
-              />
-            )}
-        </div>
-      )}
-    </div>
-  )
-}

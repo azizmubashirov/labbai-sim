@@ -1,8 +1,6 @@
 /** @vitest-environment node */
 
-import { recordAudit } from '@sim/audit'
 import type { OAuthAccessTokenPrincipal, Principal } from '@sim/auth/principal'
-import { db } from '@sim/db'
 import { member } from '@sim/db/schema'
 import { queueTableRows, resetDbChainMock, resetEnvFlagsMock, setEnvFlags } from '@sim/testing'
 import { NextRequest } from 'next/server'
@@ -15,10 +13,6 @@ const mocks = vi.hoisted(() => ({
   config: vi.fn(),
   subscription: vi.fn(),
   entitled: vi.fn(),
-  limit: vi.fn(),
-  used: vi.fn(),
-  setLimit: vi.fn(),
-  limitTarget: vi.fn(),
   totals: vi.fn(),
   series: vi.fn(),
   breakdown: vi.fn(),
@@ -48,12 +42,6 @@ vi.mock('@/lib/billing/core/subscription', async (original) => ({
   ...(await original<typeof import('@/lib/billing/core/subscription')>()),
   isOrganizationFeatureEntitled: mocks.entitled,
 }))
-vi.mock('@/lib/billing/organizations/member-limits', () => ({
-  getOrgMemberUsageLimit: mocks.limit,
-  getOrgMemberUsageForCurrentPeriod: mocks.used,
-  setOrgMemberUsageLimit: mocks.setLimit,
-  isOrgMemberUsageLimitTarget: mocks.limitTarget,
-}))
 vi.mock('@/lib/billing/core/usage-analytics-queries', () => ({
   readUsageTotals: mocks.totals,
   readUsageTimeSeries: mocks.series,
@@ -65,10 +53,6 @@ vi.mock('@/lib/billing/core/usage-log', () => ({ getBillingEntityUsageLogs: mock
 import { SIM_CLI_CLIENT_ID } from '@/lib/auth/oauth-provider'
 import { DEFAULT_PERMISSION_GROUP_CONFIG } from '@/lib/permission-groups/fields'
 import { decodeCursor, encodeCursor } from '@/app/api/v2/lib/response'
-import {
-  GET as getLimit,
-  PATCH as setLimit,
-} from '@/app/api/v2/organizations/[organizationId]/members/[userId]/usage-limit/route'
 import { GET as breakdown } from '@/app/api/v2/organizations/[organizationId]/usage/breakdown/route'
 import { GET as events } from '@/app/api/v2/organizations/[organizationId]/usage/events/route'
 import { GET as summary } from '@/app/api/v2/organizations/[organizationId]/usage/summary/route'
@@ -82,7 +66,6 @@ const oauth: OAuthAccessTokenPrincipal = {
   scopes: ['api:read', 'api:write'],
   expiresAt: new Date('2099-01-01'),
 }
-const context = { params: Promise.resolve({ organizationId: 'org', userId: 'external-user' }) }
 const usageContext = { params: Promise.resolve({ organizationId: 'org' }) }
 function authenticate(principal: Principal) {
   mocks.authenticate.mockResolvedValue({
@@ -110,7 +93,7 @@ function admin() {
 beforeEach(() => {
   vi.clearAllMocks()
   resetDbChainMock()
-  setEnvFlags({ isHosted: true, isBillingEnabled: true })
+  setEnvFlags({ isHosted: true })
   authenticate(personal)
   const admission = {
     allowed: true,
@@ -127,10 +110,6 @@ beforeEach(() => {
     periodStart: new Date('2026-08-01'),
     periodEnd: new Date('2026-09-01'),
   })
-  mocks.limit.mockResolvedValue(2)
-  mocks.used.mockResolvedValue(1)
-  mocks.limitTarget.mockResolvedValue(true)
-  mocks.setLimit.mockResolvedValue(undefined)
   mocks.totals.mockResolvedValue({ cost: 1 })
   mocks.series.mockResolvedValue([])
   mocks.breakdown.mockResolvedValue([])
@@ -138,174 +117,6 @@ beforeEach(() => {
 })
 afterEach(() => vi.useRealTimers())
 afterAll(resetEnvFlagsMock)
-
-describe('organization credit-limit API', () => {
-  it.each([personal, oauth])(
-    'admits $kind and preserves external-user credit units and one semantic audit',
-    async (principal) => {
-      authenticate(principal)
-      admin()
-      admin()
-      const response = await setLimit(
-        request('members/external-user/usage-limit', { creditLimit: 400 }),
-        context
-      )
-      expect(response.status).toBe(200)
-      expect(await response.json()).toEqual({ data: { creditLimit: 400 } })
-      expect(mocks.setLimit).toHaveBeenCalledWith('org', 'external-user', 2, 'actor', db)
-      expect(mocks.limitTarget).toHaveBeenCalledWith('org', 'external-user')
-      expect(recordAudit).toHaveBeenCalledExactlyOnceWith(
-        expect.objectContaining({
-          actorId: 'actor',
-          resourceId: 'org',
-          metadata: expect.objectContaining({
-            organizationId: 'org',
-            targetUserId: 'external-user',
-            creditLimit: 400,
-          }),
-        })
-      )
-    }
-  )
-
-  it.each([null, 0])('supports the distinct cap value %s', async (creditLimit) => {
-    admin()
-    admin()
-    expect(
-      (await setLimit(request('members/external-user/usage-limit', { creditLimit }), context))
-        .status
-    ).toBe(200)
-    expect(mocks.setLimit).toHaveBeenCalledWith('org', 'external-user', creditLimit, 'actor', db)
-  })
-
-  it('rechecks the target after acquiring mutation locks', async () => {
-    admin()
-    admin()
-    mocks.limitTarget.mockResolvedValueOnce(true).mockResolvedValueOnce(false)
-    const response = await setLimit(
-      request('members/external-user/usage-limit', { creditLimit: 400 }),
-      context
-    )
-    expect(response.status).toBe(404)
-    expect(mocks.limitTarget).toHaveBeenLastCalledWith('org', 'external-user', {
-      executor: db,
-      forShare: true,
-    })
-    expect(mocks.setLimit).not.toHaveBeenCalled()
-    expect(recordAudit).not.toHaveBeenCalled()
-  })
-
-  it('refuses an actor demoted while waiting for mutation locks', async () => {
-    admin()
-    queueTableRows(member, [{ role: 'member' }])
-    const response = await setLimit(
-      request('members/external-user/usage-limit', { creditLimit: 400 }),
-      context
-    )
-    expect(response.status).toBe(403)
-    expect(mocks.setLimit).not.toHaveBeenCalled()
-    expect(recordAudit).not.toHaveBeenCalled()
-  })
-
-  it.each([
-    [personal, { disablePersonalApiKeys: true }],
-    [oauth, { disableOAuthAppAccess: true }],
-    [{ ...oauth, clientId: SIM_CLI_CLIENT_ID }, { disableCliAccess: true }],
-  ] as const)(
-    'rechecks $0.kind credential policy inside the mutation',
-    async (principal, restriction) => {
-      authenticate(principal)
-      admin()
-      admin()
-      mocks.config.mockResolvedValueOnce(null).mockResolvedValueOnce({
-        ...DEFAULT_PERMISSION_GROUP_CONFIG,
-        ...restriction,
-      })
-      const response = await setLimit(
-        request('members/external-user/usage-limit', { creditLimit: 400 }),
-        context
-      )
-      expect(response.status).toBe(403)
-      expect(mocks.config).toHaveBeenLastCalledWith('org', db)
-      expect(mocks.setLimit).not.toHaveBeenCalled()
-      expect(recordAudit).not.toHaveBeenCalled()
-    }
-  )
-
-  it('returns credits and the resolved organization billing interval', async () => {
-    admin()
-    const response = await getLimit(request('members/external-user/usage-limit'), context)
-    expect(await response.json()).toEqual({
-      data: { creditsUsed: 200, creditLimit: 400, billingInterval: 'month' },
-    })
-    expect(mocks.used).toHaveBeenCalledWith(
-      'org',
-      'external-user',
-      await mocks.subscription.mock.results[0].value
-    )
-  })
-
-  it('does not require Usage Monitoring for hosted caps', async () => {
-    admin()
-    mocks.entitled.mockResolvedValue(false)
-    expect((await getLimit(request('members/external-user/usage-limit'), context)).status).toBe(200)
-    expect(mocks.entitled).not.toHaveBeenCalled()
-  })
-
-  it('preserves hosted-only admission before body validation', async () => {
-    setEnvFlags({ isHosted: false })
-    expect(
-      (await setLimit(request('members/external-user/usage-limit', { invalid: true }), context))
-        .status
-    ).toBe(404)
-    expect(mocks.setLimit).not.toHaveBeenCalled()
-  })
-
-  it('refuses reads for a user outside the organization before loading usage', async () => {
-    admin()
-    mocks.limitTarget.mockResolvedValue(false)
-    const response = await getLimit(request('members/external-user/usage-limit'), context)
-    expect(response.status).toBe(404)
-    expect(mocks.limit).not.toHaveBeenCalled()
-    expect(mocks.used).not.toHaveBeenCalled()
-    expect(mocks.subscription).not.toHaveBeenCalled()
-  })
-
-  it.each([10, null])(
-    'refuses cap %s for a user outside the organization without mutation or audit',
-    async (creditLimit) => {
-      admin()
-      mocks.limitTarget.mockResolvedValue(false)
-      const response = await setLimit(
-        request('members/external-user/usage-limit', { creditLimit }),
-        context
-      )
-      expect(response.status).toBe(404)
-      expect(mocks.setLimit).not.toHaveBeenCalled()
-      expect(recordAudit).not.toHaveBeenCalled()
-    }
-  )
-
-  it.each([{}, { creditLimit: -1 }, { creditLimit: 0.5 }, { creditLimit: 100, unexpected: true }])(
-    'rejects malformed cap %j before protected reads',
-    async (body) => {
-      expect(
-        (await setLimit(request('members/external-user/usage-limit', body), context)).status
-      ).toBe(400)
-      expect(mocks.limitTarget).not.toHaveBeenCalled()
-      expect(recordAudit).not.toHaveBeenCalled()
-    }
-  )
-
-  it('refuses read-only OAuth writes before target reads', async () => {
-    authenticate({ ...oauth, scopes: ['api:read'] })
-    expect(
-      (await setLimit(request('members/external-user/usage-limit', { creditLimit: 10 }), context))
-        .status
-    ).toBe(403)
-    expect(mocks.limitTarget).not.toHaveBeenCalled()
-  })
-})
 
 describe('organization usage API authorization and bounds', () => {
   it.each([personal, oauth])(

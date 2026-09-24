@@ -10,7 +10,6 @@ import {
   renderPermissionAccessRequestEmail,
   renderScheduleDisabledEmail,
   renderSubprocessorChangeEmail,
-  renderUsageLimitReachedEmail,
 } from '@/components/emails/render'
 
 describe('renderPermissionAccessRequestEmail', () => {
@@ -65,51 +64,6 @@ describe('renderScheduleDisabledEmail', () => {
 
     expect(html).toContain('a scheduled workflow')
     expect(html).not.toContain('Open workflow')
-  })
-})
-
-describe('renderUsageLimitReachedEmail', () => {
-  it('tells a personal payer to raise their limit, never to upgrade to Pro', async () => {
-    const html = await renderUsageLimitReachedEmail({
-      userName: 'John',
-      planName: 'Pro',
-      scope: 'user',
-      currentUsage: 20,
-      limit: 20,
-      ctaLink: 'https://sim.ai/account/settings/billing',
-    })
-
-    expect(html).toContain('Raise Usage Limit')
-    expect(html).toContain('upgrade your plan')
-    expect(html).not.toContain('Upgrade to Pro')
-    expect(html).not.toContain('free credits')
-  })
-
-  it('points an organization at the org limit', async () => {
-    const html = await renderUsageLimitReachedEmail({
-      planName: 'Team',
-      scope: 'organization',
-      currentUsage: 500,
-      limit: 500,
-      ctaLink: 'https://sim.ai/workspace/ws_1/settings/billing',
-    })
-
-    expect(html).toContain('Raise Organization Limit')
-    expect(html).toContain('organization usage limit')
-    expect(html).not.toContain('upgrade your plan')
-  })
-
-  it('renders credits, not dollars', async () => {
-    const html = await renderUsageLimitReachedEmail({
-      planName: 'Pro',
-      scope: 'user',
-      currentUsage: 20,
-      limit: 20,
-      ctaLink: 'https://sim.ai/account/settings/billing',
-    })
-
-    expect(html).toContain('credits used')
-    expect(html).not.toContain('$20')
   })
 })
 

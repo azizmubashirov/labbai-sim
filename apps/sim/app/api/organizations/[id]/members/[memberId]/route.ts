@@ -206,7 +206,7 @@ export const DELETE = defineInternalJsonRoute({
             credentialMembershipsRevoked: result.removal.credentialMembershipsRevoked,
             pendingInvitationsCancelled: result.removal.pendingInvitationsCancelled,
           }
-        : { seatReduction: result.seatReduction }),
+        : {}),
     },
   }),
   async onSuccess({ principal, input, result }) {

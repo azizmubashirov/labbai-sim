@@ -17,9 +17,6 @@ vi.mock('@/ee/access-control/hooks/permission-groups', () => ({
   usePermissionGroups: mocks.groups,
   useUserPermissionConfig: () => ({ data: { entitled: true }, isPending: false }),
 }))
-vi.mock('@/hooks/queries/organization', () => ({
-  useOrganizationBilling: () => ({ data: undefined, isPending: false }),
-}))
 
 import { SettingsHeaderProvider, SettingsHeaderShell } from '@/components/settings/settings-header'
 import { SettingsSectionProvider } from '@/components/settings/settings-panel'

@@ -22,8 +22,6 @@ import type {
   AccountDeletionPlan,
   AccountDeletionResource,
 } from '@/lib/api/contracts/user'
-import { getHighestPriorityPersonalSubscription } from '@/lib/billing/core/plan'
-import { isSoleOwnerOfPaidOrganization } from '@/lib/billing/organizations/membership'
 import { OrchestrationError } from '@/lib/core/orchestration/types'
 import { appendTableEvent, type TableEvent } from '@/lib/table/events'
 import {
@@ -196,10 +194,6 @@ export interface AccountDeletionFacts {
   /** Who else is in each of those workspaces, keyed by workspace id. */
   company: Map<string, WorkspaceCompany>
   organizationNames: string[]
-  /** The organization the account solely owns on a paid plan, if any. */
-  paidOrganizationName: string | null
-  /** The account's own paid plan, if it still entitles them. */
-  personalPlan: string | null
   hasDataDrains: boolean
 }
 
@@ -214,7 +208,7 @@ export interface AccountDeletionFacts {
  * go. Rather than chase that blast radius across every creator column (and
  * silently lose whichever one is added next), deletion refuses while the account
  * is still entangled and names the existing action that untangles it: leave the
- * workspace, leave the organization, cancel the plan. Each of those already hands
+ * workspace, leave the organization. Each of those already hands
  * the account's content to a surviving member on its own well-tested path.
  *
  * What remains is provably private, so a workspace falls into exactly one bucket:
@@ -231,22 +225,10 @@ export function classifyAccountDeletion(facts: AccountDeletionFacts): AccountDel
   const sharedWorkspaces: AccountDeletionResource[] = []
   const organizationWorkspaces: AccountDeletionResource[] = []
 
-  if (facts.paidOrganizationName) {
-    blockers.push({
-      code: 'paid_organization_owner',
-      message: `You own ${facts.paidOrganizationName}. Transfer ownership to another member, or cancel the organization’s plan, before deleting your account.`,
-    })
-  } else if (facts.organizationNames.length > 0) {
+  if (facts.organizationNames.length > 0) {
     blockers.push({
       code: 'organization_member',
       message: `Leave ${formatNames(facts.organizationNames)} before deleting your account, so your seat is released and your work is handed over.`,
-    })
-  }
-
-  if (facts.personalPlan) {
-    blockers.push({
-      code: 'active_subscription',
-      message: `Your ${facts.personalPlan} plan is still active. Cancel it in Billing before deleting your account.`,
     })
   }
 
@@ -304,32 +286,20 @@ function formatResourceNames(resources: AccountDeletionResource[]): string {
 
 /** Gathers the facts above and classifies them. */
 export async function getAccountDeletionPlan(userId: string): Promise<AccountDeletionPlan> {
-  const [workspaces, organizationNames, paidOrgCheck, personalSubscription, drains] =
-    await Promise.all([
-      loadRelatedWorkspaces(userId),
-      loadOrganizationNames(userId),
-      isSoleOwnerOfPaidOrganization(userId),
-      /**
-       * `onError: 'throw'` rather than the default `'return-null'`: a failed
-       * subscription read would otherwise read as "no plan", skipping the
-       * blocker and erasing an account Stripe is still billing.
-       */
-      getHighestPriorityPersonalSubscription(userId, { onError: 'throw' }),
-      db
-        .select({ id: dataDrains.id })
-        .from(dataDrains)
-        .where(eq(dataDrains.createdBy, userId))
-        .limit(1),
-    ])
+  const [workspaces, organizationNames, drains] = await Promise.all([
+    loadRelatedWorkspaces(userId),
+    loadOrganizationNames(userId),
+    db
+      .select({ id: dataDrains.id })
+      .from(dataDrains)
+      .where(eq(dataDrains.createdBy, userId))
+      .limit(1),
+  ])
 
   return classifyAccountDeletion({
     workspaces,
     company: await loadWorkspaceCompany(userId, workspaces),
     organizationNames,
-    paidOrganizationName: paidOrgCheck.isBlocker
-      ? (paidOrgCheck.organizationName ?? 'a paid organization')
-      : null,
-    personalPlan: personalSubscription?.plan ?? null,
     hasDataDrains: drains.length > 0,
   })
 }

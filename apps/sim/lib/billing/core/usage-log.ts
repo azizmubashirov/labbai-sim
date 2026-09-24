@@ -439,10 +439,9 @@ export async function getStampedPeriodRangeUsageCostByUser(
  * but usage writes no longer contend on the user_stats row.
  */
 export async function recordUsage(params: RecordUsageParams): Promise<void> {
-  // The usage ledger is written regardless of BILLING_ENABLED so it is the
-  // single, universal source of truth for cost (including self-hosted, where
-  // it powers the logs-page cost display). Billing *enforcement* (Stripe /
-  // overage) is gated separately by callers, not here.
+  // The usage ledger is the single, universal source of truth for cost (it
+  // powers the logs-page cost display). Labbai has no payments, so nothing is
+  // charged or enforced from it.
   const {
     userId,
     entries,

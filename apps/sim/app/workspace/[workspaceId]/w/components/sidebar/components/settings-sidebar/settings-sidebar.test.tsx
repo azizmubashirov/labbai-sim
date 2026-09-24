@@ -71,7 +71,6 @@ import { useSettingsDirtyStore } from '@/stores/settings/dirty/store'
 
 const deployment: DeploymentShape = {
   hosted: true,
-  billingEnabled: true,
   chatEnabled: true,
   azureConfigured: false,
   cohereConfigured: false,
@@ -220,7 +219,6 @@ describe('workspace SettingsSidebar organization rollout', () => {
       renderSidebar()
 
       expect(workspaceLink('organization')).toHaveTextContent('Members')
-      expect(workspaceLink('billing')).toHaveTextContent('Subscription')
       expect(workspaceLink('usage')).toHaveTextContent('Insights')
       expect(workspaceLink('sso')).toHaveTextContent('Single sign-on')
       expect(workspaceLink('connected-accounts')).toHaveTextContent('Credential Groups')
@@ -237,7 +235,6 @@ describe('workspace SettingsSidebar organization rollout', () => {
     expect(workspaceLink('connected-accounts')).toBeNull()
 
     expect(workspaceLink('organization')).toHaveTextContent('Members')
-    expect(workspaceLink('billing')).toHaveTextContent('Subscription')
     expect(container.querySelector('a[href^="/o/"]')).toBeNull()
     expectWorkspaceLinks()
   })
@@ -252,7 +249,7 @@ describe('workspace SettingsSidebar organization rollout', () => {
       expect(links).toHaveLength(1)
       expect(links[0]).toHaveAttribute('href', '/o/host-org/settings/members')
       expect(links[0]).toHaveTextContent('Organization')
-      for (const section of ['organization', 'billing', 'usage', 'sso', 'connected-accounts']) {
+      for (const section of ['organization', 'usage', 'sso', 'connected-accounts']) {
         expect(workspaceLink(section)).toBeNull()
       }
       expectWorkspaceLinks()
@@ -264,19 +261,18 @@ describe('workspace SettingsSidebar organization rollout', () => {
     renderSidebar()
 
     expect(workspaceLink('organization')).toHaveTextContent('Members')
-    for (const section of ['billing', 'usage', 'sso', 'connected-accounts']) {
+    for (const section of ['usage', 'sso', 'connected-accounts']) {
       expect(workspaceLink(section)).toBeNull()
     }
     expect(container.querySelector('a[href^="/o/"]')).toBeNull()
     expectWorkspaceLinks()
   })
 
-  it('preserves plan restrictions without hiding the billing recovery link when disabled', () => {
+  it('preserves plan restrictions for a lapsed owner when disabled', () => {
     hostContext.ownerBilling.billingBlocked = true
     hostContext.ownerBilling.billingBlockedReason = 'payment_failed'
     renderSidebar()
 
-    expect(workspaceLink('billing')).toHaveTextContent('Subscription')
     expect(workspaceLink('organization')).toHaveTextContent('Members')
     for (const section of ['usage', 'sso']) {
       expect(workspaceLink(section)).toBeNull()
@@ -285,14 +281,13 @@ describe('workspace SettingsSidebar organization rollout', () => {
   })
 
   it.each(['admin', 'member', 'external'] as const)(
-    'shows permitted inline settings for a self-hosted %s with Search and billing disabled',
+    'shows permitted inline settings for a self-hosted %s with Search disabled',
     (role) => {
       hostContext = makeHostContext(role, false)
-      hostContext.deployment = { ...deployment, hosted: false, billingEnabled: false }
+      hostContext.deployment = { ...deployment, hosted: false }
       renderSidebar()
 
       expect(container.querySelector('a[href^="/o/"]')).toBeNull()
-      expect(workspaceLink('billing')).toBeNull()
       if (role === 'external') {
         expect(workspaceLink('organization')).toBeNull()
       } else {
@@ -316,7 +311,7 @@ describe('workspace SettingsSidebar organization rollout', () => {
       renderSidebar()
 
       expect(container.querySelector('a[href^="/o/"]')).toBeNull()
-      for (const section of ['organization', 'billing', 'usage', 'sso', 'connected-accounts']) {
+      for (const section of ['organization', 'usage', 'sso', 'connected-accounts']) {
         expect(workspaceLink(section)).toBeNull()
       }
       expectWorkspaceLinks()

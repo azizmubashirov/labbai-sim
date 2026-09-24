@@ -2,11 +2,11 @@
  * @vitest-environment jsdom
  */
 import { act, type ReactNode } from 'react'
-import { resetEnvFlagsMock, setEnvFlags } from '@sim/testing'
+import { resetEnvFlagsMock } from '@sim/testing'
 import { createRoot, type Root } from 'react-dom/client'
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { hostContext, mockUseOrganizationBilling, mockUseAdminWorkspaces, mockMutate } = vi.hoisted(
+const { hostContext, mockUseAdminWorkspaces, mockMutate } = vi.hoisted(
   () => ({
     hostContext: {
       current: {
@@ -14,7 +14,6 @@ const { hostContext, mockUseOrganizationBilling, mockUseAdminWorkspaces, mockMut
         viewer: { isHostOrganizationAdmin: false },
       } as { hostOrganizationId: string; viewer: { isHostOrganizationAdmin: boolean } } | null,
     },
-    mockUseOrganizationBilling: vi.fn(),
     mockUseAdminWorkspaces: vi.fn(),
     mockMutate: vi.fn(),
   })
@@ -73,13 +72,6 @@ vi.mock('@/hooks/queries/invitations', () => ({
   useSendWorkspaceInvitations: () => ({ isPending: false, mutate: mockMutate }),
 }))
 
-vi.mock('@/hooks/queries/organization', () => ({
-  useOrganizationBilling: (...args: unknown[]) => {
-    mockUseOrganizationBilling(...args)
-    return { data: undefined }
-  },
-}))
-
 vi.mock('@/hooks/queries/workspace', () => ({
   useAdminWorkspaces: (...args: unknown[]) => {
     mockUseAdminWorkspaces(...args)
@@ -94,10 +86,6 @@ import {
 
 let container: HTMLDivElement
 let root: Root
-
-beforeAll(() => {
-  setEnvFlags({ isBillingEnabled: true })
-})
 
 afterAll(resetEnvFlagsMock)
 
@@ -116,22 +104,6 @@ describe('InviteModal organization billing isolation', () => {
     act(() => root.unmount())
     container.remove()
     vi.clearAllMocks()
-  })
-
-  it('does not fetch admin billing data for a workspace-only administrator', async () => {
-    await act(async () => {
-      root.render(
-        <InviteModal
-          open
-          onOpenChange={vi.fn()}
-          workspaceId='workspace-1'
-          organizationId='org-host'
-          workspaceName='Host'
-        />
-      )
-    })
-
-    expect(mockUseOrganizationBilling).toHaveBeenCalledWith('org-host', { enabled: false })
   })
 
   it('invites an organization member without a workspace provider or workspace selection', async () => {
@@ -189,48 +161,6 @@ describe('InviteModal organization billing isolation', () => {
     expect(container.querySelector('[data-field="Role"]')?.textContent).toBe('RoleMember')
   })
 
-  it('fetches seat data for an administrator of the routed host organization', async () => {
-    hostContext.current = {
-      hostOrganizationId: 'org-host',
-      viewer: { isHostOrganizationAdmin: true },
-    }
-
-    await act(async () => {
-      root.render(
-        <InviteModal
-          open
-          onOpenChange={vi.fn()}
-          workspaceId='workspace-1'
-          organizationId='org-host'
-          workspaceName='Host'
-        />
-      )
-    })
-
-    expect(mockUseOrganizationBilling).toHaveBeenCalledWith('org-host', { enabled: true })
-  })
-
-  it('does not fetch billing data for a stale organization prop', async () => {
-    hostContext.current = {
-      hostOrganizationId: 'org-host',
-      viewer: { isHostOrganizationAdmin: true },
-    }
-
-    await act(async () => {
-      root.render(
-        <InviteModal
-          open
-          onOpenChange={vi.fn()}
-          workspaceId='workspace-1'
-          organizationId='org-other'
-          workspaceName='Host'
-        />
-      )
-    })
-
-    expect(mockUseOrganizationBilling).toHaveBeenCalledWith('org-other', { enabled: false })
-  })
-
   it('does not list selectable workspaces outside an organization', async () => {
     await act(async () => {
       root.render(
@@ -249,21 +179,21 @@ describe('InviteModal organization billing isolation', () => {
 })
 
 describe('buildInviteFailureMessage', () => {
-  const notPaid = (email: string) =>
-    `${email} is not on a paid Sim plan, so they cannot be added as an external collaborator. Invite them as a Member or Admin instead — that adds a seat.`
+  const otherOrg = (email: string) =>
+    `${email} already belongs to another organization and cannot be invited as an internal member`
 
   it('returns the reason alone for a single failure, which already names the address', () => {
-    expect(buildInviteFailureMessage([{ email: 'a@x.com', error: notPaid('a@x.com') }], 3)).toBe(
-      notPaid('a@x.com')
+    expect(buildInviteFailureMessage([{ email: 'a@x.com', error: otherOrg('a@x.com') }], 3)).toBe(
+      otherOrg('a@x.com')
     )
   })
 
   it('names every address when a whole batch is rejected for the same cause', () => {
     const message = buildInviteFailureMessage(
       [
-        { email: 'a@x.com', error: notPaid('a@x.com') },
-        { email: 'b@x.com', error: notPaid('b@x.com') },
-        { email: 'c@x.com', error: notPaid('c@x.com') },
+        { email: 'a@x.com', error: otherOrg('a@x.com') },
+        { email: 'b@x.com', error: otherOrg('b@x.com') },
+        { email: 'c@x.com', error: otherOrg('c@x.com') },
       ],
       3
     )
@@ -277,7 +207,7 @@ describe('buildInviteFailureMessage', () => {
   it('reports the denominator when only some of the batch failed', () => {
     const message = buildInviteFailureMessage(
       [
-        { email: 'a@x.com', error: notPaid('a@x.com') },
+        { email: 'a@x.com', error: otherOrg('a@x.com') },
         { email: 'b@x.com', error: 'b@x.com has already been invited to this workspace' },
       ],
       5
@@ -303,7 +233,7 @@ describe('buildInviteFailureMessage', () => {
     const message = buildInviteFailureMessage(
       ['a', 'b', 'c', 'd', 'e'].map((name) => ({
         email: `${name}@x.com`,
-        error: notPaid(`${name}@x.com`),
+        error: otherOrg(`${name}@x.com`),
       })),
       5
     )

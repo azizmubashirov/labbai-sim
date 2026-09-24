@@ -13,7 +13,6 @@ import {
   resetDbChainMock,
   resetEnvFlagsMock,
   schemaMock,
-  setEnvFlags,
 } from '@sim/testing'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DbOrTx } from '@/lib/db/types'
@@ -34,7 +33,6 @@ const {
   mockRevertPendingInvitationGrants,
   mockFindPendingGrantWorkspaceIds,
   mockFindPendingOrganizationInvitation,
-  mockGetInvitePlanCategoryForUser,
   mockListInvitationsForWorkspaces,
   mockListAccessibleWorkspaceRowsForUser,
 } = vi.hoisted(() => ({
@@ -54,7 +52,6 @@ const {
   mockRevertPendingInvitationGrants: vi.fn(),
   mockFindPendingGrantWorkspaceIds: vi.fn(),
   mockFindPendingOrganizationInvitation: vi.fn(),
-  mockGetInvitePlanCategoryForUser: vi.fn(),
 }))
 
 vi.mock('@/lib/workspaces/permissions/utils', () => ({
@@ -64,7 +61,6 @@ vi.mock('@/lib/workspaces/permissions/utils', () => ({
 
 vi.mock('@/lib/workspaces/policy', () => ({
   getWorkspaceInvitePolicy: mockGetWorkspaceInvitePolicy,
-  getInvitePlanCategoryForUser: mockGetInvitePlanCategoryForUser,
   isOrganizationWorkspace: (ws: {
     workspaceMode?: string | null
     organizationId?: string | null
@@ -241,7 +237,6 @@ describe('POST /api/workspaces/invitations/batch', () => {
     mockRevertPendingInvitationGrants.mockResolvedValue(true)
     mockFindPendingGrantWorkspaceIds.mockResolvedValue(new Set())
     mockFindPendingOrganizationInvitation.mockResolvedValue(null)
-    mockGetInvitePlanCategoryForUser.mockResolvedValue('free')
   })
 
   afterAll(() => {
@@ -527,49 +522,6 @@ describe('POST /api/workspaces/invitations/batch', () => {
     )
     expect(mockSendInvitationEmail).toHaveBeenCalledTimes(1)
     expect(data.invitations[0].workspaceIds).toEqual(['workspace-1', 'workspace-2'])
-  })
-
-  it('reports a per-email failure when an external invite targets a free account', async () => {
-    mockGetWorkspaceWithOwner.mockResolvedValueOnce({
-      id: 'workspace-1',
-      name: 'Org Workspace',
-      ownerId: 'user-1',
-      organizationId: 'org-1',
-      workspaceMode: 'organization',
-      billedAccountUserId: 'owner-1',
-    })
-    mockGetWorkspaceInvitePolicy.mockResolvedValueOnce({
-      allowed: true,
-      reason: null,
-      requiresSeat: false,
-      organizationId: 'org-1',
-      upgradeRequired: false,
-    })
-    /**
-     * The paid-plan requirement is a billing rule, so it only applies when
-     * billing is on — with billing off there are no seats to protect and every
-     * account reads as free.
-     */
-    setEnvFlags({ isBillingEnabled: true })
-    queueTableRows(schemaMock.user, [{ id: 'free-user', email: 'free@example.com' }])
-    mockGetUserOrganization.mockResolvedValueOnce(null)
-    mockGetInvitePlanCategoryForUser.mockResolvedValueOnce('free')
-
-    const request = createMockRequest('POST', {
-      workspaceIds: ['workspace-1'],
-      emails: ['free@example.com'],
-      permission: 'write',
-      membership: 'external',
-    })
-
-    const response = await POST(request)
-    const data = await response.json()
-
-    expect(response.status).toBe(200)
-    expect(data.success).toBe(false)
-    expect(data.failed[0].email).toBe('free@example.com')
-    expect(data.failed[0].error).toContain('not on a paid Sim plan')
-    expect(mockCreatePendingInvitation).not.toHaveBeenCalled()
   })
 
   it('rolls back the unified invitation when email delivery fails', async () => {

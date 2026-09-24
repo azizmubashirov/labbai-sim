@@ -16,11 +16,7 @@
  *
  * DELETE /api/v1/admin/organizations/[id]/members/[memberId]
  *
- * Remove member from organization with full billing logic.
- * Handles departed usage capture and Pro restoration like the regular flow.
- *
- * Query Parameters:
- *   - skipBillingLogic: boolean - Skip billing logic (default: false)
+ * Remove member from organization.
  *
  * Response: { success: true, memberId: string, billingActions: {...} }
  */
@@ -41,7 +37,6 @@ import {
   removeUserFromOrganization,
   WORKSPACE_BILLING_ACCOUNT_REMOVAL_ERROR,
 } from '@/lib/billing/organizations/membership'
-import { isBillingEnabled } from '@/lib/core/config/env-flags'
 import { withRouteHandler } from '@/lib/core/utils/with-route-handler'
 import { withAdminAuthParams } from '@/app/api/v1/admin/middleware'
 import {
@@ -236,7 +231,6 @@ export const DELETE = withRouteHandler(
     if (!parsed.success) return parsed.response
 
     const { id: organizationId, memberId } = parsed.data.params
-    const skipBillingLogic = !isBillingEnabled || parsed.data.query.skipBillingLogic
 
     try {
       const [orgData] = await db
@@ -269,7 +263,6 @@ export const DELETE = withRouteHandler(
         userId,
         organizationId,
         memberId,
-        skipBillingLogic,
       })
 
       if (!result.success) {
@@ -309,7 +302,6 @@ export const DELETE = withRouteHandler(
           usageCaptured: result.billingActions.usageCaptured,
           proRestored: result.billingActions.proRestored,
           usageRestored: result.billingActions.usageRestored,
-          skipBillingLogic,
         },
       })
     } catch (error) {

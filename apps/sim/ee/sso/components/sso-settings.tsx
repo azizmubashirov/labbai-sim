@@ -4,7 +4,6 @@ import { useState } from 'react'
 import { ChipConfirmModal, ChipModalTabs, toast } from '@sim/emcn'
 import { getErrorMessage } from '@sim/utils/errors'
 import { useQueryStates } from 'nuqs'
-import { isEnterprise } from '@/lib/billing/plan-helpers'
 import { useDeploymentShape } from '@/lib/core/config/deployment-shape'
 import {
   SettingsEmptyState,
@@ -18,7 +17,6 @@ import { SsoProviderSettings } from '@/ee/sso/components/sso-provider-settings'
 import { VerifiedDomainsSection } from '@/ee/sso/components/verified-domains-section'
 import { useDeleteSSOProvider, useSetPrimarySSOProvider, useSSOProviders } from '@/ee/sso/hooks/sso'
 import { ssoSettingsParsers, ssoSettingsUrlKeys } from '@/ee/sso/search-params'
-import { useOrganizationBilling } from '@/hooks/queries/organization'
 
 const SETTINGS_TABS = [
   { value: 'sign-in', label: 'Sign-in' },
@@ -43,8 +41,7 @@ export function SSO({ organizationId }: SSOProps) {
 function OrganizationSsoSettings({ organizationId }: SSOProps) {
   const [{ tab: requestedTab, provider: requestedProvider, createProvider }, setParams] =
     useQueryStates(ssoSettingsParsers, ssoSettingsUrlKeys)
-  const { billingEnabled, features } = useDeploymentShape()
-  const billing = useOrganizationBilling(organizationId)
+  const { features } = useDeploymentShape()
   const providers = useSSOProviders({ organizationId })
   const provisioningAvailable = features.scim
   const tab = requestedTab === 'provisioning' && !provisioningAvailable ? 'sign-in' : requestedTab
@@ -108,27 +105,6 @@ function OrganizationSsoSettings({ organizationId }: SSOProps) {
     } catch (error) {
       toast.error(getErrorMessage(error, 'Failed to delete identity provider'))
     }
-  }
-
-  if (billingEnabled && billing.isLoading) {
-    return <SettingsEmptyState variant='inline'>Loading sign-in settings...</SettingsEmptyState>
-  }
-
-  if (billingEnabled && billing.data === undefined && billing.error) {
-    return (
-      <SettingsQueryErrorState
-        error={billing.error}
-        fallback='Failed to load organization billing'
-        isRetrying={billing.isFetching}
-        onRetry={() => void billing.refetch()}
-      />
-    )
-  }
-
-  if (billingEnabled && !isEnterprise(billing.data?.data?.subscriptionPlan)) {
-    return (
-      <SettingsEmptyState>Single Sign-On is available on Enterprise plans only.</SettingsEmptyState>
-    )
   }
 
   return (

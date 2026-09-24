@@ -4,7 +4,6 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as billingAttributionModule from '@/lib/billing/core/billing-attribution'
 import * as usageLogModule from '@/lib/billing/core/usage-log'
-import * as thresholdBillingModule from '@/lib/billing/threshold-billing'
 import * as embeddingModelsModule from '@/lib/knowledge/embedding-models'
 import { recordSearchEmbeddingUsage } from '@/lib/knowledge/embeddings'
 import * as tokenizationModule from '@/lib/tokenization'
@@ -21,9 +20,6 @@ const mockRecordUsage = vi
   .spyOn(usageLogModule, 'recordUsage')
   .mockResolvedValue(undefined as never)
 const mockToBillingContext = vi.spyOn(billingAttributionModule, 'toBillingContext')
-const mockCheckAndBillPayerOverageThreshold = vi
-  .spyOn(thresholdBillingModule, 'checkAndBillPayerOverageThreshold')
-  .mockResolvedValue(undefined as never)
 const mockCalculateCost = vi.spyOn(providersUtilsModule, 'calculateCost')
 const estimateTokenCountSpy = vi
   .spyOn(tokenizationModule, 'estimateTokenCount')
@@ -35,7 +31,6 @@ const getEmbeddingModelInfoSpy = vi
 afterAll(() => {
   mockRecordUsage.mockRestore()
   mockToBillingContext.mockRestore()
-  mockCheckAndBillPayerOverageThreshold.mockRestore()
   mockCalculateCost.mockRestore()
   estimateTokenCountSpy.mockRestore()
   getEmbeddingModelInfoSpy.mockRestore()
@@ -45,7 +40,6 @@ describe('recordSearchEmbeddingUsage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockRecordUsage.mockResolvedValue(undefined as never)
-    mockCheckAndBillPayerOverageThreshold.mockResolvedValue(undefined as never)
     estimateTokenCountSpy.mockReturnValue({ count: 100 } as never)
     getEmbeddingModelInfoSpy.mockReturnValue({ tokenizerProvider: 'openai' } as never)
     mockCalculateCost.mockReturnValue({ total: 0.01 } as never)
@@ -87,9 +81,5 @@ describe('recordSearchEmbeddingUsage', () => {
         billingEntity: { type: 'organization', id: 'org-1' },
       })
     )
-    expect(mockCheckAndBillPayerOverageThreshold).toHaveBeenCalledWith({
-      type: 'organization',
-      id: 'org-1',
-    })
   })
 })

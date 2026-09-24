@@ -23,26 +23,17 @@ import {
   CumulativeUsageContextMismatchError,
   recordCumulativeUsage,
 } from '@/lib/billing/core/usage-log'
-import {
-  checkAndBillOverageThreshold,
-  checkAndBillPayerOverageThreshold,
-  ThresholdSettlementError,
-} from '@/lib/billing/threshold-billing'
 import { BILLING_CALLBACK_OUTCOME } from '@/lib/copilot/generated/billing-protocol-v1'
 import { BillingRouteOutcome } from '@/lib/copilot/generated/trace-attribute-values-v1'
 import { TraceAttr } from '@/lib/copilot/generated/trace-attributes-v1'
 import { TraceSpan } from '@/lib/copilot/generated/trace-spans-v1'
 import { checkInternalApiKey } from '@/lib/copilot/request/http'
 import { withIncomingGoSpan } from '@/lib/copilot/request/otel'
-import { isBillingEnabled, isHosted } from '@/lib/core/config/env-flags'
+import { isHosted } from '@/lib/core/config/env-flags'
 import { generateRequestId } from '@/lib/core/utils/request'
 import { withRouteHandler } from '@/lib/core/utils/with-route-handler'
 
 const logger = createLogger('BillingUpdateCostAPI')
-const RETRYABLE_SETTLEMENT_RESPONSE = {
-  code: 'BILLING_SETTLEMENT_RETRYABLE',
-  error: 'Billing settlement temporarily unavailable',
-} as const
 
 function invalidBillingProtocolResponse(requestId: string, span: Span): NextResponse {
   span.setAttribute(TraceAttr.BillingOutcome, BillingRouteOutcome.InvalidBody)
@@ -107,20 +98,6 @@ async function updateCostInner(req: NextRequest, span: Span): Promise<NextRespon
         },
         { status: 401 }
       )
-    }
-
-    if (!isBillingEnabled) {
-      span.setAttribute(TraceAttr.BillingOutcome, BillingRouteOutcome.BillingDisabled)
-      span.setAttribute(TraceAttr.HttpStatusCode, 200)
-      return NextResponse.json({
-        success: true,
-        message: 'Billing disabled, cost update skipped',
-        data: {
-          billingEnabled: false,
-          processedAt: new Date().toISOString(),
-          requestId,
-        },
-      })
     }
 
     const parsed = await parseRequest(
@@ -334,18 +311,6 @@ async function updateCostInner(req: NextRequest, span: Span): Promise<NextRespon
       durationMs: Date.now() - usageStartedAt,
     })
 
-    // Reconcile the payer's ledger-backed threshold after every cumulative
-    // callback, including duplicate retries after a prior settlement failure.
-    // Strict error handling lets Go retry until the committed usage is settled.
-    if (billingContext) {
-      await checkAndBillPayerOverageThreshold(billingContext.billingEntity, {
-        onError: 'throw',
-        expectedBillingPeriod: billingContext.billingPeriod,
-      })
-    } else {
-      await checkAndBillOverageThreshold(userId, undefined, { onError: 'throw' })
-    }
-
     const duration = Date.now() - startTime
 
     // Same-or-lower cumulative than already recorded: nothing new to bill.
@@ -415,11 +380,9 @@ async function updateCostInner(req: NextRequest, span: Span): Promise<NextRespon
     const pgCode = getPostgresErrorCode(error)
     const pgConstraint = getPostgresConstraintName(error)
     const reconciliationOutcome =
-      error instanceof ThresholdSettlementError && !error.retryable
-        ? BILLING_CALLBACK_OUTCOME.billingPeriodElapsed
-        : pgCode === '23503' && pgConstraint === 'usage_log_user_id_user_id_fk'
-          ? BILLING_CALLBACK_OUTCOME.billingUserNotFound
-          : undefined
+      pgCode === '23503' && pgConstraint === 'usage_log_user_id_user_id_fk'
+        ? BILLING_CALLBACK_OUTCOME.billingUserNotFound
+        : undefined
 
     /** Old markerless clients treat every 409 as a successful duplicate. */
     if (reconciliationOutcome && !isMarkerlessLegacy) {
@@ -441,31 +404,6 @@ async function updateCostInner(req: NextRequest, span: Span): Promise<NextRespon
           requestId,
         },
         { status: 409 }
-      )
-    }
-
-    if (error instanceof ThresholdSettlementError) {
-      logger.error(`[${requestId}] Retryable threshold settlement failure`, {
-        settlementErrorCode: error.code,
-        retryable: error.retryable,
-        duration,
-        billingProtocol:
-          req.headers.get(COPILOT_BILLING_PROTOCOL_HEADER) ?? COPILOT_BILLING_PROTOCOL.legacy,
-      })
-      span.setAttribute(TraceAttr.BillingOutcome, BillingRouteOutcome.InternalError)
-      span.setAttribute(TraceAttr.HttpStatusCode, 503)
-      span.setAttribute(TraceAttr.BillingDurationMs, duration)
-      return NextResponse.json(
-        {
-          success: false,
-          ...RETRYABLE_SETTLEMENT_RESPONSE,
-          retryable: true,
-          requestId,
-        },
-        {
-          status: 503,
-          headers: { 'Retry-After': '1' },
-        }
       )
     }
 

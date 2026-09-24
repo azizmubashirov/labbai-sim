@@ -5,7 +5,6 @@ import {
   isAccessControlEnabled,
   isAuditLogsEnabled,
   isAzureConfigured,
-  isBillingEnabled,
   isChatEnabled,
   isCohereConfigured,
   isCustomBlocksEnabled,
@@ -20,8 +19,8 @@ import {
 } from '@/lib/core/config/env-flags'
 
 /**
- * One reader for the deployment's shape: hosted or self-hosted, whether billing and
- * Chat run, which provider credentials the deployment supplies, and which enterprise
+ * One reader for the deployment's shape: hosted or self-hosted, whether
+ * Chat runs, which provider credentials the deployment supplies, and which enterprise
  * features its configuration turns on.
  *
  * Server code reads the `env-flags` constants directly and this module only packages
@@ -81,7 +80,6 @@ function browserFallbackShape(): DeploymentShape {
 export function resolveDeploymentShape(): DeploymentShape {
   return {
     hosted: isHosted,
-    billingEnabled: isBillingEnabled,
     chatEnabled: isChatEnabled,
     azureConfigured: isAzureConfigured,
     cohereConfigured: isCohereConfigured,
@@ -104,7 +102,6 @@ function isSameDeploymentShape(seeded: DeploymentShape | null, next: DeploymentS
   if (seeded === null) return false
   if (
     seeded.hosted !== next.hosted ||
-    seeded.billingEnabled !== next.billingEnabled ||
     seeded.chatEnabled !== next.chatEnabled ||
     seeded.azureConfigured !== next.azureConfigured ||
     seeded.cohereConfigured !== next.cohereConfigured

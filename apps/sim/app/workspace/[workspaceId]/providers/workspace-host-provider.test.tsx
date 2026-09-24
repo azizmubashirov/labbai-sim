@@ -59,7 +59,7 @@ const HOST_CONTEXT: WorkspaceHostContext = {
   deployment: {
     ...resolveDeploymentShape(),
     hosted: true,
-    billingEnabled: true,
+    azureConfigured: true,
   },
 }
 
@@ -70,7 +70,7 @@ function GetterReader() {
 
 function ContextReader() {
   const { deployment } = useWorkspaceHostContext()
-  return <output data-testid='context'>{String(deployment?.billingEnabled)}</output>
+  return <output data-testid='context'>{String(deployment?.azureConfigured)}</output>
 }
 
 let host: HTMLDivElement
@@ -117,19 +117,19 @@ describe('WorkspaceHostProvider', () => {
   it('follows a host context that arrives after mount over the initial seed', () => {
     renderProvider(HOST_CONTEXT)
     expect(textOf('context')).toBe('true')
-    expect(getDeploymentShape().billingEnabled).toBe(true)
+    expect(getDeploymentShape().azureConfigured).toBe(true)
 
     mockUseWorkspaceHostContextQuery.mockReturnValue({
       data: {
         ...HOST_CONTEXT,
-        deployment: { ...HOST_CONTEXT.deployment!, billingEnabled: false },
+        deployment: { ...HOST_CONTEXT.deployment!, azureConfigured: false },
       },
       error: null,
     })
     renderProvider(HOST_CONTEXT)
 
     expect(textOf('context')).toBe('false')
-    expect(getDeploymentShape().billingEnabled).toBe(false)
+    expect(getDeploymentShape().azureConfigured).toBe(false)
   })
 
   it('keeps the env fallback for a host context that predates deployment projection', () => {

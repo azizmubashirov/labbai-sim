@@ -12,7 +12,6 @@ import {
   queueTableRows,
   resetDbChainMock,
   resetEnvFlagsMock,
-  setEnvFlags,
 } from '@sim/testing'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ForbiddenOperationError } from '@/lib/core/application/forbidden'
@@ -37,7 +36,6 @@ const {
   mockRevertPendingInvitationGrants,
   mockFindPendingGrantWorkspaceIds,
   mockFindPendingOrganizationInvitation,
-  mockGetInvitePlanCategoryForUser,
   mockIsOrganizationOwnerOrAdmin,
   mockWorkspaceMemberInvited,
   mockCaptureServerEvent,
@@ -58,7 +56,6 @@ const {
   mockRevertPendingInvitationGrants: vi.fn(),
   mockFindPendingGrantWorkspaceIds: vi.fn(),
   mockFindPendingOrganizationInvitation: vi.fn(),
-  mockGetInvitePlanCategoryForUser: vi.fn(),
   mockIsOrganizationOwnerOrAdmin: vi.fn(),
   mockWorkspaceMemberInvited: vi.fn(),
   mockCaptureServerEvent: vi.fn(),
@@ -115,7 +112,6 @@ vi.mock('@/lib/billing/core/organization', () => ({
 
 vi.mock('@/lib/workspaces/policy', () => ({
   getWorkspaceInvitePolicy: vi.fn(),
-  getInvitePlanCategoryForUser: mockGetInvitePlanCategoryForUser,
 }))
 
 vi.mock('@/ee/access-control/utils/permission-check', () => ({
@@ -187,7 +183,6 @@ describe('createWorkspaceInvitation', () => {
     vi.clearAllMocks()
     resetDbChainMock()
     /** Production default; the billing-disabled case opts out explicitly. */
-    setEnvFlags({ isBillingEnabled: true })
     mockIsOrganizationOwnerOrAdmin.mockResolvedValue(false)
     mockAcquireInvitationMutationLocks.mockResolvedValue(undefined)
     mockAcquireOrganizationMutationLock.mockResolvedValue(undefined)
@@ -216,7 +211,6 @@ describe('createWorkspaceInvitation', () => {
     mockRevertPendingInvitationGrants.mockResolvedValue(true)
     mockFindPendingGrantWorkspaceIds.mockResolvedValue(new Set())
     mockFindPendingOrganizationInvitation.mockResolvedValue(null)
-    mockGetInvitePlanCategoryForUser.mockResolvedValue('free')
   })
 
   it('directly grants access to an existing member of the workspace organization', async () => {
@@ -864,15 +858,8 @@ describe('createWorkspaceInvitation', () => {
     )
   })
 
-  it('allows an external invite with billing disabled, where nobody has a plan', async () => {
-    /**
-     * The paid-plan requirement is seat economics: an external collaborator takes
-     * no seat, so somebody else must be paying for them. With billing off there
-     * are no seats and no subscriptions, so every account reads as free —
-     * enforcing it would leave a self-hosted deployment no way to grant
-     * workspace-only access without an organization join and a workspace sweep.
-     */
-    setEnvFlags({ isBillingEnabled: false })
+  it('allows an external invite without any plan requirement', async () => {
+    /** Labbai has no paid plans, so any account may be invited as an external collaborator. */
     queueWhereResponses([[{ id: 'user-9', email: 'selfhost@example.com' }], []])
     mockGetUserOrganization.mockResolvedValueOnce(null)
 
@@ -885,8 +872,6 @@ describe('createWorkspaceInvitation', () => {
     })
 
     expect(result.membershipIntent).toBe('external')
-    /** Short-circuits before the plan lookup — there is nothing to look up. */
-    expect(mockGetInvitePlanCategoryForUser).not.toHaveBeenCalled()
   })
 
   it('refuses to grant organization Admin to a workspace-only administrator', async () => {
@@ -912,45 +897,26 @@ describe('createWorkspaceInvitation', () => {
     expect(mockCreatePendingInvitation).not.toHaveBeenCalled()
   })
 
-  it('rejects an explicit external invite for an invitee with no paid plan', async () => {
-    queueWhereResponses([[{ id: 'user-5', email: 'free@example.com' }], []])
-    mockGetUserOrganization.mockResolvedValueOnce(null)
-    mockGetInvitePlanCategoryForUser.mockResolvedValueOnce('free')
-
-    await expect(
-      createWorkspaceInvitation({
-        context: makeContext(),
-        email: 'free@example.com',
-        permission: 'write',
-        membership: 'external',
-        request,
-      })
-    ).rejects.toThrow('not on a paid Sim plan')
-
-    expect(mockCreatePendingInvitation).not.toHaveBeenCalled()
-  })
-
-  it('rejects an explicit external invite for an email with no Sim account', async () => {
+  it('allows an explicit external invite for an email with no Sim account yet', async () => {
     queueWhereResponses([[]])
 
-    await expect(
-      createWorkspaceInvitation({
-        context: makeContext(),
-        email: 'stranger@example.com',
-        permission: 'write',
-        membership: 'external',
-        request,
-      })
-    ).rejects.toThrow('not on a paid Sim plan')
+    const result = await createWorkspaceInvitation({
+      context: makeContext(),
+      email: 'stranger@example.com',
+      permission: 'write',
+      membership: 'external',
+      request,
+    })
 
-    expect(mockGetInvitePlanCategoryForUser).not.toHaveBeenCalled()
-    expect(mockCreatePendingInvitation).not.toHaveBeenCalled()
+    expect(result.membershipIntent).toBe('external')
+    expect(mockCreatePendingInvitation).toHaveBeenCalledWith(
+      expect.objectContaining({ membershipIntent: 'external' })
+    )
   })
 
-  it('allows an explicit external invite for an invitee on their own paid plan', async () => {
+  it('allows an explicit external invite for an existing account', async () => {
     queueWhereResponses([[{ id: 'user-6', email: 'pro@example.com' }], []])
     mockGetUserOrganization.mockResolvedValueOnce(null)
-    mockGetInvitePlanCategoryForUser.mockResolvedValueOnce('pro')
 
     const result = await createWorkspaceInvitation({
       context: makeContext(),
@@ -1029,79 +995,6 @@ describe('createWorkspaceInvitation', () => {
 
     expect(mockCreatePendingInvitation).toHaveBeenCalledWith(
       expect.objectContaining({ grants: [{ workspaceId: 'ws-2', permission: 'write' }] })
-    )
-  })
-
-  it('reuses an existing Enterprise seat reservation when extending a pending invitation', async () => {
-    queueTableRows(userTable, [])
-    const context = makeContext(['ws-2'])
-    context.targets[0].invitePolicy.requiresSeat = true
-    mockCreatePendingInvitation.mockImplementationOnce(
-      async (input: CreatePendingInvitationInput) => {
-        await input.validateLockedContext?.({
-          tx: dbChainMock.db as unknown as DbOrTx,
-          organizationId: 'org-1',
-          workspaceIds: ['ws-2'],
-        })
-        return {
-          invitationId: 'inv-existing',
-          token: 'tok-existing',
-          expiresAt: new Date(),
-          created: false,
-          addedWorkspaceIds: ['ws-2'],
-          grants: [{ workspaceId: 'ws-2', permission: 'write' }],
-          mutationUpdatedAt: new Date('2026-07-30T12:00:00.000Z'),
-          mutationOrganizationId: 'org-1',
-        }
-      }
-    )
-    mockFindPendingOrganizationInvitation.mockResolvedValueOnce({ id: 'inv-existing' })
-
-    await createWorkspaceInvitation({
-      context,
-      email: 'new@example.com',
-      permission: 'write',
-      request,
-    })
-
-    expect(mockValidateSeatAvailability).not.toHaveBeenCalled()
-    expect(mockCreatePendingInvitation).toHaveBeenCalled()
-  })
-
-  it('checks a new Enterprise seat reservation under the organization lock', async () => {
-    queueTableRows(userTable, [])
-    const context = makeContext(['ws-2'])
-    context.targets[0].invitePolicy.requiresSeat = true
-    mockValidateSeatAvailability.mockResolvedValueOnce({
-      canInvite: false,
-      reason: 'No available seats.',
-    })
-    mockCreatePendingInvitation.mockImplementationOnce(
-      async (input: CreatePendingInvitationInput) => {
-        await input.validateLockedContext?.({
-          tx: dbChainMock.db as unknown as DbOrTx,
-          organizationId: 'org-1',
-          workspaceIds: ['ws-2'],
-        })
-        throw new Error('unreachable')
-      }
-    )
-
-    await expect(
-      createWorkspaceInvitation({
-        context,
-        email: 'new@example.com',
-        permission: 'write',
-        request,
-      })
-    ).rejects.toMatchObject({ status: 400 })
-
-    expect(mockAcquireOrganizationMutationLock).toHaveBeenCalled()
-    expect(mockValidateSeatAvailability).toHaveBeenCalledWith('org-1', 1, {
-      executor: dbChainMock.db,
-    })
-    expect(mockAcquireOrganizationMutationLock.mock.invocationCallOrder[0]).toBeLessThan(
-      mockValidateSeatAvailability.mock.invocationCallOrder[0]
     )
   })
 

@@ -1,6 +1,6 @@
 /** @vitest-environment node */
 import { db } from '@sim/db'
-import { resetEnvFlagsMock, setEnvFlags } from '@sim/testing'
+import { resetEnvFlagsMock } from '@sim/testing'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
@@ -61,7 +61,6 @@ const invitation: InvitationWithGrants = {
 
 beforeEach(() => {
   vi.resetAllMocks()
-  setEnvFlags({ isBillingEnabled: true })
   mocks.workspace.mockResolvedValue({
     id: 'workspace',
     organizationId: 'org',
@@ -102,25 +101,5 @@ describe('locked resend policy', () => {
     })
     await expect(lockInvitationResendPolicy(db, invitation, 'actor')).rejects.toBe(refusal)
     expect(mocks.workspacePolicy).not.toHaveBeenCalled()
-  })
-
-  it('refuses a workspace whose paid invitation policy has lapsed', async () => {
-    mocks.workspacePolicy.mockResolvedValue({
-      allowed: false,
-      upgradeRequired: true,
-      reason: 'Plan required',
-    })
-    await expect(lockInvitationResendPolicy(db, invitation, 'actor')).rejects.toMatchObject({
-      status: 403,
-      upgradeRequired: true,
-    })
-  })
-
-  it('rechecks grantless organization billing on the locked executor', async () => {
-    mocks.subscription.mockResolvedValue(null)
-    await expect(
-      lockInvitationResendPolicy(db, { ...invitation, grants: [] }, 'actor')
-    ).rejects.toMatchObject({ status: 403 })
-    expect(mocks.subscription).toHaveBeenCalledWith('org', { executor: db, onError: 'throw' })
   })
 })

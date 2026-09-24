@@ -2,17 +2,13 @@
  * @vitest-environment jsdom
  */
 import { act, type ReactNode } from 'react'
-import { resetEnvFlagsMock, setEnvFlags } from '@sim/testing'
 import { createRoot, type Root } from 'react-dom/client'
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { mockUseOrganizationBilling } = vi.hoisted(() => ({
-  mockUseOrganizationBilling: vi.fn(),
+const { mockUseWhitelabelSettings } = vi.hoisted(() => ({
+  mockUseWhitelabelSettings: vi.fn(),
 }))
 
-/** Billing on, so plan entitlement gates the page; read through the deployment shape. */
-beforeAll(() => setEnvFlags({ isBillingEnabled: true }))
-afterAll(resetEnvFlagsMock)
 vi.mock('@/components/settings/save-discard-actions', () => ({
   saveDiscardActions: () => [],
 }))
@@ -39,10 +35,7 @@ vi.mock('@/ee/components/setting-row', () => ({
 }))
 vi.mock('@/ee/whitelabeling/hooks/whitelabel', () => ({
   useUpdateWhitelabelSettings: () => ({ isPending: false, mutateAsync: vi.fn() }),
-  useWhitelabelSettings: () => ({ data: {}, error: null, isLoading: false }),
-}))
-vi.mock('@/hooks/queries/organization', () => ({
-  useOrganizationBilling: mockUseOrganizationBilling,
+  useWhitelabelSettings: mockUseWhitelabelSettings,
 }))
 vi.mock('@/hooks/queries/workspace', () => ({
   useWorkspacesQuery: () => ({ data: [] }),
@@ -67,28 +60,16 @@ afterEach(() => {
 })
 
 describe('WhitelabelingSettings entitlement states', () => {
-  it('shows a billing failure instead of an Enterprise notice when access is unknown', () => {
-    mockUseOrganizationBilling.mockReturnValue({
+  it('shows a settings failure without any plan gate', () => {
+    mockUseWhitelabelSettings.mockReturnValue({
       data: undefined,
-      error: new Error('Whitelabel billing failed'),
-      isPending: false,
+      error: new Error('Whitelabel settings failed'),
+      isLoading: false,
     })
 
     act(() => root.render(<WhitelabelingSettings organizationId='org-1' />))
 
-    expect(container.textContent).toContain('Whitelabel billing failed')
-    expect(container.textContent).not.toContain('available on Enterprise plans only')
-  })
-
-  it('preserves the Enterprise notice for a successful non-entitled response', () => {
-    mockUseOrganizationBilling.mockReturnValue({
-      data: { data: { subscriptionPlan: 'free' } },
-      error: null,
-      isPending: false,
-    })
-
-    act(() => root.render(<WhitelabelingSettings organizationId='org-1' />))
-
-    expect(container.textContent).toContain('available on Enterprise plans only')
+    expect(container.textContent).toContain('Whitelabel settings failed')
+    expect(container.textContent).not.toContain('Enterprise plans')
   })
 })

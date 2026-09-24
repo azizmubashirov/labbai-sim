@@ -28,8 +28,6 @@ interface ForkWorkspaceModalProps {
   sourceWorkspaceName: string
   /** Whether the user is under their workspace cap; creating a fork is gated on this. */
   canFork: boolean
-  /** Sends the user to upgrade (billing) when they try to fork at the cap. */
-  onUpgrade: () => void
 }
 
 type ResourceKey = Exclude<keyof GetForkResourcesResponse, 'deployedWorkflowCount'>
@@ -76,7 +74,6 @@ export function ForkWorkspaceModal({
   sourceWorkspaceId,
   sourceWorkspaceName,
   canFork,
-  onUpgrade,
 }: ForkWorkspaceModalProps) {
   const router = useRouter()
   const forkWorkspace = useForkWorkspace()
@@ -125,12 +122,8 @@ export function ForkWorkspaceModal({
     Boolean(resources.data) && (resources.data?.deployedWorkflowCount ?? 0) === 0
 
   const handleSubmit = () => {
-    // At a workspace cap, creating a fork is the only gated action - send the user to
-    // upgrade rather than blocking the whole modal.
-    if (!canFork) {
-      onUpgrade()
-      return
-    }
+    // At a workspace cap, creating a fork is the only gated action.
+    if (!canFork) return
     const trimmed = name.trim()
     // Block until the resources query resolves: building `copy` from an unloaded `resources.data`
     // would send an empty selection and silently clear every reference in the fork. The Fork

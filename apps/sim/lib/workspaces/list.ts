@@ -2,14 +2,10 @@ import { db } from '@sim/db'
 import { pinnedItem, settings, type workspace as workspaceTable } from '@sim/db/schema'
 import type { PermissionType } from '@sim/platform-authz/workspace'
 import { and, eq } from 'drizzle-orm'
-import type { PlanCategory } from '@/lib/billing/plan-helpers'
 import {
   evaluateWorkspaceInvitePolicy,
-  getInvitePlanCategoryForOrganization,
-  getInvitePlanCategoryForUser,
   getWorkspaceCreationPolicy,
   resolveInviteFlags,
-  WORKSPACE_MODE,
   type WorkspaceCreationPolicy,
   type WorkspaceInviteFlags,
 } from '@/lib/workspaces/policy'
@@ -43,8 +39,7 @@ export interface WorkspaceListPayload {
 
 /**
  * Decorates accessible workspace rows with the viewer's role and per-workspace
- * invite policy flags (resolving each workspace's billed plan category once per
- * billed user / organization).
+ * invite policy flags.
  */
 async function buildWorkspacesWithInviteFlags(
   userWorkspaces: Array<{
@@ -54,42 +49,8 @@ async function buildWorkspacesWithInviteFlags(
   }>,
   userId: string
 ): Promise<WorkspaceWithInviteFlags[]> {
-  const nonOrgBilledUserIds = [
-    ...new Set(
-      userWorkspaces
-        .filter(({ workspace: ws }) => ws.workspaceMode !== WORKSPACE_MODE.ORGANIZATION)
-        .map(({ workspace: ws }) => ws.billedAccountUserId)
-    ),
-  ]
-  const orgIds = [
-    ...new Set(
-      userWorkspaces
-        .filter(
-          ({ workspace: ws }) =>
-            ws.workspaceMode === WORKSPACE_MODE.ORGANIZATION && ws.organizationId
-        )
-        .map(({ workspace: ws }) => ws.organizationId as string)
-    ),
-  ]
-  const planCategoryByBilledUser = new Map<string, PlanCategory>()
-  const planCategoryByOrg = new Map<string, PlanCategory>()
-  await Promise.all([
-    ...nonOrgBilledUserIds.map(async (billedUserId) => {
-      planCategoryByBilledUser.set(billedUserId, await getInvitePlanCategoryForUser(billedUserId))
-    }),
-    ...orgIds.map(async (orgId) => {
-      planCategoryByOrg.set(orgId, await getInvitePlanCategoryForOrganization(orgId))
-    }),
-  ])
-
   return userWorkspaces.map(({ workspace: workspaceDetails, permissionType, viaOrgAdmin }) => {
-    const billedPlanCategory: PlanCategory =
-      workspaceDetails.workspaceMode === WORKSPACE_MODE.ORGANIZATION
-        ? workspaceDetails.organizationId
-          ? (planCategoryByOrg.get(workspaceDetails.organizationId) ?? 'free')
-          : 'free'
-        : (planCategoryByBilledUser.get(workspaceDetails.billedAccountUserId) ?? 'free')
-    const invitePolicy = evaluateWorkspaceInvitePolicy(workspaceDetails, { billedPlanCategory })
+    const invitePolicy = evaluateWorkspaceInvitePolicy(workspaceDetails)
 
     return {
       ...workspaceDetails,

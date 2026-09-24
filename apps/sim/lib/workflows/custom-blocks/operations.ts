@@ -11,7 +11,7 @@ import { generateId, generateShortId } from '@sim/utils/id'
 import { and, eq, isNull, ne, sql } from 'drizzle-orm'
 import { isOrganizationFeatureEntitled } from '@/lib/billing/core/subscription'
 import { acquireOrganizationMutationLock } from '@/lib/billing/organizations/membership'
-import { isBillingEnabled, isCustomBlocksEnabled } from '@/lib/core/config/env-flags'
+import { isCustomBlocksEnabled } from '@/lib/core/config/env-flags'
 import { mapWithConcurrency } from '@/lib/core/utils/concurrency'
 import type { DbOrTx } from '@/lib/db/types'
 import { extractInputFieldsFromBlocks, type WorkflowInputField } from '@/lib/workflows/input-format'
@@ -25,7 +25,7 @@ const CUSTOM_BLOCK_HYDRATION_CONCURRENCY = 10
 
 /** Whether the deployment permits Custom Blocks surfaces independent of an organization's plan. */
 export function isCustomBlocksDeploymentEnabled(): boolean {
-  return isBillingEnabled || isCustomBlocksEnabled
+  return isCustomBlocksEnabled
 }
 
 /** Whether an organization may publish, list, and execute custom blocks. */

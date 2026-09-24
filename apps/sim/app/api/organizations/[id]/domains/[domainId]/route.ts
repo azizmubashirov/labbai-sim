@@ -10,8 +10,6 @@ import { removeOrganizationDomainContract } from '@/lib/api/contracts/organizati
 import { parseRequest } from '@/lib/api/server'
 import { getSession } from '@/lib/auth'
 import { invalidateSsoPolicyCache } from '@/lib/auth/sso-policy'
-import { isOrganizationOnEnterprisePlan } from '@/lib/billing/core/subscription'
-import { isBillingEnabled } from '@/lib/core/config/env-flags'
 import { withRouteHandler } from '@/lib/core/utils/with-route-handler'
 
 const logger = createLogger('OrgDomainDeleteAPI')
@@ -51,14 +49,6 @@ export const DELETE = withRouteHandler(
     if (!isOrgAdminRole(memberEntry.role)) {
       return NextResponse.json(
         { error: 'Forbidden - Only organization owners and admins can remove domains' },
-        { status: 403 }
-      )
-    }
-    // Enterprise-gate removal like add/verify so all domain mutations require the
-    // same entitlement (the UI already hides removal from non-Enterprise orgs).
-    if (isBillingEnabled && !(await isOrganizationOnEnterprisePlan(organizationId))) {
-      return NextResponse.json(
-        { error: 'Domain verification is available on Enterprise plans only' },
         { status: 403 }
       )
     }

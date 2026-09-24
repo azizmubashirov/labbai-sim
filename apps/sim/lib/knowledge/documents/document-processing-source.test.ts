@@ -74,7 +74,6 @@ vi.mock('@/lib/uploads/server/metadata', () => ({
 }))
 
 import * as billingAttribution from '@/lib/billing/core/billing-attribution'
-import { resetUsageGateCache } from '@/lib/billing/core/usage-gate-cache'
 import { env } from '@/lib/core/config/env'
 import {
   markInsideTriggerRun,
@@ -106,7 +105,6 @@ import { MAX_PROCESSING_ATTEMPTS, QUEUED_DISPATCH_GRACE_MS } from '@/lib/knowled
 
 const mockEmbeddingCapacity = vi.fn<typeof embeddingClient.assertKnowledgeEmbeddingCapacity>()
 beforeEach(() => {
-  resetUsageGateCache()
   vi.spyOn(billingAttribution, 'checkAttributedUsageLimits').mockImplementation(
     mockCheckAttributedUsageLimits
   )

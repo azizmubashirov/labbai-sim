@@ -1,19 +1,14 @@
 import { db, dbFor } from '@sim/db'
-import { usageLog, user as userTable, workflow, workflowExecutionLogs } from '@sim/db/schema'
+import { usageLog, workflow, workflowExecutionLogs } from '@sim/db/schema'
 import { createLogger } from '@sim/logger'
 import { describeError, getErrorMessage } from '@sim/utils/errors'
 import { generateId } from '@sim/utils/id'
 import { and, eq, inArray, sql } from 'drizzle-orm'
-import { checkUsageStatus as checkResolvedUsageStatus } from '@/lib/billing/calculations/usage-monitor'
 import {
   type BillingAttributionSnapshot,
   toBillingContext,
 } from '@/lib/billing/core/billing-attribution'
-import {
-  getHighestPriorityPersonalSubscription,
-  getHighestPrioritySubscription,
-} from '@/lib/billing/core/subscription'
-import { getOrgUsageLimit, maybeSendUsageThresholdEmail } from '@/lib/billing/core/usage'
+import { getHighestPrioritySubscription } from '@/lib/billing/core/subscription'
 import {
   type BillingContext,
   deriveBillingContext,
@@ -21,8 +16,6 @@ import {
   recordUsage,
   stableEventKey,
 } from '@/lib/billing/core/usage-log'
-import { checkAndBillPayerOverageThreshold } from '@/lib/billing/threshold-billing'
-import { isBillingEnabled } from '@/lib/core/config/env-flags'
 import { redactApiKeys } from '@/lib/core/security/redaction'
 import { filterForDisplay } from '@/lib/core/utils/display-filters'
 import {
@@ -1074,134 +1067,17 @@ export class ExecutionLogger implements IExecutionLoggerService {
       : undefined
 
     try {
-      // Skip workflow lookup if workflow was deleted.
-      const wf = updatedLog.workflowId
-        ? (await db.select().from(workflow).where(eq(workflow.id, updatedLog.workflowId)))[0]
-        : undefined
-
-      const payerContactUserId = billingAttribution?.billedAccountUserId ?? actorUserId
-      const usr =
-        wf && payerContactUserId
-          ? (
-              await db
-                .select({ id: userTable.id, email: userTable.email, name: userTable.name })
-                .from(userTable)
-                .where(eq(userTable.id, payerContactUserId))
-                .limit(1)
-            )[0]
-          : undefined
-
-      // Resolve the billing context + the pre-increment usage snapshot for the
-      // threshold email BEFORE recording, so currentUsageAfter = before +
-      // costDelta doesn't double-count this boundary's own increment.
-      type EmailContext =
-        | {
-            scope: 'user'
-            userId: string
-            userEmail: string
-            userName: string | null
-            planName: string
-            before: Awaited<ReturnType<typeof checkResolvedUsageStatus>>
-          }
-        | {
-            scope: 'organization'
-            organizationId: string
-            planName: string
-            orgLimit: number
-            orgUsageBefore: number
-          }
-      const billingContext = exactBillingContext
-      let emailContext: EmailContext | undefined
-
-      if (
-        billingAttribution?.billingEntity.type === 'organization' &&
-        billingAttribution.payerSubscription &&
-        exactBillingContext
-      ) {
-        const organizationId = billingAttribution.billingEntity.id
-        const payerSubscription = billingAttribution.payerSubscription
-        const { getDisplayPlanName } = await import('@/lib/billing/plan-helpers')
-        const { limit: orgLimit } = await getOrgUsageLimit(
-          organizationId,
-          payerSubscription.plan,
-          payerSubscription.seats
-        )
-        const { getBillingPeriodUsageCost } = await import('@/lib/billing/core/usage-log')
-        const orgLedger = await getBillingPeriodUsageCost(
-          billingAttribution.billingEntity,
-          exactBillingContext.billingPeriod
-        )
-        emailContext = {
-          scope: 'organization',
-          organizationId,
-          planName: getDisplayPlanName(payerSubscription.plan),
-          orgLimit,
-          orgUsageBefore: orgLedger,
-        }
-      } else if (billingAttribution?.billingEntity.type === 'user' && usr?.email) {
-        const sub = await getHighestPriorityPersonalSubscription(usr.id)
-        const { getDisplayPlanName } = await import('@/lib/billing/plan-helpers')
-        emailContext = {
-          scope: 'user',
-          userId: usr.id,
-          userEmail: usr.email,
-          userName: usr.name,
-          planName: getDisplayPlanName(sub?.plan),
-          before: await checkResolvedUsageStatus(usr.id, sub),
-        }
-      }
-
-      // Record usage exactly once for every path. costDelta is the amount
-      // actually recorded at this boundary (the increment), not the cumulative
-      // run total — so resumed runs don't double-count pre-pause cost below.
-      const costDelta = await this.recordExecutionUsage(
+      // Record usage exactly once for every path. The ledger is the cost source
+      // of truth; Labbai has no usage limits, so nothing is enforced here.
+      await this.recordExecutionUsage(
         updatedLog.workflowId,
         costSummary,
         updatedLog.trigger as ExecutionTrigger['type'],
         executionId,
         actorUserId,
-        billingContext,
+        exactBillingContext,
         status !== 'pending'
       )
-
-      // Best-effort usage-threshold email.
-      if (emailContext?.scope === 'user') {
-        const limit = emailContext.before.limit
-        const percentBefore = emailContext.before.percentUsed
-        const percentAfter =
-          limit > 0 ? Math.min(100, percentBefore + (costDelta / limit) * 100) : percentBefore
-        const currentUsageAfter = emailContext.before.currentUsage + costDelta
-
-        await maybeSendUsageThresholdEmail({
-          scope: 'user',
-          userId: emailContext.userId,
-          userEmail: emailContext.userEmail,
-          userName: emailContext.userName || undefined,
-          planName: emailContext.planName,
-          workspaceId: updatedLog.workspaceId,
-          percentBefore,
-          percentAfter,
-          currentUsageAfter,
-          limit,
-        })
-      } else if (emailContext?.scope === 'organization') {
-        const { orgLimit, orgUsageBefore } = emailContext
-        const percentBefore = orgLimit > 0 ? Math.min(100, (orgUsageBefore / orgLimit) * 100) : 0
-        const percentAfter =
-          orgLimit > 0 ? Math.min(100, percentBefore + (costDelta / orgLimit) * 100) : percentBefore
-        const currentUsageAfter = orgUsageBefore + costDelta
-
-        await maybeSendUsageThresholdEmail({
-          scope: 'organization',
-          organizationId: emailContext.organizationId,
-          planName: emailContext.planName,
-          workspaceId: updatedLog.workspaceId,
-          percentBefore,
-          percentAfter,
-          currentUsageAfter,
-          limit: orgLimit,
-        })
-      }
     } catch (e) {
       // Safety net: if a step above threw BEFORE the single record call, ensure
       // the run is still billed. Reconciliation is idempotent, so re-recording
@@ -1363,9 +1239,8 @@ export class ExecutionLogger implements IExecutionLoggerService {
   ): Promise<number> {
     const statsLog = logger.withMetadata({ workflowId: workflowId ?? undefined, executionId })
 
-    // The usage ledger (recordUsage below) is written regardless of
-    // BILLING_ENABLED so cost is available everywhere (incl. self-hosted).
-    // Only enforcement (overage/Stripe) is gated on the flag.
+    // The usage ledger (recordUsage below) is always written so cost is
+    // available everywhere. Labbai has no payments, so nothing is enforced.
     // Returns the amount actually recorded at THIS boundary (the increment), so
     // callers drive usage-threshold math off the delta rather than the
     // cumulative run total (which would double-count pre-pause cost on resume).
@@ -1668,12 +1543,6 @@ export class ExecutionLogger implements IExecutionLoggerService {
           })
           recordedIncrement = entries.reduce((acc, e) => acc + e.cost, 0)
         }
-      }
-
-      // Enforcement only when billing is enabled: the ledger above is always
-      // written, but overage/Stripe billing is gated on BILLING_ENABLED.
-      if (isBillingEnabled) {
-        await checkAndBillPayerOverageThreshold(resolvedBillingContext.billingEntity)
       }
     } catch (error) {
       // Swallowed so a billing-write failure never fails the execution. The

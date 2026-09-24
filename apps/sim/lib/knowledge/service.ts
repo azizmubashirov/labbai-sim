@@ -19,7 +19,6 @@ import {
 } from '@/lib/api/list-query'
 import {
   applyStorageUsageDeltasInTx,
-  maybeNotifyStorageLimitForBillingContext,
   resolveStorageBillingContext,
   type StorageBillingContext,
 } from '@/lib/billing/storage'
@@ -870,17 +869,6 @@ export async function updateKnowledgeBase(
       throw new KnowledgeBaseConflictError(updates.name)
     }
     throw error
-  }
-
-  if (storageMove && destinationUpdatedUsage !== undefined) {
-    const sourcePayer = storageMove.sourceContext.billingEntity
-    const destinationPayer = storageMove.destinationContext.billingEntity
-    if (sourcePayer.type !== destinationPayer.type || sourcePayer.id !== destinationPayer.id) {
-      void maybeNotifyStorageLimitForBillingContext(
-        storageMove.destinationContext,
-        destinationUpdatedUsage
-      )
-    }
   }
 
   const updatedKb = await db

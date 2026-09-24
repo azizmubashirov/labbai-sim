@@ -7,7 +7,6 @@ import {
 } from '@/lib/billing/core/billing-attribution'
 import { checkSearchUsageLimits } from '@/lib/billing/core/usage-gate-cache'
 import { recordUsage } from '@/lib/billing/core/usage-log'
-import { checkAndBillPayerOverageThreshold } from '@/lib/billing/threshold-billing'
 import { OrchestrationError } from '@/lib/core/orchestration/types'
 import { resourceScopeFromOwner, resourceScopeKey } from '@/lib/core/resource-scope'
 import { PlatformEvents } from '@/lib/core/telemetry'
@@ -644,9 +643,6 @@ export async function runKnowledgeSearch({
             },
           ],
         })
-      )
-      await measureSearchStage('overage_billing', () =>
-        checkAndBillPayerOverageThreshold(billingAttribution.billingEntity)
       )
     } catch (error) {
       logger.error('Failed to record Knowledge search usage', { error })

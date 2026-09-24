@@ -1,7 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query'
 import type { SettingsSection } from '@/app/workspace/[workspaceId]/settings/navigation'
-import { organizationBillingSummaryOptions } from '@/hooks/queries/organization-billing-summary'
-import { subscriptionDataQueryOptions } from '@/hooks/queries/subscription-data'
 import { workspaceCredentialListQueryOptions } from '@/hooks/queries/utils/fetch-workspace-credentials'
 import { prefetchQueryOnIntent } from '@/hooks/queries/utils/prefetch-query-on-intent'
 
@@ -13,18 +11,10 @@ const SETTINGS_QUERY_WARMERS: Partial<
       queryClient,
       workspaceCredentialListQueryOptions(workspaceId, 'env_workspace')
     ),
-  billing: (queryClient, { billingOrganizationId }) => {
-    if (billingOrganizationId) {
-      prefetchQueryOnIntent(queryClient, organizationBillingSummaryOptions(billingOrganizationId))
-      return
-    }
-    prefetchQueryOnIntent(queryClient, subscriptionDataQueryOptions(false))
-  },
 }
 
 export interface SettingsQueryWarmContext {
   workspaceId: string
-  billingOrganizationId: string | null
 }
 
 /** Starts approved first-content data within the workspace graph's enforced module budget. */

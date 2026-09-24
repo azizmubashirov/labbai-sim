@@ -17,14 +17,12 @@ const {
   mockApplySessionPolicyToNewMember,
   mockCaptureServerEvent,
   mockEnsureUserInOrganizationTx,
-  mockReconcileOrganizationSeats,
   mockSyncUsageLimitsFromSubscription,
 } = vi.hoisted(() => ({
   mockAcquireOrganizationUserMutationLocks: vi.fn(),
   mockApplySessionPolicyToNewMember: vi.fn(),
   mockCaptureServerEvent: vi.fn(),
   mockEnsureUserInOrganizationTx: vi.fn(),
-  mockReconcileOrganizationSeats: vi.fn(),
   mockSyncUsageLimitsFromSubscription: vi.fn(),
 }))
 
@@ -38,10 +36,6 @@ vi.mock('@/lib/billing/organizations/membership', () => ({
 
 vi.mock('@/lib/auth/session-policy', () => ({
   applySessionPolicyToNewMember: mockApplySessionPolicyToNewMember,
-}))
-
-vi.mock('@/lib/billing/organizations/seats', () => ({
-  reconcileOrganizationSeats: mockReconcileOrganizationSeats,
 }))
 
 vi.mock('@/lib/billing/core/usage', () => ({
@@ -129,11 +123,6 @@ describe('SSO JIT admission', () => {
       role: 'member',
     })
     expect(mockApplySessionPolicyToNewMember).toHaveBeenCalledWith('user-1', 'org-1')
-    expect(mockReconcileOrganizationSeats).toHaveBeenCalledWith({
-      organizationId: 'org-1',
-      reason: 'sso-jit-member-added',
-      actorId: 'user-1',
-    })
     expect(mockSyncUsageLimitsFromSubscription).toHaveBeenCalledWith('user-1')
     expect(auditMock.recordAudit).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -338,12 +327,6 @@ describe('SSO JIT admission', () => {
       role: 'member',
       skipSeatValidation: true,
       organizationSubscriptionId: 'subscription-current',
-    })
-    expect(mockReconcileOrganizationSeats).toHaveBeenCalledWith({
-      organizationId: 'org-1',
-      reason: 'sso-jit-member-added',
-      actorId: 'user-1',
-      subscriptionId: 'subscription-current',
     })
   })
 

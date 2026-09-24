@@ -9,7 +9,6 @@ import {
   toBillingContext,
 } from '@/lib/billing/core/billing-attribution'
 import { checkExecutionUsageLimits } from '@/lib/billing/core/usage-gate-cache'
-import { checkAndBillPayerOverageThreshold } from '@/lib/billing/threshold-billing'
 import { prepareCopilotEnvironmentContext } from '@/lib/copilot/environment-context'
 import { inspectModelInputProvenanceRequest } from '@/lib/execution/model-input-provenance'
 import { validateHallucination } from '@/lib/guardrails/validate_hallucination'
@@ -270,7 +269,6 @@ async function recordHallucinationUsage(
         },
       ],
     })
-    await checkAndBillPayerOverageThreshold(hallucinationContext.billingAttribution.billingEntity)
   } catch (error) {
     logger.error(`[${context.requestId}] Failed to record guardrail usage`, { error })
   }

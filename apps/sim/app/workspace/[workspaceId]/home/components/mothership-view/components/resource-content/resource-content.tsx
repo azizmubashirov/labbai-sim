@@ -1,7 +1,7 @@
 'use client'
 
 import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { OverflowText, PlayOutline, Skeleton, TabStripAction, Tooltip, toast } from '@sim/emcn'
+import { OverflowText, PlayOutline, Skeleton, TabStripAction, Tooltip } from '@sim/emcn'
 import {
   Download,
   FileX,
@@ -15,8 +15,6 @@ import {
 import { createLogger } from '@sim/logger'
 import { useRouter } from 'next/navigation'
 import { isApiClientError } from '@/lib/api/client/errors'
-import { useSession } from '@/lib/auth/auth-client'
-import { getWorkspaceUsageLimitAction } from '@/lib/billing/workspace-permissions'
 import type { FilePreviewSession } from '@/lib/copilot/request/session'
 import {
   cancelRunToolExecution,
@@ -40,20 +38,17 @@ import type {
 } from '@/app/workspace/[workspaceId]/home/types'
 import { KnowledgeBase } from '@/app/workspace/[workspaceId]/knowledge/[id]/base'
 import { LogDetailsContent } from '@/app/workspace/[workspaceId]/logs/components'
-import { useWorkspaceHostContext } from '@/app/workspace/[workspaceId]/providers/workspace-host-provider'
 import {
   useUserPermissionsContext,
   useWorkspacePermissionsContext,
 } from '@/app/workspace/[workspaceId]/providers/workspace-permissions-provider'
 import { Table } from '@/app/workspace/[workspaceId]/tables/[tableId]/table'
-import { useUsageLimits } from '@/app/workspace/[workspaceId]/w/[workflowId]/components/panel/hooks'
 import { useWorkflowExecution } from '@/app/workspace/[workspaceId]/w/[workflowId]/hooks/use-workflow-execution'
 import { useFolders } from '@/hooks/queries/folders'
 import { useLogDetail } from '@/hooks/queries/logs'
 import { exportTable } from '@/hooks/queries/tables'
 import { useWorkflows } from '@/hooks/queries/workflows'
 import { useWorkspaceFiles } from '@/hooks/queries/workspace-files'
-import { useSettingsNavigation } from '@/hooks/use-settings-navigation'
 import { useExecutionStore } from '@/stores/execution/store'
 import { useTableViewPinStore } from '@/stores/table/view-pin/store'
 import { useWorkflowRegistry } from '@/stores/workflows/registry/store'
@@ -352,29 +347,19 @@ interface EmbeddedWorkflowActionsProps {
 
 export function EmbeddedWorkflowActions({ workspaceId, workflowId }: EmbeddedWorkflowActionsProps) {
   const openInternalLink = useOpenInternalLink()
-  const { navigateToSettings } = useSettingsNavigation()
-  const { data: session } = useSession()
-  const hostContext = useWorkspaceHostContext()
   const { userPermissions: effectivePermissions } = useWorkspacePermissionsContext()
   const setActiveWorkflow = useWorkflowRegistry((state) => state.setActiveWorkflow)
   const { handleRunWorkflow, handleCancelExecution } = useWorkflowExecution()
   const isExecuting = useExecutionStore(
     (state) => state.workflowExecutions.get(workflowId)?.isExecuting ?? false
   )
-  const {
-    usageExceeded,
-    message: usageLimitMessage,
-    scope: usageLimitScope,
-    isLoading: isUsageGateLoading,
-  } = useUsageLimits({ workspaceId })
 
   useEffect(() => {
     void setActiveWorkflow(workflowId)
   }, [workflowId, setActiveWorkflow])
 
   const isRunButtonDisabled =
-    !isExecuting &&
-    (isUsageGateLoading || (!effectivePermissions.canRead && !effectivePermissions.isLoading))
+    !isExecuting && !effectivePermissions.canRead && !effectivePermissions.isLoading
 
   const handleRun = async () => {
     setActiveWorkflow(workflowId)
@@ -384,21 +369,6 @@ export function EmbeddedWorkflowActions({ workspaceId, workflowId }: EmbeddedWor
       cancelRunToolExecution(workflowId)
       await handleCancelExecution()
       await reportManualRunToolStop(workflowId, toolCallId)
-      return
-    }
-
-    if (isUsageGateLoading) return
-
-    if (usageExceeded) {
-      const action = getWorkspaceUsageLimitAction(hostContext, session?.user?.id, {
-        message: usageLimitMessage,
-        scope: usageLimitScope,
-      })
-      if (action.type === 'manage-billing') {
-        navigateToSettings({ section: 'billing' })
-      } else {
-        toast.error(action.message)
-      }
       return
     }
 

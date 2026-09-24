@@ -25,7 +25,6 @@ import {
 import { SettingsIntentLink } from '@/components/settings/settings-intent-link'
 import { useSession } from '@/lib/auth/auth-client'
 import { getSubscriptionAccessState } from '@/lib/billing/client'
-import { canViewWorkspaceBillingSettings } from '@/lib/billing/workspace-permissions'
 import { useDeploymentShape } from '@/lib/core/config/deployment-shape'
 import { useWorkspaceHostContext } from '@/app/workspace/[workspaceId]/providers/workspace-host-provider'
 import { useUserPermissionsContext } from '@/app/workspace/[workspaceId]/providers/workspace-permissions-provider'
@@ -71,7 +70,6 @@ import { useSettingsDirtyStore } from '@/stores/settings/dirty/store'
 const SECTION_CHUNK_WARMERS: Partial<Record<SettingsSection, () => Promise<unknown>>> = {
   general: () => import('@/app/workspace/[workspaceId]/settings/components/general/general'),
   secrets: () => import('@/app/workspace/[workspaceId]/settings/components/secrets/secrets'),
-  billing: () => import('@/app/workspace/[workspaceId]/settings/components/billing/billing'),
 }
 
 interface SettingsSidebarProps {
@@ -107,7 +105,7 @@ export function SettingsSidebar({
   const { data: session } = useSession()
   const hostContext = useWorkspaceHostContext()
   const deployment = useDeploymentShape()
-  const { hosted, billingEnabled } = deployment
+  const { hosted } = deployment
   const { data: generalSettings } = useGeneralSettings()
   const { data: ssoProvidersData, isLoading: isLoadingSSO } = useSSOProviders({
     enabled: !hosted,
@@ -162,14 +160,6 @@ export function SettingsSidebar({
         )
       }
       if (item.requiresSelfHosted && hosted) {
-        return false
-      }
-
-      if (item.hideWhenBillingDisabled && !billingEnabled) {
-        return false
-      }
-
-      if (item.id === 'billing' && !canViewWorkspaceBillingSettings(hostContext, userId)) {
         return false
       }
 
@@ -250,7 +240,6 @@ export function SettingsSidebar({
   }, [
     deployment,
     hosted,
-    billingEnabled,
     hasEnterprisePlan,
     isEnterprisePlan,
     subscriptionAccess.hasUsableMaxAccess,
@@ -279,11 +268,7 @@ export function SettingsSidebar({
 
   const handleIntent = (section: SettingsSection) => {
     void SECTION_CHUNK_WARMERS[section]?.()
-    warmSettingsSectionQuery(
-      queryClient,
-      { workspaceId, billingOrganizationId: hostContext.hostOrganizationId },
-      section
-    )
+    warmSettingsSectionQuery(queryClient, { workspaceId }, section)
   }
 
   const handleBack = useCallback(() => {

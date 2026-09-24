@@ -63,7 +63,7 @@ async function codeOf(promise: Promise<unknown>): Promise<string> {
 describe('organization usage authorization', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    setEnvFlags({ isBillingEnabled: true, isHosted: true })
+    setEnvFlags({ isHosted: true })
     mocks.authorizeOrganizationOperation.mockResolvedValue(true)
     mocks.isOrganizationFeatureEntitled.mockResolvedValue(true)
     mocks.getOrganizationSubscription.mockResolvedValue({
@@ -76,7 +76,7 @@ describe('organization usage authorization', () => {
   })
 
   afterAll(() => {
-    setEnvFlags({ isBillingEnabled: false, isHosted: false })
+    setEnvFlags({ isHosted: false })
   })
 
   it('admits personal keys through the shared current-organization authorization', async () => {

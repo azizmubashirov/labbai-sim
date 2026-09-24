@@ -6,33 +6,14 @@ import { getErrorMessage } from '@sim/utils/errors'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const {
-  deployment,
-  mockIsAdminOrOwner,
-  mockUseOrganization,
-  mockUseOrganizationBilling,
-  mockUseOrganizationRoster,
-} = vi.hoisted(() => ({
-  deployment: { billingEnabled: true },
+const { mockIsAdminOrOwner, mockUseOrganization, mockUseOrganizationRoster } = vi.hoisted(() => ({
   mockIsAdminOrOwner: vi.fn(),
   mockUseOrganization: vi.fn(),
-  mockUseOrganizationBilling: vi.fn(),
   mockUseOrganizationRoster: vi.fn(),
 }))
 
 vi.mock('@/lib/auth/auth-client', () => ({
   useSession: () => ({ data: { user: { id: 'viewer-1', email: 'viewer' } } }),
-}))
-
-vi.mock('@/lib/core/config/deployment-shape', () => ({
-  useDeploymentShape: () => deployment,
-}))
-
-vi.mock('@/lib/billing/client/utils', () => ({
-  getSubscriptionAccessState: () => ({
-    hasUsableTeamAccess: false,
-    hasUsableEnterpriseAccess: false,
-  }),
 }))
 
 vi.mock('@/lib/workspaces/organization', () => ({
@@ -94,7 +75,6 @@ vi.mock('@/app/workspace/[workspaceId]/settings/components/team-management/compo
   NoOrganizationView: () => <div>no-organization-view</div>,
   OrganizationMemberLists: () => <div>organization-member-lists</div>,
   RemoveMemberDialog: () => null,
-  TeamSeatsOverview: () => <div>team-seats-overview</div>,
   TransferOwnershipDialog: () => null,
 }))
 
@@ -106,16 +86,10 @@ vi.mock('@/hooks/use-permission-config', () => ({
   usePermissionConfig: () => ({ isInvitationsDisabled: false }),
 }))
 
-vi.mock('@/hooks/queries/subscription', () => ({
-  useOpenBillingPortal: () => ({ mutate: vi.fn() }),
-  useSubscriptionData: () => ({ data: undefined, isPending: false }),
-}))
-
 vi.mock('@/hooks/queries/organization', () => ({
   useCreateOrganization: () => ({ error: null, isPending: false, mutateAsync: vi.fn() }),
   useMemberRemovalImpact: () => ({ data: [], isError: false, isFetching: false }),
   useOrganization: mockUseOrganization,
-  useOrganizationBilling: mockUseOrganizationBilling,
   useOrganizationRoster: mockUseOrganizationRoster,
   useRemoveMember: () => ({ isPending: false, mutateAsync: vi.fn() }),
   useTransferOwnership: () => ({ isPending: false, mutateAsync: vi.fn() }),
@@ -127,17 +101,11 @@ let container: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
-  deployment.billingEnabled = true
   ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
   mockIsAdminOrOwner.mockReturnValue(false)
-  mockUseOrganizationBilling.mockReturnValue({
-    data: undefined,
-    error: null,
-    isLoading: false,
-  })
   mockUseOrganizationRoster.mockReturnValue({
     data: { members: [], pendingInvitations: [], workspaces: [] },
     error: null,
@@ -152,26 +120,15 @@ afterEach(() => {
 })
 
 describe('TeamManagement organization errors', () => {
-  it('renders members without fetching or displaying billing when billing is disabled', () => {
-    deployment.billingEnabled = false
+  it('renders members without any billing or seat information', () => {
     mockIsAdminOrOwner.mockReturnValue(true)
     mockUseOrganization.mockReturnValue({ data: { id: 'org-1' }, error: null, isLoading: false })
-    mockUseOrganizationBilling.mockReturnValue({
-      data: undefined,
-      error: new Error('Billing request failed'),
-      isLoading: false,
-    })
 
     act(() =>
-      root.render(
-        <TeamManagement organizationId='org-1' billingHref='/workspace/ws-1/settings/billing' />
-      )
+      root.render(<TeamManagement organizationId='org-1' />)
     )
 
-    expect(mockUseOrganizationBilling).toHaveBeenCalledWith('org-1', { enabled: false })
     expect(container).toHaveTextContent('organization-member-lists')
-    expect(container).not.toHaveTextContent('Billing request failed')
-    expect(container).not.toHaveTextContent('team-seats-overview')
   })
 
   it.each([
@@ -185,11 +142,7 @@ describe('TeamManagement organization errors', () => {
       mockUseOrganization.mockReturnValue({ data: { id: 'org-1' }, error: null, isLoading: false })
       act(() =>
         root.render(
-          <TeamManagement
-            organizationId='org-1'
-            billingHref='/o/org-1/settings/billing'
-            canInviteMembers={canInvite}
-          />
+          <TeamManagement organizationId='org-1' canInviteMembers={canInvite} />
         )
       )
       const invite = Array.from(container.querySelectorAll('button')).find(
@@ -207,9 +160,7 @@ describe('TeamManagement organization errors', () => {
     })
 
     act(() =>
-      root.render(
-        <TeamManagement organizationId='org-1' billingHref='/workspace/ws-1/settings/billing' />
-      )
+      root.render(<TeamManagement organizationId='org-1' />)
     )
 
     expect(container.textContent).toContain('Organization request failed')
@@ -229,9 +180,7 @@ describe('TeamManagement organization errors', () => {
     })
 
     act(() =>
-      root.render(
-        <TeamManagement organizationId='org-1' billingHref='/workspace/ws-1/settings/billing' />
-      )
+      root.render(<TeamManagement organizationId='org-1' />)
     )
 
     expect(container.textContent).toContain('Loading members…')
@@ -251,45 +200,10 @@ describe('TeamManagement organization errors', () => {
     })
 
     act(() =>
-      root.render(
-        <TeamManagement organizationId='org-1' billingHref='/workspace/ws-1/settings/billing' />
-      )
+      root.render(<TeamManagement organizationId='org-1' />)
     )
 
     expect(container.textContent).toContain('Roster request failed')
     expect(container.textContent).not.toContain('organization-member-lists')
-  })
-
-  it('shows a retryable billing failure instead of a subscription upsell', async () => {
-    const refetch = vi.fn().mockResolvedValue(undefined)
-    mockIsAdminOrOwner.mockReturnValue(true)
-    mockUseOrganization.mockReturnValue({
-      data: { id: 'org-1' },
-      error: null,
-      isLoading: false,
-    })
-    mockUseOrganizationBilling.mockReturnValue({
-      data: undefined,
-      error: new Error('Billing request failed'),
-      isLoading: false,
-      refetch,
-    })
-
-    act(() =>
-      root.render(
-        <TeamManagement organizationId='org-1' billingHref='/workspace/ws-1/settings/billing' />
-      )
-    )
-
-    expect(container.textContent).toContain('Billing request failed')
-    expect(container.textContent).toContain('Try again')
-    expect(container.textContent).not.toContain('team-seats-overview')
-
-    await act(async () => {
-      Array.from(container.querySelectorAll('button'))
-        .find((button) => button.textContent === 'Try again')
-        ?.click()
-    })
-    expect(refetch).toHaveBeenCalledOnce()
   })
 })

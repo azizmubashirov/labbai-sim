@@ -97,20 +97,6 @@ export const isStatusNoticePreviewEnabled = isTruthy(getEnv('NEXT_PUBLIC_STATUS_
 export const isCopilotToolPermissionsEnabled = isTruthy(env.COPILOT_TOOL_PERMISSIONS_ENABLED)
 
 /**
- * Is billing enforcement enabled.
- *
- * Server code reads `BILLING_ENABLED`. Server-only vars never reach browser
- * bundles, so client evaluation reads the `NEXT_PUBLIC_BILLING_ENABLED` twin
- * (via `window.__ENV`, populated by `<PublicEnvScript>`) — reading
- * `env.BILLING_ENABLED` in client code is always `undefined`. Deployments must
- * set both vars together.
- */
-export const isBillingEnabled =
-  typeof window === 'undefined'
-    ? isTruthy(env.BILLING_ENABLED)
-    : isTruthy(getEnv('NEXT_PUBLIC_BILLING_ENABLED'))
-
-/**
  * Is email verification enabled
  */
 export const isEmailVerificationEnabled = isTruthy(env.EMAIL_VERIFICATION_ENABLED)
@@ -246,13 +232,14 @@ export const isAppConfigEnabled =
 export const isTriggerDevEnabled = isTruthy(env.TRIGGER_DEV_ENABLED)
 
 /**
- * Turns on the whole enterprise suite for a deployment that does not run
- * billing. Individual feature flags below still win where they are set, so an
- * operator can enable everything and then switch one feature back off.
+ * Turns on the whole enterprise suite for the deployment. Individual feature
+ * flags below still win where they are set, so an operator can enable
+ * everything and then switch one feature back off.
  *
- * Server code reads `ENTERPRISE_ENABLED`; the browser reads the
- * `NEXT_PUBLIC_ENTERPRISE_ENABLED` twin (see {@link isBillingEnabled}).
- * Deployments must set both together.
+ * Server code reads `ENTERPRISE_ENABLED`. Server-only vars never reach browser
+ * bundles, so the browser reads the `NEXT_PUBLIC_ENTERPRISE_ENABLED` twin (via
+ * `window.__ENV`, populated by `<PublicEnvScript>`). Deployments must set both
+ * together.
  */
 export const isEnterpriseEnabled =
   typeof window === 'undefined'
@@ -274,10 +261,8 @@ function explicitEnterpriseFlag(
 /**
  * Resolves one enterprise feature for this deployment.
  *
- * When billing runs, subscription plans decide entitlement and these flags are
- * only explicit overrides — so an unset flag stays `false` and never widens
- * access on Sim Cloud. When billing is off there is no plan to consult, so
- * resolution falls through the master switch to the feature's legacy default
+ * Labbai has no paid plans to consult, so resolution falls through the
+ * feature's own flag and the master switch to the feature's legacy default
  * (see {@link ENTERPRISE_FEATURE_LEGACY_DEFAULTS}).
  */
 function enterpriseFeatureEnabled(
@@ -286,7 +271,6 @@ function enterpriseFeatureEnabled(
   clientKey: string
 ): boolean {
   const explicit = explicitEnterpriseFlag(serverValue, clientKey)
-  if (isBillingEnabled) return explicit ?? false
   return resolveEnterpriseEntitlement({
     explicit,
     masterEnabled: isEnterpriseEnabled,
@@ -340,16 +324,14 @@ export const isAccessControlEnabled = enterpriseFeatureEnabled(
 
 /**
  * Is organizations enabled.
- * True if billing is enabled (orgs come with billing), OR resolved on for this
- * deployment, OR if access control is enabled (access control requires
- * organizations).
+ * True if resolved on for this deployment (on by default in Labbai), OR if
+ * access control is enabled (access control requires organizations).
  *
- * Each term resolves through its `NEXT_PUBLIC_*` twin in the browser (see
- * {@link isBillingEnabled}), so client code — e.g. the better-auth
- * `organizationClient` plugin registration — sees the same value as the server.
+ * Each term resolves through its `NEXT_PUBLIC_*` twin in the browser, so client
+ * code — e.g. the better-auth `organizationClient` plugin registration — sees
+ * the same value as the server.
  */
 export const isOrganizationsEnabled =
-  isBillingEnabled ||
   enterpriseFeatureEnabled(
     'organizations',
     env.ORGANIZATIONS_ENABLED,

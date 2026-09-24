@@ -1,7 +1,4 @@
-import {
-  v2GetBillingStatusContract,
-  v2ListBillingLogsContract,
-} from '@/lib/api/contracts/v2/billing'
+import { v2ListBillingLogsContract } from '@/lib/api/contracts/v2/billing'
 import {
   documentedSchema,
   ERROR_RESPONSES,
@@ -20,28 +17,6 @@ import {
   type OpenApiSuccessMetadata,
 } from '@/lib/api/openapi/types'
 import { billingOperations } from '@/lib/billing/application/operations'
-
-const BILLING_STATUS_EXAMPLE = {
-  data: {
-    workspaceId: null,
-    period: {
-      start: '2026-07-01T00:00:00.000Z',
-      end: '2026-08-01T00:00:00.000Z',
-    },
-    plan: 'pro',
-    status: 'active',
-    credits: {
-      used: 512,
-      limit: 20_000,
-      remaining: 19_488,
-    },
-    storage: {
-      usedBytes: 5_242_880,
-      limitBytes: 1_073_741_824,
-      percentUsed: 0.48828125,
-    },
-  },
-} as const
 
 const BILLING_LOGS_EXAMPLE = {
   data: [
@@ -76,33 +51,6 @@ function billingOperation(
 }
 
 const routes = [
-  defineOpenApiRoute(
-    v2GetBillingStatusContract,
-    billingOperation({
-      applicationOperation: billingOperations.readStatus,
-      operationId: 'getBillingStatus',
-      summary: 'Get Billing Status',
-      description:
-        "Get the current plan, billing standing, credit allowance, and storage quota. Pooled `credits` and `storage` are visible only to callers who can manage the payer's billing; workspace API keys receive null for both. Use List Billing Logs for credit history.",
-      errors: RESOURCE_ERRORS,
-      success: { description: 'The current billing and storage status.' },
-    }),
-    {
-      query: documentedSchema(
-        v2GetBillingStatusContract.query,
-        'GetBillingStatusQuery',
-        'Get billing status query',
-        'Optional workspace scope for resolving the payer.'
-      ),
-      response: documentedSchema(
-        v2GetBillingStatusContract.response.schema,
-        'V2BillingStatusResponse',
-        'Billing status response',
-        'Current billing standing, credit allowance, and storage quota.',
-        [BILLING_STATUS_EXAMPLE]
-      ),
-    }
-  ),
   defineOpenApiRoute(
     v2ListBillingLogsContract,
     billingOperation({

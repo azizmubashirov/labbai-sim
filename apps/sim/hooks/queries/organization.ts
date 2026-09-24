@@ -1,8 +1,6 @@
 import { createLogger } from '@sim/logger'
-import { isRecordLike, toRecord } from '@sim/utils/object'
 import {
   queryOptions,
-  type UseQueryResult,
   useMutation,
   useQuery,
   useQueryClient,
@@ -18,10 +16,7 @@ import {
 import {
   createOrganizationContract,
   getMemberRemovalImpactContract,
-  getOrganizationMemberUsageLimitContract,
   getOrganizationRosterContract,
-  type OrganizationBillingSummary,
-  type OrganizationMemberUsageLimitData,
   type OrganizationRoster,
   type RemovalImpactCredential,
   type RosterMember,
@@ -30,19 +25,11 @@ import {
   removeOrganizationMemberContract,
   transferOwnershipContract,
   updateOrganizationMemberRoleContract,
-  updateOrganizationMemberUsageLimitContract,
-  updateOrganizationUsageLimitContract,
 } from '@/lib/api/contracts/organization'
-import {
-  getOrganizationBillingContract,
-  type OrganizationBillingApiResponse,
-} from '@/lib/api/contracts/subscription'
 import { client } from '@/lib/auth/auth-client'
 import { isOrganizationsEnabled } from '@/lib/core/config/env-flags'
 import { workspaceCredentialKeys } from '@/hooks/queries/utils/credential-keys'
 import { organizationKeys } from '@/hooks/queries/utils/organization-keys'
-import { organizationUsageKeys } from '@/hooks/queries/utils/organization-usage-keys'
-import { subscriptionKeys } from '@/hooks/queries/utils/subscription-keys'
 import { workspaceKeys } from '@/hooks/queries/workspace'
 
 const logger = createLogger('OrganizationQueries')
@@ -51,27 +38,13 @@ const invitationListsKey = ['invitations', 'list'] as const
 export const ORGANIZATION_ROSTER_STALE_TIME = 30 * 1000
 export const ORGANIZATION_LIST_STALE_TIME = 30 * 1000
 export const ORGANIZATION_DETAIL_STALE_TIME = 30 * 1000
-export const ORGANIZATION_SUBSCRIPTION_STALE_TIME = 30 * 1000
-export const ORGANIZATION_BILLING_STALE_TIME = 30 * 1000
 export const ORGANIZATION_MEMBERS_STALE_TIME = 30 * 1000
-export const ORGANIZATION_MEMBER_USAGE_LIMIT_STALE_TIME = 30 * 1000
 /**
  * Zero: removal impact is a consent disclosure, so every dialog open must
  * refetch — a cached list may omit credentials added moments ago, and the
  * dialog holds its confirm on `isFetching` until fresh data lands.
  */
 export const ORGANIZATION_REMOVAL_IMPACT_STALE_TIME = 0
-
-type OrganizationBillingQueryResult = UseQueryResult<OrganizationBillingApiResponse | null, Error>
-
-function readNumber(value: unknown): number | undefined {
-  if (typeof value === 'number') return value
-  if (typeof value === 'string') {
-    const parsed = Number.parseFloat(value)
-    return Number.isFinite(parsed) ? parsed : undefined
-  }
-  return undefined
-}
 
 export { organizationKeys }
 
@@ -195,160 +168,6 @@ export function useOrganization(orgId: string) {
 }
 
 /**
- * Fetch organization billing data
- */
-async function fetchOrganizationBilling(
-  orgId: string,
-  signal?: AbortSignal
-): Promise<OrganizationBillingApiResponse | null> {
-  try {
-    return await requestJson(getOrganizationBillingContract, {
-      query: { context: 'organization', id: orgId },
-      signal,
-    })
-  } catch (error) {
-    if (error instanceof ApiClientError && error.status === 404) {
-      return null
-    }
-    throw error
-  }
-}
-
-export function organizationBillingQueryOptions(orgId: string) {
-  return queryOptions({
-    queryKey: organizationKeys.billing(orgId),
-    queryFn: ({ signal }) => fetchOrganizationBilling(orgId, signal),
-    retry: false,
-    staleTime: ORGANIZATION_BILLING_STALE_TIME,
-  })
-}
-
-export function useOrganizationBilling(
-  orgId: string,
-  options?: { enabled?: boolean }
-): OrganizationBillingQueryResult {
-  return useQuery({
-    ...organizationBillingQueryOptions(orgId),
-    enabled: !!orgId && (options?.enabled ?? true),
-  })
-}
-
-/**
- * Update organization usage limit mutation with optimistic updates
- */
-type UpdateOrganizationUsageLimitParams = Pick<
-  ContractBodyInput<typeof updateOrganizationUsageLimitContract>,
-  'organizationId' | 'limit'
->
-
-export function useUpdateOrganizationUsageLimit() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: async ({ organizationId, limit }: UpdateOrganizationUsageLimitParams) => {
-      return requestJson(updateOrganizationUsageLimitContract, {
-        body: { context: 'organization', organizationId, limit },
-      })
-    },
-    onMutate: async ({ organizationId, limit }) => {
-      await queryClient.cancelQueries({
-        queryKey: organizationKeys.billing(organizationId),
-      })
-      await queryClient.cancelQueries({
-        queryKey: organizationKeys.subscription(organizationId),
-      })
-
-      const previousBillingData = queryClient.getQueryData(organizationKeys.billing(organizationId))
-      const previousBillingSummary = queryClient.getQueryData(
-        organizationKeys.billingSummary(organizationId)
-      )
-      const previousSubscriptionData = queryClient.getQueryData(
-        organizationKeys.subscription(organizationId)
-      )
-
-      queryClient.setQueryData<unknown>(
-        organizationKeys.billing(organizationId),
-        (old: unknown) => {
-          if (!isRecordLike(old) || !isRecordLike(old.data)) return old
-          const usage = toRecord(old.data.usage)
-          const currentUsage =
-            readNumber(old.data.currentUsage) ??
-            readNumber(usage.current) ??
-            readNumber(old.data.totalCurrentUsage) ??
-            0
-          const newPercentUsed = limit > 0 ? (currentUsage / limit) * 100 : 0
-
-          return {
-            ...old,
-            data: {
-              ...old.data,
-              totalUsageLimit: limit,
-              usage: {
-                ...usage,
-                limit,
-                percentUsed: newPercentUsed,
-              },
-              percentUsed: newPercentUsed,
-            },
-          }
-        }
-      )
-
-      queryClient.setQueryData<{
-        success: true
-        data: OrganizationBillingSummary
-      }>(organizationKeys.billingSummary(organizationId), (old) =>
-        old
-          ? {
-              ...old,
-              data: { ...old.data, totalUsageLimit: limit },
-            }
-          : old
-      )
-
-      return {
-        previousBillingData,
-        previousBillingSummary,
-        previousSubscriptionData,
-        organizationId,
-      }
-    },
-    onError: (_err, _variables, context) => {
-      if (context?.previousBillingData && context?.organizationId) {
-        queryClient.setQueryData(
-          organizationKeys.billing(context.organizationId),
-          context.previousBillingData
-        )
-      }
-      if (context?.previousSubscriptionData && context?.organizationId) {
-        queryClient.setQueryData(
-          organizationKeys.subscription(context.organizationId),
-          context.previousSubscriptionData
-        )
-      }
-      if (context?.previousBillingSummary && context?.organizationId) {
-        queryClient.setQueryData(
-          organizationKeys.billingSummary(context.organizationId),
-          context.previousBillingSummary
-        )
-      }
-    },
-    onSettled: (_data, _error, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: organizationKeys.billing(variables.organizationId),
-      })
-      queryClient.invalidateQueries({
-        queryKey: organizationKeys.subscription(variables.organizationId),
-      })
-      /** The Insights headline states the same allowance. */
-      queryClient.invalidateQueries({
-        queryKey: organizationUsageKeys.overviews(variables.organizationId),
-      })
-    },
-  })
-}
-
-/**
  * Remove member mutation
  */
 interface RemoveMemberParams {
@@ -370,19 +189,9 @@ export function useRemoveMember() {
         queryKey: organizationKeys.detail(variables.orgId),
       })
       queryClient.invalidateQueries({
-        queryKey: organizationKeys.billing(variables.orgId),
-      })
-      queryClient.invalidateQueries({
-        queryKey: organizationKeys.memberUsage(variables.orgId),
-      })
-      queryClient.invalidateQueries({
-        queryKey: organizationKeys.subscription(variables.orgId),
-      })
-      queryClient.invalidateQueries({
         queryKey: organizationKeys.roster(variables.orgId),
       })
       queryClient.invalidateQueries({ queryKey: organizationKeys.lists() })
-      queryClient.invalidateQueries({ queryKey: subscriptionKeys.all })
       queryClient.invalidateQueries({ queryKey: workspaceKeys.all })
       queryClient.invalidateQueries({ queryKey: workspaceCredentialKeys.all })
       queryClient.invalidateQueries({ queryKey: invitationListsKey })
@@ -417,56 +226,6 @@ export function useUpdateOrganizationMemberRole() {
   })
 }
 
-async function fetchOrganizationMemberUsageLimit(
-  orgId: string,
-  userId: string,
-  signal?: AbortSignal
-): Promise<OrganizationMemberUsageLimitData> {
-  const response = await requestJson(getOrganizationMemberUsageLimitContract, {
-    params: { id: orgId, memberId: userId },
-    signal,
-  })
-  return response.data
-}
-
-/**
- * Hook to fetch a single member's per-org credit usage + cap (values in credits).
- * Lazily enabled so it only fires while the Manage Credits modal is open.
- */
-export function useOrganizationMemberUsageLimit(orgId?: string, userId?: string, enabled = true) {
-  return useQuery({
-    queryKey: organizationKeys.memberUsageLimit(orgId ?? '', userId ?? ''),
-    queryFn: ({ signal }) =>
-      fetchOrganizationMemberUsageLimit(orgId as string, userId as string, signal),
-    enabled: Boolean(orgId) && Boolean(userId) && enabled,
-    staleTime: ORGANIZATION_MEMBER_USAGE_LIMIT_STALE_TIME,
-  })
-}
-
-interface UpdateMemberUsageLimitParams {
-  orgId: string
-  userId: string
-  creditLimit: ContractBodyInput<typeof updateOrganizationMemberUsageLimitContract>['creditLimit']
-}
-
-export function useUpdateOrganizationMemberUsageLimit() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: async ({ orgId, userId, creditLimit }: UpdateMemberUsageLimitParams) => {
-      return requestJson(updateOrganizationMemberUsageLimitContract, {
-        params: { id: orgId, memberId: userId },
-        body: { creditLimit },
-      })
-    },
-    onSettled: (_data, _error, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: organizationKeys.memberUsageLimit(variables.orgId, variables.userId),
-      })
-    },
-  })
-}
-
 type TransferOwnershipParams = {
   orgId: string
 } & ContractBodyInput<typeof transferOwnershipContract>
@@ -488,14 +247,7 @@ export function useTransferOwnership() {
       queryClient.invalidateQueries({
         queryKey: organizationKeys.roster(variables.orgId),
       })
-      queryClient.invalidateQueries({
-        queryKey: organizationKeys.billing(variables.orgId),
-      })
-      queryClient.invalidateQueries({
-        queryKey: organizationKeys.subscription(variables.orgId),
-      })
       queryClient.invalidateQueries({ queryKey: organizationKeys.lists() })
-      queryClient.invalidateQueries({ queryKey: subscriptionKeys.all })
       queryClient.invalidateQueries({ queryKey: workspaceKeys.lists() })
     },
   })
@@ -555,9 +307,6 @@ export function useCancelInvitation() {
       })
       queryClient.invalidateQueries({
         queryKey: organizationKeys.roster(variables.orgId),
-      })
-      queryClient.invalidateQueries({
-        queryKey: organizationKeys.billing(variables.orgId),
       })
       queryClient.invalidateQueries({ queryKey: organizationKeys.lists() })
       queryClient.invalidateQueries({ queryKey: invitationListsKey })

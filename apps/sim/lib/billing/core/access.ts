@@ -1,10 +1,13 @@
 import { db } from '@sim/db'
-import { member, userStats } from '@sim/db/schema'
-import { createLogger } from '@sim/logger'
-import { and, eq } from 'drizzle-orm'
 import type { DbOrTx } from '@/lib/db/types'
 
-const logger = createLogger('BillingAccess')
+/**
+ * Billing block state.
+ *
+ * Sim blocked accounts and organizations whose Stripe payment failed or was
+ * disputed. Labbai has no payments, so no payer is ever blocked. These readers
+ * keep their signatures so the gates that consult them stay unchanged.
+ */
 
 export interface EffectiveBillingStatus {
   billingBlocked: boolean
@@ -17,142 +20,32 @@ export interface BillingEntityBlockStatus {
   billingBlockedReason: 'payment_failed' | 'dispute' | null
 }
 
-/**
- * Reads the effective block state of one payer, personal or organization.
- *
- * A personal payer resolves through {@link getEffectiveBillingStatus}, so a
- * delinquent organization blocks its members on their personal resources too.
- * That is the policy `blockOrgMembers` already writes; re-deriving it here
- * instead of trusting the fan-out is what keeps the read correct for a member
- * who joined *after* the block landed and whose own row was never marked.
- *
- * Every gate that asks "is this payer blocked?" must come through here or
- * {@link getEffectiveBillingStatus}. A direct `userStats.billingBlocked` select
- * answers a narrower question and will disagree with them.
- */
+const NOT_BLOCKED: EffectiveBillingStatus = {
+  billingBlocked: false,
+  billingBlockedReason: null,
+  blockedByOrgOwner: false,
+}
+
+/** Block state of one payer, personal or organization. Never blocked. */
 export async function getBillingEntityBlockStatus(
-  billingEntity: { type: 'user' | 'organization'; id: string },
-  executor: DbOrTx = db
+  _billingEntity: { type: 'user' | 'organization'; id: string },
+  _executor: DbOrTx = db
 ): Promise<BillingEntityBlockStatus> {
-  if (billingEntity.type === 'user') {
-    const { billingBlocked, billingBlockedReason } = await getEffectiveBillingStatus(
-      billingEntity.id,
-      executor
-    )
-    return { billingBlocked, billingBlockedReason }
-  }
-
-  const [owner] = await executor
-    .select({
-      billingBlocked: userStats.billingBlocked,
-      billingBlockedReason: userStats.billingBlockedReason,
-    })
-    .from(member)
-    .leftJoin(userStats, eq(userStats.userId, member.userId))
-    .where(and(eq(member.organizationId, billingEntity.id), eq(member.role, 'owner')))
-    .limit(1)
-
-  if (!owner) {
-    logger.error(
-      'Organization has no owner when checking billing-blocked state — data integrity issue',
-      { organizationId: billingEntity.id }
-    )
-    return { billingBlocked: false, billingBlockedReason: null }
-  }
-
-  const billingBlocked = Boolean(owner.billingBlocked)
-  return {
-    billingBlocked,
-    billingBlockedReason: billingBlocked ? (owner.billingBlockedReason ?? null) : null,
-  }
+  return { billingBlocked: false, billingBlockedReason: null }
 }
 
-/**
- * Gets the effective billing blocked status for a user.
- * If the user belongs to an organization, also checks whether the org owner is blocked.
- */
+/** Effective block state for a user. Never blocked. */
 export async function getEffectiveBillingStatus(
-  userId: string,
-  executor: DbOrTx = db
+  _userId: string,
+  _executor: DbOrTx = db
 ): Promise<EffectiveBillingStatus> {
-  const userStatsRows = await executor
-    .select({
-      blocked: userStats.billingBlocked,
-      blockedReason: userStats.billingBlockedReason,
-    })
-    .from(userStats)
-    .where(eq(userStats.userId, userId))
-    .limit(1)
-
-  const userBlocked = userStatsRows.length > 0 ? !!userStatsRows[0].blocked : false
-  const userBlockedReason = userStatsRows.length > 0 ? userStatsRows[0].blockedReason : null
-
-  if (userBlocked) {
-    return {
-      billingBlocked: true,
-      billingBlockedReason: userBlockedReason,
-      blockedByOrgOwner: false,
-    }
-  }
-
-  const memberships = await executor
-    .select({ organizationId: member.organizationId })
-    .from(member)
-    .where(eq(member.userId, userId))
-
-  const ownerResults = await Promise.all(
-    memberships.map((m) =>
-      executor
-        .select({ userId: member.userId })
-        .from(member)
-        .where(and(eq(member.organizationId, m.organizationId), eq(member.role, 'owner')))
-        .limit(1)
-    )
-  )
-
-  const otherOwnerIds = ownerResults
-    .filter((owners) => owners.length > 0 && owners[0].userId !== userId)
-    .map((owners) => owners[0].userId)
-
-  if (otherOwnerIds.length > 0) {
-    const ownerStatsResults = await Promise.all(
-      otherOwnerIds.map((ownerId) =>
-        executor
-          .select({
-            blocked: userStats.billingBlocked,
-            blockedReason: userStats.billingBlockedReason,
-          })
-          .from(userStats)
-          .where(eq(userStats.userId, ownerId))
-          .limit(1)
-      )
-    )
-
-    for (const stats of ownerStatsResults) {
-      if (stats.length > 0 && stats[0].blocked) {
-        return {
-          billingBlocked: true,
-          billingBlockedReason: stats[0].blockedReason,
-          blockedByOrgOwner: true,
-        }
-      }
-    }
-  }
-
-  return {
-    billingBlocked: false,
-    billingBlockedReason: null,
-    blockedByOrgOwner: false,
-  }
+  return { ...NOT_BLOCKED }
 }
 
+/** Whether an organization is billing-blocked. Never. */
 export async function isOrganizationBillingBlocked(
-  organizationId: string,
-  executor: DbOrTx = db
+  _organizationId: string,
+  _executor: DbOrTx = db
 ): Promise<boolean> {
-  const status = await getBillingEntityBlockStatus(
-    { type: 'organization', id: organizationId },
-    executor
-  )
-  return status.billingBlocked
+  return false
 }

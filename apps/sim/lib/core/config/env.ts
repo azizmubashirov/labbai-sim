@@ -159,26 +159,19 @@ export const env = createEnv({
     /** Explicit PDF OCR backend; legacy installs infer it from configured credentials. */
     OCR_PROVIDER:                          z.enum(['local', 'mistral', 'azure-mistral']).optional(),
 
-    // Payment & Billing
-    STRIPE_SECRET_KEY:                     z.string().min(1).optional(),           // Stripe secret key for payment processing
-    STRIPE_WEBHOOK_SECRET:                 z.string().min(1).optional(),           // General Stripe webhook secret
-    STRIPE_FREE_PRICE_ID:                  z.string().min(1).optional(),           // Stripe price ID for free tier
+    // Usage ledger & limits (Labbai has no payments)
     FREE_TIER_COST_LIMIT:                  z.number().optional(),                  // Cost limit for free tier users
     FREE_STORAGE_LIMIT_GB:                 z.number().optional(),                  // Free-tier storage limit in GB (default 5). With billing disabled, setting it explicitly opts into storage enforcement
-    STRIPE_PRO_PRICE_ID:                   z.string().min(1).optional(),           // Stripe price ID for pro tier
     PRO_TIER_COST_LIMIT:                   z.number().optional(),                  // Cost limit for pro tier users
     PRO_STORAGE_LIMIT_GB:                  z.number().optional().default(50),      // Storage limit in GB for pro tier users
-    STRIPE_TEAM_PRICE_ID:                  z.string().min(1).optional(),           // Stripe price ID for team tier
     TEAM_TIER_COST_LIMIT:                  z.number().optional(),                  // Cost limit for team tier users
     TEAM_STORAGE_LIMIT_GB:                 z.number().optional().default(500),     // Storage limit in GB for team tier organizations (pooled)
-    STRIPE_ENTERPRISE_PRICE_ID:            z.string().min(1).optional(),           // Stripe price ID for enterprise tier
     ENTERPRISE_TIER_COST_LIMIT:            z.number().optional(),                  // Cost limit for enterprise tier users
     ENTERPRISE_STORAGE_LIMIT_GB:           z.number().optional().default(500),     // Default storage limit in GB for enterprise tier (can be overridden per org)
     BILLING_CONCURRENCY_LIMIT_FREE:         z.string().optional(),                  // In-flight executions per free billing account
     BILLING_CONCURRENCY_LIMIT_PRO:          z.string().optional(),                  // In-flight executions per Pro-tier billing account (Pro and Pro for Teams)
     BILLING_CONCURRENCY_LIMIT_TEAM:         z.string().optional(),                  // In-flight executions per Max-tier billing account (Max and Max for Teams)
     BILLING_CONCURRENCY_LIMIT_ENTERPRISE:   z.string().optional(),                  // In-flight executions per Enterprise billing account (metadata-overridable)
-    BILLING_ENABLED:                       z.boolean().optional(),                 // Enable billing enforcement and usage tracking
     TRIGGER_EU_REGION:                     z.boolean().optional(),                 // Route Trigger.dev runs to eu-central-1 instead of the default us-east-1 (fallback for the trigger-eu-region flag when AppConfig is not the source of truth)
 
     // Table feature limits (per plan). Apply when billing is disabled (free tier defaults) or for billed plans.
@@ -194,21 +187,6 @@ export const env = createEnv({
     TABLE_MAX_PAGE_BYTES:                  z.number().optional(),                  // Byte budget per row-page read; pages cut early past it (default: 5242880)
     TABLE_DISPATCH_CONCURRENCY_FREE:       z.number().optional(),                  // Rows one table run executes in parallel on free tier (default: 20)
     TABLE_DISPATCH_CONCURRENCY_PAID:       z.number().optional(),                  // Rows one table run executes in parallel on paid tiers (default: 50)
-
-    // Credit-tier Stripe prices (monthly)
-    STRIPE_PRICE_TIER_25_MO:               z.string().min(1).optional(),           // Pro: $25/mo (6,000 credits)
-    STRIPE_PRICE_TIER_100_MO:              z.string().min(1).optional(),           // Max: $100/mo (25,000 credits)
-
-    // Credit-tier Stripe prices (annual, 15% discount)
-    STRIPE_PRICE_TIER_25_YR:               z.string().min(1).optional(),           // Pro: $255/yr (15% off $300)
-    STRIPE_PRICE_TIER_100_YR:              z.string().min(1).optional(),           // Max: $1,020/yr (15% off $1,200)
-
-    // Team-specific Stripe prices (separate products for Billing Portal compat)
-    STRIPE_PRICE_TEAM_25_MO:               z.string().min(1).optional(),           // Team Pro: $25/seat/mo
-    STRIPE_PRICE_TEAM_25_YR:               z.string().min(1).optional(),           // Team Pro: $255/seat/yr
-    STRIPE_PRICE_TEAM_100_MO:              z.string().min(1).optional(),           // Team Max: $100/seat/mo
-    STRIPE_PRICE_TEAM_100_YR:              z.string().min(1).optional(),           // Team Max: $1,020/seat/yr
-    OVERAGE_THRESHOLD_DOLLARS:             z.number().optional().default(100),     // Dollar threshold for incremental overage billing (default: $100)
 
     // Email & Communication
     EMAIL_VERIFICATION_ENABLED:            z.boolean().optional(),                 // Enable email verification for user registration and login (defaults to false)
@@ -386,7 +364,6 @@ export const env = createEnv({
     GCS_OG_IMAGES_BUCKET_NAME:             z.string().optional(),                  // GCS bucket for OpenGraph images
     GCS_WORKSPACE_LOGOS_BUCKET_NAME:       z.string().optional(),                  // GCS bucket for workspace logos
 
-
     // Admission & Burst Protection
     ADMISSION_GATE_MAX_INFLIGHT:           z.string().optional().default('500'),   // Max concurrent in-flight execution requests per pod
     API_MAX_JSON_BODY_BYTES:               z.string().optional().default('52428800'),// Default max JSON request body size for contract routes (50 MB)
@@ -555,7 +532,6 @@ export const env = createEnv({
     /** Comma-separated proxy IPs/CIDRs skipped while resolving the forwarded client chain. */
     AUTH_TRUSTED_PROXIES:                  z.string().optional(),
 
-
     // SSO Configuration (for script-based registration)
     SSO_ENABLED:                           z.boolean().optional(),                 // Enable SSO functionality
     SCIM_ENABLED:                          z.boolean().optional(),                 // Enable SCIM directory provisioning
@@ -606,7 +582,6 @@ export const env = createEnv({
     NEXT_PUBLIC_SOCKET_URL:                z.string().url().optional(),            // WebSocket server URL for real-time features
     
     // Billing
-    NEXT_PUBLIC_BILLING_ENABLED:           z.boolean().optional(),                 // Enable billing enforcement and usage tracking (client-side)
     
     // Analytics & Tracking
     NEXT_PUBLIC_POSTHOG_ENABLED:           z.boolean().optional(),                 // Enable PostHog analytics (client-side)
@@ -665,7 +640,6 @@ export const env = createEnv({
 
   experimental__runtimeEnv: {
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
-    NEXT_PUBLIC_BILLING_ENABLED: process.env.NEXT_PUBLIC_BILLING_ENABLED,
     NEXT_PUBLIC_SOCKET_URL: process.env.NEXT_PUBLIC_SOCKET_URL,
     NEXT_PUBLIC_BRAND_NAME: process.env.NEXT_PUBLIC_BRAND_NAME,
     NEXT_PUBLIC_BRAND_LOGO_URL: process.env.NEXT_PUBLIC_BRAND_LOGO_URL,

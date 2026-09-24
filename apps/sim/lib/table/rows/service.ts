@@ -19,7 +19,6 @@ import { OrchestrationError } from '@/lib/core/orchestration/types'
 import {
   assertRowCapacity,
   getMaxRowsPerTable,
-  notifyTableRowUsage,
   TableRowLimitError,
   wouldExceedRowLimit,
 } from '@/lib/table/billing'
@@ -211,13 +210,6 @@ export async function insertRow(
     readProvenance: options.readProvenance,
   })
 
-  notifyTableRowUsage({
-    workspaceId: table.workspaceId,
-    currentRowCount: table.rowCount,
-    addedRows: 1,
-    limit: rowLimit,
-  })
-
   logger.info(`[${requestId}] Inserted row ${rowId} into table ${data.tableId}`)
 
   const insertedRow: TableRow = {
@@ -280,12 +272,6 @@ export async function batchInsertRows(
   const result = await db.transaction((trx) =>
     batchInsertRowsWithTx(trx, data, table, requestId, options)
   )
-  notifyTableRowUsage({
-    workspaceId: table.workspaceId,
-    currentRowCount: table.rowCount,
-    addedRows: result.length,
-    limit: rowLimit,
-  })
   dispatchAfterBatchInsert(table, result, requestId, data.userId, data.capabilityGovernedUserId)
   return result
 }
@@ -470,12 +456,6 @@ export async function replaceTableRows(
   const result = await db.transaction((trx) =>
     replaceTableRowsWithTx(trx, data, table, requestId, options)
   )
-  notifyTableRowUsage({
-    workspaceId: table.workspaceId,
-    currentRowCount: 0,
-    addedRows: result.insertedCount,
-    limit: rowLimit,
-  })
   return result
 }
 
@@ -900,12 +880,6 @@ export async function upsertRow(
   )
 
   if (result.operation === 'insert') {
-    notifyTableRowUsage({
-      workspaceId: data.workspaceId,
-      currentRowCount: table.rowCount,
-      addedRows: 1,
-      limit: rowLimit,
-    })
     void fireTableTrigger(
       data.tableId,
       table.workspaceId,

@@ -66,7 +66,6 @@ import {
   useUpdateTableView,
 } from '@/hooks/queries/tables'
 import { useInlineRename } from '@/hooks/use-inline-rename'
-import { useSettingsNavigation } from '@/hooks/use-settings-navigation'
 import { useLogDetailsUIStore } from '@/stores/logs/store'
 import type { DeletedRowSnapshot } from '@/stores/table/types'
 import { useTableViewPinStore } from '@/stores/table/view-pin/store'
@@ -196,13 +195,10 @@ export function Table({
   const posthogRef = useRef(posthog)
   posthogRef.current = posthog
 
-  const { navigateToSettings } = useSettingsNavigation()
   // Plain function: `useTableEventStream` keeps it in a ref (its effect doesn't
   // depend on the identity), so a stable reference buys nothing here.
   const onUsageLimitReached = ({ message }: { dispatchId?: string; message: string }) => {
-    toast.error(message, {
-      action: { label: 'Upgrade', onClick: () => navigateToSettings({ section: 'billing' }) },
-    })
+    toast.error(message)
   }
   useTableEventStream({ tableId, workspaceId, onUsageLimitReached })
 

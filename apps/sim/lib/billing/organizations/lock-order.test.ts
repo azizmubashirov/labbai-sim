@@ -1,17 +1,13 @@
 /**
  * @vitest-environment node
  *
- * Lock-order regression guard: the paid-org join billing transaction must lock
- * the personal Pro subscription BEFORE userStats, matching
- * restoreUserProSubscription's subscription → userStats order. Snapshotting
- * userStats before locking the subscription inverts that pair and deadlocks a
- * concurrent Pro restore for the same user.
+ * Lock-order regression guards for organization membership, ownership, and
+ * workspace payer changes.
  */
 import {
   invitation,
   member,
   organization,
-  outboxEvent,
   permissions,
   subscription as subscriptionTable,
   user,
@@ -34,8 +30,6 @@ vi.mock('@/lib/billing/storage/payer-transfer', () => ({
 }))
 
 import {
-  reapplyPaidOrgJoinBillingForExistingMemberTx,
-  restoreUserProSubscription,
   transferOrganizationOwnership,
   withInvitationSafeOrganizationAccessMutation,
 } from '@/lib/billing/organizations/membership'
@@ -100,92 +94,6 @@ function createRecordingTx(row = GENERIC_ROW) {
   }
   return { tx, ops }
 }
-
-describe('paid-org join billing lock ordering', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    resetDbChainMock()
-    mockChangeOrganizationWorkspaceBilledAccountsInTx.mockReset()
-    mockChangeWorkspaceStoragePayersInTx.mockReset()
-  })
-
-  it('locks the personal subscription before pausing it and never mutates userStats', async () => {
-    const { tx, ops } = createRecordingTx()
-
-    await reapplyPaidOrgJoinBillingForExistingMemberTx(tx as DbOrTx, 'user-1', 'org-1')
-
-    const userStatsUpdate = ops.findIndex((o) => o.op === 'update' && o.table === userStats)
-    const subscriptionLock = ops.findIndex((o) => o.op === 'lock' && o.table === subscriptionTable)
-    const subscriptionUpdate = ops.findIndex(
-      (o) => o.op === 'update' && o.table === subscriptionTable
-    )
-
-    // Ledger entity stamps attribute usage; join billing no longer touches userStats.
-    expect(userStatsUpdate).toBe(-1)
-    expect(subscriptionLock).toBeGreaterThanOrEqual(0)
-    expect(subscriptionUpdate).toBeGreaterThan(subscriptionLock)
-  })
-
-  it('still locks an already-paused personal Pro so a concurrent restore cannot pass it', async () => {
-    const { tx, ops } = createRecordingTx({ ...GENERIC_ROW, cancelAtPeriodEnd: true })
-
-    await reapplyPaidOrgJoinBillingForExistingMemberTx(tx as DbOrTx, 'user-1', 'org-1')
-
-    expect(ops.some((op) => op.op === 'lock' && op.table === subscriptionTable)).toBe(true)
-  })
-
-  it('does not restore personal Pro when a paid-org membership committed first', async () => {
-    const updates: unknown[] = []
-    const select = () => {
-      const context: { table: unknown } = { table: undefined }
-      const chain = {
-        from: (table: unknown) => {
-          context.table = table
-          return chain
-        },
-        where: () => chain,
-        for: () => chain,
-        limit: async () =>
-          context.table === subscriptionTable
-            ? [
-                {
-                  ...GENERIC_ROW,
-                  cancelAtPeriodEnd: true,
-                  stripeSubscriptionId: 'stripe-personal',
-                },
-              ]
-            : [],
-        then: (resolve: (rows: unknown[]) => unknown, reject: (error: unknown) => unknown) => {
-          const rows =
-            context.table === member
-              ? [{ organizationId: 'org-1' }]
-              : context.table === subscriptionTable
-                ? [{ plan: 'team_6000' }]
-                : []
-          return Promise.resolve(rows).then(resolve, reject)
-        },
-      }
-      return chain
-    }
-    const tx = {
-      select,
-      update: (table: unknown) => ({
-        set: () => ({
-          where: async () => {
-            updates.push(table)
-          },
-        }),
-      }),
-      execute: async () => [],
-    }
-    dbChainMockFns.transaction.mockImplementation(async (cb: (t: unknown) => unknown) => cb(tx))
-
-    const result = await restoreUserProSubscription('user-1')
-
-    expect(result.restored).toBe(false)
-    expect(updates).not.toContain(subscriptionTable)
-  })
-})
 
 describe('workspace payer-change transaction lock ordering', () => {
   it('locks nonzero workspaces before join billing or aggregate payer changes', async () => {
@@ -288,60 +196,6 @@ describe('organization ownership transfer reservation', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     resetDbChainMock()
-  })
-
-  it('cannot change the Stripe customer owner while Enterprise issuance is unresolved', async () => {
-    const select = () => {
-      const context: { table: unknown } = { table: undefined }
-      const chain = {
-        from: (table: unknown) => {
-          context.table = table
-          return chain
-        },
-        where: () => chain,
-        orderBy: () => chain,
-        limit: async () =>
-          context.table === outboxEvent
-            ? [
-                {
-                  id: 'operation-1',
-                  status: 'completed',
-                  payload: {
-                    version: 1,
-                    request: {
-                      requestKey: 'enterprise-v3:owner-1:org-1:10000:20000:5',
-                      ownerUserId: 'owner-1',
-                      organizationId: 'org-1',
-                      requestedByEmail: 'admin@sim.ai',
-                      requestedByUserId: 'admin-1',
-                      invoiceAmountCents: 10000,
-                      usageLimitCredits: 20000,
-                      seats: 5,
-                    },
-                    retryRevision: 0,
-                    stripeProgress: {},
-                  },
-                },
-              ]
-            : [],
-      }
-      return chain
-    }
-    const execute = vi.fn().mockResolvedValue([])
-    const tx = { select, execute }
-    dbChainMockFns.transaction.mockImplementation(async (cb: (t: unknown) => unknown) => cb(tx))
-
-    const result = await transferOrganizationOwnership({
-      organizationId: 'org-1',
-      currentOwnerUserId: 'owner-1',
-      newOwnerUserId: 'owner-2',
-    })
-
-    expect(result.success).toBe(false)
-    expect(result.error).toBe('Organization has an unfinished Enterprise issuance')
-    const executedSql = execute.mock.calls.map(([query]) => JSON.stringify(query))
-    expect(executedSql.some((query) => query.includes('organization-mutation:org-1'))).toBe(true)
-    expect(dbChainMockFns.update).not.toHaveBeenCalled()
   })
 
   it('reassigns billed accounts through one same-payer update and preserves owner semantics', async () => {

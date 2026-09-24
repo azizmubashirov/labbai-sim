@@ -18,14 +18,6 @@ vi.mock('@/ee/workspace-forking/lib/background-work/store', () => ({
 vi.mock('@/lib/knowledge/connectors/connector-error', () => ({
   getConnectorFailureDiagnostic: () => undefined,
 }))
-vi.mock('@/lib/admin/invitation-operation', () => ({ adminInvitationOperationOutboxHandlers: {} }))
-vi.mock('@/lib/admin/member-operation', () => ({ adminMemberOperationOutboxHandlers: {} }))
-vi.mock('@/lib/billing/enterprise-owner-claim', () => ({ enterpriseOwnerClaimOutboxHandlers: {} }))
-vi.mock('@/lib/billing/enterprise-provisioning', () => ({ enterpriseIssuanceOutboxHandlers: {} }))
-vi.mock('@/lib/billing/organizations/membership-reconciliation', () => ({
-  membershipBillingOutboxHandlers: {},
-}))
-vi.mock('@/lib/billing/webhooks/outbox-handlers', () => ({ billingOutboxHandlers: {} }))
 vi.mock('@/lib/invitations/direct-grant', () => ({ directGrantOutboxHandlers: {} }))
 vi.mock('@/lib/knowledge/documents/processing-outbox-handler', () => ({
   knowledgeDocumentProcessingOutboxHandlers: {},

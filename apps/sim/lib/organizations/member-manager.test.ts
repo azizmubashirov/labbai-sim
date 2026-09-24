@@ -8,7 +8,6 @@ const mocks = vi.hoisted(() => ({
   scim: vi.fn(),
   remove: vi.fn(),
   external: vi.fn(),
-  seats: vi.fn(),
 }))
 vi.mock('@/lib/billing/organizations/membership', () => ({
   acquireOrganizationUserMutationLocks: mocks.locks,
@@ -16,7 +15,6 @@ vi.mock('@/lib/billing/organizations/membership', () => ({
   removeExternalUserFromOrganizationWorkspaces: mocks.external,
   WORKSPACE_BILLING_ACCOUNT_REMOVAL_ERROR: 'Billing owner cannot be removed',
 }))
-vi.mock('@/lib/billing/organizations/seats', () => ({ reconcileOrganizationSeats: mocks.seats }))
 vi.mock('@/ee/scim/lib/managed-membership', () => ({ assertMembershipNotScimManaged: mocks.scim }))
 
 import { ForbiddenOperationError } from '@/lib/core/application/forbidden'
@@ -44,7 +42,6 @@ beforeEach(() => {
   vi.resetAllMocks()
   resetDbChainMock()
   mocks.remove.mockResolvedValue({ success: true })
-  mocks.seats.mockResolvedValue({ changed: false })
 })
 describe('organization member managers', () => {
   it('rejects a demoted actor under the mutation lock', async () => {
@@ -89,7 +86,6 @@ describe('organization member managers', () => {
 
   it('preserves successful emergency removal after billing reconciliation fails', async () => {
     queueTableRows(member, [target])
-    mocks.seats.mockRejectedValue(new Error('Billing unavailable'))
     await expect(removeOrganizationMemberRecord(input)).resolves.toMatchObject({
       membershipType: 'internal',
       removal: { success: true },
@@ -111,6 +107,5 @@ describe('organization member managers', () => {
       message: 'User is an organization member',
     })
     expect(mocks.remove).not.toHaveBeenCalled()
-    expect(mocks.seats).not.toHaveBeenCalled()
   })
 })

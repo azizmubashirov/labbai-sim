@@ -47,7 +47,7 @@ import { TraceAttr } from '@/lib/copilot/generated/trace-attributes-v1'
 import { TraceSpan } from '@/lib/copilot/generated/trace-spans-v1'
 import { checkInternalApiKey } from '@/lib/copilot/request/http'
 import { withIncomingGoSpan } from '@/lib/copilot/request/otel'
-import { isBillingEnabled, isHosted } from '@/lib/core/config/env-flags'
+import { isHosted } from '@/lib/core/config/env-flags'
 import { asOrchestrationError } from '@/lib/core/orchestration/types'
 import { withRouteHandler } from '@/lib/core/utils/with-route-handler'
 
@@ -215,7 +215,7 @@ function resolveContinuationBilling(
         return invalidBillingProtocolResponse()
       }
       if (!hasAttribution) {
-        return !isHosted && !isBillingEnabled ? null : invalidBillingProtocolResponse()
+        return !isHosted ? null : invalidBillingProtocolResponse()
       }
     }
     if (!scope.workspaceId && !scope.organizationId) return invalidBillingProtocolResponse()
@@ -370,8 +370,7 @@ export const POST = withRouteHandler((req: NextRequest) =>
             (protocol === undefined || protocol === COPILOT_BILLING_PROTOCOL.legacy) &&
             !req.headers.has(BILLING_ATTRIBUTION_HEADER) &&
             !req.headers.has(BILLING_ACCOUNT_DECISION_HEADER) &&
-            !isHosted &&
-            !isBillingEnabled
+            !isHosted
           if (
             purpose === COPILOT_VALIDATION_PURPOSE.cancellation &&
             protocol !== COPILOT_BILLING_PROTOCOL.direct &&

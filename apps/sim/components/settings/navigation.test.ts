@@ -26,7 +26,6 @@ import type { DeploymentShape } from '@/lib/api/contracts/workspaces'
 
 const SELF_HOSTED: DeploymentShape = {
   hosted: false,
-  billingEnabled: false,
   chatEnabled: true,
   azureConfigured: false,
   cohereConfigured: false,
@@ -43,7 +42,7 @@ const SELF_HOSTED: DeploymentShape = {
   },
 }
 
-const HOSTED: DeploymentShape = { ...SELF_HOSTED, hosted: true, billingEnabled: true }
+const HOSTED: DeploymentShape = { ...SELF_HOSTED, hosted: true }
 
 /** A self-hosted deployment with every feature override on. */
 const SELF_HOSTED_ALL_FEATURES: DeploymentShape = {
@@ -89,7 +88,6 @@ describe('settings navigation boundaries', () => {
       'access-control',
       'audit-logs',
       'forks',
-      'billing',
       'teammates',
       'organization',
       'usage',
@@ -110,7 +108,6 @@ describe('settings navigation boundaries', () => {
     ])
     expect(ACCOUNT_SETTINGS_ITEMS.map(({ id }) => id)).toEqual([
       'general',
-      'billing',
       'api-keys',
       'admin',
     ])
@@ -135,7 +132,6 @@ describe('settings navigation boundaries', () => {
         features: { ...SELF_HOSTED.features, sso: true, usageMonitoring: true },
       })
     ).toEqual({
-      billingEnabled: false,
       hasEnterprisePlan: true,
       governanceActive: true,
       hosted: false,
@@ -152,7 +148,6 @@ describe('settings navigation boundaries', () => {
       },
     })
     expect(getOrganizationSettingsFeatures(false, HOSTED)).toMatchObject({
-      billingEnabled: true,
       hosted: true,
     })
   })
@@ -184,7 +179,6 @@ describe('settings navigation boundaries', () => {
     expect([...ORGANIZATION_PLANE_UNIFIED_SECTIONS].sort()).toEqual([
       'access-control',
       'audit-logs',
-      'billing',
       'connected-accounts',
       'data-drains',
       'data-retention',
@@ -202,7 +196,6 @@ describe('settings navigation boundaries', () => {
     // is a section any workspace member could open.
     expect(UNIFIED_TO_ORGANIZATION_SECTION).toEqual({
       organization: 'members',
-      billing: 'billing',
       'connected-accounts': 'connected-accounts',
       'access-control': 'access-control',
       'audit-logs': 'audit-logs',
@@ -269,7 +262,7 @@ describe('settings navigation boundaries', () => {
       })
 
     expect(parseAccountPath('general', null)).toBe('general')
-    expect(parseAccountPath('/account/settings/billing/credit-usage', null)).toBe('billing')
+    expect(parseAccountPath('/account/settings/api-keys/nested', null)).toBe('api-keys')
     expect(parseAccountPath('/account/settings/apikeys', null)).toBe('api-keys')
     expect(parseAccountPath('/account/settings/not-a-section', null)).toBeNull()
     expect(parseAccountPath('/account/settings', 'general')).toBe('general')
@@ -345,7 +338,6 @@ describe('settings navigation boundaries', () => {
 
   it('gates organization control-plane sections by the target organization plan', () => {
     const hostedFree = {
-      billingEnabled: true,
       hasEnterprisePlan: false,
       governanceActive: false,
       hosted: true,
@@ -353,7 +345,6 @@ describe('settings navigation boundaries', () => {
     }
     expect(isOrganizationSettingsSectionAvailable('members', hostedFree)).toBe(true)
     expect(isOrganizationSettingsSectionAvailable('recently-deleted', hostedFree)).toBe(true)
-    expect(isOrganizationSettingsSectionAvailable('billing', hostedFree)).toBe(true)
     expect(isOrganizationSettingsSectionAvailable('requests', hostedFree)).toBe(true)
     expect(isOrganizationSettingsSectionAvailable('sso', hostedFree)).toBe(false)
     expect(

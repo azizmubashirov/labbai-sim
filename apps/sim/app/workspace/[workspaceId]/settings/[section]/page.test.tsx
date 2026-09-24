@@ -42,11 +42,9 @@ vi.mock('@/app/_shell/providers/get-query-client', () => ({
 }))
 vi.mock('@/app/workspace/[workspaceId]/settings/navigation', () => ({
   resolveSettingsSection: vi.fn((section: string) => {
-    const aliases: Record<string, string> = { subscription: 'billing' }
-    const id = aliases[section] ?? section
+    const id = section
     return [
       'general',
-      'billing',
       'secrets',
       'connected-accounts',
       'organization',
@@ -65,7 +63,7 @@ vi.mock('@/app/workspace/[workspaceId]/settings/navigation', () => ({
   }),
 }))
 vi.mock('@/app/workspace/[workspaceId]/settings/[section]/prefetch', () => ({
-  SECTION_PREFETCHERS: { general: mockSectionPrefetch, billing: mockSectionPrefetch },
+  SECTION_PREFETCHERS: { general: mockSectionPrefetch },
 }))
 vi.mock('@/app/workspace/[workspaceId]/settings/[section]/settings', () => ({
   SettingsPage: vi.fn(() => null),
@@ -89,12 +87,12 @@ describe('WorkspaceSettingsSectionPage', () => {
   })
 
   it('authenticates before authorizing the resolved section', async () => {
-    await WorkspaceSettingsSectionPage(pageProps('subscription'))
+    await WorkspaceSettingsSectionPage(pageProps('general'))
 
     expect(mockAuthorizeSection).toHaveBeenCalledWith({
       workspaceId: 'workspace-b',
       userId: 'viewer-a',
-      section: 'billing',
+      section: 'general',
     })
     expect(mockSectionPrefetch).toHaveBeenCalledTimes(1)
   })
@@ -106,11 +104,11 @@ describe('WorkspaceSettingsSectionPage', () => {
     })
     await expect(
       WorkspaceSettingsSectionPage({
-        ...pageProps('subscription'),
+        ...pageProps('usage'),
         searchParams: Promise.resolve({ window: 'month', source: ['search', 'chat'] }),
       })
     ).rejects.toThrow(
-      'NEXT_REDIRECT:/o/org-target/settings/billing?window=month&source=search&source=chat'
+      'NEXT_REDIRECT:/o/org-target/settings/usage?window=month&source=search&source=chat'
     )
     expect(mockSectionPrefetch).not.toHaveBeenCalled()
   })
@@ -185,7 +183,7 @@ describe('WorkspaceSettingsSectionPage', () => {
     async (features) => {
       mockGetHostContext.mockResolvedValue({ hostOrganizationId: 'org-target', features })
 
-      await WorkspaceSettingsSectionPage(pageProps('billing'))
+      await WorkspaceSettingsSectionPage(pageProps('general'))
 
       expect(mockRedirect).not.toHaveBeenCalled()
       expect(mockSectionPrefetch).toHaveBeenCalledTimes(1)
@@ -238,7 +236,7 @@ describe('WorkspaceSettingsSectionPage', () => {
       configKey: 'hideApiKeysTab',
     })
 
-    const element = await WorkspaceSettingsSectionPage(pageProps('billing'))
+    const element = await WorkspaceSettingsSectionPage(pageProps('general'))
 
     expect(element.props.children.props).toEqual({ configKey: 'hideApiKeysTab' })
     expect(mockSectionPrefetch).not.toHaveBeenCalled()
@@ -250,7 +248,7 @@ describe('WorkspaceSettingsSectionPage', () => {
   it('redirects unavailable visible-catalog sections to General', async () => {
     mockAuthorizeSection.mockResolvedValue({ allowed: false, disposition: 'redirect-general' })
 
-    await expect(WorkspaceSettingsSectionPage(pageProps('billing'))).rejects.toThrow(
+    await expect(WorkspaceSettingsSectionPage(pageProps('general'))).rejects.toThrow(
       'NEXT_REDIRECT:/workspace/workspace-b/settings/general'
     )
     expect(mockSectionPrefetch).not.toHaveBeenCalled()

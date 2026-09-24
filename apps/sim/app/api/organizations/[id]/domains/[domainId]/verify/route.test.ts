@@ -28,8 +28,6 @@ vi.mock('@/lib/billing/core/subscription', () => ({
   isOrganizationOnEnterprisePlan: mockIsEnterprise,
 }))
 
-vi.mock('@/lib/core/config/env-flags', () => ({ isBillingEnabled: true }))
-
 vi.mock('@sim/audit', () => ({
   recordAudit: mockRecordAudit,
   AuditAction: { ORGANIZATION_DOMAIN_VERIFIED: 'organization.domain.verified' },

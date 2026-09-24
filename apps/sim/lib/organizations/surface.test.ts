@@ -42,7 +42,7 @@ describe('getOrganizationSurfaceContext', () => {
     mockSearchAccess.mockResolvedValue({ memberScoped: true, sourceMirrored: false })
     mockPermissionConfig.mockResolvedValue(null)
     mockEnterprisePlan.mockResolvedValue(true)
-    setEnvFlags({ isInvitationsDisabled: false, isHosted: true, isBillingEnabled: true })
+    setEnvFlags({ isInvitationsDisabled: false, isHosted: true })
   })
 
   it('returns the organization and the viewer standing for a member', async () => {
@@ -71,10 +71,9 @@ describe('getOrganizationSurfaceContext', () => {
       searchAccess: { memberScoped: true, sourceMirrored: false },
       settingsFeatures: expect.objectContaining({
         hosted: true,
-        billingEnabled: true,
         hasEnterprisePlan: true,
       }),
-      deployment: expect.objectContaining({ hosted: true, billingEnabled: true }),
+      deployment: expect.objectContaining({ hosted: true }),
     })
     expect(mockSearchAccess).toHaveBeenCalledWith({ organizationId: 'org-1' })
     expect(mockEnterprisePlan).toHaveBeenCalledWith('org-1')
@@ -94,7 +93,7 @@ describe('getOrganizationSurfaceContext', () => {
   })
 
   it('resolves self-hosted settings from deployment flags without a plan read', async () => {
-    setEnvFlags({ isHosted: false, isBillingEnabled: false, isAuditLogsEnabled: true })
+    setEnvFlags({ isHosted: false, isAuditLogsEnabled: true })
     queueTableRows(member, [{ role: 'admin' }])
     queueTableRows(organization, [{ id: 'org-1', name: 'Acme', slug: 'acme', logo: null }])
     queueTableRows(member, [{ memberCount: 1 }])
@@ -102,10 +101,9 @@ describe('getOrganizationSurfaceContext', () => {
     await expect(getOrganizationSurfaceContext('org-1', 'viewer')).resolves.toMatchObject({
       settingsFeatures: {
         hosted: false,
-        billingEnabled: false,
         selfHosted: { 'audit-logs': true },
       },
-      deployment: { hosted: false, billingEnabled: false, features: { auditLogs: true } },
+      deployment: { hosted: false, features: { auditLogs: true } },
     })
     expect(mockEnterprisePlan).not.toHaveBeenCalled()
   })

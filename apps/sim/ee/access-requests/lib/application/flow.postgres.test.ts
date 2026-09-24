@@ -167,7 +167,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   if (!connection) return
   vi.mocked(recordAudit).mockClear()
-  setEnvFlags({ isHosted: true, isBillingEnabled: true, isAccessControlEnabled: true })
+  setEnvFlags({ isHosted: true, isAccessControlEnabled: true })
   await connection.unsafe(`
     TRUNCATE "user", organization, member, user_stats, subscription, workspace, permissions,
       permission_group, permission_group_workspace, permission_group_member,

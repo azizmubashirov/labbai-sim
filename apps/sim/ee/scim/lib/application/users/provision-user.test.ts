@@ -12,8 +12,6 @@ const mocks = vi.hoisted(() => ({
   applySessionPolicy: vi.fn(),
   syncUsageLimits: vi.fn(),
   ensureMember: vi.fn(),
-  resolveSeatPolicy: vi.fn(),
-  reconcileSeats: vi.fn(),
   isInstanceMode: vi.fn(),
   getInstanceOrganizationId: vi.fn(),
   suspend: vi.fn(),
@@ -46,12 +44,6 @@ vi.mock('@/lib/billing/core/usage', () => ({
 }))
 vi.mock('@/lib/billing/organizations/membership', () => ({
   ensureUserInOrganizationTx: mocks.ensureMember,
-}))
-vi.mock('@/lib/billing/organizations/seat-policy', () => ({
-  resolveOrganizationSeatPolicyTx: mocks.resolveSeatPolicy,
-}))
-vi.mock('@/lib/billing/organizations/seats', () => ({
-  reconcileOrganizationSeats: mocks.reconcileSeats,
 }))
 vi.mock('@/lib/organizations/instance-org', () => ({
   isInstanceOrganizationMode: mocks.isInstanceMode,
@@ -174,13 +166,11 @@ describe('provisionScimUser', () => {
     mocks.resolveIdentity.mockResolvedValue({ action: 'create' })
     mocks.createUser.mockResolvedValue({ user: { id: 'u-new' } })
     mocks.findScimUserByUserId.mockResolvedValue(null)
-    mocks.resolveSeatPolicy.mockResolvedValue({ organizationSubscriptionId: 'sub-1' })
     mocks.ensureMember.mockResolvedValue({ success: true, memberId: 'm-1', alreadyMember: false })
     mocks.insertScimUser.mockResolvedValue({ id: 'su-new' })
     mocks.reconcile.mockResolvedValue({ added: [], removed: [], raised: [] })
     mocks.deleteAccount.mockResolvedValue({})
     mocks.applySessionPolicy.mockResolvedValue(undefined)
-    mocks.reconcileSeats.mockResolvedValue({ changed: false })
     mocks.syncUsageLimits.mockResolvedValue(undefined)
     stageReadBack('u-new', attributes(), null)
   })
@@ -294,11 +284,6 @@ describe('provisionScimUser', () => {
     stageConnection()
     await run(attributes())
     expect(mocks.applySessionPolicy).toHaveBeenCalledWith('u-new', 'org-1')
-    expect(mocks.reconcileSeats).toHaveBeenCalledWith({
-      organizationId: 'org-1',
-      reason: 'scim-member-added',
-      subscriptionId: 'sub-1',
-    })
     expect(mocks.syncUsageLimits).toHaveBeenCalledWith('u-new')
     expect(mocks.captureEvent).toHaveBeenCalledWith(
       'u-new',
@@ -311,7 +296,6 @@ describe('provisionScimUser', () => {
 
   it('omits the subscription id from seat reconciliation when admission validated none', async () => {
     stageConnection()
-    mocks.resolveSeatPolicy.mockResolvedValue({ skipSeatValidation: true })
     const result = await run(attributes())
     expect(mocks.ensureMember).toHaveBeenCalledWith(db, {
       userId: 'u-new',
@@ -320,16 +304,11 @@ describe('provisionScimUser', () => {
       skipSeatValidation: true,
     })
     expect(result.subscriptionId).toBeUndefined()
-    expect(mocks.reconcileSeats).toHaveBeenCalledWith({
-      organizationId: 'org-1',
-      reason: 'scim-member-added',
-    })
   })
 
   it('keeps going through the remaining effects when one of them fails', async () => {
     stageConnection()
     mocks.applySessionPolicy.mockRejectedValue(new Error('policy unavailable'))
-    mocks.reconcileSeats.mockRejectedValue(new Error('stripe down'))
     const result = await run(attributes())
     expect(result.userId).toBe('u-new')
     expect(mocks.syncUsageLimits).toHaveBeenCalledWith('u-new')
@@ -389,7 +368,6 @@ describe('provisionScimUser', () => {
     expect(mocks.reconcile).not.toHaveBeenCalled()
     expect(mocks.deleteAccount).toHaveBeenCalledWith('u-new')
     expect(mocks.recordAudit).not.toHaveBeenCalled()
-    expect(mocks.reconcileSeats).not.toHaveBeenCalled()
   })
 
   it('reports an account committed elsewhere as a uniqueness conflict', async () => {

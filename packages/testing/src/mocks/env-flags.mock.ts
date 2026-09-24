@@ -15,7 +15,6 @@ export interface EnvFlagsMockState {
   isChatEnabled: boolean
   isStatusNoticePreviewEnabled: boolean
   isCopilotToolPermissionsEnabled: boolean
-  isBillingEnabled: boolean
   isEmailVerificationEnabled: boolean
   isAuthDisabled: boolean
   egressAllowedHosts: string | undefined
@@ -64,7 +63,6 @@ const defaultEnvFlagsState: EnvFlagsMockState = {
   isChatEnabled: true,
   isStatusNoticePreviewEnabled: false,
   isCopilotToolPermissionsEnabled: false,
-  isBillingEnabled: false,
   isEmailVerificationEnabled: false,
   isAuthDisabled: false,
   egressAllowedHosts: undefined,
@@ -149,7 +147,7 @@ export const envFlagsMockFns = {
  * @example
  * ```ts
  * beforeEach(() => {
- *   setEnvFlags({ isBillingEnabled: true, isHosted: true })
+ *   setEnvFlags({ isHosted: true, isSsoEnabled: true })
  * })
  * afterAll(resetEnvFlagsMock)
  * ```

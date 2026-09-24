@@ -26,7 +26,6 @@ import {
   validateOrganizationSlugOrThrow,
 } from '@/lib/billing/organizations/create-organization'
 import { env } from '@/lib/core/config/env'
-import { isBillingEnabled } from '@/lib/core/config/env-flags'
 import type { DbOrTx } from '@/lib/db/types'
 
 const logger = createLogger('InstanceOrganization')
@@ -43,14 +42,8 @@ interface InstanceOrganizationConfig {
 /**
  * Reads instance-org configuration from the environment, or `null` when the
  * mode is off.
- *
- * Returns `null` when billing is enabled: paid organizations own their own
- * lifecycle, and silently folding every signup into one org would break
- * per-organization billing.
  */
 export function getInstanceOrganizationConfig(): InstanceOrganizationConfig | null {
-  if (isBillingEnabled) return null
-
   const name = env.INSTANCE_ORG_NAME?.trim()
   if (!name) return null
 
@@ -292,7 +285,6 @@ export async function joinInstanceOrganization(userId: string): Promise<void> {
       userId,
       organizationId,
       role: 'member',
-      skipBillingLogic: true,
       skipSeatValidation: true,
     })
 

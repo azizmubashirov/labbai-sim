@@ -1,6 +1,5 @@
 import { db } from '@sim/db'
 import { user } from '@sim/db/schema'
-import { createLogger } from '@sim/logger'
 import { eq } from 'drizzle-orm'
 import {
   acquireOrganizationUserMutationLocks,
@@ -8,14 +7,11 @@ import {
   removeUserFromOrganization,
   WORKSPACE_BILLING_ACCOUNT_REMOVAL_ERROR,
 } from '@/lib/billing/organizations/membership'
-import { reconcileOrganizationSeats } from '@/lib/billing/organizations/seats'
 import { OrchestrationError } from '@/lib/core/orchestration/types'
 import { requireMemberManagementAuthority } from '@/lib/organizations/members/authority'
 import { changeMemberRoleTx } from '@/lib/organizations/members/lifecycle'
 import { findOrganizationMemberRecord } from '@/lib/organizations/queries'
 import { assertMembershipNotScimManaged } from '@/ee/scim/lib/managed-membership'
-
-const logger = createLogger('OrganizationMemberManager')
 
 export async function updateOrganizationMemberRecord(input: {
   organizationId: string
@@ -83,7 +79,6 @@ export async function removeOrganizationMemberRecord(input: {
       membershipType: 'external' as const,
       target: { userId: external.id, userName: external.name, userEmail: external.email },
       removal,
-      seatReduction: null,
     }
   }
   const removal = await removeUserFromOrganization({
@@ -102,19 +97,5 @@ export async function removeOrganizationMemberRecord(input: {
           : 'internal'
     throw new OrchestrationError(code, message)
   }
-  let seatReduction: Awaited<ReturnType<typeof reconcileOrganizationSeats>>
-  try {
-    seatReduction = await reconcileOrganizationSeats({
-      organizationId: input.organizationId,
-      reason: 'member-removed',
-      actorId: input.actorUserId,
-    })
-  } catch (error) {
-    logger.error('Failed to reduce seats after member removal', {
-      organizationId: input.organizationId,
-      error,
-    })
-    seatReduction = { changed: false, reason: 'Failed to reduce seats after member removal' }
-  }
-  return { membershipType: 'internal' as const, target, removal, seatReduction }
+  return { membershipType: 'internal' as const, target, removal }
 }

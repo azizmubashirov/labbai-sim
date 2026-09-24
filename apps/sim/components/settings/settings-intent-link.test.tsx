@@ -6,7 +6,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { mockPathname } = vi.hoisted(() => ({
-  mockPathname: vi.fn<() => string | null>(() => '/settings/billing'),
+  mockPathname: vi.fn<() => string | null>(() => '/settings/secrets'),
 }))
 
 vi.mock('next/navigation', () => ({ usePathname: mockPathname }))
@@ -29,7 +29,7 @@ let root: Root
 beforeEach(() => {
   ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   vi.useFakeTimers()
-  mockPathname.mockReturnValue('/settings/billing')
+  mockPathname.mockReturnValue('/settings/secrets')
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
@@ -172,8 +172,8 @@ describe('SettingsIntentLink', () => {
   })
 
   it('treats a descendant page as the current settings section', () => {
-    mockPathname.mockReturnValue('/settings/billing/credit-usage')
-    const { link, onIntent } = renderLink({ href: '/settings/billing' })
+    mockPathname.mockReturnValue('/settings/secrets/details')
+    const { link, onIntent } = renderLink({ href: '/settings/secrets' })
 
     act(() => {
       link.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))

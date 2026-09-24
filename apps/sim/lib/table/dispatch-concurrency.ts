@@ -1,6 +1,4 @@
-import { getPlanTypeForLimits } from '@/lib/billing/plan-helpers'
 import { env, envNumber } from '@/lib/core/config/env'
-import { isBillingEnabled } from '@/lib/core/config/env-flags'
 
 /**
  * Default table dispatch concurrency — how many rows one table run executes
@@ -30,13 +28,11 @@ export function getTableDispatchConcurrencyLimits(): { free: number; paid: numbe
 }
 
 /**
- * Dispatch concurrency for one payer plan. Billing-disabled deployments get
- * the paid value.
+ * Dispatch concurrency. Labbai has no paid plans, so every payer gets the
+ * `paid` window.
  */
-export function getTableDispatchConcurrency(plan: string | null | undefined): number {
-  const limits = getTableDispatchConcurrencyLimits()
-  if (!isBillingEnabled) return limits.paid
-  return getPlanTypeForLimits(plan) === 'free' ? limits.free : limits.paid
+export function getTableDispatchConcurrency(_plan: string | null | undefined): number {
+  return getTableDispatchConcurrencyLimits().paid
 }
 
 /**
@@ -54,19 +50,9 @@ export function getMaxTableDispatchConcurrency(): number {
  * Uses the same billing attribution the cells are billed under, so the window
  * follows whoever pays for the run.
  */
-export async function resolveTableDispatchConcurrency(input: {
+export async function resolveTableDispatchConcurrency(_input: {
   workspaceId: string
   actorUserId?: string | null
 }): Promise<number> {
-  if (!isBillingEnabled) return getTableDispatchConcurrencyLimits().paid
-  const { resolveBillingAttribution, resolveSystemBillingAttribution } = await import(
-    '@/lib/billing/core/billing-attribution'
-  )
-  const attribution = input.actorUserId
-    ? await resolveBillingAttribution({
-        actorUserId: input.actorUserId,
-        workspaceId: input.workspaceId,
-      })
-    : await resolveSystemBillingAttribution(input.workspaceId)
-  return getTableDispatchConcurrency(attribution.payerSubscription?.plan)
+  return getTableDispatchConcurrencyLimits().paid
 }

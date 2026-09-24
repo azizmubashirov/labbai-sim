@@ -7,7 +7,8 @@ import { SidebarChromeProvider } from '@/app/workspace/[workspaceId]/components/
 import { useFullscreenOriginStore } from '@/stores/fullscreen-origin'
 import { useSidebarStore } from '@/stores/sidebar/store'
 
-const FULLSCREEN_SUFFIXES = ['/upgrade'] as const
+/** Routes that render fullscreen (sidebar collapsed to zero width). None today. */
+const FULLSCREEN_SUFFIXES: readonly string[] = []
 
 interface WorkspaceChromeProps {
   children: ReactNode
@@ -29,7 +30,7 @@ function isFullscreenPath(pathname: string | null): boolean {
 /**
  * Renders the app chrome as a single persistent tree — the workspace layout and the
  * organization layout both mount it, each with its own sidebar. The sidebar is
- * always mounted; on a fullscreen route (`/upgrade`) its wrapper collapses to
+ * always mounted; on a fullscreen route its wrapper collapses to
  * zero width, revealing the route content. Because this component lives in the
  * layout it persists across navigations, so the rail never re-mounts.
  *

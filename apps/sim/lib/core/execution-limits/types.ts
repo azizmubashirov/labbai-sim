@@ -4,9 +4,7 @@ import {
   parseWorkflowExecutionTimeoutSeconds,
   resolveEnterpriseWorkflowExecutionTimeoutFallbackSeconds,
 } from '@/lib/billing/execution-timeout-defaults'
-import { getPlanTypeForLimits } from '@/lib/billing/plan-helpers'
 import { env } from '@/lib/core/config/env'
-import { isBillingEnabled } from '@/lib/core/config/env-flags'
 import type { SubscriptionPlan } from '@/lib/core/rate-limiter/types'
 
 interface ExecutionTimeoutConfig {
@@ -72,30 +70,20 @@ const EXECUTION_TIMEOUTS: Record<SubscriptionPlan, ExecutionTimeoutConfig> = {
 }
 
 /**
- * Per-plan execution timeout in milliseconds; `0` means no timeout.
- * Billing-disabled deployments run untimed unless the operator explicitly set
- * the free-tier env var (`EXECUTION_TIMEOUT_FREE` /
- * `EXECUTION_TIMEOUT_ASYNC_FREE`), which opts back into that bound.
+ * Execution timeout in milliseconds; `0` means no timeout.
+ * Labbai has no plans: runs are untimed unless the operator explicitly set the
+ * free-tier env var (`EXECUTION_TIMEOUT_FREE` / `EXECUTION_TIMEOUT_ASYNC_FREE`),
+ * which opts into that bound for everyone.
  */
 export function getExecutionTimeout(
-  plan: SubscriptionPlan | string | undefined,
+  _plan: SubscriptionPlan | string | undefined,
   type: 'sync' | 'async' = 'sync',
-  enterpriseWorkflowExecutionTimeoutSeconds?: number
+  _enterpriseWorkflowExecutionTimeoutSeconds?: number
 ): number {
-  if (!isBillingEnabled) {
-    const override = Number.parseInt(
-      (type === 'sync' ? env.EXECUTION_TIMEOUT_FREE : env.EXECUTION_TIMEOUT_ASYNC_FREE) || ''
-    )
-    return Number.isFinite(override) && override > 0 ? EXECUTION_TIMEOUTS.free[type] : 0
-  }
-  const planType = getPlanTypeForLimits(plan)
-  if (type === 'async' && planType === 'enterprise') {
-    const configuredTimeout = parseWorkflowExecutionTimeoutSeconds(
-      enterpriseWorkflowExecutionTimeoutSeconds
-    )
-    if (configuredTimeout !== null) return configuredTimeout * 1000
-  }
-  return EXECUTION_TIMEOUTS[planType][type]
+  const override = Number.parseInt(
+    (type === 'sync' ? env.EXECUTION_TIMEOUT_FREE : env.EXECUTION_TIMEOUT_ASYNC_FREE) || ''
+  )
+  return Number.isFinite(override) && override > 0 ? EXECUTION_TIMEOUTS.free[type] : 0
 }
 
 /** Resolves the async execution policy captured in a trusted billing snapshot. */

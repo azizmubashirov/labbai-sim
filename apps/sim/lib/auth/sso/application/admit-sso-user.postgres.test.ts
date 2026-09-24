@@ -14,13 +14,11 @@ vi.mock('@/lib/core/config/env-flags', () => ({
   ...envFlagsMock,
   isHosted: true,
   isScimEnabled: true,
-  isBillingEnabled: true,
 }))
 
 /** Admission and billing entitlement use PostgreSQL; post-commit integrations are outside this regression. */
 vi.mock('@/lib/auth/session-policy', () => ({ applySessionPolicyToNewMember: vi.fn() }))
 vi.mock('@/lib/billing/core/usage', () => ({ syncUsageLimitsFromSubscription: vi.fn() }))
-vi.mock('@/lib/billing/organizations/seats', () => ({ reconcileOrganizationSeats: vi.fn() }))
 vi.mock('@/lib/posthog/server', () => ({ captureServerEvent: vi.fn() }))
 
 const databaseUrl = process.env.OAUTH_TOKEN_FAMILY_TEST_DATABASE_URL

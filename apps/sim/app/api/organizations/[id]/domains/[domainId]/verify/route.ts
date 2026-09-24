@@ -12,8 +12,6 @@ import { parseRequest } from '@/lib/api/server'
 import { getSession } from '@/lib/auth'
 import { checkDomainTxtRecord, toDomainResponse } from '@/lib/auth/sso/domain-verification'
 import { invalidateSsoPolicyCache } from '@/lib/auth/sso-policy'
-import { isOrganizationOnEnterprisePlan } from '@/lib/billing/core/subscription'
-import { isBillingEnabled } from '@/lib/core/config/env-flags'
 import { withRouteHandler } from '@/lib/core/utils/with-route-handler'
 
 const logger = createLogger('OrgDomainVerifyAPI')
@@ -50,12 +48,6 @@ export const POST = withRouteHandler(
     if (!isOrgAdminRole(memberEntry.role)) {
       return NextResponse.json(
         { error: 'Forbidden - Only organization owners and admins can verify domains' },
-        { status: 403 }
-      )
-    }
-    if (isBillingEnabled && !(await isOrganizationOnEnterprisePlan(organizationId))) {
-      return NextResponse.json(
-        { error: 'Domain verification is available on Enterprise plans only' },
         { status: 403 }
       )
     }

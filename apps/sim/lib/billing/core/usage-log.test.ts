@@ -2,8 +2,8 @@
  * @vitest-environment node
  */
 import { usageLog } from '@sim/db/schema'
-import { dbChainMockFns, resetDbChainMock, resetEnvFlagsMock, setEnvFlags } from '@sim/testing'
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { dbChainMockFns, resetDbChainMock, resetEnvFlagsMock } from '@sim/testing'
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const {
   mockGetHighestPrioritySubscription,
@@ -65,10 +65,6 @@ function installSharedDbMocks(): void {
 
 afterAll(() => {
   resetDbChainMock()
-})
-
-beforeAll(() => {
-  setEnvFlags({ isBillingEnabled: true })
 })
 
 afterAll(resetEnvFlagsMock)

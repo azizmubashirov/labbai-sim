@@ -15,6 +15,5 @@ export {
   incrementAdmittedStorageUsageForBillingContextInTx,
   incrementStorageUsageForBillingContextInTx,
   type LegacyStorageUsageDelta,
-  maybeNotifyStorageLimitForBillingContext,
   type WorkspaceStorageUsageDelta,
 } from './tracking'

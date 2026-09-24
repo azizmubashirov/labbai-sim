@@ -61,23 +61,6 @@ export interface PostHogEventMap {
     error_code: string
   }
 
-  subscription_created: {
-    plan: string
-    status: string
-    reference_id: string
-  }
-
-  subscription_cancelled: {
-    plan: string
-    reference_id: string
-  }
-
-  subscription_changed: {
-    from_plan: string
-    to_plan: string
-    interval: string
-  }
-
   workspace_created: {
     workspace_id: string
     name: string
@@ -392,13 +375,6 @@ export interface PostHogEventMap {
     workspace_id?: string
     key_count: number
     scope?: 'workspace' | 'personal'
-  }
-
-  seats_provisioned: {
-    organization_id: string
-    previous_seats: number
-    seats: number
-    reason: string
   }
 
   copilot_chat_sent: {
@@ -737,14 +713,6 @@ export interface PostHogEventMap {
     new_role: string
   }
 
-  /** Org seat count decreased (member removal / drift reconciliation). */
-  seats_deprovisioned: {
-    organization_id: string
-    previous_seats: number
-    seats: number
-    reason: string
-  }
-
   /** A workflow's edit-lock was toggled on or off. */
   workflow_lock_toggled: {
     workflow_id: string
@@ -815,67 +783,6 @@ export interface PostHogEventMap {
       | 'personal_token'
     provider_id: string
     workspace_id?: string
-  }
-
-  payment_succeeded: {
-    plan: string
-    amount: number
-    currency: string
-    entity_type: 'user' | 'organization'
-    reference_id: string
-  }
-
-  payment_failed: {
-    plan: string
-    amount: number
-    currency: string
-    entity_type: 'user' | 'organization'
-    reference_id: string
-    attempt_count: number
-  }
-
-  overage_billed: {
-    amount: number
-    currency: string
-    entity_type: 'user' | 'organization'
-    reference_id: string
-    settled_via: 'stripe' | 'credits'
-  }
-
-  credits_purchased: {
-    amount: number
-    currency: string
-    entity_type: 'user' | 'organization'
-    reference_id: string
-  }
-
-  charge_disputed: {
-    amount: number
-    currency: string
-    reason: string
-    status: 'opened' | 'closed'
-    entity_type: 'user' | 'organization'
-    reference_id: string
-  }
-
-  plan_converted: {
-    organization_id: string
-    from_plan: string
-    to_plan: string
-  }
-
-  enterprise_subscription_created: {
-    reference_id: string
-    seats: number
-    invoice_amount: number
-    billing_interval: 'month' | 'year'
-    currency: string
-  }
-
-  subscription_transferred: {
-    subscription_id: string
-    from_entity: 'user' | 'organization'
-    to_entity: 'user' | 'organization'
   }
 }
 

@@ -1,10 +1,5 @@
 import { z } from 'zod'
-import {
-  organizationRoleSchema,
-  retentionOverridesSchema,
-  workspaceIdSchema,
-} from '@/lib/api/contracts/primitives'
-import { organizationBillingDataSchema } from '@/lib/api/contracts/subscription'
+import { organizationRoleSchema, retentionOverridesSchema } from '@/lib/api/contracts/primitives'
 import { defineRouteContract } from '@/lib/api/contracts/types'
 import { workspacePermissionSchema } from '@/lib/api/contracts/workspaces'
 import { HEX_COLOR_REGEX } from '@/lib/branding'
@@ -446,53 +441,6 @@ export const removeOrganizationMemberContract = defineRouteContract({
   },
 })
 
-/** Per-member credit usage + cap for the Manage Credits modal (values in credits). */
-export const organizationMemberUsageLimitDataSchema = z.object({
-  creditsUsed: z.number(),
-  creditLimit: z.number().nullable(),
-  /** Billing cadence of the org's subscription, so the UI can label the usage window. */
-  billingInterval: z.enum(['month', 'year']),
-})
-
-export const getOrganizationMemberUsageLimitContract = defineRouteContract({
-  method: 'GET',
-  path: '/api/organizations/[id]/members/[memberId]/usage-limit',
-  params: organizationMemberParamsSchema,
-  response: {
-    mode: 'json',
-    schema: z.object({
-      success: z.boolean(),
-      data: organizationMemberUsageLimitDataSchema,
-    }),
-  },
-})
-
-export const updateOrganizationMemberUsageLimitBodySchema = z.object({
-  /** New cap in credits; `null` clears the per-member cap. */
-  creditLimit: z
-    .number()
-    .int('Credit limit must be a whole number of credits')
-    .min(0, 'Credit limit cannot be negative')
-    .nullable(),
-})
-
-export const updateOrganizationMemberUsageLimitContract = defineRouteContract({
-  method: 'PUT',
-  path: '/api/organizations/[id]/members/[memberId]/usage-limit',
-  params: organizationMemberParamsSchema,
-  body: updateOrganizationMemberUsageLimitBodySchema,
-  response: {
-    mode: 'json',
-    schema: successResponseSchema.extend({
-      data: z
-        .object({
-          creditLimit: z.number().nullable(),
-        })
-        .optional(),
-    }),
-  },
-})
-
 export const transferOwnershipContract = defineRouteContract({
   method: 'POST',
   path: '/api/organizations/[id]/transfer-ownership',
@@ -743,68 +691,8 @@ export const createOrganizationContract = defineRouteContract({
   },
 })
 
-export const organizationBillingSummarySchema = z.object({
-  organizationId: z.string().min(1),
-  subscriptionState: z.enum(['active', 'free', 'lapsed']),
-  subscriptionPlan: z.string().min(1),
-  subscriptionStatus: z.string().nullable(),
-  creditBalance: z.number(),
-  billingInterval: z.enum(['month', 'year']),
-  cancelAtPeriodEnd: z.boolean(),
-  totalSeats: z.number().int().min(0),
-  totalCurrentUsage: z.number().min(0),
-  totalUsageLimit: z.number().min(0),
-  minimumBillingAmount: z.number().min(0),
-  billingPeriodEnd: z.string().nullable(),
-  billingBlocked: z.boolean(),
-  billingBlockedReason: z.enum(['payment_failed', 'dispute']).nullable(),
-  blockedByOrgOwner: z.boolean(),
-  upgradeWorkspaceId: workspaceIdSchema.nullable(),
-  userRole: z.enum(['admin', 'owner']),
-})
-
-export type OrganizationBillingSummary = z.output<typeof organizationBillingSummarySchema>
-
-export const getOrganizationBillingSummaryContract = defineRouteContract({
-  method: 'GET',
-  path: '/api/organizations/[id]/billing-summary',
-  params: organizationParamsSchema,
-  response: {
-    mode: 'json',
-    schema: z.object({
-      success: z.literal(true),
-      data: organizationBillingSummarySchema,
-    }),
-  },
-})
-
-export const updateOrganizationUsageLimitContract = defineRouteContract({
-  method: 'PUT',
-  path: '/api/usage',
-  body: z.object({
-    context: z.literal('organization'),
-    organizationId: z.string().min(1),
-    limit: z.number().min(0, 'Limit must be a non-negative number'),
-  }),
-  response: {
-    mode: 'json',
-    schema: z
-      .object({
-        success: z.boolean(),
-        context: z.literal('organization'),
-        userId: z.string(),
-        organizationId: z.string(),
-        data: organizationBillingDataSchema.nullable(),
-      })
-      .passthrough(),
-  },
-})
-
 export type OrganizationRoster = z.infer<typeof organizationRosterSchema>
 export type RosterWorkspaceAccess = z.infer<typeof rosterWorkspaceAccessSchema>
 export type RosterMember = z.infer<typeof rosterMemberSchema>
 export type RosterPendingInvitation = z.infer<typeof rosterPendingInvitationSchema>
 export type OrganizationMembersResponse = z.infer<typeof listOrganizationMembersResponseSchema>
-export type OrganizationMemberUsageLimitData = z.infer<
-  typeof organizationMemberUsageLimitDataSchema
->

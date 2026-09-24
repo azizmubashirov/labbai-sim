@@ -10,7 +10,6 @@ import {
   toBillingContext,
 } from '@/lib/billing/core/billing-attribution'
 import { recordUsage } from '@/lib/billing/core/usage-log'
-import { checkAndBillPayerOverageThreshold } from '@/lib/billing/threshold-billing'
 import { defineAuthorizedWorkspaceUseCase } from '@/lib/core/application/authorized-workspace-use-case'
 import { authorizeOrganizationOperation } from '@/lib/core/application/organization-authorization'
 import { defineOrganizationOperation } from '@/lib/core/application/organization-operation'
@@ -111,7 +110,6 @@ async function issueSpeechToken(
         },
       ],
     })
-    await checkAndBillPayerOverageThreshold(billingAttribution.billingEntity)
   } catch (error) {
     logger.warn('Failed to record voice input usage, continuing:', error)
   }

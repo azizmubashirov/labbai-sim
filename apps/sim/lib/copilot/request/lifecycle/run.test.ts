@@ -133,10 +133,6 @@ vi.mock('@/lib/copilot/tools/handlers/context', () => ({
   prepareExecutionContext: mockPrepareExecutionContext,
 }))
 
-vi.mock('@/lib/copilot/request/tools/billing', () => ({
-  handleBillingLimitResponse: vi.fn(),
-}))
-
 vi.mock('@/lib/copilot/request/tools/executor', () => ({
   executeToolAndReport: vi.fn(),
   forceFailHungToolCall: mockForceFailHungToolCall,

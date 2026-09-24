@@ -164,7 +164,7 @@ function queuedMarker(workflowId: string): RowExecutionMetadata {
 }
 
 beforeAll(() => {
-  setEnvFlags({ isTriggerDevEnabled: true, isBillingEnabled: true })
+  setEnvFlags({ isTriggerDevEnabled: true })
 })
 
 afterAll(resetEnvFlagsMock)
@@ -337,7 +337,7 @@ describe('cancelWorkflowGroupRuns deletion races', () => {
   }
 
   beforeEach(() => {
-    setEnvFlags({ isTriggerDevEnabled: false, isBillingEnabled: true })
+    setEnvFlags({ isTriggerDevEnabled: false })
     mockGetTableById.mockResolvedValue(table)
   })
 

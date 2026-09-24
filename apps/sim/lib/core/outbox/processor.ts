@@ -1,12 +1,6 @@
 import { db } from '@sim/db'
 import { createLogger } from '@sim/logger'
 import { toError } from '@sim/utils/errors'
-import { adminInvitationOperationOutboxHandlers } from '@/lib/admin/invitation-operation'
-import { adminMemberOperationOutboxHandlers } from '@/lib/admin/member-operation'
-import { enterpriseOwnerClaimOutboxHandlers } from '@/lib/billing/enterprise-owner-claim'
-import { enterpriseIssuanceOutboxHandlers } from '@/lib/billing/enterprise-provisioning'
-import { membershipBillingOutboxHandlers } from '@/lib/billing/organizations/membership-reconciliation'
-import { billingOutboxHandlers } from '@/lib/billing/webhooks/outbox-handlers'
 import {
   OUTBOX_PROCESSOR_MAX_RUNTIME_MS,
   OUTBOX_PROCESSOR_RECOVERY_CUTOFF_MS,
@@ -30,12 +24,6 @@ import { reapStaleBackgroundWork } from '@/ee/workspace-forking/lib/background-w
 const logger = createLogger('OutboxProcessor')
 
 const handlers = {
-  ...adminInvitationOperationOutboxHandlers,
-  ...adminMemberOperationOutboxHandlers,
-  ...billingOutboxHandlers,
-  ...membershipBillingOutboxHandlers,
-  ...enterpriseIssuanceOutboxHandlers,
-  ...enterpriseOwnerClaimOutboxHandlers,
   ...invitationMigrationOutboxHandlers,
   ...directGrantOutboxHandlers,
   ...knowledgeDocumentProcessingOutboxHandlers,

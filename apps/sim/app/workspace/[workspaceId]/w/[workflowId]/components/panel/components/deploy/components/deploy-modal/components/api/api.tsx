@@ -39,7 +39,7 @@ interface ApiDeployProps {
   onSelectedStreamingOutputsChange: (outputs: string[]) => void
 }
 
-type AsyncExampleType = 'execute' | 'status' | 'rate-limits'
+type AsyncExampleType = 'execute' | 'status'
 type CodeLanguage = 'curl' | 'python' | 'javascript' | 'typescript'
 
 type CopiedState = {
@@ -367,50 +367,6 @@ console.log(status);`
             return ''
         }
 
-      case 'rate-limits':
-        switch (language) {
-          case 'curl':
-            return `curl -H "X-API-Key: $SIM_API_KEY" \\
-  ${baseUrl}/api/users/me/usage-limits`
-
-          case 'python':
-            return `import os
-import requests
-
-response = requests.get(
-    "${baseUrl}/api/users/me/usage-limits",
-    headers={"X-API-Key": os.environ.get("SIM_API_KEY")}
-)
-
-limits = response.json()
-print(limits)`
-
-          case 'javascript':
-            return `const response = await fetch(
-  "${baseUrl}/api/users/me/usage-limits",
-  {
-    headers: { "X-API-Key": process.env.SIM_API_KEY }
-  }
-);
-
-const limits = await response.json();
-console.log(limits);`
-
-          case 'typescript':
-            return `const response = await fetch(
-  "${baseUrl}/api/users/me/usage-limits",
-  {
-    headers: { "X-API-Key": process.env.SIM_API_KEY }
-  }
-);
-
-const limits: Record<string, unknown> = await response.json();
-console.log(limits);`
-
-          default:
-            return ''
-        }
-
       default:
         return ''
     }
@@ -422,8 +378,6 @@ console.log(limits);`
         return 'Start Execution'
       case 'status':
         return 'Check Status'
-      case 'rate-limits':
-        return 'Usage Limits'
       default:
         return 'Start Execution'
     }
@@ -566,7 +520,6 @@ console.log(limits);`
                 options={[
                   { label: 'Start Execution', value: 'execute' },
                   { label: 'Check Status', value: 'status' },
-                  { label: 'Usage Limits', value: 'rate-limits' },
                 ]}
                 value={asyncExampleType}
                 onChange={(value) => setAsyncExampleType(value as AsyncExampleType)}

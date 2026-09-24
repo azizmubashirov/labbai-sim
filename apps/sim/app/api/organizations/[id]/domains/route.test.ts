@@ -25,8 +25,6 @@ vi.mock('@/lib/billing/core/subscription', () => ({
   isOrganizationOnEnterprisePlan: mockIsEnterprise,
 }))
 
-vi.mock('@/lib/core/config/env-flags', () => ({ isBillingEnabled: true }))
-
 vi.mock('@sim/audit', () => ({
   recordAudit: mockRecordAudit,
   AuditAction: { ORGANIZATION_DOMAIN_ADDED: 'organization.domain.added' },
@@ -94,15 +92,6 @@ describe('org domains route', () => {
         status: 'pending',
         txtRecordValue: null, // secret hidden from members
       })
-    })
-
-    it('returns an empty list (no domains/tokens) for non-Enterprise orgs', async () => {
-      queueTableRows(member, [{ role: 'admin' }])
-      mockIsEnterprise.mockResolvedValue(false)
-      const res = await GET(createMockRequest('GET'), routeContext)
-      expect(res.status).toBe(200)
-      const body = await res.json()
-      expect(body.data).toEqual({ isEnterprise: false, domains: [] })
     })
   })
 

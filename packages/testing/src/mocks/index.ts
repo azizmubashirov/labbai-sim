@@ -159,14 +159,6 @@ export {
 export { clearStorageMocks, createMockStorage, setupGlobalStorageMocks } from './storage.mock'
 // Storage service mocks (for @/lib/uploads/core/storage-service)
 export { storageServiceMock, storageServiceMockFns } from './storage-service.mock'
-// Stripe mocks
-export {
-  createMockStripeEvent,
-  stripeClientMock,
-  stripeClientMockFns,
-  stripePaymentMethodMock,
-  stripePaymentMethodMockFns,
-} from './stripe.mock'
 // Telemetry mocks
 export { telemetryMock } from './telemetry.mock'
 // Terminal console mocks (for @/stores/terminal and @/stores/terminal/console/store)

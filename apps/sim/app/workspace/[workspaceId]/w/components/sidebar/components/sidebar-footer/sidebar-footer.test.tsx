@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { act, type ComponentProps } from 'react'
-import { Building, Credit, Trash, Users } from '@sim/emcn/icons'
+import { Building, Key, Trash, Users } from '@sim/emcn/icons'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -63,9 +63,9 @@ async function renderFooter(overrides: Partial<Parameters<typeof SidebarFooter>[
         onOpenAccountSettings={() => {}}
         navigationLinks={[
           {
-            label: 'Subscription',
-            icon: Credit,
-            href: '/workspace/workspace-1/settings/billing',
+            label: 'Secrets',
+            icon: Key,
+            href: '/workspace/workspace-1/settings/secrets',
             onNavigate: () => {},
           },
           {
@@ -147,7 +147,7 @@ describe('SidebarFooter', () => {
     openProfileMenu()
     expect(
       [...document.querySelectorAll('[role="menuitem"]')].map((item) => item.textContent)
-    ).toEqual(['Settings', 'Subscription', 'Teammates', 'Recently deleted', 'Sign out'])
+    ).toEqual(['Settings', 'Secrets', 'Teammates', 'Recently deleted', 'Sign out'])
     expect(document.querySelector('[role="separator"]')).toBeNull()
     expect(menuItem('Settings')).toHaveAttribute('href', '/workspace/workspace-1/settings/general')
   })

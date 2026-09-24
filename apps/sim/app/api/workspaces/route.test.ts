@@ -110,16 +110,15 @@ describe('POST /api/workspaces capability refusal', () => {
   it('leaves an unrelated policy refusal alone', async () => {
     mockGetWorkspaceCreationPolicy.mockResolvedValue({
       canCreate: false,
-      status: 402,
-      reason: 'Your organization subscription is inactive.',
-      blockedReasonCode: 'organization-subscription-inactive',
+      status: 403,
+      reason: 'Workspace creation is not available for this account.',
     })
 
     const response = await POST(createRequest())
 
-    expect(response.status).toBe(402)
+    expect(response.status).toBe(403)
     const body = await response.json()
-    expect(body.error).toBe('Your organization subscription is inactive.')
+    expect(body.error).toBe('Workspace creation is not available for this account.')
     expect(body.details).toBeUndefined()
   })
 

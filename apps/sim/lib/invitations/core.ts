@@ -19,8 +19,6 @@ import { generateId } from '@sim/utils/id'
 import { normalizeEmail } from '@sim/utils/string'
 import { and, asc, count, eq, inArray, lte, sql } from 'drizzle-orm'
 import { applySessionPolicyToNewMember } from '@/lib/auth/session-policy'
-import { getOrganizationSubscription } from '@/lib/billing/core/billing'
-import { getHighestPriorityPersonalSubscription } from '@/lib/billing/core/plan'
 import { syncUsageLimitsFromSubscription } from '@/lib/billing/core/usage'
 import {
   acquireOrganizationMutationLock,
@@ -28,15 +26,7 @@ import {
   ensureUserInOrganizationTx,
   getUserOrganization,
 } from '@/lib/billing/organizations/membership'
-import {
-  type AcceptancePlanConversion,
-  ensureTeamOrganizationForAcceptance,
-} from '@/lib/billing/organizations/provision-seat'
-import { reconcileOrganizationSeats } from '@/lib/billing/organizations/seats'
-import { isPro, isTeam } from '@/lib/billing/plan-helpers'
-import { hasUsableSubscriptionStatus } from '@/lib/billing/subscriptions/utils'
 import { ForbiddenOperationError } from '@/lib/core/application/forbidden'
-import { isBillingEnabled } from '@/lib/core/config/env-flags'
 import { syncWorkspaceEnvCredentials } from '@/lib/credentials/environment'
 import type { DbOrTx } from '@/lib/db/types'
 import { acquireInvitationMutationLocks } from '@/lib/invitations/locks'
@@ -47,7 +37,6 @@ import {
   ownedAttachableWorkspacesWhere,
 } from '@/lib/workspaces/organization-workspaces'
 import { getWorkspaceWithOwner, type WorkspaceWithOwner } from '@/lib/workspaces/permissions/utils'
-import { getInvitePlanCategoryForUser } from '@/lib/workspaces/policy'
 
 const logger = createLogger('InvitationCore')
 
@@ -409,8 +398,8 @@ export interface InvitationJoinPreviewResult {
    * - `already-member` — they are in the organization already; only workspace
    *   access changes, so neither the join nor the external copy is true.
    * - `external`      — workspaces only, never a seat, nothing of theirs moves.
-   * - `blocked`       — acceptance will fail (`upgrade-required`,
-   *   `workspace-not-found`). Nothing is promised, because nothing happens.
+   * - `blocked`       — acceptance will fail (`workspace-not-found`). Nothing is
+   *   promised, because nothing happens.
    */
   outcome: InvitationJoinOutcome
   /**
@@ -451,14 +440,13 @@ export async function getInvitationJoinPreview(
   const primaryWorkspace = primaryGrantWorkspaceId
     ? await getWorkspaceWithOwner(primaryGrantWorkspaceId)
     : null
-  const billedAccountUserId = primaryWorkspace?.billedAccountUserId ?? null
   const workspaceOrganizationId = invitationJoinTargetOrganizationId(inv, primaryWorkspace)
 
   /**
-   * Personal-workspace invites only produce an organization through billing's
-   * Pro→Team provisioning; with billing disabled there is nothing to join.
+   * Personal-workspace invites never produce an organization: there is nothing
+   * to join.
    */
-  if (!workspaceOrganizationId && !isBillingEnabled) return withOutcome('external')
+  if (!workspaceOrganizationId) return withOutcome('external')
 
   /**
    * Already in the target organization (nothing changes) or in a different
@@ -470,21 +458,6 @@ export async function getInvitationJoinPreview(
     (workspaceOrganizationId ? existingMembership.organizationId !== workspaceOrganizationId : true)
 
   if (inv.membershipIntent === 'external') {
-    /**
-     * Mirrors acceptance's `external-requires-paid-plan` gate, including its
-     * exemptions: it only applies with billing on, to an organization-owned
-     * workspace, and not when externality was imposed because the invitee already
-     * belongs to another organization. Without this the screen promised external
-     * access that acceptance would refuse.
-     */
-    if (
-      isBillingEnabled &&
-      !inDifferentOrganization &&
-      workspaceOrganizationId &&
-      (await getInvitePlanCategoryForUser(inviteeUserId)) === 'free'
-    ) {
-      return withOutcome('blocked')
-    }
     return withOutcome('external')
   }
 
@@ -508,29 +481,6 @@ export async function getInvitationJoinPreview(
     return withOutcome('external')
 
   if (!(await hasLiveGrantInStampedOrganization(inv))) return withOutcome('blocked')
-
-  /**
-   * Mirror acceptance's billing gates: an unusable organization subscription
-   * (or, for personal-workspace invites, a billed owner without a convertible
-   * paid plan) makes acceptance fail with upgrade-required — the disclosure
-   * must not promise a migration that cannot happen.
-   */
-  if (isBillingEnabled) {
-    if (workspaceOrganizationId) {
-      const orgSub = await getOrganizationSubscription(workspaceOrganizationId)
-      if (!orgSub || !hasUsableSubscriptionStatus(orgSub.status)) return withOutcome('blocked')
-    } else {
-      const payerUserId = billedAccountUserId ?? inv.inviterId
-      const personalSub = await getHighestPriorityPersonalSubscription(payerUserId)
-      if (
-        !personalSub ||
-        !hasUsableSubscriptionStatus(personalSub.status) ||
-        !(isPro(personalSub.plan) || isTeam(personalSub.plan))
-      ) {
-        return withOutcome('blocked')
-      }
-    }
-  }
 
   const ownedWorkspaces = await db
     .select({ id: workspace.id, name: workspace.name })
@@ -594,8 +544,6 @@ export type AcceptInvitationFailure =
   | { kind: 'invalid-token' }
   | { kind: 'already-in-organization' }
   | { kind: 'no-seats-available' }
-  | { kind: 'upgrade-required' }
-  | { kind: 'external-requires-paid-plan' }
   | { kind: 'server-error'; message?: string }
 
 export type AcceptInvitationSuccess = {
@@ -657,21 +605,6 @@ class JoinerWorkspacesChangedDuringAcceptError extends Error {
 }
 
 /**
- * Thrown after a personal subscription conversion when the billing owner
- * created another attachable workspace after the pre-lock sweep plan was
- * captured. The conversion now holds that owner's billing-identity lock, so
- * this re-check is stable; rolling back lets the retry include the new
- * workspace in the advisory-lock plan instead of leaving it personally billed
- * after the subscription moved to the organization.
- */
-class BillingOwnerWorkspacesChangedDuringAcceptError extends Error {
-  constructor() {
-    super('Billing owner workspaces changed during invite acceptance')
-    this.name = 'BillingOwnerWorkspacesChangedDuringAcceptError'
-  }
-}
-
-/**
  * Thrown when every grant on a member-role organization invite turned stale
  * (the workspaces left the stamped organization), which would strand the new
  * member with no workspace. Rolls the whole acceptance back.
@@ -698,12 +631,10 @@ class DisclosureOutdatedDuringAcceptError extends Error {
 interface InvitationAcceptancePostCommitEffects {
   organizationId: string | null
   memberRole: string | null
-  reconcileSeats: boolean
   acceptedWorkspaceIds: string[]
   /** Owned personal workspaces that followed the invitee into the org. */
   attachedWorkspaceIds: string[]
   syncUsageLimitUserIds: string[]
-  planConversions: AcceptancePlanConversion[]
   acceptedInvitation: InvitationWithGrants | null
   membershipAlreadyExists: boolean
 }
@@ -753,29 +684,8 @@ async function getInvitationAcceptanceWorkspaceLockIds(
             .where(ownedAttachableWorkspacesWhere({ userId: inviteeUserId, includeArchived: true }))
         ).map((row) => row.id)
 
-  const billingOwnerCanAttach =
-    isBillingEnabled &&
-    inv.membershipIntent !== 'external' &&
-    primaryWorkspace !== null &&
-    !primaryWorkspace.organizationId
-
-  const billingOwnerWorkspaceIds = billingOwnerCanAttach
-    ? (
-        await tx
-          .select({ id: workspace.id })
-          .from(workspace)
-          .where(
-            ownedAttachableWorkspacesWhere({
-              userId: primaryWorkspace.billedAccountUserId,
-              ownerMatch: 'billing-account',
-              includeArchived: true,
-            })
-          )
-      ).map((row) => row.id)
-    : []
-
   return {
-    workspaceIds: [...new Set([...grantWorkspaceIds, ...billingOwnerWorkspaceIds])].sort(),
+    workspaceIds: [...new Set(grantWorkspaceIds)].sort(),
     joinerAttachWorkspaceIds: [...new Set(joinerAttachWorkspaceIds)].sort(),
     primaryWorkspace,
   }
@@ -787,11 +697,9 @@ export async function acceptInvitation(
   const effects: InvitationAcceptancePostCommitEffects = {
     organizationId: null,
     memberRole: null,
-    reconcileSeats: false,
     acceptedWorkspaceIds: [],
     attachedWorkspaceIds: [],
     syncUsageLimitUserIds: [],
-    planConversions: [],
     acceptedInvitation: null,
     membershipAlreadyExists: false,
   }
@@ -871,20 +779,6 @@ export async function acceptInvitation(
           message: 'Your workspaces changed while accepting — please try again.',
         }
       }
-      if (error instanceof BillingOwnerWorkspacesChangedDuringAcceptError) {
-        logger.warn(
-          'Invite acceptance rolled back: billing owner workspaces changed concurrently',
-          {
-            invitationId: input.invitationId,
-            userId: input.userId,
-          }
-        )
-        return {
-          success: false,
-          kind: 'server-error',
-          message: "The workspace owner's workspaces changed while accepting — please try again.",
-        }
-      }
       if (error instanceof AllGrantsStaleDuringAcceptError) {
         logger.warn('Invite acceptance rolled back: every grant turned stale', {
           invitationId: input.invitationId,
@@ -935,11 +829,6 @@ async function acceptLockedInvitation(
    * granted workspace whose org changed after send must never redirect the
    * membership into an organization the invitee was not invited to.
    */
-  const primaryGrant = inv.grants[0]
-  let billingOwnerUserId = inv.inviterId
-  if (primaryGrant && lockPlan.primaryWorkspace && inv.kind === 'workspace') {
-    billingOwnerUserId = lockPlan.primaryWorkspace.billedAccountUserId
-  }
   const workspaceOrganizationId = invitationJoinTargetOrganizationId(inv, lockPlan.primaryWorkspace)
 
   if (
@@ -961,33 +850,6 @@ async function acceptLockedInvitation(
     }
     acceptedMembershipIntent = 'external'
     shouldJoinOrganization = false
-  }
-
-  /**
-   * External collaborators hold access inside a paid organization without
-   * taking one of its seats, so the invitee has to be paying Sim elsewhere.
-   * The invite-time gate can go stale across the invitation's 7-day life (a
-   * cancelled Pro), so the same predicate runs again here.
-   *
-   * Mirrors exactly when the invite-time gate applies, which is narrower than
-   * "the invitation is external". Externality is imposed, not chosen, whenever
-   * the invitee already belongs to another organization — an account can only
-   * be in one, so the inviter's Member/Admin choice is overridden and
-   * `inviteeCanBeExternal` never runs. The same holds for the downgrades above,
-   * where a workspace moved organizations after the invite went out. Those
-   * fallbacks preserve access the invitee was already legitimately granted;
-   * charging them a plan requirement nobody warned the inviter about would
-   * strand them over someone else's action. Scoped to organization-owned
-   * workspaces because sharing a personal workspace has no seat economics.
-   */
-  if (
-    isBillingEnabled &&
-    inv.membershipIntent === 'external' &&
-    !inviteeAlreadyInDifferentOrg &&
-    workspaceOrganizationId &&
-    (await getInvitePlanCategoryForUser(input.userId, tx)) === 'free'
-  ) {
-    return { success: false, kind: 'external-requires-paid-plan' }
   }
 
   /**
@@ -1028,7 +890,7 @@ async function acceptLockedInvitation(
    *
    * A disclosed `blocked` is skipped deliberately: the screen already told the
    * invitee acceptance would fail, so the gates below must surface the real
-   * cause (`upgrade-required`, `workspace-not-found`) instead of a consent
+   * cause (`workspace-not-found`) instead of a consent
    * mismatch. Placed after the dead-grant gate for the same reason.
    *
    * Runs before any write, so a plain failure return needs no rollback.
@@ -1048,7 +910,7 @@ async function acceptLockedInvitation(
   const willCreateMembership =
     shouldJoinOrganization &&
     !alreadyMemberOfTargetOrganization &&
-    (!!workspaceOrganizationId || isBillingEnabled)
+    !!workspaceOrganizationId
   if (input.disclosedOutcome !== undefined && input.disclosedOutcome !== 'blocked') {
     if ((input.disclosedOutcome === 'will-join') !== willCreateMembership) {
       return { success: false, kind: 'disclosure-outdated' }
@@ -1060,76 +922,12 @@ async function acceptLockedInvitation(
   if (shouldJoinOrganization) {
     const alreadyMemberOfTarget = alreadyMemberOfTargetOrganization
 
-    let fixedSeats = false
-
-    if (isBillingEnabled && !alreadyMemberOfTarget) {
-      if (workspaceOrganizationId) {
-        await acquireOrganizationMutationLock(tx, workspaceOrganizationId)
-      }
-      const orgResult = await ensureTeamOrganizationForAcceptance({
-        billingOwnerUserId,
-        workspaceOrganizationId,
-        executor: tx,
-        workspaceIdsToAttach: lockPlan.workspaceIds,
-      })
-      if (!orgResult.success) {
-        return { success: false, kind: orgResult.failureCode }
-      }
-
-      /**
-       * A personal Pro→Team conversion acquires the billing owner's
-       * billing-identity lock and attaches every workspace from the pre-lock
-       * plan inside this transaction. Re-read only after that conversion:
-       * anything still attachable was created between the plan read and the
-       * identity lock, so it never received a workspace advisory lock. Abort
-       * the whole conversion/acceptance and let the retry plan include it.
-       *
-       * Do not take the identity lock here before provisioning. Organization
-       * membership paths acquire organization → identity, and reversing that
-       * order would introduce a deadlock.
-       */
-      if (!workspaceOrganizationId) {
-        const [unplannedBillingOwnerWorkspace] = await tx
-          .select({ id: workspace.id })
-          .from(workspace)
-          .where(
-            ownedAttachableWorkspacesWhere({
-              userId: billingOwnerUserId,
-              ownerMatch: 'billing-account',
-              includeArchived: true,
-            })
-          )
-          .limit(1)
-        if (unplannedBillingOwnerWorkspace) {
-          throw new BillingOwnerWorkspacesChangedDuringAcceptError()
-        }
-      }
-
-      targetOrganizationId = orgResult.organizationId
-      fixedSeats = orgResult.fixedSeats
-      if (orgResult.postCommitEffects) {
-        effects.planConversions.push(...orgResult.postCommitEffects.planConversions)
-        effects.syncUsageLimitUserIds.push(...orgResult.postCommitEffects.usageLimitUserIds)
-      }
-    }
-
-    // Team plans manage seats by reconciling to the member count after the
-    // join (and charging async), so the synchronous seat-cap validation is
-    // skipped. Enterprise keeps its fixed-seat validation, and when billing is
-    // disabled we leave validation in place unchanged.
-    const billingManagesSeats = isBillingEnabled && !fixedSeats
-
     if (targetOrganizationId) {
       const membershipResult = await ensureUserInOrganizationTx(tx, {
         userId: input.userId,
         organizationId: targetOrganizationId,
         role: (inv.role || 'member') as 'admin' | 'member' | 'owner',
         acceptingInvitationId: inv.id,
-        // If the pre-lock membership read said the user already belonged to
-        // this org but a concurrent removal won the org lock first, fall back
-        // to normal validation instead of accidentally bypassing Enterprise's
-        // fixed-seat cap with stale state.
-        skipSeatValidation: billingManagesSeats && !alreadyMemberOfTarget,
       })
 
       if (!membershipResult.success) {
@@ -1174,15 +972,6 @@ async function acceptLockedInvitation(
           .where(
             and(eq(member.userId, input.userId), eq(member.organizationId, targetOrganizationId))
           )
-      }
-
-      // Grow the paid seat count to match the new member and push the charge
-      // to Stripe asynchronously (Team plans only; Enterprise seats are
-      // fixed). Best-effort: the member is already in, and a transient
-      // failure self-heals on the next join/removal reconcile, matching the
-      // removal path's seat accounting.
-      if (billingManagesSeats && joinedDuringThisAcceptance) {
-        effects.reconcileSeats = true
       }
 
       /**
@@ -1474,44 +1263,6 @@ async function runInvitationAcceptancePostCommitEffects(
       { organization_id: effects.organizationId, member_role: effects.memberRole },
       { groups: { organization: effects.organizationId } }
     )
-  }
-
-  for (const conversion of effects.planConversions) {
-    recordAudit({
-      workspaceId: null,
-      actorId: conversion.actorId,
-      action: AuditAction.ORG_PLAN_CONVERTED,
-      resourceType: AuditResourceType.ORGANIZATION,
-      resourceId: conversion.organizationId,
-      description: `Converted ${conversion.fromPlan} to ${conversion.toPlan}`,
-      metadata: {
-        fromPlan: conversion.fromPlan,
-        toPlan: conversion.toPlan,
-        trigger: 'invite-acceptance',
-      },
-    })
-    captureServerEvent(conversion.actorId, 'subscription_changed', {
-      from_plan: conversion.fromPlan,
-      to_plan: conversion.toPlan,
-      interval: 'unchanged',
-    })
-  }
-
-  if (effects.organizationId && effects.reconcileSeats) {
-    try {
-      await reconcileOrganizationSeats({
-        organizationId: effects.organizationId,
-        reason: 'member-accepted-invite',
-        actorId: input.userId,
-      })
-    } catch (seatError) {
-      logger.error('Failed to reconcile organization seats after invite acceptance', {
-        userId: input.userId,
-        organizationId: effects.organizationId,
-        invitationId: input.invitationId,
-        error: seatError,
-      })
-    }
   }
 
   if (effects.organizationId) {

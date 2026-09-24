@@ -1,22 +1,14 @@
 import { z } from 'zod'
 import {
-  organizationMemberUsageLimitDataSchema,
-  updateOrganizationMemberUsageLimitBodySchema,
-} from '@/lib/api/contracts/organization'
-import {
   MAX_CUSTOM_RANGE_DAYS,
   organizationUsageBreakdownQuerySchema,
   organizationUsageBreakdownResponseSchema,
   organizationUsageSummaryQuerySchema,
   organizationUsageSummaryResponseSchema,
 } from '@/lib/api/contracts/organization-usage'
-import { noInputSchema } from '@/lib/api/contracts/primitives'
 import { defineRouteContract } from '@/lib/api/contracts/types'
 import { usageLogSourceSchema } from '@/lib/api/contracts/user'
-import {
-  v2OrganizationMemberParamsSchema,
-  v2OrganizationParamsSchema,
-} from '@/lib/api/contracts/v2/organizations'
+import { v2OrganizationParamsSchema } from '@/lib/api/contracts/v2/organizations'
 import {
   v2CursorListResponse,
   v2DataResponse,
@@ -24,66 +16,6 @@ import {
   v2SortFields,
   v2TimestampSchema,
 } from '@/lib/api/contracts/v2/shared'
-
-export const v2OrganizationMemberUsageLimitSchema = organizationMemberUsageLimitDataSchema
-  .extend({
-    billingInterval: organizationMemberUsageLimitDataSchema.shape.billingInterval.describe(
-      'Organization billing interval used for the credit cap.'
-    ),
-    creditsUsed: z
-      .number()
-      .describe('Credits used by this person during the organization billing period.'),
-    creditLimit: z
-      .number()
-      .nullable()
-      .describe(
-        'Per-person credit cap. Null means no per-person cap; organization limits still apply. Zero prevents further credit-consuming usage.'
-      ),
-  })
-  .meta({ id: 'V2OrganizationMemberUsageLimit' })
-export type V2OrganizationMemberUsageLimit = z.output<typeof v2OrganizationMemberUsageLimitSchema>
-
-export const v2UpdateOrganizationMemberUsageLimitBodySchema =
-  updateOrganizationMemberUsageLimitBodySchema
-    .extend({
-      creditLimit: updateOrganizationMemberUsageLimitBodySchema.shape.creditLimit.describe(
-        'Credit cap for this person. Send null to clear the cap or 0 to prevent further credit-consuming usage. Organization limits still apply.'
-      ),
-    })
-    .strict()
-export type V2UpdateOrganizationMemberUsageLimitBody = z.input<
-  typeof v2UpdateOrganizationMemberUsageLimitBodySchema
->
-
-export const v2OrganizationMemberUsageLimitParamsSchema = v2OrganizationMemberParamsSchema.extend({
-  userId: v2OrganizationMemberParamsSchema.shape.userId.describe(
-    'User ID of an organization member or external collaborator with workspace access in this organization. Use List Organization Members or List Workspace Members to find it.'
-  ),
-})
-
-export const v2GetOrganizationMemberUsageLimitContract = defineRouteContract({
-  method: 'GET',
-  path: '/api/v2/organizations/[organizationId]/members/[userId]/usage-limit',
-  params: v2OrganizationMemberUsageLimitParamsSchema,
-  query: noInputSchema,
-  response: { mode: 'json', schema: v2DataResponse(v2OrganizationMemberUsageLimitSchema) },
-})
-
-export const v2UpdateOrganizationMemberUsageLimitContract = defineRouteContract({
-  method: 'PATCH',
-  path: '/api/v2/organizations/[organizationId]/members/[userId]/usage-limit',
-  params: v2OrganizationMemberUsageLimitParamsSchema,
-  query: noInputSchema,
-  body: v2UpdateOrganizationMemberUsageLimitBodySchema,
-  response: {
-    mode: 'json',
-    schema: v2DataResponse(
-      v2UpdateOrganizationMemberUsageLimitBodySchema.meta({
-        id: 'V2OrganizationMemberUsageLimitUpdate',
-      })
-    ),
-  },
-})
 
 const windowFields = {
   preset: organizationUsageSummaryQuerySchema.shape.preset

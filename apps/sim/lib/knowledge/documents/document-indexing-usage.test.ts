@@ -7,7 +7,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const {
   mockCalculateCost,
   mockCheckAttributedUsageLimits,
-  mockCheckAndBillPayerOverageThreshold,
   mockGenerateEmbeddings,
   mockGetBoundWorkspaceFileSecretProvenanceByMetadata,
   mockGetFileMetadataByKeys,
@@ -16,7 +15,6 @@ const {
 } = vi.hoisted(() => ({
   mockCalculateCost: vi.fn(),
   mockCheckAttributedUsageLimits: vi.fn(),
-  mockCheckAndBillPayerOverageThreshold: vi.fn(),
   mockGenerateEmbeddings: vi.fn(),
   mockGetBoundWorkspaceFileSecretProvenanceByMetadata: vi.fn(),
   mockGetFileMetadataByKeys: vi.fn(),
@@ -26,10 +24,6 @@ const {
 
 vi.mock('@/lib/billing/core/usage-log', () => ({
   recordUsage: mockRecordUsage,
-}))
-
-vi.mock('@/lib/billing/threshold-billing', () => ({
-  checkAndBillPayerOverageThreshold: mockCheckAndBillPayerOverageThreshold,
 }))
 
 vi.mock('@/lib/knowledge/documents/document-processor', () => ({
@@ -65,13 +59,11 @@ vi.mock('@/providers/utils', () => ({
 }))
 
 import * as billingAttribution from '@/lib/billing/core/billing-attribution'
-import { resetUsageGateCache } from '@/lib/billing/core/usage-gate-cache'
 import * as embeddingClient from '@/lib/embeddings/client'
 import { processDocumentAsync } from '@/lib/knowledge/documents/service'
 
 const mockEmbeddingCapacity = vi.fn<typeof embeddingClient.assertKnowledgeEmbeddingCapacity>()
 beforeEach(() => {
-  resetUsageGateCache()
   vi.spyOn(billingAttribution, 'checkAttributedUsageLimits').mockImplementation(
     mockCheckAttributedUsageLimits
   )
@@ -311,9 +303,6 @@ describe('knowledge document indexing usage', () => {
         workspaceId: BILLING_ATTRIBUTION.workspaceId,
         billingEntity: BILLING_ATTRIBUTION.billingEntity,
       })
-    )
-    expect(mockCheckAndBillPayerOverageThreshold).toHaveBeenCalledWith(
-      BILLING_ATTRIBUTION.billingEntity
     )
   })
 

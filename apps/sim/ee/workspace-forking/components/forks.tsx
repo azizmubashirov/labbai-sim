@@ -9,7 +9,6 @@ import { useQueryState } from 'nuqs'
 import { saveDiscardActions } from '@/components/settings/save-discard-actions'
 import type { SettingsAction } from '@/components/settings/settings-header'
 import type { ForkLineageChildApi, ForkLineageNodeApi } from '@/lib/api/contracts/workspace-fork'
-import { useDeploymentShape } from '@/lib/core/config/deployment-shape'
 import { FloatingOverflowText } from '@/app/workspace/[workspaceId]/components'
 import { UnsavedChangesModal } from '@/app/workspace/[workspaceId]/components/credential-detail'
 import { useUserPermissionsContext } from '@/app/workspace/[workspaceId]/providers/workspace-permissions-provider'
@@ -45,7 +44,6 @@ import {
   useUnlinkFork,
 } from '@/ee/workspace-forking/hooks/workspace-fork'
 import { useWorkspaceCreationPolicy, useWorkspacesQuery } from '@/hooks/queries/workspace'
-import { useSettingsNavigation } from '@/hooks/use-settings-navigation'
 import { buildWebhookTriggerUrl } from '@/triggers/webhook-url'
 
 /** Explains a disabled lineage action whose target workspace the viewer cannot open. */
@@ -311,14 +309,12 @@ export function Forks() {
   const workspaceId = params.workspaceId as string
 
   const { canAdmin, isLoading: permissionsLoading } = useUserPermissionsContext()
-  const { billingEnabled } = useDeploymentShape()
   const { available: forkingAvailable, isLoading: availabilityLoading } =
     useForkingAvailability(workspaceId)
   const canUseForking = forkingAvailable && canAdmin
 
   const { data: workspaces } = useWorkspacesQuery()
   const { data: creationPolicy } = useWorkspaceCreationPolicy()
-  const { navigateToSettings } = useSettingsNavigation()
   const lineage = useForkLineage(workspaceId, canUseForking)
   const rollback = useRollbackFork()
   const unlink = useUnlinkFork()
@@ -560,9 +556,6 @@ export function Forks() {
         sourceWorkspaceId={workspaceId}
         sourceWorkspaceName={workspaceName || 'Workspace'}
         canFork={canFork}
-        onUpgrade={() => {
-          if (billingEnabled) navigateToSettings({ section: 'billing' })
-        }}
       />
 
       <ChipConfirmModal

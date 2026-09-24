@@ -22,10 +22,7 @@ import {
   v2UpdateOrganizationAccessRequestSettingsContract,
 } from '@/lib/api/contracts/v2/access-requests'
 import { v2GetAuditLogContract, v2ListAuditLogsContract } from '@/lib/api/contracts/v2/audit-logs'
-import {
-  v2GetBillingStatusContract,
-  v2ListBillingLogsContract,
-} from '@/lib/api/contracts/v2/billing'
+import { v2ListBillingLogsContract } from '@/lib/api/contracts/v2/billing'
 import {
   v2ExecuteToolContract,
   v2GetBlockContract,
@@ -151,11 +148,9 @@ import {
 } from '@/lib/api/contracts/v2/mcp-servers'
 import { v2GetMetaContract } from '@/lib/api/contracts/v2/meta'
 import {
-  v2GetOrganizationMemberUsageLimitContract,
   v2GetOrganizationUsageBreakdownContract,
   v2GetOrganizationUsageSummaryContract,
   v2ListOrganizationUsageEventsContract,
-  v2UpdateOrganizationMemberUsageLimitContract,
 } from '@/lib/api/contracts/v2/organization-usage'
 import {
   v2CreateOrganizationInvitationContract,
@@ -1163,13 +1158,6 @@ export const V2_MCP_OPERATIONS = {
     workspaceKeyUnsupported: true,
     handler: () => import('@/app/api/v2/audit-logs/[auditLogId]/route').then((route) => route.GET),
   },
-  getBillingStatus: {
-    contract: v2GetBillingStatusContract,
-    summary: 'Get Billing Status',
-    description:
-      "Get the current plan, billing standing, credit allowance, and storage quota. Pooled `credits` and `storage` are visible only to callers who can manage the payer's billing; workspace API keys receive null for both. Use List Billing Logs for credit history.\n\nOAuth scope: `api:read`.",
-    handler: () => import('@/app/api/v2/billing/status/route').then((route) => route.GET),
-  },
   getBlock: {
     contract: v2GetBlockContract,
     summary: 'Get Block',
@@ -1322,17 +1310,6 @@ export const V2_MCP_OPERATIONS = {
     workspaceKeyUnsupported: true,
     handler: () =>
       import('@/app/api/v2/organizations/[organizationId]/invitations/[invitationId]/route').then(
-        (route) => route.GET
-      ),
-  },
-  getOrganizationMemberUsageLimit: {
-    contract: v2GetOrganizationMemberUsageLimitContract,
-    summary: 'Get Organization Member Credit Limit',
-    description:
-      'Read a person’s credit cap and credits consumed in the organization billing period. Hosted only. The userId identifies an organization member or external collaborator with workspace access in this organization; it is not a membership record ID. Null means no per-person cap, while organization limits still apply. Requires organization administrator access. Workspace API keys return `403`; use a personal API key or scoped OAuth token.\n\nOAuth scope: `api:read`.',
-    workspaceKeyUnsupported: true,
-    handler: () =>
-      import('@/app/api/v2/organizations/[organizationId]/members/[userId]/usage-limit/route').then(
         (route) => route.GET
       ),
   },
@@ -2577,17 +2554,6 @@ export const V2_MCP_OPERATIONS = {
     workspaceKeyUnsupported: true,
     handler: () =>
       import('@/app/api/v2/organizations/[organizationId]/members/[userId]/route').then(
-        (route) => route.PATCH
-      ),
-  },
-  updateOrganizationMemberUsageLimit: {
-    contract: v2UpdateOrganizationMemberUsageLimitContract,
-    summary: 'Update Organization Member Credit Limit',
-    description:
-      'Set or clear a person’s credit cap. Hosted only. The userId must identify an organization member or external collaborator with workspace access in this organization. The cap is a nonnegative whole number of credits, not dollars: 0 prevents further credit-consuming usage; null removes the per-person cap. Organization limits continue to apply. Retrying the same value is safe. Requires organization administrator access. Workspace API keys return `403`; use a personal API key or scoped OAuth token.\n\nOAuth scope: `api:write`.',
-    workspaceKeyUnsupported: true,
-    handler: () =>
-      import('@/app/api/v2/organizations/[organizationId]/members/[userId]/usage-limit/route').then(
         (route) => route.PATCH
       ),
   },

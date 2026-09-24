@@ -9,9 +9,8 @@ import {
   queueTableRows,
   resetDbChainMock,
   resetEnvFlagsMock,
-  setEnvFlags,
 } from '@sim/testing'
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { mockIsEnterprise, mockEagerClamp, mockRecordAudit } = vi.hoisted(() => ({
   mockIsEnterprise: vi.fn(),
@@ -52,10 +51,6 @@ const mockGetSession = authMockFns.mockGetSession
 
 const ORG_ID = 'org-1'
 const routeContext = { params: Promise.resolve({ id: ORG_ID }) }
-
-beforeAll(() => {
-  setEnvFlags({ isBillingEnabled: true })
-})
 
 afterAll(resetEnvFlagsMock)
 
@@ -119,16 +114,6 @@ describe('session policy route', () => {
         routeContext
       )
       expect(response.status).toBe(400)
-    })
-
-    it('rejects non-enterprise organizations', async () => {
-      queueTableRows(member, [{ role: 'owner' }])
-      mockIsEnterprise.mockResolvedValue(false)
-      const response = await PUT(
-        putRequest({ maxSessionHours: 72, idleTimeoutHours: null }),
-        routeContext
-      )
-      expect(response.status).toBe(403)
     })
 
     it('saves the policy, eagerly clamps sessions, and bumps the version', async () => {

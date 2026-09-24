@@ -17,7 +17,6 @@ vi.mock('next/navigation', () => ({
   },
 }))
 vi.mock('@/lib/auth', () => ({ getSession: mockGetSession }))
-vi.mock('@/lib/core/config/env-flags', () => ({ isBillingEnabled: true }))
 vi.mock('@/lib/permissions/super-user', () => ({ isPlatformAdmin: vi.fn() }))
 vi.mock('@/app/_shell/providers/get-query-client', () => ({ getQueryClient: vi.fn() }))
 vi.mock('@/components/settings/prefetch-standalone-general', () => ({

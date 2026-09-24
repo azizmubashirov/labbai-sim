@@ -9,7 +9,6 @@ import { saveDiscardActions } from '@/components/settings/save-discard-actions'
 import type { SettingsAction } from '@/components/settings/settings-header'
 import type { UpdateOrganizationDataRetentionBody } from '@/lib/api/contracts/organization'
 import type { RetentionOverride } from '@/lib/api/contracts/primitives'
-import { useDeploymentShape } from '@/lib/core/config/deployment-shape'
 import { UnsavedChangesModal } from '@/app/workspace/[workspaceId]/components/credential-detail'
 import { SettingsEmptyState } from '@/app/workspace/[workspaceId]/settings/components/settings-empty-state'
 import { SettingsPanel } from '@/app/workspace/[workspaceId]/settings/components/settings-panel'
@@ -583,7 +582,6 @@ function DataRetentionForm({ initialData: data, orgId, workspaces }: DataRetenti
 export function DataRetentionSettings({ organizationId: orgId }: DataRetentionSettingsProps) {
   const { data, isLoading } = useOrganizationRetention(orgId)
   const { data: workspaces = [] } = useWorkspacesQuery(Boolean(orgId))
-  const { billingEnabled } = useDeploymentShape()
 
   if (isLoading) {
     return (
@@ -604,12 +602,6 @@ export function DataRetentionSettings({ organizationId: orgId }: DataRetentionSe
 
   if (!data) {
     return <SettingsEmptyState>Failed to load data retention settings.</SettingsEmptyState>
-  }
-
-  if (billingEnabled && !data.isEnterprise) {
-    return (
-      <SettingsEmptyState>Data retention is available on Enterprise plans only.</SettingsEmptyState>
-    )
   }
 
   return <DataRetentionForm key={orgId} initialData={data} orgId={orgId} workspaces={workspaces} />

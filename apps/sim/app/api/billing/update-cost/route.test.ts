@@ -7,36 +7,19 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 const {
   mockCheckInternalApiKey,
   mockRecordCumulativeUsage,
-  mockCheckAndBillOverageThreshold,
-  mockCheckAndBillPayerOverageThreshold,
   mockRequireAccountBillingDecisionHeader,
   mockRequireBillingAttributionHeader,
   mockResolveLegacyV0BillingAttribution,
   mockToBillingContext,
   MockCumulativeUsageContextMismatchError,
-  MockThresholdSettlementError,
 } = vi.hoisted(() => ({
   mockCheckInternalApiKey: vi.fn(),
   mockRecordCumulativeUsage: vi.fn(),
-  mockCheckAndBillOverageThreshold: vi.fn(),
-  mockCheckAndBillPayerOverageThreshold: vi.fn(),
   mockRequireAccountBillingDecisionHeader: vi.fn(),
   mockRequireBillingAttributionHeader: vi.fn(),
   mockResolveLegacyV0BillingAttribution: vi.fn(),
   mockToBillingContext: vi.fn(),
   MockCumulativeUsageContextMismatchError: class extends Error {},
-  MockThresholdSettlementError: class extends Error {
-    readonly code: string
-    get retryable() {
-      return this.code !== 'billing_period_elapsed'
-    }
-
-    constructor(code: string) {
-      super('Billing settlement temporarily unavailable')
-      this.name = 'ThresholdSettlementError'
-      this.code = code
-    }
-  },
 }))
 
 vi.mock('@/lib/copilot/request/http', () => ({
@@ -71,12 +54,6 @@ vi.mock('@/lib/billing/core/billing-attribution', () => ({
   requireBillingCallbackAttribution: mockRequireBillingAttributionHeader,
   resolveLegacyV0BillingAttribution: mockResolveLegacyV0BillingAttribution,
   toBillingContext: mockToBillingContext,
-}))
-
-vi.mock('@/lib/billing/threshold-billing', () => ({
-  checkAndBillOverageThreshold: mockCheckAndBillOverageThreshold,
-  checkAndBillPayerOverageThreshold: mockCheckAndBillPayerOverageThreshold,
-  ThresholdSettlementError: MockThresholdSettlementError,
 }))
 
 import { billingUpdateCostBodySchema } from '@/lib/api/contracts/subscription'
@@ -150,11 +127,9 @@ const KEYLESS_UPDATE_COST_BODY = {
 describe('POST /api/billing/update-cost — workspaceId attribution', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    setEnvFlags({ isBillingEnabled: true, isHosted: false })
+    setEnvFlags({ isHosted: false })
     mockCheckInternalApiKey.mockReturnValue({ success: true })
     mockRecordCumulativeUsage.mockResolvedValue({ billed: true, delta: 0.5, total: 0.5 })
-    mockCheckAndBillOverageThreshold.mockResolvedValue(undefined)
-    mockCheckAndBillPayerOverageThreshold.mockResolvedValue(undefined)
     mockRequireBillingAttributionHeader.mockReturnValue(ATTRIBUTION)
     mockRequireAccountBillingDecisionHeader.mockReturnValue(ACCOUNT_BILLING_DECISION)
     mockResolveLegacyV0BillingAttribution.mockResolvedValue(ATTRIBUTION)
@@ -167,8 +142,7 @@ describe('POST /api/billing/update-cost — workspaceId attribution', () => {
     })
   })
 
-  it('returns 401 for a billing-disabled request without valid internal auth', async () => {
-    setEnvFlags({ isBillingEnabled: false })
+  it('returns 401 for a request without valid internal auth', async () => {
     mockCheckInternalApiKey.mockReturnValue({ success: false, error: 'Invalid internal API key' })
 
     const res = await POST(
@@ -189,32 +163,6 @@ describe('POST /api/billing/update-cost — workspaceId attribution', () => {
     expect(mockRecordCumulativeUsage).not.toHaveBeenCalled()
   })
 
-  it('returns no-op success for markerless local self-hosted Go when billing is disabled', async () => {
-    setEnvFlags({ isBillingEnabled: false })
-
-    const res = await POST(
-      createMockRequest(
-        'POST',
-        {
-          userId: 'user-1',
-          cost: 0.5,
-          model: 'gpt',
-          source: 'copilot',
-        },
-        { 'x-api-key': 'internal' }
-      )
-    )
-
-    expect(res.status).toBe(200)
-    await expect(res.json()).resolves.toMatchObject({
-      success: true,
-      message: 'Billing disabled, cost update skipped',
-      data: { billingEnabled: false },
-    })
-    expect(mockCheckInternalApiKey).toHaveBeenCalledTimes(1)
-    expect(mockRecordCumulativeUsage).not.toHaveBeenCalled()
-  })
-
   it('keeps local self-hosted callback bodies contract-compatible', () => {
     expect(billingUpdateCostBodySchema.safeParse(SELF_HOSTED_UPDATE_COST_BODY).success).toBe(true)
     expect(
@@ -225,15 +173,13 @@ describe('POST /api/billing/update-cost — workspaceId attribution', () => {
     ).toBe(true)
   })
 
-  it('rejects billing-enabled callbacks without a stable idempotency key', async () => {
+  it('rejects callbacks without a stable idempotency key', async () => {
     const res = await POST(
       createMockRequest('POST', KEYLESS_UPDATE_COST_BODY, { 'x-api-key': 'internal' })
     )
 
     expect(res.status).toBe(400)
     expect(mockRecordCumulativeUsage).not.toHaveBeenCalled()
-    expect(mockCheckAndBillOverageThreshold).not.toHaveBeenCalled()
-    expect(mockCheckAndBillPayerOverageThreshold).not.toHaveBeenCalled()
   })
 
   it('bills the routed workspace payer for a markerless self-hosted callback', async () => {
@@ -259,36 +205,6 @@ describe('POST /api/billing/update-cost — workspaceId attribution', () => {
       cost: 0.4662453,
       eventKey: 'update-cost:random-old-go-billing-id',
       metadata: { inputTokens: 461371, outputTokens: 1686 },
-    })
-    expect(mockCheckAndBillPayerOverageThreshold).toHaveBeenCalledWith(
-      { type: 'organization', id: 'org-1' },
-      {
-        onError: 'throw',
-        expectedBillingPeriod: {
-          start: new Date('2026-07-01T00:00:00.000Z'),
-          end: new Date('2026-08-01T00:00:00.000Z'),
-        },
-      }
-    )
-    expect(mockCheckAndBillOverageThreshold).not.toHaveBeenCalled()
-  })
-
-  it('returns a retryable 503 when markerless legacy workspace settlement fails', async () => {
-    mockCheckAndBillPayerOverageThreshold.mockRejectedValueOnce(
-      new MockThresholdSettlementError('required_state_missing')
-    )
-
-    const res = await POST(
-      createMockRequest('POST', SELF_HOSTED_UPDATE_COST_BODY, { 'x-api-key': 'internal' })
-    )
-
-    expect(res.status).toBe(503)
-    expect(res.headers.get('retry-after')).toBe('1')
-    await expect(res.json()).resolves.toMatchObject({
-      success: false,
-      code: 'BILLING_SETTLEMENT_RETRYABLE',
-      error: 'Billing settlement temporarily unavailable',
-      retryable: true,
     })
   })
 
@@ -383,11 +299,6 @@ describe('POST /api/billing/update-cost — workspaceId attribution', () => {
         eventKey: 'update-cost:explicit-legacy-billing-id',
       })
     )
-    expect(mockCheckAndBillPayerOverageThreshold).toHaveBeenCalledWith(
-      { type: 'organization', id: 'org-1' },
-      expect.objectContaining({ onError: 'throw' })
-    )
-    expect(mockCheckAndBillOverageThreshold).not.toHaveBeenCalled()
   })
 
   it('rejects a direct-v1 callback without its immutable account decision envelope', async () => {
@@ -452,21 +363,6 @@ describe('POST /api/billing/update-cost — workspaceId attribution', () => {
         },
       })
     )
-    expect(mockCheckAndBillPayerOverageThreshold).toHaveBeenCalledWith(
-      {
-        type: 'organization',
-        id: 'account-org',
-      },
-      {
-        onError: 'throw',
-        expectedBillingPeriod: {
-          start: new Date('2026-07-01T00:00:00.000Z'),
-          end: new Date('2026-08-01T00:00:00.000Z'),
-          source: 'reporting',
-        },
-      }
-    )
-    expect(mockCheckAndBillOverageThreshold).not.toHaveBeenCalled()
   })
 
   it('keeps direct-v1 isolated from legacy callback-time resolution', async () => {
@@ -550,8 +446,6 @@ describe('POST /api/billing/update-cost — workspaceId attribution', () => {
       success: false,
       error: 'Internal server error',
     })
-    expect(mockCheckAndBillOverageThreshold).not.toHaveBeenCalled()
-    expect(mockCheckAndBillPayerOverageThreshold).not.toHaveBeenCalled()
   })
 
   it('preserves duplicate-compatible 409 semantics for markerless self-hosted callbacks', async () => {
@@ -563,68 +457,14 @@ describe('POST /api/billing/update-cost — workspaceId attribution', () => {
     await expect(res.json()).resolves.toMatchObject({
       code: 'DUPLICATE_BILLING_EVENT',
     })
-    expect(mockCheckAndBillOverageThreshold).not.toHaveBeenCalled()
-    expect(mockCheckAndBillPayerOverageThreshold).toHaveBeenCalledWith(
-      {
-        type: 'organization',
-        id: 'org-1',
-      },
-      {
-        onError: 'throw',
-        expectedBillingPeriod: {
-          start: new Date('2026-07-01T00:00:00.000Z'),
-          end: new Date('2026-08-01T00:00:00.000Z'),
-        },
-      }
-    )
   })
 
-  it('retries settlement without adding usage again and then returns the duplicate outcome', async () => {
-    mockRecordCumulativeUsage
-      .mockResolvedValueOnce({ billed: true, delta: 0.4662453, total: 0.4662453 })
-      .mockResolvedValueOnce({ billed: false, delta: 0, total: 0.4662453 })
-    mockCheckAndBillPayerOverageThreshold
-      .mockRejectedValueOnce(new Error('Threshold settlement unavailable'))
-      .mockResolvedValueOnce(undefined)
-    const createRequest = () =>
-      createMockRequest('POST', SELF_HOSTED_UPDATE_COST_BODY, { 'x-api-key': 'internal' })
-
-    const firstResponse = await POST(createRequest())
-    const retryResponse = await POST(createRequest())
-
-    expect(firstResponse.status).toBe(500)
-    expect(retryResponse.status).toBe(409)
-    await expect(retryResponse.json()).resolves.toMatchObject({
-      code: 'DUPLICATE_BILLING_EVENT',
-    })
-    expect(mockRecordCumulativeUsage).toHaveBeenCalledTimes(2)
-    expect(mockResolveLegacyV0BillingAttribution).toHaveBeenCalledTimes(2)
-    expect(mockCheckAndBillPayerOverageThreshold).toHaveBeenCalledTimes(2)
-    expect(mockCheckAndBillPayerOverageThreshold).toHaveBeenNthCalledWith(
-      2,
-      {
-        type: 'organization',
-        id: 'org-1',
-      },
-      {
-        onError: 'throw',
-        expectedBillingPeriod: {
-          start: new Date('2026-07-01T00:00:00.000Z'),
-          end: new Date('2026-08-01T00:00:00.000Z'),
-        },
-      }
-    )
-  })
-
-  it.each(['legacy-v0', 'attribution-v1', 'direct-v1'])(
+(
     'returns a distinct non-retryable conflict for an elapsed %s period and preserves usage attribution',
     async (protocol) => {
       const billingRequestId = '0190c03f-9f7d-4b79-8b58-e7f779fd29e1'
       const direct = protocol === 'direct-v1'
-      setEnvFlags({ isBillingEnabled: true, isHosted: true })
-      mockCheckAndBillPayerOverageThreshold.mockRejectedValue(
-        new MockThresholdSettlementError('billing_period_elapsed')
-      )
+      setEnvFlags({ isHosted: true })
       mockRecordCumulativeUsage
         .mockResolvedValueOnce({ billed: true, delta: 0.5, total: 0.5 })
         .mockResolvedValueOnce({ billed: false, delta: 0, total: 0.5 })
@@ -699,8 +539,6 @@ describe('POST /api/billing/update-cost — workspaceId attribution', () => {
         })
       )
       expect(res.status).toBe(status)
-      expect(mockCheckAndBillPayerOverageThreshold).not.toHaveBeenCalled()
-      expect(mockCheckAndBillOverageThreshold).not.toHaveBeenCalled()
       if (status === 409) {
         await expect(res.json()).resolves.toMatchObject({
           code: 'BILLING_USER_NOT_FOUND',
@@ -709,98 +547,6 @@ describe('POST /api/billing/update-cost — workspaceId attribution', () => {
       }
     }
   )
-
-  it('does not expose elapsed-period 409 to markerless clients that treat all conflicts as success', async () => {
-    mockCheckAndBillPayerOverageThreshold.mockRejectedValueOnce(
-      new MockThresholdSettlementError('billing_period_elapsed')
-    )
-    const res = await POST(
-      createMockRequest('POST', SELF_HOSTED_UPDATE_COST_BODY, { 'x-api-key': 'internal' })
-    )
-    expect(res.status).toBe(503)
-  })
-
-  it('returns a stable retryable 503 when modern threshold settlement fails', async () => {
-    const billingRequestId = '0190c03f-9f7d-4b79-8b58-e7f779fd29e1'
-    mockCheckAndBillPayerOverageThreshold.mockRejectedValueOnce(
-      new MockThresholdSettlementError('provider_failure')
-    )
-
-    const res = await POST(
-      createMockRequest(
-        'POST',
-        {
-          userId: 'user-1',
-          cost: 0.5,
-          model: 'claude-opus-4.8',
-          source: 'workspace-chat',
-          idempotencyKey: billingRequestId,
-        },
-        {
-          'x-api-key': 'internal',
-          'x-sim-billing-protocol': 'direct-v1',
-          'x-sim-billing-request-id': billingRequestId,
-          'x-sim-billing-account-decision': 'serialized-account-decision',
-        }
-      )
-    )
-
-    expect(res.status).toBe(503)
-    expect(res.headers.get('retry-after')).toBe('1')
-    await expect(res.json()).resolves.toMatchObject({
-      success: false,
-      code: 'BILLING_SETTLEMENT_RETRYABLE',
-      error: 'Billing settlement temporarily unavailable',
-      retryable: true,
-    })
-  })
-
-  it('retries modern settlement on a duplicate cumulative callback before returning 409', async () => {
-    const billingRequestId = '0190c03f-9f7d-4b79-8b58-e7f779fd29e1'
-    mockRecordCumulativeUsage
-      .mockResolvedValueOnce({ billed: true, delta: 0.5, total: 0.5 })
-      .mockResolvedValueOnce({ billed: false, delta: 0, total: 0.5 })
-    mockCheckAndBillPayerOverageThreshold
-      .mockRejectedValueOnce(new MockThresholdSettlementError('required_state_missing'))
-      .mockResolvedValueOnce({ status: 'no-op', reason: 'already-settled' })
-    const createRequest = () =>
-      createMockRequest(
-        'POST',
-        {
-          userId: 'user-1',
-          cost: 0.5,
-          model: 'claude-opus-4.8',
-          source: 'workspace-chat',
-          idempotencyKey: billingRequestId,
-        },
-        {
-          'x-api-key': 'internal',
-          'x-sim-billing-protocol': 'direct-v1',
-          'x-sim-billing-request-id': billingRequestId,
-          'x-sim-billing-account-decision': 'serialized-account-decision',
-        }
-      )
-
-    const firstResponse = await POST(createRequest())
-    const retryResponse = await POST(createRequest())
-
-    expect(firstResponse.status).toBe(503)
-    expect(retryResponse.status).toBe(409)
-    expect(mockRecordCumulativeUsage).toHaveBeenCalledTimes(2)
-    expect(mockCheckAndBillPayerOverageThreshold).toHaveBeenCalledTimes(2)
-    expect(mockCheckAndBillPayerOverageThreshold).toHaveBeenNthCalledWith(
-      2,
-      { type: 'organization', id: 'account-org' },
-      {
-        onError: 'throw',
-        expectedBillingPeriod: {
-          start: new Date('2026-07-01T00:00:00.000Z'),
-          end: new Date('2026-08-01T00:00:00.000Z'),
-          source: 'reporting',
-        },
-      }
-    )
-  })
 
   it('preserves account-ledger ownership for a workspace-less self-hosted callback', async () => {
     const res = await POST(
@@ -818,9 +564,6 @@ describe('POST /api/billing/update-cost — workspaceId attribution', () => {
       eventKey: 'update-cost:random-old-go-direct-billing-id',
     })
     expect(mockRecordCumulativeUsage.mock.calls[0][0]).not.toHaveProperty('billingEntity')
-    expect(mockCheckAndBillOverageThreshold).toHaveBeenCalledWith('user-1', undefined, {
-      onError: 'throw',
-    })
   })
 
   it('preserves account-ledger ownership for an opaque direct legacy workspace', async () => {
@@ -839,9 +582,6 @@ describe('POST /api/billing/update-cost — workspaceId attribution', () => {
       eventKey: 'update-cost:random-old-go-direct-billing-id',
     })
     expect(mockRecordCumulativeUsage.mock.calls[0][0]).not.toHaveProperty('billingEntity')
-    expect(mockCheckAndBillOverageThreshold).toHaveBeenCalledWith('user-1', undefined, {
-      onError: 'throw',
-    })
   })
 
   it('binds an attributed-v1 callback to the exact hosted actor and workspace snapshot', async () => {

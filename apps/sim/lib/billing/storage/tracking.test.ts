@@ -1,8 +1,9 @@
 /**
  * @vitest-environment node
  */
-import { envFlagsMock, resetEnvFlagsMock, setEnvFlags } from '@sim/testing'
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const storageEnforcement = vi.hoisted(() => ({ enabled: true }))
 
 const {
   mockGetStorageLimitForBillingContext,
@@ -10,7 +11,6 @@ const {
   mockGetUserStorageLimit,
   mockGetUserStorageUsage,
   mockLoggerError,
-  mockMaybeNotifyLimit,
   mockOrderedLockRows,
   mockSql,
   mockTxFor,
@@ -30,7 +30,6 @@ const {
   mockGetUserStorageLimit: vi.fn(),
   mockGetUserStorageUsage: vi.fn(),
   mockLoggerError: vi.fn(),
-  mockMaybeNotifyLimit: vi.fn(),
   mockOrderedLockRows: { queue: [] as unknown[][] },
   mockSql: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({ strings, values })),
   mockTxFor: vi.fn(),
@@ -83,18 +82,14 @@ vi.mock('drizzle-orm', () => ({
   sql: mockSql,
 }))
 
-vi.mock('@/lib/billing/core/limit-notifications', () => ({
-  maybeNotifyLimit: mockMaybeNotifyLimit,
-}))
-
 vi.mock('@/lib/billing/storage/limits', () => ({
   getStorageLimitForBillingContext: mockGetStorageLimitForBillingContext,
   getStorageUsageForBillingContext: mockGetStorageUsageForBillingContext,
   getUserStorageLimit: mockGetUserStorageLimit,
   getUserStorageUsage: mockGetUserStorageUsage,
   StorageLimitExceededError: class StorageLimitExceededError extends Error {},
-  // No FREE_STORAGE_LIMIT_GB opt-in in these tests, so enforcement === billing.
-  isStorageEnforcementEnabled: () => envFlagsMock.isBillingEnabled,
+  // Enforcement is the FREE_STORAGE_LIMIT_GB opt-in; toggled per test here.
+  isStorageEnforcementEnabled: () => storageEnforcement.enabled,
 }))
 
 vi.mock('@sim/logger', () => ({
@@ -110,7 +105,6 @@ import {
   applyStorageUsageDeltasInTx,
   decrementStorageUsageForBillingContextInTx,
   incrementStorageUsageForBillingContextInTx,
-  maybeNotifyStorageLimitForBillingContext,
 } from '@/lib/billing/storage/tracking'
 import type { DbOrTx } from '@/lib/db/types'
 
@@ -158,16 +152,10 @@ const PAYER_CASES = [
   },
 ] as const
 
-beforeAll(() => {
-  setEnvFlags({ isBillingEnabled: true })
-})
-
-afterAll(resetEnvFlagsMock)
-
 describe('workspace storage counter mutations', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    setEnvFlags({ isBillingEnabled: true })
+    storageEnforcement.enabled = true
     mockWorkspaceRow.current = {
       billedAccountUserId: 'workspace-owner',
       organizationId: 'workspace-org',
@@ -199,7 +187,6 @@ describe('workspace storage counter mutations', () => {
     mockGetStorageUsageForBillingContext.mockResolvedValue(1_000)
     mockGetUserStorageLimit.mockResolvedValue(1_050)
     mockGetUserStorageUsage.mockResolvedValue(1_000)
-    mockMaybeNotifyLimit.mockResolvedValue(undefined)
   })
 
   it('locks the workspace before its payer and updates both ledgers', async () => {
@@ -219,7 +206,6 @@ describe('workspace storage counter mutations', () => {
       2,
       expect.objectContaining({ id: 'organization.id' })
     )
-    expect(mockMaybeNotifyLimit).not.toHaveBeenCalled()
   })
 
   /**
@@ -346,7 +332,6 @@ describe('workspace storage counter mutations', () => {
       incrementStorageUsageForBillingContextInTx(mockTx as unknown as DbOrTx, ORG_CONTEXT, 100)
     ).rejects.toThrow('Storage payer organization:workspace-org not found')
     expect(mockTxSet).not.toHaveBeenCalled()
-    expect(mockMaybeNotifyLimit).not.toHaveBeenCalled()
   })
 
   it('still throws on a missing payer row during a clamped decrement', async () => {
@@ -362,29 +347,14 @@ describe('workspace storage counter mutations', () => {
     await incrementStorageUsageForBillingContextInTx(mockTx as unknown as DbOrTx, ORG_CONTEXT, 100)
 
     expect(mockTxUpdate).toHaveBeenCalledTimes(2)
-    expect(mockMaybeNotifyLimit).not.toHaveBeenCalled()
   })
 
-  it('keeps durable workspace and payer ledgers accurate while billing is disabled', async () => {
-    setEnvFlags({ isBillingEnabled: false })
+  it('keeps durable workspace and payer ledgers accurate while storage is not enforced', async () => {
+    storageEnforcement.enabled = false
 
     await incrementStorageUsageForBillingContextInTx(mockTx as unknown as DbOrTx, ORG_CONTEXT, 100)
 
     expect(mockTxUpdate).toHaveBeenCalledTimes(2)
-    expect(mockMaybeNotifyLimit).not.toHaveBeenCalled()
-  })
-
-  it('keeps context-aware notifications available after commit', async () => {
-    await maybeNotifyStorageLimitForBillingContext(ORG_CONTEXT, 1_100)
-
-    expect(mockMaybeNotifyLimit).toHaveBeenCalledWith(
-      expect.objectContaining({
-        billedUserId: 'workspace-owner',
-        billingEntity: ORG_CONTEXT.billingEntity,
-        currentUsage: 1_100,
-        workspaceId: 'workspace-1',
-      })
-    )
   })
 
   it('moves workspace bytes without touching the aggregate when both workspaces share a payer', async () => {

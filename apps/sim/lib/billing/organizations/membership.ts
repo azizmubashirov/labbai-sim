@@ -15,7 +15,6 @@ import {
   organization,
   permissionGroupMember,
   permissions,
-  subscription as subscriptionTable,
   user,
   userStats,
   workspace,
@@ -25,31 +24,18 @@ import { createLogger } from '@sim/logger'
 import { getErrorMessage } from '@sim/utils/errors'
 import { generateId } from '@sim/utils/id'
 import { normalizeEmail } from '@sim/utils/string'
-import { and, count, desc, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm'
+import { and, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm'
 import {
   invalidateMembershipCache,
   invalidateSecurityPolicyVersionCache,
 } from '@/lib/auth/security-policy'
 import { applySessionPolicyToNewMember } from '@/lib/auth/session-policy'
-import { syncUsageLimitsFromSubscription } from '@/lib/billing/core/usage'
-import {
-  assertNoUnresolvedEnterpriseIssuance,
-  resolveEnterpriseMetadataIntent,
-} from '@/lib/billing/enterprise-outbox'
 import { acquireUserBillingIdentityLock } from '@/lib/billing/organizations/billing-identity-lock'
 import { setOrgMemberUsageLimit } from '@/lib/billing/organizations/member-limits'
-import { isPaid, sqlIsPro } from '@/lib/billing/plan-helpers'
 import { changeOrganizationWorkspaceBilledAccountsInTx } from '@/lib/billing/storage/payer-transfer'
-import {
-  ENTITLED_SUBSCRIPTION_STATUSES,
-  getEffectiveSeats,
-} from '@/lib/billing/subscriptions/utils'
 import { toDecimal, toNumber } from '@/lib/billing/utils/decimal'
 import { validateSeatAvailability } from '@/lib/billing/validation/seat-management'
-import { OUTBOX_EVENT_TYPES } from '@/lib/billing/webhooks/outbox-handlers'
-import { isBillingEnabled } from '@/lib/core/config/env-flags'
 import { OrchestrationError } from '@/lib/core/orchestration/types'
-import { enqueueOutboxEvent } from '@/lib/core/outbox/service'
 import { revokeWorkspaceCredentialMembershipsTx } from '@/lib/credentials/access'
 import { isRetryableTransactionError } from '@/lib/db/transaction'
 import type { DbOrTx } from '@/lib/db/types'
@@ -72,8 +58,6 @@ export { WORKSPACE_BILLING_ACCOUNT_REMOVAL_ERROR } from '@/lib/workspaces/utils'
 const logger = createLogger('OrganizationMembership')
 
 const ORG_MEMBERSHIP_LOCK_TIMEOUT_MS = 5_000
-
-export const MEMBER_BILLING_RECONCILIATION_EVENT_TYPE = 'billing.reconcile-member-after-org-leave'
 
 /** Serializes organization-wide owner, seat, move, and membership decisions. */
 export async function acquireOrganizationMutationLock(
@@ -138,312 +122,12 @@ export async function acquireOrganizationUserMutationLocks(
   }
 }
 
-export type BillingBlockReason = 'payment_failed' | 'dispute'
-
-/**
- * Get all member user IDs for an organization
- */
-export async function getOrgMemberIds(organizationId: string): Promise<string[]> {
-  const members = await db
-    .select({ userId: member.userId })
-    .from(member)
-    .where(eq(member.organizationId, organizationId))
-
-  return members.map((m) => m.userId)
-}
-
-/**
- * Block all members of an organization for billing reasons
- * Returns the number of members actually blocked
- *
- * Reason priority: dispute > payment_failed
- * A payment_failed block won't overwrite an existing dispute block
- */
-export async function blockOrgMembers(
-  organizationId: string,
-  reason: BillingBlockReason
-): Promise<number> {
-  const memberIds = await getOrgMemberIds(organizationId)
-
-  if (memberIds.length === 0) {
-    return 0
-  }
-
-  // Don't overwrite dispute blocks with payment_failed (dispute is higher priority)
-  const whereClause =
-    reason === 'payment_failed'
-      ? and(
-          inArray(userStats.userId, memberIds),
-          or(ne(userStats.billingBlockedReason, 'dispute'), isNull(userStats.billingBlockedReason))
-        )
-      : inArray(userStats.userId, memberIds)
-
-  const result = await db
-    .update(userStats)
-    .set({ billingBlocked: true, billingBlockedReason: reason })
-    .where(whereClause)
-    .returning({ userId: userStats.userId })
-
-  return result.length
-}
-
-/**
- * Unblock all members of an organization blocked for a specific reason
- * Only unblocks members blocked for the specified reason (not other reasons)
- * Returns the number of members actually unblocked
- */
-export async function unblockOrgMembers(
-  organizationId: string,
-  reason: BillingBlockReason
-): Promise<number> {
-  const memberIds = await getOrgMemberIds(organizationId)
-
-  if (memberIds.length === 0) {
-    return 0
-  }
-
-  const result = await db
-    .update(userStats)
-    .set({ billingBlocked: false, billingBlockedReason: null })
-    .where(and(inArray(userStats.userId, memberIds), eq(userStats.billingBlockedReason, reason)))
-    .returning({ userId: userStats.userId })
-
-  return result.length
-}
-
-export interface RestoreProResult {
-  restored: boolean
-  usageRestored: boolean
-  subscriptionId?: string
-}
-
-/**
- * Restore a user's personal Pro subscription if it was paused
- * (`cancelAtPeriodEnd = true`). No usage moves — ledger entity stamps kept
- * their personal usage attributed to them throughout the org membership.
- *
- * Errors propagate to the caller so webhook handlers can rely on Stripe
- * retry semantics.
- *
- * Idempotent: early returns when the user has no paused Pro subscription,
- * so re-runs after a successful restore are no-ops.
- *
- * Called when:
- *   - A member leaves a team (via `removeUserFromOrganization`).
- *   - A team subscription ends (members stay but get Pro restored).
- */
-export async function restoreUserProSubscription(userId: string): Promise<RestoreProResult> {
-  const result: RestoreProResult = {
-    restored: false,
-    usageRestored: false,
-  }
-
-  await db.transaction(async (tx) => {
-    await acquireUserBillingIdentityLock(tx, userId)
-    // The personal subscription row is the cross-organization serialization
-    // point shared with paid-org joins. Lock and re-read it before deciding to
-    // restore so a concurrent join cannot commit membership while this path
-    // leaves the user's personal Pro unpaused.
-    const [personalPro] = await tx
-      .select()
-      .from(subscriptionTable)
-      .where(
-        and(
-          eq(subscriptionTable.referenceId, userId),
-          inArray(subscriptionTable.status, ENTITLED_SUBSCRIPTION_STATUSES),
-          sqlIsPro(subscriptionTable.plan)
-        )
-      )
-      .for('update')
-      .limit(1)
-
-    if (!personalPro?.cancelAtPeriodEnd || !personalPro.stripeSubscriptionId) return
-    result.subscriptionId = personalPro.id
-
-    const organizationMemberships = await tx
-      .select({ organizationId: member.organizationId })
-      .from(member)
-      .where(eq(member.userId, userId))
-    if (organizationMemberships.length > 0) {
-      const paidOrganizationSubscriptions = await tx
-        .select({ plan: subscriptionTable.plan })
-        .from(subscriptionTable)
-        .where(
-          and(
-            inArray(
-              subscriptionTable.referenceId,
-              organizationMemberships.map((membership) => membership.organizationId)
-            ),
-            inArray(subscriptionTable.status, ENTITLED_SUBSCRIPTION_STATUSES)
-          )
-        )
-      if (paidOrganizationSubscriptions.some((orgSubscription) => isPaid(orgSubscription.plan))) {
-        return
-      }
-    }
-
-    await tx
-      .update(subscriptionTable)
-      .set({ cancelAtPeriodEnd: false })
-      .where(eq(subscriptionTable.id, personalPro.id))
-
-    await enqueueOutboxEvent(tx, OUTBOX_EVENT_TYPES.STRIPE_SYNC_CANCEL_AT_PERIOD_END, {
-      stripeSubscriptionId: personalPro.stripeSubscriptionId,
-      subscriptionId: personalPro.id,
-      reason: 'member-left-paid-org',
-    })
-
-    result.restored = true
-  })
-
-  if (result.restored) {
-    logger.info('Restored personal Pro subscription (DB committed, Stripe queued)', {
-      userId,
-      subscriptionId: result.subscriptionId,
-      usageRestored: result.usageRestored,
-    })
-  }
-
-  return result
-}
-
-export interface PauseProForOrgCoverageResult {
-  /**
-   * True when an entitled paid organization covers this user — regardless of
-   * whether this call changed any state (the personal Pro may already be
-   * pausing). Callers gate coverage-dependent behavior on this, never on
-   * `paused`, so repeated invocations stay consistent.
-   */
-  covered: boolean
-  /** True only when this call transitioned the personal Pro to cancel at period end. */
-  paused: boolean
-  subscriptionId?: string
-  organizationId?: string
-}
-
-/**
- * Pause (cancel at period end) a user's entitled personal Pro subscription
- * because an organization with an entitled paid subscription already covers
- * them. Transactional fence behind the checkout admission guard: it closes
- * the race where a user starts a personal checkout while uncovered, joins a
- * paid org mid-checkout, and completes payment after the join.
- *
- * The user keeps the period they paid for and the subscription simply does
- * not renew — the same state a paid-org joiner's personal Pro enters, so the
- * billing UI already renders it. If they leave the org before period end,
- * `restoreUserProSubscription` un-pauses it automatically.
- *
- * Unlike `applyPaidOrgJoinBillingTx` (the join-time pause), this does NOT
- * snapshot or zero current-period usage: by the time this runs the user's
- * usage already attributes to the organization pool, and moving it into the
- * pro snapshot would undercount the org's period.
- *
- * Idempotent: no state change when there is no entitled personal Pro, when
- * it is already pausing, or when no entitled paid org covers the user. All
- * checks re-run under the user billing identity lock and a `FOR UPDATE` read
- * of the personal subscription row — the same serialization points as the
- * join and restore paths.
- */
-export async function pauseProSubscriptionForOrgCoverage(
-  userId: string
-): Promise<PauseProForOrgCoverageResult> {
-  const result: PauseProForOrgCoverageResult = { covered: false, paused: false }
-
-  await db.transaction(async (tx) => {
-    await acquireUserBillingIdentityLock(tx, userId)
-
-    /**
-     * Coverage is determined before (and independent of) the personal-sub
-     * lookup: `covered` reports the organization's coverage truth even when
-     * no entitled personal Pro row exists, exactly as the result contract
-     * promises. Callers gate free→paid transition handling on it, so a
-     * personal-sub lookup miss must not read as "not covered".
-     */
-    const memberships = await tx
-      .select({ organizationId: member.organizationId })
-      .from(member)
-      .where(eq(member.userId, userId))
-    if (memberships.length === 0) return
-
-    const organizationSubscriptions = await tx
-      .select({ plan: subscriptionTable.plan, referenceId: subscriptionTable.referenceId })
-      .from(subscriptionTable)
-      .where(
-        and(
-          inArray(
-            subscriptionTable.referenceId,
-            memberships.map((membership) => membership.organizationId)
-          ),
-          inArray(subscriptionTable.status, ENTITLED_SUBSCRIPTION_STATUSES)
-        )
-      )
-    const coveringSubscription = organizationSubscriptions.find((organizationSubscription) =>
-      isPaid(organizationSubscription.plan)
-    )
-    if (!coveringSubscription) return
-
-    result.covered = true
-    result.organizationId = coveringSubscription.referenceId
-
-    const [personalPro] = await tx
-      .select()
-      .from(subscriptionTable)
-      .where(
-        and(
-          eq(subscriptionTable.referenceId, userId),
-          inArray(subscriptionTable.status, ENTITLED_SUBSCRIPTION_STATUSES),
-          sqlIsPro(subscriptionTable.plan)
-        )
-      )
-      .for('update')
-      .limit(1)
-
-    if (!personalPro) return
-
-    result.subscriptionId = personalPro.id
-
-    if (personalPro.cancelAtPeriodEnd) return
-
-    await tx
-      .update(subscriptionTable)
-      .set({ cancelAtPeriodEnd: true })
-      .where(eq(subscriptionTable.id, personalPro.id))
-
-    if (personalPro.stripeSubscriptionId) {
-      await enqueueOutboxEvent(tx, OUTBOX_EVENT_TYPES.STRIPE_SYNC_CANCEL_AT_PERIOD_END, {
-        stripeSubscriptionId: personalPro.stripeSubscriptionId,
-        subscriptionId: personalPro.id,
-        reason: 'covered-by-organization',
-      })
-    }
-
-    result.paused = true
-  })
-
-  if (result.paused) {
-    logger.warn(
-      'Paused personal Pro created while covered by an organization subscription (kept until period end, Stripe sync queued)',
-      {
-        userId,
-        subscriptionId: result.subscriptionId,
-        organizationId: result.organizationId,
-      }
-    )
-  }
-
-  return result
-}
-
 export interface AddMemberParams {
   userId: string
   organizationId: string
   role: 'admin' | 'member' | 'owner'
-  /** Skip Pro snapshot/cancellation logic (default: false) */
-  skipBillingLogic?: boolean
   /** Skip seat validation (default: false) */
   skipSeatValidation?: boolean
-  /** Restrict billing decisions to an already-resolved entitled organization subscription. */
-  organizationSubscriptionId?: string
   /** When provided, the acceptor's own pending invitation is excluded from the seat count during validation. */
   acceptingInvitationId?: string
 }
@@ -455,11 +139,7 @@ export interface AddMemberResult {
   failureCode?: MembershipAdditionFailureCode
   billingActions: {
     proUsageSnapshotted: boolean
-    /**
-     * True when this function marked the user's personal Pro for
-     * cancellation at period end AND enqueued the Stripe sync via
-     * the outbox. Callers should NOT make a Stripe call themselves.
-     */
+    /** Always false: Labbai has no paid personal plans to pause. */
     proCancelledAtPeriodEnd: boolean
   }
 }
@@ -473,8 +153,6 @@ export interface RemoveMemberParams {
   userId: string
   organizationId: string
   memberId: string
-  /** Skip departed usage capture and Pro restoration (default: false) */
-  skipBillingLogic?: boolean
   /**
    * Also delete the member's personal API keys. Off by default: personal keys
    * are the person's own and outlive one organization. Directory
@@ -643,9 +321,6 @@ export async function ensureUserInOrganizationTx(
     userId,
     organizationId,
     role,
-    skipBillingLogic = false,
-    skipSeatValidation = false,
-    organizationSubscriptionId,
   } = params
   const emptyBillingActions = {
     proUsageSnapshotted: false,
@@ -711,58 +386,6 @@ export async function ensureUserInOrganizationTx(
     }
   }
 
-  if (isBillingEnabled && !skipSeatValidation) {
-    const [organizationSubscription] = await tx
-      .select()
-      .from(subscriptionTable)
-      .where(
-        and(
-          eq(subscriptionTable.referenceId, organizationId),
-          inArray(subscriptionTable.status, ENTITLED_SUBSCRIPTION_STATUSES),
-          organizationSubscriptionId
-            ? eq(subscriptionTable.id, organizationSubscriptionId)
-            : undefined
-        )
-      )
-      .orderBy(desc(subscriptionTable.periodStart), desc(subscriptionTable.id))
-      .limit(1)
-    if (!organizationSubscription || !isPaid(organizationSubscription.plan)) {
-      return {
-        success: false,
-        alreadyMember: false,
-        failureCode: 'no-seats-available',
-        error: 'No active paid organization subscription found',
-        billingActions: emptyBillingActions,
-      }
-    }
-
-    // Acceptance validates only committed members. Pending invitations never
-    // reserve Enterprise capacity; serialized acceptances consume seats one by one.
-    const [memberCountRow] = await tx
-      .select({ value: count() })
-      .from(member)
-      .where(eq(member.organizationId, organizationId))
-    const canonicalSeats = getEffectiveSeats(organizationSubscription)
-    const metadataIntent =
-      organizationSubscription.plan === 'enterprise'
-        ? await resolveEnterpriseMetadataIntent(
-            tx,
-            organizationSubscription.id,
-            organizationSubscription.metadata
-          )
-        : null
-    const effectiveSeats = metadataIntent?.effectiveSeatCapacity ?? canonicalSeats
-    if ((memberCountRow?.value ?? 0) >= effectiveSeats) {
-      return {
-        success: false,
-        alreadyMember: false,
-        failureCode: 'no-seats-available',
-        error: 'No available organization seats',
-        billingActions: emptyBillingActions,
-      }
-    }
-  }
-
   const memberId = generateId()
   await tx.insert(member).values({
     id: memberId,
@@ -772,138 +395,12 @@ export async function ensureUserInOrganizationTx(
     createdAt: new Date(),
   })
 
-  const billingActions = skipBillingLogic
-    ? emptyBillingActions
-    : await (async () => {
-        const [organizationSubscription] = await tx
-          .select({ plan: subscriptionTable.plan })
-          .from(subscriptionTable)
-          .where(
-            and(
-              eq(subscriptionTable.referenceId, organizationId),
-              inArray(subscriptionTable.status, ENTITLED_SUBSCRIPTION_STATUSES),
-              organizationSubscriptionId
-                ? eq(subscriptionTable.id, organizationSubscriptionId)
-                : undefined
-            )
-          )
-          .orderBy(desc(subscriptionTable.periodStart), desc(subscriptionTable.id))
-          .limit(1)
-        return organizationSubscription && isPaid(organizationSubscription.plan)
-          ? applyPaidOrgJoinBillingTx(tx, userId, organizationId)
-          : emptyBillingActions
-      })()
-
   return {
     success: true,
     memberId,
     alreadyMember: false,
-    billingActions,
+    billingActions: emptyBillingActions,
   }
-}
-
-interface PaidOrgJoinBillingActions {
-  proUsageSnapshotted: boolean
-  proCancelledAtPeriodEnd: boolean
-}
-
-/**
- * Applies the billing side-effects of a user joining a paid (Team/Enterprise)
- * organization inside an existing transaction: marks the personal Pro
- * subscription `cancelAtPeriodEnd=true` and enqueues the Stripe sync via the
- * outbox. No usage is moved — ledger entity stamps already attribute
- * post-join usage to the organization and pre-join usage to the user.
- *
- * Storage follows each workspace's routed payer independently. The workspace
- * payer-change transaction transfers that workspace's durable byte ledger; a
- * membership change must never move the user's account-wide storage counter.
- *
- * Idempotent: re-running is a no-op when Pro is already flagged cancel-at-period-end.
- */
-async function applyPaidOrgJoinBillingTx(
-  tx: DbOrTx,
-  userId: string,
-  organizationId: string,
-  options: { sourceOperationId?: string } = {}
-): Promise<PaidOrgJoinBillingActions> {
-  const actions: PaidOrgJoinBillingActions = {
-    proUsageSnapshotted: false,
-    proCancelledAtPeriodEnd: false,
-  }
-
-  const [personalPro] = await tx
-    .select()
-    .from(subscriptionTable)
-    .where(
-      and(
-        eq(subscriptionTable.referenceId, userId),
-        inArray(subscriptionTable.status, ENTITLED_SUBSCRIPTION_STATUSES),
-        sqlIsPro(subscriptionTable.plan)
-      )
-    )
-    .for('update')
-    .limit(1)
-
-  if (personalPro && !personalPro.cancelAtPeriodEnd) {
-    await tx
-      .update(subscriptionTable)
-      .set({ cancelAtPeriodEnd: true })
-      .where(eq(subscriptionTable.id, personalPro.id))
-
-    if (personalPro.stripeSubscriptionId) {
-      await enqueueOutboxEvent(tx, OUTBOX_EVENT_TYPES.STRIPE_SYNC_CANCEL_AT_PERIOD_END, {
-        stripeSubscriptionId: personalPro.stripeSubscriptionId,
-        subscriptionId: personalPro.id,
-        reason: 'joined-paid-org',
-        ...(options.sourceOperationId ? { sourceOperationId: options.sourceOperationId } : {}),
-      })
-    }
-
-    actions.proCancelledAtPeriodEnd = true
-
-    logger.info('Marked personal Pro for cancellation at period end (Stripe queued)', {
-      userId,
-      subscriptionId: personalPro.id,
-      organizationId,
-    })
-  }
-
-  return actions
-}
-
-/**
- * Transaction-enlisted variant used by subscription webhooks. Keeping the
- * subscription upsert, effective-limit update, provisioning completion, and
- * existing-member Pro handling in one transaction prevents a partially
- * applied Enterprise entitlement when Stripe retries a failed delivery.
- *
- * The caller must hold the organization mutation lock before invoking this
- * helper so a concurrent member removal cannot fall between the member census
- * and the personal-Pro transition.
- */
-export async function reapplyPaidOrgJoinBillingForExistingMemberTx(
-  tx: DbOrTx,
-  userId: string,
-  organizationId: string,
-  options: { sourceOperationId?: string } = {}
-): Promise<PaidOrgJoinBillingActions> {
-  await acquireUserBillingIdentityLock(tx, userId)
-  const [orgSub] = await tx
-    .select({ plan: subscriptionTable.plan })
-    .from(subscriptionTable)
-    .where(
-      and(
-        eq(subscriptionTable.referenceId, organizationId),
-        inArray(subscriptionTable.status, ENTITLED_SUBSCRIPTION_STATUSES)
-      )
-    )
-    .limit(1)
-
-  if (!orgSub || !isPaid(orgSub.plan)) {
-    return { proUsageSnapshotted: false, proCancelledAtPeriodEnd: false }
-  }
-
-  return applyPaidOrgJoinBillingTx(tx, userId, organizationId, options)
 }
 
 type InvitationRemovalScope = 'all' | 'external'
@@ -1135,17 +632,6 @@ export async function transferUserBetweenOrganizations(
           )
         }
 
-        const [destinationSubscription] = await tx
-          .select({ plan: subscriptionTable.plan })
-          .from(subscriptionTable)
-          .where(
-            and(
-              eq(subscriptionTable.referenceId, params.destinationOrganizationId),
-              inArray(subscriptionTable.status, ENTITLED_SUBSCRIPTION_STATUSES)
-            )
-          )
-          .limit(1)
-
         const deleted = await tx
           .delete(member)
           .where(and(eq(member.id, sourceMembership.id), ne(member.role, 'owner')))
@@ -1226,7 +712,6 @@ export async function transferUserBetweenOrganizations(
           userId: params.userId,
           organizationId: params.destinationOrganizationId,
           role: params.role,
-          skipSeatValidation: destinationSubscription?.plan.startsWith('team') ?? false,
         })
         if (!added.success || !added.memberId || added.alreadyMember) {
           throw new Error(added.error ?? 'Failed to add member to destination organization')
@@ -1284,7 +769,6 @@ export async function removeUserFromOrganization(
     userId,
     organizationId,
     memberId,
-    skipBillingLogic = false,
     requireNoOrgWorkspaceAccess = false,
     revokePersonalApiKeys = false,
     spareSessionToken,
@@ -1353,13 +837,6 @@ export async function removeUserFromOrganization(
             'conflict',
             'The membership changed before removal. Refresh and try again.'
           )
-        }
-
-        if (!skipBillingLogic) {
-          await enqueueOutboxEvent(tx, MEMBER_BILLING_RECONCILIATION_EVENT_TYPE, {
-            userId,
-            organizationId,
-          })
         }
 
         const cancelledInvitations = invitationIds.length
@@ -1487,48 +964,6 @@ export async function removeUserFromOrganization(
       credentialMembershipsRevoked: result.credentialMembershipsRevoked,
       pendingInvitationsCancelled: result.pendingInvitationsCancelled,
     })
-
-    if (!skipBillingLogic) {
-      try {
-        const remainingPaidTeams = await db
-          .select({ orgId: member.organizationId })
-          .from(member)
-          .where(eq(member.userId, userId))
-
-        let hasAnyPaidTeam = false
-        if (remainingPaidTeams.length > 0) {
-          const orgIds = remainingPaidTeams.map((m) => m.orgId)
-          const orgPaidSubs = await db
-            .select()
-            .from(subscriptionTable)
-            .where(
-              and(
-                inArray(subscriptionTable.referenceId, orgIds),
-                inArray(subscriptionTable.status, ENTITLED_SUBSCRIPTION_STATUSES)
-              )
-            )
-
-          hasAnyPaidTeam = orgPaidSubs.some((s) => isPaid(s.plan))
-        }
-
-        if (!hasAnyPaidTeam) {
-          const restoreResult = await restoreUserProSubscription(userId)
-          billingActions.proRestored = restoreResult.restored
-          billingActions.usageRestored = restoreResult.usageRestored
-
-          await syncUsageLimitsFromSubscription(userId)
-        }
-      } catch (postRemoveError) {
-        logger.error(
-          'Immediate post-removal personal Pro restore failed; durable retry remains queued',
-          {
-            organizationId,
-            userId,
-            error: postRemoveError,
-          }
-        )
-      }
-    }
 
     return { success: true, removed: true, billingActions }
   } catch (error) {
@@ -1773,7 +1208,6 @@ export async function transferOrganizationOwnership(
   try {
     await db.transaction(async (tx) => {
       await acquireOrganizationMutationLock(tx, organizationId)
-      await assertNoUnresolvedEnterpriseIssuance(tx, organizationId)
       const [currentOwnerMember] = await tx
         .select({ id: member.id, role: member.role })
         .from(member)
@@ -1924,27 +1358,6 @@ export async function transferOrganizationOwnership(
           }
         }
       }
-
-      const [orgSub] = await tx
-        .select({
-          id: subscriptionTable.id,
-          stripeCustomerId: subscriptionTable.stripeCustomerId,
-        })
-        .from(subscriptionTable)
-        .where(
-          and(
-            eq(subscriptionTable.referenceId, organizationId),
-            inArray(subscriptionTable.status, ENTITLED_SUBSCRIPTION_STATUSES)
-          )
-        )
-        .limit(1)
-
-      if (orgSub?.stripeCustomerId) {
-        await enqueueOutboxEvent(tx, OUTBOX_EVENT_TYPES.STRIPE_SYNC_CUSTOMER_CONTACT, {
-          subscriptionId: orgSub.id,
-          reason: 'ownership-transfer',
-        })
-      }
     })
 
     logger.info('Transferred organization ownership', {
@@ -1971,51 +1384,6 @@ export async function transferOrganizationOwnership(
       success: false,
       error: getErrorMessage(error, 'Failed to transfer ownership'),
     }
-  }
-}
-
-export async function isSoleOwnerOfPaidOrganization(userId: string): Promise<{
-  isBlocker: boolean
-  organizationId?: string
-  organizationName?: string
-  plan?: string | null
-}> {
-  const [ownerMembership] = await db
-    .select({ organizationId: member.organizationId })
-    .from(member)
-    .where(and(eq(member.userId, userId), eq(member.role, 'owner')))
-    .limit(1)
-
-  if (!ownerMembership) {
-    return { isBlocker: false }
-  }
-
-  const [orgSub] = await db
-    .select({ plan: subscriptionTable.plan })
-    .from(subscriptionTable)
-    .where(
-      and(
-        eq(subscriptionTable.referenceId, ownerMembership.organizationId),
-        inArray(subscriptionTable.status, ENTITLED_SUBSCRIPTION_STATUSES)
-      )
-    )
-    .limit(1)
-
-  if (!orgSub || !isPaid(orgSub.plan)) {
-    return { isBlocker: false }
-  }
-
-  const [orgRow] = await db
-    .select({ name: organization.name })
-    .from(organization)
-    .where(eq(organization.id, ownerMembership.organizationId))
-    .limit(1)
-
-  return {
-    isBlocker: true,
-    organizationId: ownerMembership.organizationId,
-    organizationName: orgRow?.name,
-    plan: orgSub.plan,
   }
 }
 
@@ -2101,9 +1469,7 @@ export async function addUserToOrganization(params: AddMemberParams): Promise<Ad
     userId,
     organizationId,
     role,
-    skipBillingLogic = false,
     skipSeatValidation = false,
-    organizationSubscriptionId,
     acceptingInvitationId,
   } = params
 
@@ -2160,9 +1526,6 @@ export async function addUserToOrganization(params: AddMemberParams): Promise<Ad
         userId,
         organizationId,
         role,
-        skipBillingLogic,
-        skipSeatValidation,
-        organizationSubscriptionId,
         acceptingInvitationId,
       })
     )

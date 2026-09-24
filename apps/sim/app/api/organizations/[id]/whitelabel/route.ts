@@ -9,7 +9,7 @@ import { parseRequest, validationErrorResponse } from '@/lib/api/server'
 import { getSession } from '@/lib/auth'
 import { isOrganizationFeatureEntitled } from '@/lib/billing/core/subscription'
 import type { OrganizationWhitelabelSettings } from '@/lib/branding/types'
-import { isBillingEnabled, isWhitelabelingEnabled } from '@/lib/core/config/env-flags'
+import { isWhitelabelingEnabled } from '@/lib/core/config/env-flags'
 import { withRouteHandler } from '@/lib/core/utils/with-route-handler'
 
 const logger = createLogger('WhitelabelAPI')
@@ -113,9 +113,7 @@ export const PUT = withRouteHandler(
       if (!entitled) {
         return NextResponse.json(
           {
-            error: isBillingEnabled
-              ? 'Whitelabeling is available on Enterprise plans only'
-              : 'Whitelabeling is disabled. Set ENTERPRISE_ENABLED or WHITELABELING_ENABLED to enable it.',
+            error: 'Whitelabeling is disabled. Set ENTERPRISE_ENABLED or WHITELABELING_ENABLED to enable it.',
           },
           { status: 403 }
         )

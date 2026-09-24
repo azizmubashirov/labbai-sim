@@ -1,16 +1,15 @@
-import { resetEnvFlagsMock, setEnvFlags } from '@sim/testing'
-import { afterAll, beforeAll, beforeEach, describe, expect, it, type Mock, vi } from 'vitest'
+import { resetEnvFlagsMock } from '@sim/testing'
+import { afterAll, beforeEach, describe, expect, it, type Mock, vi } from 'vitest'
 
 /**
  * Query-suffixed imports give this file private instances of the modules under
  * test. Under `isolate: false` the worker's module graph is shared across test
  * files, so the plain specifiers may already be cached with the real env-flags
- * binding (`isBillingEnabled` false ⇒ unlimited limits; mocks never reach an
- * already-evaluated module) — and evaluating them here under this file's mocks
+ * binding (mocks never reach an already-evaluated module) — and evaluating them here under this file's mocks
  * would poison them for later files. The suffixed ids are unique to this file,
  * so they always evaluate fresh with the mocks below. The plain `./types` id is
  * redirected to the same fresh instance so the `RateLimiter` under test and the
- * assertions below share one `RATE_LIMITS`/`getRateLimit`.
+ * assertions below share one `getRateLimit`.
  */
 declare module '@/lib/core/rate-limiter/rate-limiter?rate-limiter-test' {
   // biome-ignore lint/suspicious/noExportsInTest: ambient type re-declaration for the query-suffixed specifier, not a runtime export
@@ -28,7 +27,14 @@ vi.mock(
 
 import { RateLimiter } from '@/lib/core/rate-limiter/rate-limiter?rate-limiter-test'
 import type { ConsumeResult, RateLimitStorageAdapter, TokenStatus } from './storage'
-import { MANUAL_EXECUTION_LIMIT, RATE_LIMITS, RateLimitError } from './types'
+import { getRateLimit, MANUAL_EXECUTION_LIMIT, RateLimitError } from './types'
+
+/** Labbai has no plans: every subject resolves to the same bucket config. */
+const LIMITS = {
+  sync: getRateLimit(undefined, 'sync'),
+  async: getRateLimit(undefined, 'async'),
+  apiEndpoint: getRateLimit(undefined, 'api-endpoint'),
+}
 
 interface MockAdapter {
   consumeTokens: Mock
@@ -40,10 +46,6 @@ const createMockAdapter = (): MockAdapter => ({
   consumeTokens: vi.fn(),
   getTokenStatus: vi.fn(),
   resetBucket: vi.fn(),
-})
-
-beforeAll(() => {
-  setEnvFlags({ isBillingEnabled: true })
 })
 
 afterAll(resetEnvFlagsMock)
@@ -78,7 +80,7 @@ describe('RateLimiter', () => {
     it('should consume tokens for API requests', async () => {
       const mockResult: ConsumeResult = {
         allowed: true,
-        tokensRemaining: RATE_LIMITS.free.sync.maxTokens - 1,
+        tokensRemaining: LIMITS.sync.maxTokens - 1,
         resetAt: new Date(Date.now() + 60000),
       }
       mockAdapter.consumeTokens.mockResolvedValue(mockResult)
@@ -95,14 +97,14 @@ describe('RateLimiter', () => {
       expect(mockAdapter.consumeTokens).toHaveBeenCalledWith(
         `${testUserId}:sync`,
         1,
-        RATE_LIMITS.free.sync
+        LIMITS.sync
       )
     })
 
     it('should use async bucket for async requests', async () => {
       const mockResult: ConsumeResult = {
         allowed: true,
-        tokensRemaining: RATE_LIMITS.free.async.maxTokens - 1,
+        tokensRemaining: LIMITS.async.maxTokens - 1,
         resetAt: new Date(Date.now() + 60000),
       }
       mockAdapter.consumeTokens.mockResolvedValue(mockResult)
@@ -112,14 +114,14 @@ describe('RateLimiter', () => {
       expect(mockAdapter.consumeTokens).toHaveBeenCalledWith(
         `${testUserId}:async`,
         1,
-        RATE_LIMITS.free.async
+        LIMITS.async
       )
     })
 
     it('should use api-endpoint bucket for api-endpoint trigger', async () => {
       const mockResult: ConsumeResult = {
         allowed: true,
-        tokensRemaining: RATE_LIMITS.free.apiEndpoint.maxTokens - 1,
+        tokensRemaining: LIMITS.apiEndpoint.maxTokens - 1,
         resetAt: new Date(Date.now() + 60000),
       }
       mockAdapter.consumeTokens.mockResolvedValue(mockResult)
@@ -134,7 +136,7 @@ describe('RateLimiter', () => {
       expect(mockAdapter.consumeTokens).toHaveBeenCalledWith(
         `${testUserId}:api-endpoint`,
         1,
-        RATE_LIMITS.free.apiEndpoint
+        LIMITS.apiEndpoint
       )
     })
 
@@ -164,7 +166,7 @@ describe('RateLimiter', () => {
       const teamSubscription = { plan: 'team', referenceId: orgId }
       const mockResult: ConsumeResult = {
         allowed: true,
-        tokensRemaining: RATE_LIMITS.team.sync.maxTokens - 1,
+        tokensRemaining: LIMITS.sync.maxTokens - 1,
         resetAt: new Date(Date.now() + 60000),
       }
       mockAdapter.consumeTokens.mockResolvedValue(mockResult)
@@ -174,7 +176,7 @@ describe('RateLimiter', () => {
       expect(mockAdapter.consumeTokens).toHaveBeenCalledWith(
         `${orgId}:sync`,
         1,
-        RATE_LIMITS.team.sync
+        LIMITS.sync
       )
     })
 
@@ -182,7 +184,7 @@ describe('RateLimiter', () => {
       const directTeamSubscription = { plan: 'team', referenceId: testUserId }
       const mockResult: ConsumeResult = {
         allowed: true,
-        tokensRemaining: RATE_LIMITS.team.sync.maxTokens - 1,
+        tokensRemaining: LIMITS.sync.maxTokens - 1,
         resetAt: new Date(Date.now() + 60000),
       }
       mockAdapter.consumeTokens.mockResolvedValue(mockResult)
@@ -197,7 +199,7 @@ describe('RateLimiter', () => {
       expect(mockAdapter.consumeTokens).toHaveBeenCalledWith(
         `${testUserId}:sync`,
         1,
-        RATE_LIMITS.team.sync
+        LIMITS.sync
       )
     })
 
@@ -230,7 +232,7 @@ describe('RateLimiter', () => {
     })
 
     it('should consume an explicit namespaced subject without rewriting its key', async () => {
-      const config = RATE_LIMITS.free.apiEndpoint
+      const config = LIMITS.apiEndpoint
       mockAdapter.consumeTokens.mockResolvedValue({
         allowed: true,
         tokensRemaining: config.maxTokens - 1,
@@ -286,7 +288,7 @@ describe('RateLimiter', () => {
     it('should return status from storage for API requests', async () => {
       const mockStatus: TokenStatus = {
         tokensAvailable: 15,
-        maxTokens: RATE_LIMITS.free.sync.maxTokens,
+        maxTokens: LIMITS.sync.maxTokens,
         lastRefillAt: new Date(),
         nextRefillAt: new Date(Date.now() + 60000),
       }
@@ -300,11 +302,11 @@ describe('RateLimiter', () => {
       )
 
       expect(status.remaining).toBe(15)
-      expect(status.requestsPerMinute).toBe(RATE_LIMITS.free.sync.refillRate)
-      expect(status.maxBurst).toBe(RATE_LIMITS.free.sync.maxTokens)
+      expect(status.requestsPerMinute).toBe(LIMITS.sync.refillRate)
+      expect(status.maxBurst).toBe(LIMITS.sync.maxTokens)
       expect(mockAdapter.getTokenStatus).toHaveBeenCalledWith(
         `${testUserId}:sync`,
-        RATE_LIMITS.free.sync
+        LIMITS.sync
       )
     })
   })
@@ -366,51 +368,10 @@ describe('RateLimiter', () => {
   })
 
   describe('subscription plan handling', () => {
-    it('should use pro plan limits', async () => {
-      const proSubscription = { plan: 'pro', referenceId: testUserId }
+    it('should use the single plan-less bucket when subscription is null', async () => {
       const mockResult: ConsumeResult = {
         allowed: true,
-        tokensRemaining: RATE_LIMITS.pro.sync.maxTokens - 1,
-        resetAt: new Date(Date.now() + 60000),
-      }
-      mockAdapter.consumeTokens.mockResolvedValue(mockResult)
-
-      await rateLimiter.checkRateLimitWithSubscription(testUserId, proSubscription, 'api', false)
-
-      expect(mockAdapter.consumeTokens).toHaveBeenCalledWith(
-        `${testUserId}:sync`,
-        1,
-        RATE_LIMITS.pro.sync
-      )
-    })
-
-    it('should use enterprise plan limits', async () => {
-      const enterpriseSubscription = { plan: 'enterprise', referenceId: 'org-enterprise' }
-      const mockResult: ConsumeResult = {
-        allowed: true,
-        tokensRemaining: RATE_LIMITS.enterprise.sync.maxTokens - 1,
-        resetAt: new Date(Date.now() + 60000),
-      }
-      mockAdapter.consumeTokens.mockResolvedValue(mockResult)
-
-      await rateLimiter.checkRateLimitWithSubscription(
-        testUserId,
-        enterpriseSubscription,
-        'api',
-        false
-      )
-
-      expect(mockAdapter.consumeTokens).toHaveBeenCalledWith(
-        `org-enterprise:sync`,
-        1,
-        RATE_LIMITS.enterprise.sync
-      )
-    })
-
-    it('should fall back to free plan when subscription is null', async () => {
-      const mockResult: ConsumeResult = {
-        allowed: true,
-        tokensRemaining: RATE_LIMITS.free.sync.maxTokens - 1,
+        tokensRemaining: LIMITS.sync.maxTokens - 1,
         resetAt: new Date(Date.now() + 60000),
       }
       mockAdapter.consumeTokens.mockResolvedValue(mockResult)
@@ -420,7 +381,7 @@ describe('RateLimiter', () => {
       expect(mockAdapter.consumeTokens).toHaveBeenCalledWith(
         `${testUserId}:sync`,
         1,
-        RATE_LIMITS.free.sync
+        LIMITS.sync
       )
     })
   })
@@ -444,7 +405,7 @@ describe('RateLimiter', () => {
       expect(mockAdapter.consumeTokens).toHaveBeenCalledWith(
         `${testUserId}:sync`,
         1,
-        RATE_LIMITS.free.sync
+        LIMITS.sync
       )
     })
 
@@ -466,7 +427,7 @@ describe('RateLimiter', () => {
       expect(mockAdapter.consumeTokens).toHaveBeenCalledWith(
         `${testUserId}:async`,
         1,
-        RATE_LIMITS.free.async
+        LIMITS.async
       )
     })
   })
@@ -483,8 +444,8 @@ describe('RateLimiter', () => {
       )
 
       expect(status.remaining).toBe(0)
-      expect(status.requestsPerMinute).toBe(RATE_LIMITS.free.sync.refillRate)
-      expect(status.maxBurst).toBe(RATE_LIMITS.free.sync.maxTokens)
+      expect(status.requestsPerMinute).toBe(LIMITS.sync.refillRate)
+      expect(status.maxBurst).toBe(LIMITS.sync.maxTokens)
     })
   })
 })

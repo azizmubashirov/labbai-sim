@@ -25,7 +25,6 @@ import { useParams, useRouter } from 'next/navigation'
 import { useQueryStates } from 'nuqs'
 import { usePostHog } from 'posthog-js/react'
 import { getDocumentIcon } from '@/components/icons/document-icons'
-import { useLimitUpgradeToast } from '@/lib/billing/client'
 import { captureEvent } from '@/lib/posthog/client'
 import {
   type FileDownloadSource,
@@ -332,7 +331,6 @@ function FilesContent() {
   }, [members])
   const uploadFile = useUploadWorkspaceFile()
   const createWorkspaceFile = useCreateWorkspaceFile()
-  const notifyLimit = useLimitUpgradeToast()
   const deleteFile = useDeleteWorkspaceFile()
   const renameFile = useRenameWorkspaceFile()
   const createFolder = useCreateWorkspaceFileFolder()
@@ -1000,7 +998,7 @@ function FilesContent() {
             logger.error('Error uploading file:', err)
             const message = getErrorMessage(err)
             if (/storage limit/i.test(message)) {
-              notifyLimit('storage', message)
+              toast.error(message)
             } else {
               toast.error(`Failed to upload "${allowedFiles[i].name}"`)
             }
@@ -1012,7 +1010,7 @@ function FilesContent() {
         setUploadProgress({ completed: 0, total: 0, currentPercent: 0 })
       }
     },
-    [workspaceId, canEdit, currentFolderId, notifyLimit, setSearchTerm]
+    [workspaceId, canEdit, currentFolderId, setSearchTerm]
   )
 
   const rowDragDropConfig = useFolderRowDragDrop({

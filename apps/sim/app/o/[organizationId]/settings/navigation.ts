@@ -40,7 +40,6 @@ export function resolveOrganizationSettingsSection(
     aliases: {
       organization: 'members',
       team: 'members',
-      subscription: 'billing',
       domains: 'sso',
       sessions: 'security',
     },
@@ -49,7 +48,7 @@ export function resolveOrganizationSettingsSection(
 
 /**
  * Resolves a settings path on the organization surface to the plane that owns
- * it. Organization sections win, so `billing` is the organization's Subscription.
+ * it. Organization sections win.
  */
 export function resolveOrganizationSurfaceSection(
   path: string

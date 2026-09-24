@@ -20,7 +20,6 @@ import { getPlanTypeForLimits, isEnterprise, isFree } from '@/lib/billing/plan-h
 import type { StorageBillingContext } from '@/lib/billing/storage/context'
 import { getLegacyStorageBillingEntity } from '@/lib/billing/storage/entity'
 import { getEnv } from '@/lib/core/config/env'
-import { isBillingEnabled } from '@/lib/core/config/env-flags'
 import { OrchestrationError } from '@/lib/core/orchestration/types'
 
 const logger = createLogger('StorageLimits')
@@ -182,12 +181,11 @@ function evaluateStorageQuota(
 }
 
 /**
- * Whether storage quotas are enforced. Always on when billing is enabled;
- * with billing disabled, enforcement is opt-in by explicitly setting
- * `FREE_STORAGE_LIMIT_GB` (all accounts resolve to the free tier there).
+ * Whether storage quotas are enforced. Labbai has no plans, so enforcement is
+ * opt-in by explicitly setting `FREE_STORAGE_LIMIT_GB` (all accounts resolve to
+ * the free tier).
  */
 export function isStorageEnforcementEnabled(): boolean {
-  if (isBillingEnabled) return true
   const explicit = getEnv('FREE_STORAGE_LIMIT_GB')
   return explicit != null && explicit !== '' && Number.parseInt(explicit) > 0
 }

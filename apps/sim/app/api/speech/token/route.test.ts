@@ -9,7 +9,6 @@ import {
   resetEnvFlagsMock,
   resetEnvMock,
   setEnv,
-  setEnvFlags,
 } from '@sim/testing'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -19,7 +18,6 @@ const mocks = vi.hoisted(() => ({
   resolveOrganizationBilling: vi.fn(),
   checkUsage: vi.fn(),
   toBillingContext: vi.fn(),
-  billOverage: vi.fn(),
   rateCheck: vi.fn(),
   organizationConfig: vi.fn(),
   workspaceContext: vi.fn(),
@@ -31,9 +29,6 @@ vi.mock('@/lib/billing/core/billing-attribution', () => ({
   resolveOrganizationBillingAttribution: mocks.resolveOrganizationBilling,
   checkAttributedUsageLimits: mocks.checkUsage,
   toBillingContext: mocks.toBillingContext,
-}))
-vi.mock('@/lib/billing/threshold-billing', () => ({
-  checkAndBillPayerOverageThreshold: mocks.billOverage,
 }))
 vi.mock('@/lib/core/rate-limiter', () => ({
   RateLimiter: class {
@@ -60,7 +55,6 @@ beforeEach(() => {
   vi.clearAllMocks()
   resetDbChainMock()
   setEnv({ ELEVENLABS_API_KEY: 'test-key' })
-  setEnvFlags({ isBillingEnabled: true })
   authMockFns.mockGetSession.mockResolvedValue({
     user: { id: principal.userId },
     session: { id: principal.sessionId },
@@ -75,7 +69,6 @@ beforeEach(() => {
   mocks.organizationConfig.mockResolvedValue(null)
   dbChainMockFns.limit.mockResolvedValue([{ role: 'member' }])
   mocks.recordUsage.mockResolvedValue(undefined)
-  mocks.billOverage.mockResolvedValue(undefined)
   mocks.rateCheck.mockResolvedValue({ allowed: true })
   mocks.checkUsage.mockResolvedValue({ isExceeded: false })
   mocks.resolveBilling.mockImplementation(async (input) => ({ ...input, billingEntity }))
@@ -128,7 +121,6 @@ describe('POST /api/speech/token', () => {
           },
         ],
       })
-      expect(mocks.billOverage).toHaveBeenCalledWith(billingEntity)
     }
   )
 
@@ -210,21 +202,7 @@ describe('POST /api/speech/token', () => {
     expect(mocks.resolveBilling).not.toHaveBeenCalled()
   })
 
-  it('rates by actor with the existing bucket and retry header before parsing', async () => {
-    mocks.rateCheck.mockResolvedValue({ allowed: false, retryAfterMs: 1501 })
-    const response = await POST(createMockRequest('POST', {}))
-    expect(response.status).toBe(429)
-    expect(response.headers.get('Retry-After')).toBe('2')
-    expect(mocks.rateCheck).toHaveBeenCalledWith('stt-token:user:member-1', {
-      maxTokens: 30,
-      refillRate: 3,
-      refillIntervalMs: 72000,
-    })
-    expect(mocks.resolveOrganizationBilling).not.toHaveBeenCalled()
-  })
-
-  it('preserves the rate exemption when billing is disabled', async () => {
-    setEnvFlags({ isBillingEnabled: false })
+  it('does not rate limit voice tokens', async () => {
     const response = await POST(createMockRequest('POST', { organizationId: 'org-1' }))
     expect(response.status).toBe(200)
     expect(mocks.rateCheck).not.toHaveBeenCalled()
@@ -269,16 +247,12 @@ describe('POST /api/speech/token', () => {
     expect(mocks.recordUsage).not.toHaveBeenCalled()
   })
 
-  it.each(['recordUsage', 'billOverage'] as const)(
-    'keeps an issued token available when %s fails',
-    async (failure) => {
-      mocks[failure].mockRejectedValue(new Error('billing write failed'))
-      const response = await POST(createMockRequest('POST', { organizationId: 'org-1' }))
-      expect(response.status).toBe(200)
-      expect(await response.json()).toEqual({ token: 'tok-123' })
-      if (failure === 'recordUsage') expect(mocks.billOverage).not.toHaveBeenCalled()
-    }
-  )
+  it('keeps an issued token available when recording usage fails', async () => {
+    mocks.recordUsage.mockRejectedValue(new Error('billing write failed'))
+    const response = await POST(createMockRequest('POST', { organizationId: 'org-1' }))
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ token: 'tok-123' })
+  })
 
   it('rejects non-session principals before any protected loading', async () => {
     for (const input of [{ workspaceId: 'ws-1' }, { organizationId: 'org-1' }]) {

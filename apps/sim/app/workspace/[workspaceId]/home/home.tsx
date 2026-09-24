@@ -52,7 +52,6 @@ import { useLocalCopilotCatalogSelection } from '@/local-copilot/hooks/use-copil
 import type { ChatContext } from '@/stores/panel'
 import {
   ChatSurfaceProvider,
-  CreditsChip,
   MothershipChat,
   MothershipResourcesProvider,
   UserInput,
@@ -647,25 +646,6 @@ function HomeContent({ chatId, userName, userId }: HomeProps) {
   return (
     <div className={cn('relative flex h-full bg-[var(--bg)]', RESOURCE_HEADER_CLASSES.layout)}>
       <div className='relative flex h-full min-w-[240px] flex-1 flex-col'>
-        {showEmptyState && (
-          <div
-            className={cn(
-              'z-10',
-              RESOURCE_HEADER_CLASSES.overlay,
-              // Collapsed, the expand toggle overlays this corner, so the chip
-              // yields the fixed reserve; open, the toggle lives in the panel's
-              // corner and the chip takes the standard end inset itself.
-              isResourceCollapsed
-                ? RESOURCE_HEADER_CLASSES.adjacentEndPosition
-                : RESOURCE_HEADER_CLASSES.endPosition,
-              skipResourceTransition
-                ? 'transition-none'
-                : 'transition-[right] duration-200 [transition-timing-function:cubic-bezier(0.25,0.1,0.25,1)]'
-            )}
-          >
-            <CreditsChip />
-          </div>
-        )}
         {showEmptyState ? (
           <div className='h-full overflow-y-auto [scrollbar-gutter:stable_both-edges]'>
             {/* Asymmetric padding biases the group up so the full cluster (heading + input + suggestions) sits at the optical center */}

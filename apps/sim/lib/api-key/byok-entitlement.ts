@@ -89,10 +89,10 @@ export async function isOrganizationBYOKEntitledCached(organizationId: string): 
  *
  * There is deliberately no per-organization invalidator, unlike
  * `invalidateSessionPolicyCache`. That one works because the route that mutates
- * the policy runs in the same process that reads it. Entitlement changes arrive
- * on a Stripe webhook, which lands in one process while the readers are
- * per-worker — an invalidator there would look like it made plan changes
- * immediate when it only cleared one process. The TTL is the real mechanism.
+ * the policy runs in the same process that reads it. Entitlement changes land in
+ * one process while the readers are per-worker — an invalidator there would look
+ * like it made plan changes immediate when it only cleared one process. The TTL
+ * is the real mechanism.
  */
 export function resetOrganizationBYOKEntitlementCache(): void {
   entitlementCache.clear()

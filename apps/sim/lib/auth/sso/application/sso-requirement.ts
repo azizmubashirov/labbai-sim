@@ -9,7 +9,7 @@ import { recordProjectedUseCaseAuditEntries } from '@/lib/core/application/autho
 import type { OperationUseCase } from '@/lib/core/application/operation'
 import { authorizeOrganizationOperation } from '@/lib/core/application/organization-authorization'
 import { defineOrganizationOperation } from '@/lib/core/application/organization-operation'
-import { isBillingEnabled, isSsoEnabled } from '@/lib/core/config/env-flags'
+import { isSsoEnabled } from '@/lib/core/config/env-flags'
 import { OrchestrationError } from '@/lib/core/orchestration/types'
 
 /**
@@ -108,9 +108,7 @@ export const setSsoRequirement: OperationUseCase<
     if (input.requireSso && !(await isOrganizationFeatureEntitled(organizationId, isSsoEnabled))) {
       throw new OrchestrationError(
         'forbidden',
-        isBillingEnabled
-          ? 'Single Sign-On is available on Enterprise plans only'
-          : 'Single Sign-On is disabled. Set ENTERPRISE_ENABLED or SSO_ENABLED to enable it.'
+        'Single Sign-On is disabled. Set ENTERPRISE_ENABLED or SSO_ENABLED to enable it.'
       )
     }
 

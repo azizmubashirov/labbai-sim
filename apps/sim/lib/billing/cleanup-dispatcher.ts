@@ -6,18 +6,15 @@ import { chunkArray } from '@sim/utils/helpers'
 import { tasks } from '@trigger.dev/sdk'
 import { and, asc, eq, gt, isNull } from 'drizzle-orm'
 import { validateCleanupLimits } from '@/lib/api/contracts/cleanup'
-import { getOrganizationSubscription } from '@/lib/billing/core/billing'
-import { getHighestPriorityPersonalSubscription } from '@/lib/billing/core/subscription'
-import { getPlanType, type PlanCategory } from '@/lib/billing/plan-helpers'
+import type { PlanCategory } from '@/lib/billing/plan-helpers'
 import { type RetentionHoursKey, resolveEffectiveRetentionHours } from '@/lib/billing/retention'
 import { type CleanupBudgets, type CleanupLimits, createCleanupBudgets } from '@/lib/cleanup/limits'
 import { getJobQueue } from '@/lib/core/async-jobs'
 import { shouldExecuteInline } from '@/lib/core/async-jobs/config'
 import { resolveTriggerRegion } from '@/lib/core/async-jobs/region'
 import type { EnqueueOptions } from '@/lib/core/async-jobs/types'
-import { isBillingEnabled, isDataRetentionEnabled } from '@/lib/core/config/env-flags'
+import { isDataRetentionEnabled } from '@/lib/core/config/env-flags'
 import { isTriggerAvailable } from '@/lib/core/config/trigger-availability'
-import { isOrganizationWorkspace, WORKSPACE_MODE } from '@/lib/workspaces/policy'
 
 const logger = createLogger('RetentionDispatcher')
 
@@ -63,8 +60,6 @@ interface WorkspaceCleanupScopeRow {
 }
 
 const DAY = 24
-
-type PlanResolutionEntry = readonly [string, PlanCategory]
 
 function getCleanupConcurrencyKey(jobType: CleanupJobType): string | undefined {
   return jobType === 'cleanup-tasks' ? `cleanup:${jobType}` : undefined
@@ -123,104 +118,21 @@ async function listActiveWorkspaceCleanupScopeRowsPage(
   }))
 }
 
-async function resolvePersonalPlanTypesByBilledUserId(
-  rows: WorkspaceCleanupScopeRow[],
-  failOnLookupError: boolean
-): Promise<Map<string, PlanCategory>> {
-  const billedUserIds = Array.from(new Set(rows.map((row) => row.billedAccountUserId)))
-  const entries = await Promise.all(
-    billedUserIds.map(async (userId) => {
-      try {
-        const subscription = await getHighestPriorityPersonalSubscription(userId, {
-          onError: 'throw',
-        })
-        return [userId, getPlanType(subscription?.plan)] as const
-      } catch (error) {
-        if (failOnLookupError) throw error
-        logger.error('Skipping cleanup for billed user after plan lookup failed', {
-          userId,
-          error,
-        })
-        return null
-      }
-    })
-  )
-
-  return new Map(entries.filter((entry): entry is PlanResolutionEntry => entry !== null))
-}
-
 async function resolvePlanTypesByWorkspaceId(
   rows: WorkspaceCleanupScopeRow[],
-  failOnLookupError: boolean
+  _failOnLookupError: boolean
 ): Promise<Map<string, PlanCategory>> {
   /**
-   * Without billing there are no subscription rows to read, and the per-plan
-   * defaults describe hosted tiers the operator never bought — falling through
-   * to them would expire logs on a 30-day free-tier window nobody chose.
+   * Labbai has no subscriptions, and the per-plan defaults describe hosted
+   * tiers the operator never bought — falling through to them would expire logs
+   * on a 30-day free-tier window nobody chose.
    *
    * Classifying every workspace as enterprise gives the semantics a self-hosted
-   * deployment actually wants: enterprise carries no default, so retention
-   * comes only from explicitly configured `organization.dataRetentionSettings`
-   * and a workspace with nothing configured keeps its data forever. It also
-   * keeps org-owned workspaces in scope, which the subscription lookup below
-   * would otherwise skip on every billing-free deployment.
+   * deployment wants: enterprise carries no default, so retention comes only
+   * from explicitly configured `organization.dataRetentionSettings` and a
+   * workspace with nothing configured keeps its data forever.
    */
-  if (!isBillingEnabled) {
-    return new Map(rows.map((row) => [row.id, 'enterprise' as PlanCategory]))
-  }
-
-  const userScopedRows = rows.filter((row) => row.workspaceMode !== WORKSPACE_MODE.ORGANIZATION)
-  const userPlanByBilledUserId = await resolvePersonalPlanTypesByBilledUserId(
-    userScopedRows,
-    failOnLookupError
-  )
-  const entries = await Promise.all(
-    rows.map(async (row) => {
-      if (row.workspaceMode === WORKSPACE_MODE.ORGANIZATION) {
-        const organizationId = isOrganizationWorkspace(row) ? row.organizationId : null
-        if (!organizationId) {
-          if (failOnLookupError) throw new Error('Malformed organization workspace')
-          logger.error('Skipping cleanup for malformed organization workspace', {
-            workspaceId: row.id,
-            organizationId: row.organizationId,
-          })
-          return null
-        }
-
-        try {
-          const subscription = await getOrganizationSubscription(organizationId, {
-            onError: 'throw',
-          })
-          if (!subscription) {
-            logger.warn('Skipping cleanup for organization workspace without an org subscription', {
-              workspaceId: row.id,
-              organizationId,
-            })
-            return null
-          }
-
-          return [row.id, getPlanType(subscription?.plan)] as const
-        } catch (error) {
-          if (failOnLookupError) throw error
-          logger.error('Skipping cleanup for organization workspace after plan lookup failed', {
-            workspaceId: row.id,
-            organizationId,
-            error,
-          })
-          return null
-        }
-      }
-
-      const plan = userPlanByBilledUserId.get(row.billedAccountUserId)
-      if (plan === undefined) {
-        return null
-      }
-
-      return [row.id, plan] as const
-    })
-  )
-
-  return new Map(entries.filter((entry): entry is PlanResolutionEntry => entry !== null))
+  return new Map(rows.map((row) => [row.id, 'enterprise' as PlanCategory]))
 }
 
 async function buildCleanupRunner(jobType: CleanupJobType): Promise<EnqueueOptions['runner']> {
@@ -336,57 +248,16 @@ async function forEachCleanupChunk(
       afterOrganizationId = organizations[organizations.length - 1].id
       for (const row of organizations) {
         if (shouldStop()) break
-        let plan: PlanCategory = 'enterprise'
-        if (isBillingEnabled) {
-          try {
-            const subscription = await getOrganizationSubscription(row.id, { onError: 'throw' })
-            if (!subscription) continue
-            plan = getPlanType(subscription.plan)
-          } catch (error) {
-            if (failOnLookupError) throw error
-            logger.error('Skipping organization cleanup after plan lookup failed', {
-              organizationId: row.id,
-              error,
-            })
-            continue
-          }
-        }
-        const retentionHours =
-          plan === 'enterprise' ? (row.settings?.[config.key] ?? null) : config.defaults[plan]
+        const retentionHours = row.settings?.[config.key] ?? null
         if (retentionHours == null) continue
         await emitChunk({
-          plan,
+          plan: 'enterprise',
           workspaceIds: [],
           organizationIds: [row.id],
           retentionHours,
-          label: `${plan}/organization/${row.id}`,
+          label: `enterprise/organization/${row.id}`,
         })
       }
-    }
-  }
-
-  /**
-   * Global housekeeping is keyed to a plan's default retention window, so it
-   * only makes sense where those plans exist. Emitting it with billing off
-   * would reach for the hosted free-tier window — the same 30 days the
-   * per-workspace pass deliberately refuses to apply — and act on it, which is
-   * exactly the rule `resolvePlanTypesByWorkspaceId` exists to enforce.
-   */
-  if (
-    isBillingEnabled &&
-    housekeepingPlan &&
-    housekeepingPlan !== 'enterprise' &&
-    !housekeepingAssigned
-  ) {
-    const retentionHours = config.defaults[housekeepingPlan]
-    if (retentionHours != null) {
-      await emitChunk({
-        plan: housekeepingPlan,
-        workspaceIds: [],
-        retentionHours,
-        label: `${housekeepingPlan}/housekeeping`,
-        runGlobalHousekeeping: true,
-      })
     }
   }
 
@@ -411,9 +282,9 @@ export async function dispatchCleanupJobs(jobType: CleanupJobType): Promise<{
    * with `DATA_RETENTION_ENABLED` (or the `ENTERPRISE_ENABLED` suite switch)
    * after configuring the windows they want.
    */
-  if (!isBillingEnabled && !isDataRetentionEnabled) {
+  if (!isDataRetentionEnabled) {
     logger.info(
-      `[${jobType}] Skipping cleanup dispatch: billing is disabled and data retention is not enabled`
+      `[${jobType}] Skipping cleanup dispatch: data retention is not enabled`
     )
     return { jobIds: [], jobCount: 0, chunkCount: 0, workspaceCount: 0 }
   }
@@ -503,7 +374,7 @@ export async function dispatchBoundedCleanup(
   input: CleanupLimits
 ) {
   const limits = validateCleanupLimits(jobType, input)
-  if (!isBillingEnabled && !isDataRetentionEnabled) throw new Error('Data retention is disabled')
+  if (!isDataRetentionEnabled) throw new Error('Data retention is disabled')
   if (!isTriggerAvailable()) throw new Error('Queued cleanup requires Trigger.dev')
   const run = await tasks.trigger(
     jobType,
@@ -523,7 +394,7 @@ export async function runCleanupWithLimits(
   runScope: (payload: CleanupJobPayload, budgets: CleanupBudgets) => Promise<void>
 ): Promise<void> {
   const limits = validateCleanupLimits(jobType, input)
-  if (!isBillingEnabled && !isDataRetentionEnabled) throw new Error('Data retention is disabled')
+  if (!isDataRetentionEnabled) throw new Error('Data retention is disabled')
   const budgets = createCleanupBudgets(limits)
   await forEachCleanupChunk(jobType, (scope) => runScope(scope, budgets), {
     shouldStop: () => Object.values(budgets).every((budget) => budget.remaining === 0),

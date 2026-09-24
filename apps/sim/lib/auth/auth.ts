@@ -1,11 +1,9 @@
 import { cache } from 'react'
 import { oauthProvider } from '@better-auth/oauth-provider'
 import { sso } from '@better-auth/sso'
-import { stripe } from '@better-auth/stripe'
 import { db } from '@sim/db'
 import * as schema from '@sim/db/schema'
 import { createLogger, setRequestAuth } from '@sim/logger'
-import { toError } from '@sim/utils/errors'
 import { type BetterAuthOptions, betterAuth, type User } from 'better-auth'
 import {
   APIError,
@@ -27,7 +25,6 @@ import {
 } from 'better-auth/plugins'
 import { and, count, eq, inArray, sql } from 'drizzle-orm'
 import { headers } from 'next/headers'
-import Stripe from 'stripe'
 import {
   getEmailSubject,
   renderExistingAccountEmail,
@@ -60,52 +57,13 @@ import { bindOAuthIssuedResource, oauthResourcePlugin } from '@/lib/auth/oauth-r
 import { getSessionCookieCacheVersion } from '@/lib/auth/security-policy'
 import { prepareSessionForCreation } from '@/lib/auth/session-hooks'
 import { clampExpiryForSession } from '@/lib/auth/session-policy'
-import { getActiveOrganizationId } from '@/lib/auth/session-response'
 import { createSimAuthAdapter } from '@/lib/auth/sim-auth-adapter'
 import { admitSsoUser } from '@/lib/auth/sso/application/admit-sso-user'
 import { resolveSsoCallbackProviderId } from '@/lib/auth/sso/callback-provider'
-import { sendPlanWelcomeEmail } from '@/lib/billing'
-import {
-  assertPersonalCheckoutAllowed,
-  authorizeSubscriptionReference,
-  isPersonalCheckoutRequest,
-} from '@/lib/billing/authorization'
-import {
-  type CheckoutAdmissionClaim,
-  claimCheckoutAdmission,
-  releaseCheckoutAdmission,
-  resolveCheckoutReferenceId,
-} from '@/lib/billing/checkout-admission'
-import {
-  getOrganizationIdForSubscriptionReference,
-  syncSubscriptionPlan,
-  writeBillingInterval,
-} from '@/lib/billing/core/subscription'
 import { handleNewUser } from '@/lib/billing/core/usage'
-import {
-  ensureOrganizationForTeamSubscription,
-  syncSubscriptionUsageLimits,
-} from '@/lib/billing/organization'
-import { pauseProSubscriptionForOrgCoverage } from '@/lib/billing/organizations/membership'
-import { isPro, isTeam } from '@/lib/billing/plan-helpers'
-import { getPlans, resolvePlanFromStripeSubscription } from '@/lib/billing/plans'
-import { syncSeatsFromStripeQuantity } from '@/lib/billing/validation/seat-management'
-import { handleAbandonedCheckout } from '@/lib/billing/webhooks/checkout'
-import { handleChargeDispute, handleDisputeClosed } from '@/lib/billing/webhooks/disputes'
-import { handleManualEnterpriseSubscription } from '@/lib/billing/webhooks/enterprise'
-import {
-  handleInvoicePaymentFailed,
-  handleInvoicePaymentSucceeded,
-} from '@/lib/billing/webhooks/invoices'
-import {
-  handleSubscriptionCreated,
-  handleSubscriptionDeleted,
-} from '@/lib/billing/webhooks/subscription'
-import { handleSubscriptionUsageUpdate } from '@/lib/billing/webhooks/subscription-usage'
 import { env } from '@/lib/core/config/env'
 import {
   isAuthDisabled,
-  isBillingEnabled,
   isEmailPasswordEnabled,
   isEmailSignupDisabled,
   isEmailVerificationEnabled,
@@ -181,15 +139,6 @@ if (env.NODE_ENV === 'production') {
       { baseUrl }
     )
   }
-}
-
-const validStripeKey = env.STRIPE_SECRET_KEY
-
-let stripeClient = null
-if (validStripeKey) {
-  stripeClient = new Stripe(env.STRIPE_SECRET_KEY || '', {
-    apiVersion: '2025-08-27.basil',
-  })
 }
 
 export const auth = betterAuth({
@@ -707,8 +656,7 @@ export const auth = betterAuth({
      * The synthetic user returned for the generic duplicate-sign-up response must carry
      * the exact same set of returned fields a real freshly-created user would, otherwise
      * the differing response shape re-opens the enumeration oracle. The admin plugin
-     * (always loaded) adds role/banned/banReason/banExpires, and the Stripe plugin — loaded
-     * only when billing is enabled — adds stripeCustomerId (null on a new user).
+     * (always loaded) adds role/banned/banReason/banExpires.
      */
     customSyntheticUser: ({
       coreFields,
@@ -731,7 +679,6 @@ export const auth = betterAuth({
       banned: false,
       banReason: null,
       banExpires: null,
-      ...(isBillingEnabled && stripeClient ? { stripeCustomerId: null } : {}),
       ...additionalFields,
       id,
     }),
@@ -903,50 +850,9 @@ export const auth = betterAuth({
         }
       }
 
-      /**
-       * Personal checkout guard. The Stripe plugin's `authorizeReference`
-       * only runs for organization references (it skips references equal to
-       * the session user), so personal checkout admission lives here. It
-       * prevents both a duplicate checkout while Stripe payment is pending
-       * and a personal plan for someone already covered by an organization.
-       */
-      if (isBillingEnabled && ctx.path === '/subscription/upgrade') {
-        const session = await getSessionFromCtx(ctx)
-        const sessionUserId = session?.user?.id
-        if (sessionUserId) {
-          const requestBody = ctx.body ?? {}
-          const referenceId = resolveCheckoutReferenceId(
-            requestBody,
-            sessionUserId,
-            getActiveOrganizationId(session)
-          )
-          if (referenceId) {
-            const checkoutAdmissionClaim = await claimCheckoutAdmission(referenceId)
-            try {
-              if (isPersonalCheckoutRequest(requestBody, sessionUserId)) {
-                await assertPersonalCheckoutAllowed(sessionUserId)
-              }
-            } catch (error) {
-              await releaseCheckoutAdmission(checkoutAdmissionClaim)
-              throw error
-            }
-            return { context: { billingCheckoutAdmissionClaim: checkoutAdmissionClaim } }
-          }
-        }
-      }
-
       return
     }),
     after: createAuthMiddleware(async (ctx) => {
-      if (isBillingEnabled && ctx.path === '/subscription/upgrade') {
-        const checkoutContext = ctx as typeof ctx & {
-          billingCheckoutAdmissionClaim?: CheckoutAdmissionClaim
-        }
-        if (checkoutContext.billingCheckoutAdmissionClaim) {
-          await releaseCheckoutAdmission(checkoutContext.billingCheckoutAdmissionClaim)
-        }
-      }
-
       if (!isSsoEnabled) return
       const oauthState = ctx.path === '/sso/callback' ? await getOAuthState() : null
       const providerId = resolveSsoCallbackProviderId({
@@ -1256,348 +1162,6 @@ export const auth = betterAuth({
                */
               disabled: true,
               defaultRole: 'member',
-            },
-          }),
-        ]
-      : []),
-    // Only include the Stripe plugin when billing is enabled
-    ...(isBillingEnabled && stripeClient
-      ? [
-          stripe({
-            stripeClient,
-            stripeWebhookSecret: env.STRIPE_WEBHOOK_SECRET || '',
-            createCustomerOnSignUp: true,
-            onCustomerCreate: async ({ stripeCustomer, user }) => {
-              logger.info('[onCustomerCreate] Stripe customer created', {
-                stripeCustomerId: stripeCustomer.id,
-                userId: user.id,
-              })
-            },
-            subscription: {
-              enabled: true,
-              plans: getPlans(),
-              authorizeReference: async ({ user, referenceId, action }, ctx) => {
-                const body: unknown = ctx?.body
-                const requestedPlan =
-                  typeof body === 'object' &&
-                  body !== null &&
-                  'plan' in body &&
-                  typeof body.plan === 'string'
-                    ? body.plan
-                    : undefined
-                return await authorizeSubscriptionReference(
-                  user.id,
-                  referenceId,
-                  action,
-                  requestedPlan
-                )
-              },
-              getCheckoutSessionParams: async () => ({
-                params: { allow_promotion_codes: true },
-              }),
-              onSubscriptionComplete: async ({
-                event,
-                stripeSubscription,
-                subscription,
-              }: {
-                event: Stripe.Event
-                stripeSubscription: Stripe.Subscription
-                subscription: any
-              }) => {
-                const { priceId, planFromStripe, isAnnual } =
-                  resolvePlanFromStripeSubscription(stripeSubscription)
-
-                logger.info('[onSubscriptionComplete] Subscription created', {
-                  subscriptionId: subscription.id,
-                  referenceId: subscription.referenceId,
-                  dbPlan: subscription.plan,
-                  planFromStripe,
-                  priceId,
-                  isAnnual,
-                  status: subscription.status,
-                })
-
-                if (!planFromStripe) {
-                  logger.error(
-                    '[onSubscriptionComplete] Could not resolve plan from Stripe price — check env var configuration',
-                    { subscriptionId: subscription.id, dbPlan: subscription.plan, priceId }
-                  )
-                }
-
-                const syncedPlan = await syncSubscriptionPlan(
-                  subscription.id,
-                  subscription.plan,
-                  planFromStripe,
-                  subscription.referenceId
-                )
-
-                const subscriptionForOrg = {
-                  ...subscription,
-                  plan: syncedPlan ?? subscription.plan,
-                  enterpriseOperationId: stripeSubscription.metadata?.enterpriseOperationId ?? null,
-                }
-
-                let resolvedSubscription = subscription
-                try {
-                  resolvedSubscription =
-                    await ensureOrganizationForTeamSubscription(subscriptionForOrg)
-                } catch (orgError) {
-                  logger.error(
-                    '[onSubscriptionComplete] Failed to ensure organization for team subscription',
-                    {
-                      subscriptionId: subscription.id,
-                      referenceId: subscription.referenceId,
-                      dbPlan: subscription.plan,
-                      planFromStripe,
-                      error: toError(orgError).message,
-                      stack: orgError instanceof Error ? orgError.stack : undefined,
-                    }
-                  )
-                  throw orgError
-                }
-
-                /**
-                 * Transactional fence behind the personal-checkout admission
-                 * guard: if the user joined a paid organization while their
-                 * checkout was in flight, pause the fresh personal Pro at
-                 * period end (same state a paid-org joiner's personal Pro
-                 * enters; restored automatically if they leave the org).
-                 *
-                 * Runs BEFORE the free→paid transition handling: a personal
-                 * subscription born covered is not a free→paid transition —
-                 * the org plan keeps governing the user — so the usage reset
-                 * (which would wipe org-attributed current-period usage) and
-                 * its instrumentation must not run. Gated on `covered`, not
-                 * `paused`, so event retries decide identically even when the
-                 * join path already paused the subscription.
-                 */
-                const coveredByOrganization = isPro(resolvedSubscription.plan)
-                  ? (await pauseProSubscriptionForOrgCoverage(resolvedSubscription.referenceId))
-                      .covered
-                  : false
-
-                if (!coveredByOrganization) {
-                  await handleSubscriptionCreated(resolvedSubscription, event.id)
-                }
-
-                await syncSubscriptionUsageLimits(resolvedSubscription)
-
-                await writeBillingInterval(resolvedSubscription.id, isAnnual ? 'year' : 'month')
-
-                await sendPlanWelcomeEmail(resolvedSubscription)
-              },
-              onSubscriptionUpdate: async ({
-                event,
-                subscription,
-              }: {
-                event: Stripe.Event
-                subscription: any
-              }) => {
-                const stripeSubscription = event.data.object as Stripe.Subscription
-                const { priceId, planFromStripe, isTeamPlan, isAnnual } =
-                  resolvePlanFromStripeSubscription(stripeSubscription)
-
-                if (priceId && !planFromStripe) {
-                  logger.warn(
-                    '[onSubscriptionUpdate] Could not determine plan from Stripe price ID',
-                    {
-                      subscriptionId: subscription.id,
-                      priceId,
-                      dbPlan: subscription.plan,
-                    }
-                  )
-                }
-
-                const referenceOrganizationId = await getOrganizationIdForSubscriptionReference(
-                  subscription.referenceId
-                )
-                const isUpgradeToTeam =
-                  isTeamPlan && !isTeam(subscription.plan) && referenceOrganizationId == null
-
-                logger.info('[onSubscriptionUpdate] Subscription updated', {
-                  subscriptionId: subscription.id,
-                  status: subscription.status,
-                  dbPlan: subscription.plan,
-                  planFromStripe,
-                  isUpgradeToTeam,
-                  isAnnual,
-                  referenceId: subscription.referenceId,
-                  referenceOrganizationId,
-                })
-
-                if (!planFromStripe) {
-                  logger.error(
-                    '[onSubscriptionUpdate] Could not resolve plan from Stripe price — org creation may be skipped for team upgrades',
-                    { subscriptionId: subscription.id, dbPlan: subscription.plan }
-                  )
-                }
-
-                const syncedPlan = await syncSubscriptionPlan(
-                  subscription.id,
-                  subscription.plan,
-                  planFromStripe,
-                  subscription.referenceId
-                )
-
-                /**
-                 * All downstream processing keys off the plan the DB actually
-                 * holds after the sync — a plan write refused by the org/plan
-                 * invariant must not leak the rejected Stripe plan into org
-                 * resolution, seat sync, or usage limits.
-                 */
-                const effectivePlanForTeamFeatures = syncedPlan ?? subscription.plan
-
-                const subscriptionForOrg = {
-                  ...subscription,
-                  plan: effectivePlanForTeamFeatures,
-                  enterpriseOperationId: stripeSubscription.metadata?.enterpriseOperationId ?? null,
-                }
-
-                let resolvedSubscription = subscription
-                try {
-                  resolvedSubscription =
-                    await ensureOrganizationForTeamSubscription(subscriptionForOrg)
-
-                  if (isUpgradeToTeam) {
-                    logger.info(
-                      '[onSubscriptionUpdate] Detected Pro -> Team upgrade, ensured organization creation',
-                      {
-                        subscriptionId: subscription.id,
-                        originalPlan: subscription.plan,
-                        newPlan: planFromStripe,
-                        resolvedReferenceId: resolvedSubscription.referenceId,
-                      }
-                    )
-                  }
-                } catch (orgError) {
-                  logger.error(
-                    '[onSubscriptionUpdate] Failed to ensure organization for team subscription',
-                    {
-                      subscriptionId: subscription.id,
-                      referenceId: subscription.referenceId,
-                      dbPlan: subscription.plan,
-                      planFromStripe,
-                      isUpgradeToTeam,
-                      error: toError(orgError).message,
-                      stack: orgError instanceof Error ? orgError.stack : undefined,
-                    }
-                  )
-                  throw orgError
-                }
-
-                if (isTeam(effectivePlanForTeamFeatures)) {
-                  try {
-                    const quantity = stripeSubscription.items?.data?.[0]?.quantity || 1
-
-                    const result = await syncSeatsFromStripeQuantity(
-                      resolvedSubscription.id,
-                      resolvedSubscription.seats ?? null,
-                      quantity
-                    )
-
-                    if (result.synced) {
-                      logger.info('[onSubscriptionUpdate] Synced seat count from Stripe', {
-                        subscriptionId: resolvedSubscription.id,
-                        referenceId: resolvedSubscription.referenceId,
-                        previousSeats: result.previousSeats,
-                        newSeats: result.newSeats,
-                      })
-                    }
-                  } catch (error) {
-                    logger.error('[onSubscriptionUpdate] Failed to sync seat count', {
-                      subscriptionId: resolvedSubscription.id,
-                      referenceId: resolvedSubscription.referenceId,
-                      error,
-                    })
-                  }
-                }
-
-                await writeBillingInterval(resolvedSubscription.id, isAnnual ? 'year' : 'month')
-              },
-              onSubscriptionDeleted: async ({
-                event,
-                subscription,
-              }: {
-                event: Stripe.Event
-                stripeSubscription: Stripe.Subscription
-                subscription: any
-              }) => {
-                logger.info('[onSubscriptionDeleted] Subscription deleted', {
-                  eventId: event.id,
-                  subscriptionId: subscription.id,
-                  referenceId: subscription.referenceId,
-                })
-
-                try {
-                  await handleSubscriptionDeleted(subscription, event.id)
-                } catch (error) {
-                  logger.error('[onSubscriptionDeleted] Failed to handle subscription deletion', {
-                    eventId: event.id,
-                    subscriptionId: subscription.id,
-                    referenceId: subscription.referenceId,
-                    error,
-                  })
-                  // Rethrow so the Stripe webhook retries — otherwise
-                  // the final overage invoice, usage reset, org cleanup,
-                  // and personal Pro restore can be permanently skipped.
-                  throw error
-                }
-              },
-            },
-            onEvent: async (event: Stripe.Event) => {
-              logger.info('[onEvent] Received Stripe webhook', {
-                eventId: event.id,
-                eventType: event.type,
-              })
-
-              try {
-                switch (event.type) {
-                  case 'invoice.payment_succeeded': {
-                    await handleInvoicePaymentSucceeded(event)
-                    break
-                  }
-                  case 'invoice.payment_failed': {
-                    await handleInvoicePaymentFailed(event)
-                    break
-                  }
-                  case 'customer.subscription.created':
-                  case 'customer.subscription.updated': {
-                    await handleManualEnterpriseSubscription(event)
-                    await handleSubscriptionUsageUpdate(event)
-                    break
-                  }
-                  case 'checkout.session.expired': {
-                    await handleAbandonedCheckout(event)
-                    break
-                  }
-                  case 'charge.dispute.created': {
-                    await handleChargeDispute(event)
-                    break
-                  }
-                  case 'charge.dispute.closed': {
-                    await handleDisputeClosed(event)
-                    break
-                  }
-                  default:
-                    logger.info('[onEvent] Ignoring unsupported webhook event', {
-                      eventId: event.id,
-                      eventType: event.type,
-                    })
-                    break
-                }
-
-                logger.info('[onEvent] Successfully processed webhook', {
-                  eventId: event.id,
-                  eventType: event.type,
-                })
-              } catch (error) {
-                logger.error('[onEvent] Failed to process webhook', {
-                  eventId: event.id,
-                  eventType: event.type,
-                  error,
-                })
-                throw error
-              }
             },
           }),
         ]

@@ -1,8 +1,8 @@
 /**
  * @vitest-environment node
  */
-import { dbChainMockFns, resetDbChainMock, resetEnvFlagsMock, setEnvFlags } from '@sim/testing'
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { dbChainMockFns, resetDbChainMock, resetEnvFlagsMock } from '@sim/testing'
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { mockIsEnterprise, mockEnqueue, mockGetJobQueue } = vi.hoisted(() => {
   const mockEnqueue = vi.fn(async () => 'job-id')
@@ -33,10 +33,6 @@ beforeEach(() => {
   resetDbChainMock()
 })
 
-beforeAll(() => {
-  setEnvFlags({ isBillingEnabled: true })
-})
-
 afterAll(resetEnvFlagsMock)
 
 describe('reapOrphanedRuns', () => {
@@ -65,16 +61,6 @@ describe('dispatchDueDrains', () => {
     expect(mockGetJobQueue).not.toHaveBeenCalled()
   })
 
-  it('skips drains for orgs not on enterprise plan', async () => {
-    dbChainMockFns.returning.mockResolvedValueOnce([]) // reaper
-    mockCandidates([{ id: 'd1', organizationId: 'org-a' }])
-    mockIsEnterprise.mockResolvedValueOnce(false)
-
-    const result = await dispatchDueDrains()
-    expect(result).toMatchObject({ candidates: 1, dispatched: 0, skipped: 1 })
-    expect(mockEnqueue).not.toHaveBeenCalled()
-  })
-
   it('claims and enqueues a job per due drain', async () => {
     dbChainMockFns.returning
       .mockResolvedValueOnce([]) // reaper
@@ -101,20 +87,5 @@ describe('dispatchDueDrains', () => {
     const result = await dispatchDueDrains()
     expect(result.dispatched).toBe(0)
     expect(mockEnqueue).not.toHaveBeenCalled()
-  })
-
-  it('caches enterprise check across drains in the same org', async () => {
-    dbChainMockFns.returning
-      .mockResolvedValueOnce([]) // reaper
-      .mockResolvedValueOnce([{ id: 'd1' }])
-      .mockResolvedValueOnce([{ id: 'd2' }])
-    mockCandidates([
-      { id: 'd1', organizationId: 'org-a' },
-      { id: 'd2', organizationId: 'org-a' },
-    ])
-    mockIsEnterprise.mockResolvedValue(true)
-
-    await dispatchDueDrains()
-    expect(mockIsEnterprise).toHaveBeenCalledTimes(1)
   })
 })

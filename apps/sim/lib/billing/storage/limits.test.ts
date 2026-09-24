@@ -5,8 +5,6 @@ import {
   dbChainMockFns,
   envMockFns,
   resetDbChainMock,
-  resetEnvFlagsMock,
-  setEnvFlags,
 } from '@sim/testing'
 
 const mockGetEnv = envMockFns.getEnv
@@ -65,14 +63,14 @@ const USER_CONTEXT: StorageBillingContext = {
 
 const GIB = 1024 ** 3
 
-afterAll(resetEnvFlagsMock)
-
 describe('storage limits and quota', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     resetDbChainMock()
-    setEnvFlags({ isBillingEnabled: true })
-    mockGetEnv.mockReturnValue(undefined)
+    /** Storage enforcement is the FREE_STORAGE_LIMIT_GB opt-in; enable it by default. */
+    mockGetEnv.mockImplementation((variable: string) =>
+      variable === 'FREE_STORAGE_LIMIT_GB' ? '5' : undefined
+    )
     dbChainMockFns.limit.mockResolvedValue([{ storageUsedBytes: 1024 }])
     mockGetHighestPrioritySubscription.mockResolvedValue(null)
   })
@@ -140,8 +138,8 @@ describe('storage limits and quota', () => {
     expect(mockGetHighestPrioritySubscription).toHaveBeenCalledTimes(1)
   })
 
-  it('applies identical disabled-billing behavior without resolving context', async () => {
-    setEnvFlags({ isBillingEnabled: false })
+  it('does not enforce storage without resolving context when FREE_STORAGE_LIMIT_GB is unset', async () => {
+    mockGetEnv.mockReturnValue(undefined)
 
     const expected = {
       allowed: true,
@@ -155,7 +153,6 @@ describe('storage limits and quota', () => {
   })
 
   it('opts into free-tier enforcement when FREE_STORAGE_LIMIT_GB is explicitly set', async () => {
-    setEnvFlags({ isBillingEnabled: false })
     mockGetEnv.mockImplementation((variable: string) =>
       variable === 'FREE_STORAGE_LIMIT_GB' ? '1' : undefined
     )

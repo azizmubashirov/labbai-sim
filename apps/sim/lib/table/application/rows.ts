@@ -57,7 +57,7 @@ import {
   resolveRowWriteProvenance,
   type TableRowProvenanceEnvelope,
 } from '@/lib/table/application/row-secret-provenance'
-import { assertRowCapacity, notifyTableRowUsage } from '@/lib/table/billing'
+import { assertRowCapacity } from '@/lib/table/billing'
 import {
   buildColumnNameById,
   buildIdByName,
@@ -1023,12 +1023,6 @@ export const replaceProjectedWireRows = defineAuthorizedTableUseCase({
       },
       { expectedWorkspaceId: context.workspaceId }
     )
-    notifyTableRowUsage({
-      workspaceId: context.workspaceId,
-      currentRowCount: 0,
-      addedRows: result.insertedCount,
-      limit: rowLimit,
-    })
     return result
   },
   projectAudit({ result }) {

@@ -1,10 +1,8 @@
 import { AuditAction, AuditResourceType } from '@sim/audit'
 import { db } from '@sim/db'
 import { member } from '@sim/db/schema'
-import { createLogger } from '@sim/logger'
 import { and, eq } from 'drizzle-orm'
 import { removeUserFromOrganization } from '@/lib/billing/organizations/membership'
-import { reconcileOrganizationSeats } from '@/lib/billing/organizations/seats'
 import {
   defineAuthorizedScimUseCase,
   type ScimUseCaseArgs,
@@ -13,8 +11,6 @@ import { scimOperations } from '@/ee/scim/lib/application/operations'
 import { endDirectoryMembershipTx } from '@/ee/scim/lib/identity/end-directory-membership'
 import { notFound, ScimError } from '@/ee/scim/lib/protocol/errors'
 import { findScimUserById } from '@/ee/scim/lib/repository/users'
-
-const logger = createLogger('ScimDeprovisionUser')
 
 export interface DeprovisionScimUserInput {
   scimUserId: string
@@ -117,16 +113,4 @@ export const deprovisionScimUser = defineAuthorizedScimUseCase({
         ]
       : []),
   ],
-
-  afterSuccess: async ({ result, context }) => {
-    if (!result.removedFromOrganization) return
-    try {
-      await reconcileOrganizationSeats({
-        organizationId: context.organizationId,
-        reason: 'scim-member-removed',
-      })
-    } catch (error) {
-      logger.error('Failed to reconcile seats after directory deprovisioning', { error })
-    }
-  },
 })

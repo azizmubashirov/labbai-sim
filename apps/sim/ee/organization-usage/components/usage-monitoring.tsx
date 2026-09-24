@@ -18,10 +18,6 @@ import {
   type UsageBreakdownDimension,
 } from '@/lib/api/contracts/organization-usage'
 import { useDeploymentShape } from '@/lib/core/config/deployment-shape'
-import {
-  ManageCreditsModal,
-  type ManageCreditsTarget,
-} from '@/app/workspace/[workspaceId]/settings/components/manage-credits-modal'
 import { SettingsPanel } from '@/app/workspace/[workspaceId]/settings/components/settings-panel'
 import { SettingsSection } from '@/app/workspace/[workspaceId]/settings/components/settings-section/settings-section'
 import { serializeAuditLogFilters } from '@/ee/audit-logs/search-params'
@@ -75,7 +71,7 @@ interface UsageMonitoringProps {
   organizationId: string
   /**
    * Base path of the events drill-down, built by the settings switch the same way it
-   * builds `creditUsageHref` and `billingHref`. The panel appends its own window.
+   * builds its other section links. The panel appends its own window.
    */
   eventsHref: string
   /** Base path of the audit-logs section, which the workspace drill-down scopes. */
@@ -93,14 +89,10 @@ export function UsageMonitoring({
     useUsageWindow()
   const [datePickerOpen, setDatePickerOpen] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
-  const [creditsTarget, setCreditsTarget] = useState<ManageCreditsTarget | null>(null)
 
   const isOverview = tab === USAGE_OVERVIEW_TAB
   /** Resolve bookmarked workspace IDs before opening the credit drill-down. */
   const isWorkspaceSelected = tab === 'workspace' && Boolean(workspace)
-
-  /** Member credit caps are enforced only on hosted deployments. */
-  const canManageCredits = tab === 'member' && hosted
 
   const overview = useOrganizationUsageOverview(organizationId, window, { enabled: isOverview })
   /** Use the full workspace page to resolve IDs selected from an expanded list. */
@@ -383,32 +375,10 @@ export function UsageMonitoring({
                     renderLeading: (row) => <UsageMemberAvatar id={row.id} name={row.label} />,
                   }
                 : {})}
-              {...(canManageCredits
-                ? {
-                    rowActions: (row) => [
-                      {
-                        label: 'Manage credits',
-                        onSelect: () => setCreditsTarget({ userId: row.id, name: row.label }),
-                      },
-                    ],
-                  }
-                : {})}
             />
           </UsageSection>
         )}
       </SettingsPanel>
-      {/** Keep the modal outside the panel’s content-spacing layout. */}
-      {canManageCredits && (
-        <ManageCreditsModal
-          key={creditsTarget?.userId ?? 'none'}
-          open={creditsTarget !== null}
-          onOpenChange={(open) => {
-            if (!open) setCreditsTarget(null)
-          }}
-          organizationId={organizationId}
-          member={creditsTarget}
-        />
-      )}
     </>
   )
 }

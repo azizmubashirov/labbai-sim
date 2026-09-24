@@ -15,8 +15,6 @@ import {
 import { parseRequest, validationErrorResponse } from '@/lib/api/server'
 import { getSession } from '@/lib/auth'
 import { generateVerificationToken, toDomainResponse } from '@/lib/auth/sso/domain-verification'
-import { isOrganizationOnEnterprisePlan } from '@/lib/billing/core/subscription'
-import { isBillingEnabled } from '@/lib/core/config/env-flags'
 import { withRouteHandler } from '@/lib/core/utils/with-route-handler'
 
 const logger = createLogger('OrgDomainsAPI')
@@ -46,14 +44,6 @@ export const GET = withRouteHandler(
         { error: 'Forbidden - Not a member of this organization' },
         { status: 403 }
       )
-    }
-
-    const isEnterprise = !isBillingEnabled || (await isOrganizationOnEnterprisePlan(organizationId))
-    // Domain management is Enterprise-only, so a non-Enterprise org has no
-    // domains to return — surface only the entitlement flag (which drives the
-    // upgrade prompt) and never the list/tokens.
-    if (!isEnterprise) {
-      return NextResponse.json({ success: true, data: { isEnterprise: false, domains: [] } })
     }
 
     const rows = await db
@@ -110,12 +100,6 @@ export const POST = withRouteHandler(
     if (!isOrgAdminRole(memberEntry.role)) {
       return NextResponse.json(
         { error: 'Forbidden - Only organization owners and admins can manage domains' },
-        { status: 403 }
-      )
-    }
-    if (isBillingEnabled && !(await isOrganizationOnEnterprisePlan(organizationId))) {
-      return NextResponse.json(
-        { error: 'Domain verification is available on Enterprise plans only' },
         { status: 403 }
       )
     }

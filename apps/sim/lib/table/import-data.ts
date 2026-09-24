@@ -10,7 +10,7 @@ import { createLogger } from '@sim/logger'
 import { generateId } from '@sim/utils/id'
 import { and, eq } from 'drizzle-orm'
 import { OrchestrationError } from '@/lib/core/orchestration/types'
-import { assertRowCapacity, notifyTableRowUsage } from '@/lib/table/billing'
+import { assertRowCapacity } from '@/lib/table/billing'
 import { CSV_MAX_BATCH_SIZE } from '@/lib/table/import'
 import { assertRowDelete, assertRowInsert, assertSchemaMutable } from '@/lib/table/mutation-locks'
 import { nKeysBetween } from '@/lib/table/order-key'
@@ -319,12 +319,6 @@ export async function importAppendRows(
       ctx.userId
     )
   }
-  notifyTableRowUsage({
-    workspaceId: ctx.workspaceId,
-    currentRowCount: table.rowCount,
-    addedRows: result.inserted.length,
-    limit: rowLimit,
-  })
   return result
 }
 
@@ -372,11 +366,5 @@ export async function importReplaceRows(
       data.userId
     )
   }
-  notifyTableRowUsage({
-    workspaceId: data.workspaceId,
-    currentRowCount: 0,
-    addedRows: result.insertedCount,
-    limit: rowLimit,
-  })
   return result
 }

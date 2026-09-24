@@ -176,7 +176,7 @@ export const PATCH = withRouteHandler(
 
       if (Object.keys(updateData).length === 1) {
         return badRequestResponse(
-          'No valid fields to update. Use /billing endpoint for orgUsageLimit.'
+          'No valid fields to update.'
         )
       }
 

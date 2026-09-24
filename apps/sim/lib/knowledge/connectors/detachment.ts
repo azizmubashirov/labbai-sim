@@ -12,7 +12,6 @@ import { z } from 'zod'
 import {
   decrementStorageUsageForBillingContextInTx,
   incrementAdmittedStorageUsageForBillingContextInTx,
-  maybeNotifyStorageLimitForBillingContext,
   resolveStorageBillingContext,
   type StorageBillingContext,
 } from '@/lib/billing/storage'
@@ -186,9 +185,6 @@ export async function settleDetachedConnectorReservations(
         )
       return grownUsage
     })
-    if (updatedUsage !== undefined) {
-      await maybeNotifyStorageLimitForBillingContext(storageContext, updatedUsage)
-    }
   }
 }
 
@@ -348,12 +344,6 @@ export const detachKnowledgeConnector: OutboxHandler = async (rawPayload, contex
     if (Date.now() >= deadline) break
   }
 
-  if (storageNotification) {
-    await maybeNotifyStorageLimitForBillingContext(
-      storageNotification.context,
-      storageNotification.updatedUsage
-    )
-  }
   if (outcome === 'obsolete') return
   if (outcome === 'paused') {
     /**

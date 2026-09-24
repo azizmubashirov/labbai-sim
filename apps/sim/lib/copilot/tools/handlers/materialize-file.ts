@@ -19,7 +19,6 @@ import { and, eq, isNull, sql } from 'drizzle-orm'
 import {
   checkStorageQuotaForBillingContext,
   incrementStorageUsageForBillingContextInTx,
-  maybeNotifyStorageLimitForBillingContext,
   resolveStorageBillingContext,
 } from '@/lib/billing/storage'
 import { resolveCopilotFilePrincipal } from '@/lib/copilot/auth/file-delegation'
@@ -207,9 +206,6 @@ async function executeSave(
     (replayedFile ? { id: replayedFile.id, originalName: replayedFile.name } : null)
   if (!updated) {
     return { success: false, error: `Upload no longer available: "${fileName}".` }
-  }
-  if (transition?.updatedUsage !== undefined) {
-    void maybeNotifyStorageLimitForBillingContext(billingContext, transition.updatedUsage)
   }
 
   logger.info(transition ? 'Materialized file' : 'Materialize replay was a no-op', {

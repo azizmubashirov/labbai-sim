@@ -168,7 +168,7 @@ describe('POST /api/copilot/api-keys/validate billing protocols', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     resetDbChainMock()
-    setEnvFlags({ isHosted: false, isBillingEnabled: false })
+    setEnvFlags({ isHosted: false })
     mockAuthorizeCallback.mockResolvedValue(undefined)
     mockCheckContinuationBilling.mockResolvedValue({ blocked: false })
     mockCheckInternalApiKey.mockReturnValue({ success: true })
@@ -589,7 +589,7 @@ describe('validation lifecycle purposes', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     resetDbChainMock()
-    setEnvFlags({ isHosted: true, isBillingEnabled: true })
+    setEnvFlags({ isHosted: true })
     for (let call = 0; call < 3; call++) queueTableRows(schemaMock.user, [{ id: 'user-1' }])
     mockCheckInternalApiKey.mockReturnValue({ success: true })
     mockAuthorizeCallback.mockReset().mockResolvedValue(undefined)
@@ -785,7 +785,7 @@ describe('validation lifecycle purposes', () => {
   it.each([true, false])(
     'rejects a legacy organization snapshot with omitted scope even when hosted=%s',
     async (isHosted) => {
-      setEnvFlags({ isHosted, isBillingEnabled: isHosted })
+      setEnvFlags({ isHosted })
       const response = await POST(
         request(
           { userId: 'user-1', purpose: 'continuation' },
@@ -802,13 +802,12 @@ describe('validation lifecycle purposes', () => {
   )
 
   it.each([
-    [true, true, 400],
-    [false, true, 400],
-    [false, false, 200],
+    [true, 400],
+    [false, 200],
   ])(
-    'allows missing legacy material only for unbilled self-hosting (%s, %s)',
-    async (isHosted, isBillingEnabled, status) => {
-      setEnvFlags({ isHosted, isBillingEnabled })
+    'allows missing legacy material only for self-hosting (hosted=%s)',
+    async (isHosted, status) => {
+      setEnvFlags({ isHosted })
       expect((await POST(request(body, { 'x-sim-billing-protocol': 'legacy-v0' }))).status).toBe(
         status
       )
@@ -818,9 +817,9 @@ describe('validation lifecycle purposes', () => {
   )
 
   it.each(['continuation', 'cancellation'])(
-    'preserves markerless unbilled local %s with an opaque workspace',
+    'preserves markerless local %s with an opaque workspace',
     async (purpose) => {
-      setEnvFlags({ isHosted: false, isBillingEnabled: false })
+      setEnvFlags({ isHosted: false })
       expect(
         (await POST(request({ ...body, workspaceId: 'opaque-local-workspace', purpose }))).status
       ).toBe(200)
@@ -831,9 +830,9 @@ describe('validation lifecycle purposes', () => {
   )
 
   it.each(['continuation', 'cancellation'])(
-    'still checks snapshot scope on unbilled local %s',
+    'still checks snapshot scope on local %s',
     async (purpose) => {
-      setEnvFlags({ isHosted: false, isBillingEnabled: false })
+      setEnvFlags({ isHosted: false })
       const headers = {
         'x-sim-billing-protocol': 'legacy-v0',
         'x-sim-billing-attribution': encode(ATTRIBUTION),
@@ -846,14 +845,12 @@ describe('validation lifecycle purposes', () => {
   )
 
   it.each([
-    ['attribution-v1', false, false],
-    ['legacy-v0', true, true],
-    ['legacy-v0', true, false],
-    ['legacy-v0', false, true],
+    ['attribution-v1', false],
+    ['legacy-v0', true],
   ])(
-    'checks cancellation scope for %s (hosted=%s, billing=%s)',
-    async (protocol, isHosted, isBillingEnabled) => {
-      setEnvFlags({ isHosted, isBillingEnabled })
+    'checks cancellation scope for %s (hosted=%s)',
+    async (protocol, isHosted) => {
+      setEnvFlags({ isHosted })
       expect(
         (
           await POST(

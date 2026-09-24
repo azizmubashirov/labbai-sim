@@ -1,9 +1,5 @@
-import { getOrganizationSubscription } from '@/lib/billing/core/billing'
 import { acquireUserBillingIdentityLock } from '@/lib/billing/organizations/billing-identity-lock'
 import { acquireOrganizationMutationLock } from '@/lib/billing/organizations/membership'
-import { isEnterprise, isTeam } from '@/lib/billing/plan-helpers'
-import { hasUsableSubscriptionStatus } from '@/lib/billing/subscriptions/utils'
-import { isBillingEnabled } from '@/lib/core/config/env-flags'
 import { OrchestrationError } from '@/lib/core/orchestration/types'
 import type { DbOrTx } from '@/lib/db/types'
 import {
@@ -71,27 +67,6 @@ export async function lockInvitationResendPolicy(
         status: 403,
         message: policy.reason ?? 'Invites are no longer allowed on this workspace',
         upgradeRequired: policy.upgradeRequired,
-      })
-  }
-  if (
-    isBillingEnabled &&
-    invitation.kind === 'organization' &&
-    !workspaces.length &&
-    invitation.organizationId
-  ) {
-    const subscription = await getOrganizationSubscription(invitation.organizationId, {
-      executor: tx,
-      onError: 'throw',
-    })
-    if (
-      !subscription ||
-      !hasUsableSubscriptionStatus(subscription.status) ||
-      (!isTeam(subscription.plan) && !isEnterprise(subscription.plan))
-    )
-      throw new WorkspaceInvitationError({
-        status: 403,
-        message: 'Invites are no longer allowed on this organization',
-        upgradeRequired: true,
       })
   }
 }

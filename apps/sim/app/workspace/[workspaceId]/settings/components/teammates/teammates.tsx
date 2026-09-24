@@ -1,11 +1,10 @@
 'use client'
 
-import { useCallback, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { ChipDropdown, Plus, toast } from '@sim/emcn'
 import { getErrorMessage } from '@sim/utils/errors'
 import { formatDate } from '@sim/utils/formatting'
-import { useQueryClient } from '@tanstack/react-query'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import {
   RoleLockTooltip,
   type WorkspaceRoleSource,
@@ -14,8 +13,6 @@ import {
 } from '@/components/permissions'
 import { canMutateWorkspaceSettingsSection } from '@/components/settings/navigation'
 import type { WorkspacePermission } from '@/lib/api/contracts/workspaces'
-import { buildUpgradeHref } from '@/lib/billing/upgrade-reasons'
-import { useDeploymentShape } from '@/lib/core/config/deployment-shape'
 import { InviteModal } from '@/app/workspace/[workspaceId]/components/invite-modal'
 import {
   MemberRow,
@@ -31,12 +28,7 @@ import {
   useResendWorkspaceInvitation,
   useUpdateWorkspacePermissions,
 } from '@/hooks/queries/invitations'
-import { prefetchUpgradeBillingData } from '@/hooks/queries/subscription'
-import {
-  prefetchWorkspaceSettings,
-  useWorkspacePermissionsQuery,
-  useWorkspacesQuery,
-} from '@/hooks/queries/workspace'
+import { useWorkspacePermissionsQuery, useWorkspacesQuery } from '@/hooks/queries/workspace'
 import { useWorkspaceInvitePolicy } from '@/hooks/use-workspace-invite-policy'
 
 const ROLE_OPTIONS = [
@@ -83,7 +75,6 @@ export function Teammates() {
   const workspaceId = (params?.workspaceId as string) || ''
 
   const [searchTerm, setSearchTerm] = useSettingsSearch()
-  const { billingEnabled } = useDeploymentShape()
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false)
 
   const { data: permissions, isPending: permissionsLoading } =
@@ -91,8 +82,6 @@ export function Teammates() {
   const { data: invitations } = usePendingInvitations(workspaceId)
   const { data: workspaces } = useWorkspacesQuery()
 
-  const router = useRouter()
-  const queryClient = useQueryClient()
   const { inviteDisabledReason, isInvitationsDisabled } = useWorkspaceInvitePolicy(workspaceId)
 
   const resendInvitation = useResendWorkspaceInvitation()
@@ -108,23 +97,8 @@ export function Teammates() {
 
   const activeWorkspace = workspaces?.find((workspace) => workspace.id === workspaceId)
 
-  const upgradeHref = buildUpgradeHref(workspaceId, 'seats')
-
-  /**
-   * Warm the Upgrade route bundle and the queries it gates on, so a gated
-   * invite click lands on cached data instead of a loading state.
-   */
-  const prefetchUpgrade = useCallback(() => {
-    router.prefetch(upgradeHref)
-    prefetchUpgradeBillingData(queryClient)
-    prefetchWorkspaceSettings(queryClient, workspaceId)
-  }, [router, queryClient, upgradeHref, workspaceId])
-
   const handleInvite = () => {
-    if (isInvitationsDisabled) {
-      if (billingEnabled) router.push(upgradeHref)
-      return
-    }
+    if (isInvitationsDisabled) return
     setIsInviteModalOpen(true)
   }
 
@@ -197,7 +171,6 @@ export function Teammates() {
                   variant: 'primary',
                   onSelect: handleInvite,
                   tooltip: inviteDisabledReason ?? undefined,
-                  onPrefetch: isInvitationsDisabled ? prefetchUpgrade : undefined,
                 },
               ]
             : []

@@ -7,8 +7,6 @@ import { auth } from '@/lib/auth'
 import { applySessionPolicyToNewMember } from '@/lib/auth/session-policy'
 import { syncUsageLimitsFromSubscription } from '@/lib/billing/core/usage'
 import { ensureUserInOrganizationTx } from '@/lib/billing/organizations/membership'
-import { resolveOrganizationSeatPolicyTx } from '@/lib/billing/organizations/seat-policy'
-import { reconcileOrganizationSeats } from '@/lib/billing/organizations/seats'
 import {
   getInstanceOrganizationId,
   isInstanceOrganizationMode,
@@ -156,18 +154,15 @@ export const provisionScimUser = defineAuthorizedScimUseCase({
     let provisioned: {
       scimUserId: string
       joinedOrganization: boolean
-      subscriptionId: string | undefined
       emailChanged: boolean
       resource: ReturnType<typeof toUserResource>
     }
     try {
       provisioned = await db.transaction(async (tx) => {
-        const seatPolicy = await resolveOrganizationSeatPolicyTx(tx, context.organizationId)
         const membership = await ensureUserInOrganizationTx(tx, {
           userId,
           organizationId: context.organizationId,
           role: 'member',
-          ...seatPolicy,
         })
         if (!membership.success) throw membershipFailure(membership.failureCode)
         let emailChanged = false
@@ -228,7 +223,6 @@ export const provisionScimUser = defineAuthorizedScimUseCase({
         return {
           scimUserId: inserted.id,
           joinedOrganization: !membership.alreadyMember,
-          subscriptionId: seatPolicy.organizationSubscriptionId,
           emailChanged,
           resource: toUserResource(toUserResourceRow(record, []), context.baseUrl),
         }
@@ -295,16 +289,6 @@ export const provisionScimUser = defineAuthorizedScimUseCase({
       await applySessionPolicyToNewMember(result.userId, context.organizationId)
     } catch (error) {
       logger.error('Failed to apply session policy to a provisioned member', { error })
-    }
-    try {
-      await reconcileOrganizationSeats({
-        organizationId: context.organizationId,
-        reason: 'scim-member-added',
-        /** The subscription admission was validated against, not whichever is newest now. */
-        ...(result.subscriptionId ? { subscriptionId: result.subscriptionId } : {}),
-      })
-    } catch (error) {
-      logger.error('Failed to reconcile seats after directory provisioning', { error })
     }
     try {
       await syncUsageLimitsFromSubscription(result.userId)

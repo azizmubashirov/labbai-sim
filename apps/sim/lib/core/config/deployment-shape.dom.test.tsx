@@ -13,7 +13,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.hoisted(() => {
   vi.stubEnv('NEXT_PUBLIC_APP_URL', '')
-  vi.stubEnv('NEXT_PUBLIC_BILLING_ENABLED', '')
   vi.stubEnv('NEXT_PUBLIC_FORCE_HOSTED', '')
   document.documentElement.id = '__next_error__'
 })
@@ -42,7 +41,7 @@ const HOSTED_MODELS = ['gpt-5.6-sol', 'claude-sonnet-5']
 const HOSTED: DeploymentShape = {
   ...resolveDeploymentShape(),
   hosted: true,
-  billingEnabled: true,
+  azureConfigured: true,
 }
 
 function apiKeyFieldShown(model: string): boolean {
@@ -50,8 +49,8 @@ function apiKeyFieldShown(model: string): boolean {
 }
 
 function HookReader() {
-  const { hosted, billingEnabled } = useDeploymentShape()
-  return <output data-testid='hook'>{`${hosted}/${billingEnabled}`}</output>
+  const { hosted, azureConfigured } = useDeploymentShape()
+  return <output data-testid='hook'>{`${hosted}/${azureConfigured}`}</output>
 }
 
 let host: HTMLDivElement

@@ -5,14 +5,12 @@ import { isOrgAdminRole } from '@sim/platform-authz/workspace'
 import { normalizeEmail } from '@sim/utils/string'
 import { and, eq } from 'drizzle-orm'
 import { isOrganizationOwnerOrAdmin } from '@/lib/billing/core/organization'
-import { resolveOrganizationPlan } from '@/lib/billing/core/subscription'
 import {
   acquireOrganizationMutationLock,
   acquireOrganizationUserMutationLocks,
   getUserOrganization,
 } from '@/lib/billing/organizations/membership'
 import { validateSeatAvailability } from '@/lib/billing/validation/seat-management'
-import { isBillingEnabled } from '@/lib/core/config/env-flags'
 import {
   cancelPendingInvitation,
   createPendingInvitation,
@@ -46,16 +44,6 @@ export async function prepareOrganizationInvitationContext(
     })
   }
   await validateInvitationsAllowed(context.inviterId, { organizationId: context.organizationId })
-  if (
-    isBillingEnabled &&
-    !(await resolveOrganizationPlan(context.organizationId, { onError: 'throw' }))
-  ) {
-    throw new WorkspaceInvitationError({
-      message: 'Your organization needs an active paid plan to invite members.',
-      status: 403,
-      upgradeRequired: true,
-    })
-  }
   return context
 }
 

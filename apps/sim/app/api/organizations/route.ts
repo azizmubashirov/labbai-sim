@@ -1,10 +1,10 @@
 import { AuditAction, AuditResourceType, recordAudit } from '@sim/audit'
 import { db } from '@sim/db'
-import { member, organization, subscription as subscriptionTable } from '@sim/db/schema'
+import { member, organization } from '@sim/db/schema'
 import { createLogger } from '@sim/logger'
 import { isOrgAdminRole } from '@sim/platform-authz/workspace'
 import { getErrorMessage } from '@sim/utils/errors'
-import { and, eq, inArray, or } from 'drizzle-orm'
+import { and, eq, or } from 'drizzle-orm'
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 import { createOrganizationBodySchema } from '@/lib/api/contracts/organization'
@@ -13,15 +13,10 @@ import { getValidationErrorMessage, parseRequest } from '@/lib/api/server'
 import { getSession } from '@/lib/auth'
 import { setActiveOrganizationForCurrentSession } from '@/lib/auth/active-organization'
 import {
-  createOrganizationForTeamPlan,
-  ensureOrganizationForTeamSubscription,
-} from '@/lib/billing/organization'
-import {
+  createOrganizationWithOwner,
   OrganizationSlugInvalidError,
   OrganizationSlugTakenError,
 } from '@/lib/billing/organizations/create-organization'
-import { isOrgPlan } from '@/lib/billing/plan-helpers'
-import { ENTITLED_SUBSCRIPTION_STATUSES } from '@/lib/billing/subscriptions/utils'
 import { withRouteHandler } from '@/lib/core/utils/with-route-handler'
 import { captureServerEvent } from '@/lib/posthog/server'
 import {
@@ -129,54 +124,11 @@ export const POST = withRouteHandler(async (request: Request) => {
       )
     }
 
-    const subscriptionReferenceIds = existingAdminMembership
-      ? [user.id, existingAdminMembership.organizationId]
-      : [user.id]
-
-    const activeOrgSubscriptions = await db
-      .select({
-        id: subscriptionTable.id,
-        plan: subscriptionTable.plan,
-        referenceId: subscriptionTable.referenceId,
-        status: subscriptionTable.status,
-        seats: subscriptionTable.seats,
-      })
-      .from(subscriptionTable)
-      .where(
-        and(
-          inArray(subscriptionTable.referenceId, subscriptionReferenceIds),
-          inArray(subscriptionTable.status, ENTITLED_SUBSCRIPTION_STATUSES)
-        )
-      )
-
-    const activeOrgSubscription =
-      (existingAdminMembership
-        ? activeOrgSubscriptions.find(
-            (subscription) =>
-              isOrgPlan(subscription.plan) &&
-              subscription.referenceId === existingAdminMembership.organizationId
-          )
-        : undefined) ??
-      activeOrgSubscriptions.find(
-        (subscription) => isOrgPlan(subscription.plan) && subscription.referenceId === user.id
-      ) ??
-      activeOrgSubscriptions.find((subscription) => isOrgPlan(subscription.plan))
-
-    if (!activeOrgSubscription) {
-      return NextResponse.json(
-        { error: 'Organization creation requires an active Team or Enterprise subscription.' },
-        { status: 403 }
-      )
-    }
-
-    logger.info('Creating organization for team plan', {
+    logger.info('Creating organization', {
       userId: user.id,
-      userName: user.name,
-      userEmail: user.email,
       organizationName,
       organizationSlug,
       existingOrganizationId: existingAdminMembership?.organizationId ?? null,
-      subscriptionReferenceId: activeOrgSubscription.referenceId,
     })
 
     let organizationId: string
@@ -184,57 +136,36 @@ export const POST = withRouteHandler(async (request: Request) => {
 
     if (existingAdminMembership) {
       organizationId = existingAdminMembership.organizationId
-
-      if (activeOrgSubscription.referenceId === organizationId) {
-        /**
-         * Keeps the default `reject` policy: manual organization creation
-         * surfaces a different-org collaborator as an explicit conflict (409
-         * with actionable copy) rather than silently demoting them to an
-         * external member. Safe alongside `includeArchived` because the attach
-         * only enumerates collaborators of ACTIVE workspaces, so sweeping
-         * archived rows cannot manufacture a conflict.
-         */
-        await attachOwnedWorkspacesToOrganization({
-          ownerUserId: user.id,
-          organizationId,
-          includeArchived: true,
-        })
-      } else {
-        const resolvedSubscription =
-          await ensureOrganizationForTeamSubscription(activeOrgSubscription)
-
-        if (resolvedSubscription.referenceId !== organizationId) {
-          logger.error('Recovered organization did not match existing owner/admin membership', {
-            userId: user.id,
-            expectedOrganizationId: organizationId,
-            resolvedReferenceId: resolvedSubscription.referenceId,
-            subscriptionId: activeOrgSubscription.id,
-          })
-          throw new Error('Organization recovery resolved to an unexpected subscription owner')
-        }
-      }
     } else {
       createdOrganization = true
-      organizationId = await createOrganizationForTeamPlan(
-        user.id,
-        organizationName || undefined,
-        user.email,
-        organizationSlug
-      )
-
-      const resolvedSubscription =
-        await ensureOrganizationForTeamSubscription(activeOrgSubscription)
-
-      if (resolvedSubscription.referenceId !== organizationId) {
-        logger.error('Newly created organization was not attached to the active subscription', {
-          userId: user.id,
-          expectedOrganizationId: organizationId,
-          resolvedReferenceId: resolvedSubscription.referenceId,
-          subscriptionId: activeOrgSubscription.id,
-        })
-        throw new Error('Failed to link the new organization to the active subscription')
-      }
+      const name = organizationName || `${user.email || 'User'}'s Team`
+      const slug =
+        organizationSlug ||
+        `${user.id}-team-${Date.now()}`
+          .toLowerCase()
+          .replace(/[^a-z0-9-_]+/g, '-')
+          .replace(/^-|-$/g, '')
+      const created = await createOrganizationWithOwner({
+        ownerUserId: user.id,
+        name,
+        slug,
+      })
+      organizationId = created.organizationId
     }
+
+    /**
+     * Keeps the default `reject` policy: manual organization creation
+     * surfaces a different-org collaborator as an explicit conflict (409
+     * with actionable copy) rather than silently demoting them to an
+     * external member. Safe alongside `includeArchived` because the attach
+     * only enumerates collaborators of ACTIVE workspaces, so sweeping
+     * archived rows cannot manufacture a conflict.
+     */
+    await attachOwnedWorkspacesToOrganization({
+      ownerUserId: user.id,
+      organizationId,
+      includeArchived: true,
+    })
 
     try {
       await setActiveOrganizationForCurrentSession(organizationId)
@@ -246,7 +177,7 @@ export const POST = withRouteHandler(async (request: Request) => {
       })
     }
 
-    logger.info('Successfully ensured organization for team plan', {
+    logger.info('Successfully ensured organization', {
       userId: user.id,
       organizationId,
       createdOrganization,
@@ -307,7 +238,7 @@ export const POST = withRouteHandler(async (request: Request) => {
       )
     }
 
-    logger.error('Failed to create organization for team plan', {
+    logger.error('Failed to create organization', {
       error: getErrorMessage(error, 'Unknown error'),
       stack: error instanceof Error ? error.stack : undefined,
     })

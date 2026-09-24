@@ -46,15 +46,14 @@ describe('enterprise audit access', () => {
     resetEnvFlagsMock()
   })
 
-  describe('with billing enabled', () => {
+  describe('with the audit-logs entitlement', () => {
     beforeEach(() => {
-      setEnvFlags({ isBillingEnabled: true })
+      setEnvFlags({ isAuditLogsEnabled: true })
       queueTableRows(schemaMock.member, [{ organizationId: 'organization-route', role: 'admin' }])
-      queueTableRows(schemaMock.subscription, [{ id: 'subscription-1' }])
       queueTableRows(schemaMock.member, [{ userId: 'viewer' }, { userId: 'member-2' }])
     })
 
-    it('authorizes and bills against the organization named by the route', async () => {
+    it('authorizes against the organization named by the route', async () => {
       await expect(validateEnterpriseAuditAccess('viewer', 'organization-route')).resolves.toEqual({
         success: true,
         context: {
@@ -69,15 +68,10 @@ describe('enterprise audit access', () => {
           { type: 'eq', left: schemaMock.member.organizationId, right: 'organization-route' },
         ],
       })
-      expect(mockIsOrganizationBillingBlocked).toHaveBeenCalledWith('organization-route')
     })
   })
 
-  describe('with billing disabled', () => {
-    beforeEach(() => {
-      setEnvFlags({ isBillingEnabled: false })
-    })
-
+  describe('entitlement checks', () => {
     it('authorizes on the audit-logs entitlement without any subscription row', async () => {
       setEnvFlags({ isAuditLogsEnabled: true })
       queueTableRows(schemaMock.member, [{ organizationId: 'org-1', role: 'owner' }])
@@ -87,11 +81,6 @@ describe('enterprise audit access', () => {
         success: true,
         context: { organizationId: 'org-1', orgMemberIds: ['viewer', 'member-2'] },
       })
-      /**
-       * The subscription lookup is what made audit logs unreachable
-       * self-hosted; a billing-free deployment never has one to find.
-       */
-      expect(mockIsOrganizationBillingBlocked).not.toHaveBeenCalled()
     })
 
     it('refuses when the audit-logs entitlement is off', async () => {
@@ -137,7 +126,7 @@ describe('enterprise audit access', () => {
     }
 
     beforeEach(() => {
-      setEnvFlags({ isBillingEnabled: false, isAuditLogsEnabled: true })
+      setEnvFlags({ isAuditLogsEnabled: true })
     })
 
     it('refuses a workspace key before resolving its creator as the subject', async () => {

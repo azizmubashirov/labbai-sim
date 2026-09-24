@@ -9,7 +9,18 @@ import {
 } from '@/components/settings/navigation'
 
 describe('standalone settings section resolution', () => {
-  it('keeps Billing active for the static account credit-usage route', () => {
+  it('resolves the legacy account apikeys segment to its canonical section', () => {
+    expect(
+      parseSettingsPathSection({
+        path: '/account/settings/apikeys',
+        items: ACCOUNT_SETTINGS_ITEMS,
+        defaultSection: 'general',
+        aliases: ACCOUNT_SETTINGS_PATH_ALIASES,
+      })
+    ).toBe('api-keys')
+  })
+
+  it('falls back to General for a retired account section', () => {
     expect(
       parseSettingsPathSection({
         path: '/account/settings/billing/credit-usage',
@@ -17,6 +28,6 @@ describe('standalone settings section resolution', () => {
         defaultSection: 'general',
         aliases: ACCOUNT_SETTINGS_PATH_ALIASES,
       })
-    ).toBe('billing')
+    ).toBe('general')
   })
 })

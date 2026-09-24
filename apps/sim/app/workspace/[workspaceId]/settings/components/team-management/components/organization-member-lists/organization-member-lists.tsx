@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { ChipDropdown, ChipTag, toast } from '@sim/emcn'
 import { createLogger } from '@sim/logger'
 import { isOrgAdminRole } from '@sim/platform-authz/predicates'
@@ -19,10 +19,6 @@ import type {
   RosterWorkspaceAccess,
 } from '@/lib/api/contracts/organization'
 import type { Member } from '@/lib/workspaces/organization'
-import {
-  ManageCreditsModal,
-  type ManageCreditsTarget,
-} from '@/app/workspace/[workspaceId]/settings/components/manage-credits-modal'
 import {
   MemberRow,
   MemberSection,
@@ -99,8 +95,6 @@ export function OrganizationMemberLists({
   onRemoveMember,
   onTransferOwnership,
 }: OrganizationMemberListsProps) {
-  const [creditsTarget, setCreditsTarget] = useState<ManageCreditsTarget | null>(null)
-
   const updateMemberRole = useUpdateOrganizationMemberRole()
   const updateInvitation = useUpdateInvitation()
   const updatePermissions = useUpdateWorkspacePermissions()
@@ -159,19 +153,6 @@ export function OrganizationMemberLists({
         }
         menu={buildActionsMenu([
           { label: 'Copy email', onSelect: () => copyToClipboard(member.email) },
-          ...(canManage && !isOwner
-            ? [
-                {
-                  label: 'Manage credits',
-                  onSelect: () =>
-                    setCreditsTarget({
-                      userId: member.userId,
-                      name: member.name,
-                      email: member.email,
-                    }),
-                },
-              ]
-            : []),
           ...(canRemove
             ? [
                 {
@@ -480,18 +461,6 @@ export function OrganizationMemberLists({
           </MemberSection>
         )
       })}
-
-      {canManage && (
-        <ManageCreditsModal
-          key={creditsTarget?.userId ?? 'none'}
-          open={creditsTarget !== null}
-          onOpenChange={(open) => {
-            if (!open) setCreditsTarget(null)
-          }}
-          organizationId={organizationId}
-          member={creditsTarget}
-        />
-      )}
     </>
   )
 }

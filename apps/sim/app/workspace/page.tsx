@@ -11,11 +11,6 @@ import { getWorkflowStateContract } from '@/lib/api/contracts/workflows'
 import { createWorkspaceContract } from '@/lib/api/contracts/workspaces'
 import { useSession } from '@/lib/auth/auth-client'
 import { recoverFromStaleSession } from '@/lib/auth/stale-session-recovery'
-import {
-  buildUpgradeHref,
-  isUpgradeReason,
-  UPGRADE_REASON_PARAM,
-} from '@/lib/billing/upgrade-reasons'
 import { WorkspaceRecencyStorage } from '@/lib/core/utils/browser-storage'
 import { useWorkspacesWithMetadata } from '@/hooks/queries/workspace'
 
@@ -121,15 +116,10 @@ export default function WorkspacePage() {
     const urlParams = new URLSearchParams(window.location.search)
     const redirectWorkflowId = urlParams.get('redirect_workflow')
     const redirectTarget = urlParams.get('redirect')
-    const rawReason = urlParams.get(UPGRADE_REASON_PARAM)
 
-    /** Preserve settings and upgrade destinations when selecting or creating a workspace. */
+    /** Preserve settings destinations when selecting or creating a workspace. */
     const destinationFor = (id: string) =>
-      redirectTarget === 'upgrade'
-        ? buildUpgradeHref(id, isUpgradeReason(rawReason) ? rawReason : undefined)
-        : redirectTarget === 'settings'
-          ? `/workspace/${id}/settings/general`
-          : `/workspace/${id}`
+      redirectTarget === 'settings' ? `/workspace/${id}/settings/general` : `/workspace/${id}`
 
     const { workspaces, lastActiveWorkspaceId, creationPolicy } = data
 
@@ -187,13 +177,11 @@ export default function WorkspacePage() {
       <WorkspaceStatusCard
         title='No workspace access yet'
         description={
-          blockedPolicy.blockedReasonCode === 'organization-subscription-inactive'
-            ? "Your organization's subscription is inactive, so new workspaces can't be created. Ask an organization owner to reactivate it."
-            : blockedPolicy.blockedReasonCode === 'permission-group-denied'
-              ? "Your permission group doesn't allow creating workspaces, and you don't have access to an existing one. Ask an organization admin for workspace access."
-              : blockedPolicy.workspaceMode === 'organization'
-                ? "Your account is linked to an organization, but you don't have access to any of its workspaces. Ask an organization admin for workspace access, then check again — or sign out and back in if you recently left the organization."
-                : 'Your plan has reached its workspace limit and none of your workspaces are active. Upgrade your plan to create another workspace, or contact support to restore an archived one.'
+          blockedPolicy.blockedReasonCode === 'permission-group-denied'
+            ? "Your permission group doesn't allow creating workspaces, and you don't have access to an existing one. Ask an organization admin for workspace access."
+            : blockedPolicy.workspaceMode === 'organization'
+              ? "Your account is linked to an organization, but you don't have access to any of its workspaces. Ask an organization admin for workspace access, then check again — or sign out and back in if you recently left the organization."
+              : "A new workspace can't be created right now and none of your workspaces are active. Contact your administrator to restore an archived one."
         }
         primaryLabel='Check again'
         onPrimary={() => window.location.reload()}

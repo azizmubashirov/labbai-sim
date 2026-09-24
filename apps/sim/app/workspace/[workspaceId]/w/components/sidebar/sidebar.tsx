@@ -40,7 +40,6 @@ import { createLogger } from '@sim/logger'
 import { useParams, usePathname, useRouter } from 'next/navigation'
 import { usePostHog } from 'posthog-js/react'
 import { useSession } from '@/lib/auth/auth-client'
-import { canViewWorkspaceBillingSettings } from '@/lib/billing/workspace-permissions'
 import { SIM_RESOURCES_DRAG_TYPE } from '@/lib/copilot/resource-types'
 import { useDeploymentShape } from '@/lib/core/config/deployment-shape'
 import { isStatusNoticePreviewEnabled } from '@/lib/core/config/env-flags'
@@ -826,10 +825,7 @@ export const Sidebar = memo(function Sidebar() {
 
   const profileNavigationLinks = allNavigationItems
     .filter(
-      ({ id }) =>
-        id === 'teammates' ||
-        id === 'recently-deleted' ||
-        (id === 'billing' && canViewWorkspaceBillingSettings(hostContext, profile?.id))
+      ({ id }) => id === 'teammates' || id === 'recently-deleted'
     )
     .map(({ id, label, icon }) => ({
       label,
