@@ -50,6 +50,7 @@ import { useMarkMothershipChatRead } from '@/hooks/queries/mothership-chats'
 import { useWorkflows } from '@/hooks/queries/workflows'
 import { getWorkspaceFilesQueryOptions, useWorkspaceFiles } from '@/hooks/queries/workspace-files'
 import { useOAuthReturnRouter } from '@/hooks/use-oauth-return'
+import { useLocalCopilotCatalogSelection } from '@/local-copilot/hooks/use-copilot-backend-preference'
 import type { ChatContext } from '@/stores/panel'
 import {
   ChatSurfaceProvider,
@@ -261,6 +262,14 @@ function HomeContent({ chatId, userName, userId }: HomeProps) {
   }
 
   const {
+    canSwitchBackend,
+    copilotBackend,
+    setCopilotBackend,
+    localCopilotCatalogId,
+    setLocalCopilotCatalogId,
+  } = useLocalCopilotCatalogSelection()
+
+  const {
     messages,
     isChatHistoryPending,
     isSending,
@@ -291,6 +300,8 @@ function HomeContent({ chatId, userName, userId }: HomeProps) {
     getMothershipUseChatOptions({
       onResourceEvent: handleResourceEvent,
       activeResourceState,
+      getCopilotBackend: () => copilotBackend,
+      getLocalCopilotCatalogId: () => localCopilotCatalogId,
       onRequestStarted: ({ requestId, userMessageId }) => {
         captureEvent(posthogRef.current, 'task_request_started', {
           workspace_id: workspaceId,
@@ -683,6 +694,11 @@ function HomeContent({ chatId, userName, userId }: HomeProps) {
                   userId={userId}
                   onContextAdd={handleContextAdd}
                   onContextRemove={handleInitialContextRemove}
+                  canSwitchCopilotBackend={canSwitchBackend}
+                  copilotBackend={copilotBackend}
+                  setCopilotBackend={setCopilotBackend}
+                  localCopilotCatalogId={localCopilotCatalogId}
+                  setLocalCopilotCatalogId={setLocalCopilotCatalogId}
                 >
                   <UserInput
                     ref={initialViewUserInputRef}
@@ -724,6 +740,11 @@ function HomeContent({ chatId, userName, userId }: HomeProps) {
             chatId={resolvedChatId}
             onContextAdd={handleContextAdd}
             onWorkspaceResourceSelect={handleWorkspaceResourceSelect}
+            canSwitchCopilotBackend={canSwitchBackend}
+            copilotBackend={copilotBackend}
+            setCopilotBackend={setCopilotBackend}
+            localCopilotCatalogId={localCopilotCatalogId}
+            setLocalCopilotCatalogId={setLocalCopilotCatalogId}
             draftScopeKey={draftScopeKey}
             animateInput={isInputEntering}
             onInputAnimationEnd={isInputEntering ? () => setIsInputEntering(false) : undefined}

@@ -1,5 +1,6 @@
 import type { PersistedStreamEventEnvelope } from '@/lib/copilot/request/session/contract'
 import type { StreamLoopContext } from '@/app/workspace/[workspaceId]/home/hooks/stream/stream-context'
+import { setLocalLiveStatus } from '@/local-copilot/lib/client/local-live-status'
 
 type CompleteEvent = Extract<PersistedStreamEventEnvelope, { type: 'complete' }>
 
@@ -12,5 +13,7 @@ export function handleCompleteEvent(ctx: StreamLoopContext, _parsed: CompleteEve
   ctx.deps.clearBrowserAgentRuns()
   ctx.state.browserAgentRunIds.clear()
   ctx.state.sawCompleteEvent = true
+  ctx.state.liveStatus = undefined
+  setLocalLiveStatus(undefined)
   ctx.ops.flush()
 }

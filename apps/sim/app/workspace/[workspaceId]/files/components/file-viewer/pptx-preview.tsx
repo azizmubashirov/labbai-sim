@@ -3,6 +3,7 @@
 import { memo, useEffect, useState } from 'react'
 import { createLogger } from '@sim/logger'
 import type { WorkspaceFileRecord } from '@/lib/uploads/contexts/workspace'
+import { GeneratingPreviewEngagement } from '@/app/workspace/[workspaceId]/files/components/file-viewer/generating-preview-engagement'
 import { PptxSandboxHost } from '@/app/workspace/[workspaceId]/files/components/file-viewer/pptx-sandbox-host'
 import {
   PREVIEW_LOADING_OVERLAY,
@@ -11,6 +12,7 @@ import {
   resolvePreviewError,
 } from '@/app/workspace/[workspaceId]/files/components/file-viewer/preview-shared'
 import { useDocPreviewBinary } from '@/app/workspace/[workspaceId]/files/components/file-viewer/use-doc-preview-binary'
+import { useLocalGeneratingPreviewEngagement } from '@/app/workspace/[workspaceId]/files/components/file-viewer/use-local-generating-preview-engagement'
 
 const logger = createLogger('PptxPreview')
 
@@ -21,10 +23,13 @@ function pptxCacheKey(fileId: string, dataUpdatedAt: number, byteLength: number)
 export const PptxPreview = memo(function PptxPreview({
   file,
   workspaceId,
+  isAgentEditing,
 }: {
   file: WorkspaceFileRecord
   workspaceId: string
+  isAgentEditing?: boolean
 }) {
+  const showGeneratingEngagement = useLocalGeneratingPreviewEngagement(isAgentEditing)
   const preview = useDocPreviewBinary(workspaceId, file)
   const fileData = preview.data
   const cacheKey = pptxCacheKey(file.id, preview.dataUpdatedAt, fileData?.byteLength ?? 0)
@@ -55,6 +60,9 @@ export const PptxPreview = memo(function PptxPreview({
   if (error) return <PreviewError label='presentation' error={error} />
 
   if (!fileData) {
+    if (showGeneratingEngagement) {
+      return <GeneratingPreviewEngagement kind='presentation' fileName={file.name} />
+    }
     return <PreviewLoadingFrame className='h-full flex-1' tone='surface' />
   }
 

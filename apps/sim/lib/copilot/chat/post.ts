@@ -5,7 +5,7 @@ import { copilotChats } from '@sim/db/schema'
 import { createLogger } from '@sim/logger'
 import { getErrorMessage } from '@sim/utils/errors'
 import { generateId } from '@sim/utils/id'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { type NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import {
@@ -89,10 +89,21 @@ import {
   isWorkspaceAccessDeniedError,
   type PermissionType,
 } from '@/lib/workspaces/permissions/utils'
+import { getLocalCopilotUserAccess } from '@/local-copilot/lib/access'
+import { DEFAULT_LOCAL_COPILOT_MODEL } from '@/local-copilot/lib/config'
+import { extractWorkflowIdFromResources } from '@/local-copilot/lib/context/open-workflow'
+import {
+  type CopilotBackendPreference,
+  parseCopilotBackendPreference,
+} from '@/local-copilot/lib/copilot-backend-preference'
+import {
+  remapLegacyLocalCopilotCatalogId,
+  resolveLocalCopilotRequestCatalogId,
+} from '@/local-copilot/lib/model-catalog'
 import type { ChatContext } from '@/stores/panel'
 
 const logger = createLogger('UnifiedChatAPI')
-const DEFAULT_MODEL = 'claude-opus-4-8'
+const DEFAULT_MODEL = DEFAULT_LOCAL_COPILOT_MODEL
 const CHAT_SELECTION_TEXT_MAX_LENGTH = 100_000
 const CHAT_SELECTION_SOURCE_URL_MAX_LENGTH = 8_192
 const CHAT_SELECTION_SOURCE_TITLE_MAX_LENGTH = 512
@@ -182,6 +193,31 @@ function dropUnaddressableAttachments(value: unknown): unknown {
     const id = (resource as { id?: unknown } | null)?.id
     return typeof id !== 'string' || hasAddressableId(id)
   })
+}
+
+/**
+ * Home chat sends an open canvas as a resource tab, not `workflowId`.
+ * Local Copilot needs the id so the live graph lands in system context after refresh.
+ */
+function resolveOpenWorkflowIdForLocalCopilot(params: {
+  branchWorkflowId?: string
+  chatWorkflowId?: string | null
+  resourceAttachments?: Array<{ type: string; id: string; active?: boolean }>
+  chatResources?: unknown
+}): string | undefined {
+  const fromBranch = params.branchWorkflowId?.trim()
+  if (fromBranch) return fromBranch
+
+  const attachments = params.resourceAttachments ?? []
+  const workflows = attachments.filter((attachment) => attachment.type === 'workflow')
+  const active = workflows.find((attachment) => attachment.active) ?? workflows[0]
+  if (active?.id) return active.id
+
+  const fromChatResources = extractWorkflowIdFromResources(params.chatResources)
+  if (fromChatResources) return fromChatResources
+
+  const fromChat = params.chatWorkflowId?.trim()
+  return fromChat || undefined
 }
 
 /** Non-strings pass through for the schema to reject; strings are sanitized. */
@@ -307,6 +343,7 @@ const ChatMessageSchema = z
     contexts: z.array(ChatContextSchema).optional(),
     commands: z.array(z.string()).optional(),
     userTimezone: z.string().optional(),
+    copilotBackend: z.enum(['local', 'external']).optional(),
     desktopCapabilities: z
       .object({
         localFilesystem: z.boolean().optional(),
@@ -569,6 +606,33 @@ async function resolveAgentContexts(params: {
   }
 
   return agentContexts
+}
+
+/**
+ * Existing Local chats created under the hosted Opus default still store
+ * `claude-opus-4-8`. Rewrite that leftover onto the generic Claude picker id
+ * so follow-up turns and `copilot_messages.model` stop carrying the old id.
+ */
+async function migrateLegacyLocalCopilotChatModel(
+  chatId: string,
+  userId: string
+): Promise<string | undefined> {
+  const [row] = await db
+    .select({ model: copilotChats.model })
+    .from(copilotChats)
+    .where(and(eq(copilotChats.id, chatId), eq(copilotChats.userId, userId)))
+    .limit(1)
+
+  const storedModel = row?.model ?? undefined
+  const remapped = remapLegacyLocalCopilotCatalogId(storedModel)
+  if (!remapped) return storedModel
+
+  await db
+    .update(copilotChats)
+    .set({ model: remapped, updatedAt: new Date() })
+    .where(and(eq(copilotChats.id, chatId), eq(copilotChats.userId, userId)))
+
+  return storedModel
 }
 
 async function persistUserMessage(params: {
@@ -903,6 +967,8 @@ async function resolveBranch(params: {
   model?: string
   mode?: UnifiedChatRequest['mode']
   provider?: string
+  /** When Local, workspace branch embeds this catalog id in the request payload. */
+  localCatalogId?: string
 }): Promise<UnifiedChatBranch | NextResponse> {
   const {
     authenticatedUserId,
@@ -914,6 +980,7 @@ async function resolveBranch(params: {
     model,
     mode,
     provider,
+    localCatalogId,
   } = params
 
   if (organizationId) {
@@ -1047,9 +1114,9 @@ async function resolveBranch(params: {
     kind: 'workspace',
     workspaceId: requestedWorkspaceId,
     workspacePermission,
-    effectiveModel: DEFAULT_MODEL,
+    effectiveModel: localCatalogId || DEFAULT_MODEL,
     goRoute: '/api/mothership',
-    titleModel: DEFAULT_MODEL,
+    titleModel: localCatalogId || DEFAULT_MODEL,
     notifyChatStatus: true,
     buildPayload: async (payloadParams) =>
       buildCopilotRequestPayload(
@@ -1059,7 +1126,7 @@ async function resolveBranch(params: {
           userId: payloadParams.userId,
           userMessageId: payloadParams.userMessageId,
           mode: mode ?? 'agent',
-          model: '',
+          model: localCatalogId || '',
           contexts: payloadParams.contexts,
           assistantSearch: payloadParams.assistantSearch,
           mcpServerIds: payloadParams.mcpServerIds,
@@ -1077,7 +1144,7 @@ async function resolveBranch(params: {
           terminals: payloadParams.terminals,
           browserSessions: payloadParams.browserSessions,
         },
-        { selectedModel: '' }
+        { selectedModel: localCatalogId || '' }
       ),
     buildExecutionContext: async ({ userId, chatId, userTimezone, messageId }) =>
       buildInitialExecutionContext({
@@ -1191,6 +1258,35 @@ export async function handleUnifiedChatPost(req: NextRequest) {
       )
     }
 
+    const requestedCopilotBackend = parseCopilotBackendPreference(body.copilotBackend)
+    const { hasAccess, localOnly, defaultModel } =
+      await getLocalCopilotUserAccess(authenticatedUserId)
+    const userAllowedForLocal = hasAccess || localOnly
+    // Local-only users are pinned to Local regardless of any stored or forged
+    // `external` preference, mirroring the server-side routing guard so chat
+    // title generation and routing never leak to the cloud mothership.
+    const copilotBackend: CopilotBackendPreference | undefined = localOnly
+      ? 'local'
+      : requestedCopilotBackend === 'local' && userAllowedForLocal
+        ? 'local'
+        : requestedCopilotBackend === 'external'
+          ? 'external'
+          : userAllowedForLocal
+            ? 'local'
+            : 'external'
+
+    let localCatalogId: string | undefined
+    if (copilotBackend === 'local') {
+      const storedChatModel = body.chatId
+        ? await migrateLegacyLocalCopilotChatModel(body.chatId, authenticatedUserId)
+        : undefined
+      localCatalogId = resolveLocalCopilotRequestCatalogId(
+        body.model?.trim(),
+        defaultModel,
+        storedChatModel
+      )
+    }
+
     const userMetadata = {
       ...(authenticatedUserName ? { name: authenticatedUserName } : {}),
       ...(authenticatedUserEmail ? { email: authenticatedUserEmail } : {}),
@@ -1247,6 +1343,7 @@ export async function handleUnifiedChatPost(req: NextRequest) {
             model: body.model,
             mode: body.mode,
             provider: body.provider,
+            ...(localCatalogId ? { localCatalogId } : {}),
           }),
         activeOtelRoot.context
       )
@@ -1350,7 +1447,7 @@ export async function handleUnifiedChatPost(req: NextRequest) {
                     },
                   }
                 : {}),
-              model: branch.titleModel,
+              model: branch.effectiveModel,
               type: branch.kind === 'workflow' ? 'copilot' : 'mothership',
             }),
           activeOtelRoot.context
@@ -1659,6 +1756,27 @@ export async function handleUnifiedChatPost(req: NextRequest) {
         activeOtelRoot.span.setAttribute(TraceAttr.WorkspaceId, workspaceId)
       }
 
+      const localOpenWorkflowId =
+        copilotBackend === 'local'
+          ? resolveOpenWorkflowIdForLocalCopilot({
+              branchWorkflowId: branch.kind === 'workflow' ? branch.workflowId : undefined,
+              chatWorkflowId:
+                currentChat && 'workflowId' in currentChat ? currentChat.workflowId : null,
+              resourceAttachments: body.resourceAttachments,
+              chatResources:
+                currentChat && 'resources' in currentChat ? currentChat.resources : undefined,
+            })
+          : undefined
+      const orchestratorWorkflowId =
+        localOpenWorkflowId ?? (branch.kind === 'workflow' ? branch.workflowId : undefined)
+
+      if (
+        orchestratorWorkflowId &&
+        !(typeof requestPayload.workflowId === 'string' && requestPayload.workflowId.trim())
+      ) {
+        requestPayload.workflowId = orchestratorWorkflowId
+      }
+
       const stream = createSSEStream({
         requestPayload,
         userId: authenticatedUserId,
@@ -1677,7 +1795,8 @@ export async function handleUnifiedChatPost(req: NextRequest) {
         otelRoot: activeOtelRoot,
         orchestrateOptions: {
           userId: authenticatedUserId,
-          ...(branch.kind === 'workflow' ? { workflowId: branch.workflowId } : {}),
+          copilotBackend,
+          ...(orchestratorWorkflowId ? { workflowId: orchestratorWorkflowId } : {}),
           ...(workspaceId ? { workspaceId } : {}),
           ...(branch.kind === 'organization' ? { organizationId: branch.organizationId } : {}),
           chatId: actualChatId,

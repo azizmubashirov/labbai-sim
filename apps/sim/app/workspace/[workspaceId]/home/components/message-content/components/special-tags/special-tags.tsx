@@ -51,11 +51,18 @@ import {
   QuestionDisplay,
 } from '@/app/workspace/[workspaceId]/home/components/message-content/components/question'
 import { ResourceMention } from '@/app/workspace/[workspaceId]/home/components/message-content/components/resource-mention'
+import { ChartDisplay } from '@/app/workspace/[workspaceId]/home/components/message-content/components/special-tags/chart-display'
+import {
+  findSingleSelectJson,
+  hasIncompleteSingleSelectJson,
+} from '@/app/workspace/[workspaceId]/home/components/message-content/components/special-tags/choice-blocks'
+import { ToolConfirmationDisplay } from '@/app/workspace/[workspaceId]/home/components/message-content/components/special-tags/tool-confirmation-display'
 import {
   resolveOAuthChipTarget,
   useOAuthChipConnection,
 } from '@/app/workspace/[workspaceId]/home/components/message-content/components/special-tags/use-oauth-chip-connection'
 import { usePersonalCredentialConnection } from '@/app/workspace/[workspaceId]/home/components/message-content/components/special-tags/use-personal-credential-connection'
+import { WorkflowPatchDisplay } from '@/app/workspace/[workspaceId]/home/components/message-content/components/special-tags/workflow-patch-display'
 import type {
   ChatMessageContext,
   MothershipResource,
@@ -333,6 +340,43 @@ export interface WorkspaceResourceTagData {
   title?: string
 }
 
+export const CHART_TAG_TYPES = ['bar', 'line', 'area', 'pie', 'scatter'] as const
+
+export type ChartTagType = (typeof CHART_TAG_TYPES)[number]
+
+export interface ChartTagSeries {
+  name?: string
+  data: Array<number | [number, number]>
+}
+
+/**
+ * Constrained chart spec streamed by the copilot inside a `<chart>` tag and
+ * rendered inline with ECharts. `labels` are x-axis categories for cartesian
+ * types and slice names for pie.
+ */
+export interface ChartTagData {
+  type: ChartTagType
+  title?: string
+  labels?: string[]
+  series: ChartTagSeries[]
+}
+
+export interface ToolConfirmationTagData {
+  toolCallId: string
+  toolName: string
+  category: 'destructive' | 'production' | 'credential' | 'costly' | 'external_write'
+  summary: string
+  target?: string
+  estimatedCostUsd?: number
+  estimatedCostLabel?: string
+}
+
+export interface WorkflowPatchTagData {
+  patchId: string
+  summary: string
+  workflowId: string
+}
+
 /**
  * A `<source>` tag: one document the reply drew on. The tag contract for
  * search answers — the model emits it inline, right after the sentence, list
@@ -378,6 +422,9 @@ export type ContentSegment =
   | { type: 'workspace_resource'; data: WorkspaceResourceTagData }
   | { type: 'question'; data: QuestionTagData }
   | { type: 'source'; data: SourceTagData }
+  | { type: 'chart'; data: ChartTagData }
+  | { type: 'tool_confirmation'; data: ToolConfirmationTagData }
+  | { type: 'workflow_patch'; data: WorkflowPatchTagData }
 
 export type RuntimeSpecialTagName =
   | 'thinking'
@@ -388,6 +435,9 @@ export type RuntimeSpecialTagName =
   | 'workspace_resource'
   | 'question'
   | 'source'
+  | 'chart'
+  | 'tool_confirmation'
+  | 'workflow_patch'
 
 export interface ParsedSpecialContent {
   segments: ContentSegment[]
@@ -403,6 +453,9 @@ const RUNTIME_SPECIAL_TAG_NAMES = [
   'workspace_resource',
   'question',
   'source',
+  'chart',
+  'tool_confirmation',
+  'workflow_patch',
 ] as const
 
 /**
@@ -419,6 +472,9 @@ export const SPECIAL_TAG_NAMES = [
   'workspace_resource',
   'question',
   'source',
+  'chart',
+  'tool_confirmation',
+  'workflow_patch',
 ] as const
 
 function isOptionsItemData(value: unknown): value is OptionsItemData {
@@ -630,6 +686,82 @@ function isWorkspaceResourceTagData(value: unknown): value is WorkspaceResourceT
   return id.length > 0
 }
 
+function isToolConfirmationTagData(value: unknown): value is ToolConfirmationTagData {
+  if (!isRecordLike(value)) return false
+  const categories = ['destructive', 'production', 'credential', 'costly', 'external_write']
+  return (
+    typeof value.toolCallId === 'string' &&
+    value.toolCallId.trim().length > 0 &&
+    typeof value.toolName === 'string' &&
+    value.toolName.trim().length > 0 &&
+    typeof value.category === 'string' &&
+    categories.includes(value.category) &&
+    typeof value.summary === 'string' &&
+    value.summary.trim().length > 0 &&
+    (value.target === undefined || typeof value.target === 'string') &&
+    (value.estimatedCostUsd === undefined || typeof value.estimatedCostUsd === 'number') &&
+    (value.estimatedCostLabel === undefined || typeof value.estimatedCostLabel === 'string')
+  )
+}
+
+function isWorkflowPatchTagData(value: unknown): value is WorkflowPatchTagData {
+  if (!isRecordLike(value)) return false
+  return (
+    typeof value.patchId === 'string' &&
+    value.patchId.trim().length > 0 &&
+    typeof value.summary === 'string' &&
+    value.summary.trim().length > 0 &&
+    typeof value.workflowId === 'string' &&
+    value.workflowId.trim().length > 0
+  )
+}
+
+const CHART_MAX_SERIES = 10
+const CHART_MAX_POINTS = 1000
+
+function isChartPoint(value: unknown): value is number | [number, number] {
+  if (typeof value === 'number') return Number.isFinite(value)
+  return (
+    Array.isArray(value) &&
+    value.length === 2 &&
+    value.every((entry) => typeof entry === 'number' && Number.isFinite(entry))
+  )
+}
+
+function isChartTagSeries(value: unknown): value is ChartTagSeries {
+  if (!isRecordLike(value)) return false
+  if (value.name !== undefined && typeof value.name !== 'string') return false
+  return (
+    Array.isArray(value.data) &&
+    value.data.length > 0 &&
+    value.data.length <= CHART_MAX_POINTS &&
+    value.data.every(isChartPoint)
+  )
+}
+
+function isChartTagData(value: unknown): value is ChartTagData {
+  if (!isRecordLike(value)) return false
+  if (
+    typeof value.type !== 'string' ||
+    !(CHART_TAG_TYPES as readonly string[]).includes(value.type)
+  ) {
+    return false
+  }
+  if (value.title !== undefined && typeof value.title !== 'string') return false
+  if (
+    value.labels !== undefined &&
+    (!Array.isArray(value.labels) || !value.labels.every((label) => typeof label === 'string'))
+  ) {
+    return false
+  }
+  return (
+    Array.isArray(value.series) &&
+    value.series.length > 0 &&
+    value.series.length <= CHART_MAX_SERIES &&
+    value.series.every(isChartTagSeries)
+  )
+}
+
 function isQuestionOption(value: unknown): value is QuestionOption {
   if (!isRecordLike(value)) return false
   return typeof value.id === 'string' && typeof value.label === 'string'
@@ -803,6 +935,9 @@ function parseSpecialTagData(
   | { type: 'workspace_resource'; data: WorkspaceResourceTagData }
   | { type: 'question'; data: QuestionTagData }
   | { type: 'source'; data: SourceTagData }
+  | { type: 'chart'; data: ChartTagData }
+  | { type: 'tool_confirmation'; data: ToolConfirmationTagData }
+  | { type: 'workflow_patch'; data: WorkflowPatchTagData }
   | null {
   if (tagName === 'thinking') {
     const content = parseTextTagBody(body)
@@ -844,6 +979,21 @@ function parseSpecialTagData(
     if (data) return { type: 'question', data }
     const recovered = recoverQuestionPrompts(body)
     return recovered ? { type: 'text', content: recovered } : null
+  }
+
+  if (tagName === 'chart') {
+    const data = parseJsonTagBody(body, isChartTagData)
+    return data ? { type: 'chart', data } : null
+  }
+
+  if (tagName === 'tool_confirmation') {
+    const data = parseJsonTagBody(body, isToolConfirmationTagData)
+    return data ? { type: 'tool_confirmation', data } : null
+  }
+
+  if (tagName === 'workflow_patch') {
+    const data = parseJsonTagBody(body, isWorkflowPatchTagData)
+    return data ? { type: 'workflow_patch', data } : null
   }
 
   return null
@@ -1567,9 +1717,32 @@ export function parseSpecialTags(content: string, isStreaming: boolean): ParsedS
             hasPendingTag = true
           }
         }
+
+        if (hasIncompleteSingleSelectJson(remaining)) {
+          const match = remaining.match(/\{\s*"type"\s*:\s*"single_select"/)
+          if (match?.index !== undefined) {
+            remaining = remaining.slice(0, match.index)
+            hasPendingTag = true
+          }
+        }
       }
 
-      pushText(remaining)
+      while (remaining.length > 0) {
+        const singleSelect = findSingleSelectJson(remaining)
+        if (!singleSelect) {
+          pushText(remaining)
+          break
+        }
+
+        if (singleSelect.before.trim()) {
+          pushText(singleSelect.before)
+        } else if (singleSelect.prompt) {
+          pushText(`${singleSelect.prompt}\n\n`)
+        }
+
+        segments.push({ type: 'options', data: singleSelect.options })
+        remaining = singleSelect.after
+      }
       break
     }
 
@@ -1802,6 +1975,12 @@ export function SpecialTags({
           onDismiss={onQuestionDismiss}
         />
       )
+    case 'chart':
+      return <ChartDisplay data={segment.data} />
+    case 'tool_confirmation':
+      return <ToolConfirmationDisplay data={segment.data} />
+    case 'workflow_patch':
+      return <WorkflowPatchDisplay data={segment.data} />
     default:
       return null
   }

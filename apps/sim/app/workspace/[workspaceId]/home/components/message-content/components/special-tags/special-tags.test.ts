@@ -1107,6 +1107,11 @@ describe('parser properties', () => {
     'mothership-error':
       '<mothership-error>{"message":"The tool call failed.","code":"E_TOOL"}</mothership-error>',
     source: '<source>{"url":"https://docs.github.com/en/x","siteName":"GitHub Docs"}</source>',
+    chart: '<chart>{"type":"bar","labels":["Mon","Tue"],"series":[{"data":[1,2]}]}</chart>',
+    tool_confirmation:
+      '<tool_confirmation>{"toolCallId":"tc-1","toolName":"delete_workflow","category":"destructive","summary":"Delete workflow"}</tool_confirmation>',
+    workflow_patch:
+      '<workflow_patch>{"patchId":"p-1","summary":"Add a block","workflowId":"wf-1"}</workflow_patch>',
   }
 
   /** Renders nothing rather than a card, so it cannot carry a card invariant. */

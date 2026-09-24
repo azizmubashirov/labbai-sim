@@ -13,7 +13,6 @@ import {
   listOrganizationChats,
 } from '@/lib/copilot/chat/organization-chats'
 import { chatPubSub } from '@/lib/copilot/chat-status'
-import { MOTHERSHIP_CHAT_DEFAULT_MODEL } from '@/lib/copilot/constants'
 import {
   authenticateCopilotRequestSessionOnly,
   createForbiddenResponse,
@@ -27,6 +26,7 @@ import {
   assertActiveWorkspaceAccess,
   isWorkspaceAccessDeniedError,
 } from '@/lib/workspaces/permissions/utils'
+import { DEFAULT_LOCAL_COPILOT_MODEL } from '@/local-copilot/lib/config'
 
 const logger = createLogger('MothershipChatsAPI')
 
@@ -104,7 +104,7 @@ export const POST = withRouteHandler(async (request: NextRequest) => {
         workspaceId,
         type: 'mothership',
         title: null,
-        model: MOTHERSHIP_CHAT_DEFAULT_MODEL,
+        model: DEFAULT_LOCAL_COPILOT_MODEL,
         updatedAt: now,
         lastSeenAt: now,
       })

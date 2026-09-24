@@ -2,7 +2,7 @@ import { toError } from '@sim/utils/errors'
 import { SimAutoIcon } from '@/components/icons'
 import { getDeploymentShape } from '@/lib/core/config/deployment-shape'
 import { getEnv, isTruthy } from '@/lib/core/config/env'
-import { isOllamaConfigured } from '@/lib/core/config/env-flags'
+import { isOllamaConfigured, platformLlmProviders } from '@/lib/core/config/env-flags'
 import { getScopesForService } from '@/lib/oauth/utils'
 import { containsReference } from '@/lib/workflows/sanitization/references'
 import type { SubBlockConfig } from '@/blocks/types'
@@ -193,6 +193,14 @@ export function shouldRequireApiKeyForModel(model: string): boolean {
   }
 
   if (isCustomModelId(normalizedModel)) return true
+
+  if (platformLlmProviders.size > 0) {
+    try {
+      if (platformLlmProviders.has(getProviderFromModel(normalizedModel))) return false
+    } catch {
+      // Unknown model id — fall through to the default rules.
+    }
+  }
 
   const storeProvider = getProviderFromStore(normalizedModel)
   if (storeProvider === 'ollama' || storeProvider === 'vllm' || storeProvider === 'litellm')

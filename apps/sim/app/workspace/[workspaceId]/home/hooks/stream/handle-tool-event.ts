@@ -1,6 +1,7 @@
 import { isCurrentBrowserToolName } from '@sim/browser-protocol'
 import { isTerminalToolName } from '@sim/terminal-protocol'
 import {
+  MothershipStreamV1ToolExecutor,
   MothershipStreamV1ToolPhase,
   MothershipStreamV1ToolStatus,
 } from '@/lib/copilot/generated/mothership-stream-v1'
@@ -136,6 +137,19 @@ function runToolResultSideEffects(ctx: StreamLoopContext, node: ToolNode): void 
  * phases, fires client workflow tools, and runs result side effects, then
  * flushes the model-derived snapshot.
  */
+/**
+ * True when the call frame is meant to run in the browser. Local Copilot emits
+ * workflow tools with `executor: go` while it already runs them server-side —
+ * those frames must not trigger a second client execution that would fail
+ * binding checks on `/api/workflows/.../execute`.
+ */
+function isClientExecutableToolCall(payload: ToolEvent['payload']): boolean {
+  if (!('executor' in payload)) return false
+  if (payload.executor === MothershipStreamV1ToolExecutor.client) return true
+  const ui = 'ui' in payload ? payload.ui : undefined
+  return ui?.clientExecutable === true
+}
+
 export function handleToolEvent(ctx: StreamLoopContext, parsed: ToolEvent): void {
   const { state, ops, deps } = ctx
   const payload = parsed.payload
@@ -168,7 +182,8 @@ export function handleToolEvent(ctx: StreamLoopContext, parsed: ToolEvent): void
   const name = payload.toolName
   const isPartial =
     payload.partial === true || payload.status === MothershipStreamV1ToolStatus.generating
-  if (isWorkflowToolName(name) && !isPartial) {
+  const clientExecutable = isClientExecutableToolCall(payload)
+  if (isWorkflowToolName(name) && !isPartial && clientExecutable) {
     const shouldStartWorkflowTool =
       !deps.options.suppressedWorkflowToolStartIds?.has(rawId) &&
       node?.kind === 'tool' &&
@@ -180,14 +195,14 @@ export function handleToolEvent(ctx: StreamLoopContext, parsed: ToolEvent): void
     }
   }
   const localFilesystemArgs = payload.arguments as Record<string, unknown> | undefined
-  if (isUserLocalVfsToolCall(name, localFilesystemArgs) && !isPartial) {
+  if (isUserLocalVfsToolCall(name, localFilesystemArgs) && !isPartial && clientExecutable) {
     const shouldStartLocalFilesystemTool =
       node?.kind === 'tool' && node.status === 'running' && !node.result
     if (shouldStartLocalFilesystemTool) {
       deps.startClientLocalFilesystemTool(rawId, name, localFilesystemArgs ?? {})
     }
   }
-  if (isCurrentBrowserToolName(name) && !isPartial) {
+  if (isCurrentBrowserToolName(name) && !isPartial && clientExecutable) {
     const shouldStartBrowserTool =
       !deps.options.suppressedWorkflowToolStartIds?.has(rawId) &&
       node?.kind === 'tool' &&
@@ -202,7 +217,7 @@ export function handleToolEvent(ctx: StreamLoopContext, parsed: ToolEvent): void
       )
     }
   }
-  if (isTerminalToolName(name) && !isPartial) {
+  if (isTerminalToolName(name) && !isPartial && clientExecutable) {
     const shouldStartTerminalTool =
       !deps.options.suppressedWorkflowToolStartIds?.has(rawId) &&
       node?.kind === 'tool' &&

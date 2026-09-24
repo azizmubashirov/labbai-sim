@@ -132,6 +132,7 @@ import { getWorkflowById, getWorkflows } from '@/hooks/queries/utils/workflow-ca
 import { getWorkflowListQueryOptions } from '@/hooks/queries/utils/workflow-list-query'
 import { workflowKeys } from '@/hooks/queries/workflows'
 import { useExecutionStream } from '@/hooks/use-execution-stream'
+import { DEFAULT_LOCAL_COPILOT_CATALOG_ID } from '@/local-copilot/lib/model-catalog'
 import { snapAllSmoothText } from '@/hooks/use-smooth-text'
 import { useExecutionStore } from '@/stores/execution/store'
 import { useMothershipQueueStore } from '@/stores/mothership-queue/store'
@@ -870,6 +871,7 @@ function buildAssistantSnapshotMessage(params: {
   content: string
   contentBlocks: ContentBlock[]
   requestId?: string
+  liveStatus?: string
 }): PersistedMessage {
   const rawContentBlocks = params.contentBlocks
     .map(toRawPersistedContentBlock)
@@ -881,6 +883,7 @@ function buildAssistantSnapshotMessage(params: {
     content: params.content,
     timestamp: new Date().toISOString(),
     ...(params.requestId ? { requestId: params.requestId } : {}),
+    ...(params.liveStatus !== undefined ? { liveStatus: params.liveStatus } : {}),
     ...(rawContentBlocks.length > 0 ? { contentBlocks: rawContentBlocks } : {}),
   })
 }
@@ -1185,6 +1188,19 @@ function startClientTerminalTool(
   executeTerminalToolOnClient(toolCallId, toolArgs, scopeId, eventTs)
 }
 
+/**
+ * Hosted Copilot recovers in-flight client-routed workflow tools after reload.
+ * Local Copilot already runs those tools server-side and never persists a
+ * binding, so recovering them POSTs `/execute` with a `copilotToolCallId` that
+ * 403s. Skip recovery while a stream is live and whenever the chat is on Local.
+ */
+export function shouldRecoverClientWorkflowTools(params: {
+  isSending: boolean
+  copilotBackend?: 'local' | 'external'
+}): boolean {
+  return !params.isSending && params.copilotBackend !== 'local'
+}
+
 function buildRecoverySubjectKey(
   chatId: string | undefined,
   selectedChatId: string | undefined
@@ -1319,6 +1335,10 @@ export interface UseChatOptions {
   projectsDesktopTabs?: boolean
   /** Fired when the server's `traceparent` response header arrives, before any stream content. */
   onRequestStarted?: (info: { requestId: string; userMessageId: string }) => void
+  /** Home chat: user-selected local vs external copilot backend. */
+  getCopilotBackend?: () => 'local' | 'external'
+  /** Local Copilot catalog id to send when backend is local. */
+  getLocalCopilotCatalogId?: () => string
 }
 
 interface ActiveStreamRecovery {
@@ -1341,6 +1361,8 @@ export function getMothershipUseChatOptions(
     | 'initialActiveResourceId'
     | 'activeResourceState'
     | 'onRequestStarted'
+    | 'getCopilotBackend'
+    | 'getLocalCopilotCatalogId'
   > = {}
 ): UseChatOptions {
   return {
@@ -1354,7 +1376,13 @@ export function getMothershipUseChatOptions(
 export function getWorkflowCopilotUseChatOptions(
   options: Pick<
     UseChatOptions,
-    'workflowId' | 'onToolResult' | 'onTitleUpdate' | 'onStreamEnd' | 'onRequestStarted'
+    | 'workflowId'
+    | 'onToolResult'
+    | 'onTitleUpdate'
+    | 'onStreamEnd'
+    | 'onRequestStarted'
+    | 'getCopilotBackend'
+    | 'getLocalCopilotCatalogId'
   > = {}
 ): UseChatOptions {
   return {
@@ -1412,6 +1440,10 @@ export function useChat(
   onStreamEndRef.current = options?.onStreamEnd
   const onRequestStartedRef = useRef(options?.onRequestStarted)
   onRequestStartedRef.current = options?.onRequestStarted
+  const getCopilotBackendRef = useRef(options?.getCopilotBackend)
+  getCopilotBackendRef.current = options?.getCopilotBackend
+  const getLocalCopilotCatalogIdRef = useRef(options?.getLocalCopilotCatalogId)
+  getLocalCopilotCatalogIdRef.current = options?.getLocalCopilotCatalogId
 
   const getCurrentRequestId = useCallback(() => {
     const traceId = streamTraceparentRef.current?.split('-')[1] ?? ''
@@ -2210,6 +2242,15 @@ export function useChat(
 
   const recoverPendingClientWorkflowTools = useCallback(
     async (nextMessages: ChatMessage[]) => {
+      if (
+        !shouldRecoverClientWorkflowTools({
+          isSending: sendingRef.current,
+          copilotBackend: getCopilotBackendRef.current?.(),
+        })
+      ) {
+        return
+      }
+
       const pending: ToolCallInfo[] = []
 
       for (const message of nextMessages) {
@@ -4134,6 +4175,15 @@ export function useChat(
             // subagent) — the server gates the features on these flags.
             ...desktopChatCapabilities,
             userTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            ...(!organizationId && getCopilotBackendRef.current
+              ? { copilotBackend: getCopilotBackendRef.current() }
+              : {}),
+            ...(!organizationId && getCopilotBackendRef.current?.() === 'local'
+              ? {
+                  model:
+                    getLocalCopilotCatalogIdRef.current?.() ?? DEFAULT_LOCAL_COPILOT_CATALOG_ID,
+                }
+              : {}),
           }),
           signal: abortController.signal,
         })

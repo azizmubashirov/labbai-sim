@@ -76,6 +76,7 @@ import { appendUnavailableAttachmentNotice } from '@/lib/uploads/utils/model-inp
 import type { ExecutorDelegationOrigin } from '@/executor/types'
 import { refuseResolvedSecretProjection } from '@/executor/utils/resolved-secret-projection-refusal'
 import type { ResolvedSecretTraceRegistry } from '@/executor/utils/resolved-secret-trace-registry'
+import { shouldRouteToLocalCopilot } from '@/local-copilot/lib/routing'
 
 const logger = createLogger('CopilotLifecycle')
 
@@ -207,6 +208,7 @@ export interface CopilotLifecycleOptions extends OrchestratorOptions {
   mcpBlockId?: string
   executorDelegationOrigin?: ExecutorDelegationOrigin
   userId: string
+  copilotBackend?: 'local' | 'external'
   workflowId?: string
   workspaceId?: string
   organizationId?: string
@@ -423,32 +425,60 @@ export async function runCopilotLifecycle(
   let onCompleteStarted = false
 
   try {
-    await ensureModelEgressRegistry(execContext, lifecycleOptions)
-    if (organizationId && goRoute !== '/api/tools/resume') {
-      if (!chatId) throw new Error('Search integration context requires a private chat ID')
-      requestPayload = {
-        ...requestPayload,
-        workspaceContext: await loadCopilotSearchIntegrations({
-          userId,
-          organizationId,
-          chatId,
-          messageId: payloadMsgId,
-          signal: lifecycleOptions.abortSignal,
-        }),
+    if (
+      requestPayload.mode !== 'assistant' &&
+      (await shouldRouteToLocalCopilot({
+        workflowId: lifecycleOptions.workflowId ?? requestPayload.workflowId,
+        workspaceId: lifecycleOptions.workspaceId ?? requestPayload.workspaceId,
+        userId: lifecycleOptions.userId,
+        copilotBackend: lifecycleOptions.copilotBackend,
+      }))
+    ) {
+      logger.info('Delegating copilot turn to Local Copilot', {
+        chatId: context.chatId,
+        requestId: context.requestId,
+        workspaceId: lifecycleOptions.workspaceId ?? requestPayload.workspaceId ?? null,
+        workflowId: lifecycleOptions.workflowId ?? requestPayload.workflowId ?? null,
+      })
+      const { runLocalCopilotMothershipLifecycle } = await import(
+        '@/local-copilot/integration/mothership-lifecycle'
+      )
+      await runLocalCopilotMothershipLifecycle(
+        requestPayload,
+        context,
+        execContext,
+        // Local already executes tools in-process; do not re-dispatch via Sim's
+        // tool registry.
+        { ...lifecycleOptions, autoExecuteTools: false }
+      )
+    } else {
+      await ensureModelEgressRegistry(execContext, lifecycleOptions)
+      if (organizationId && goRoute !== '/api/tools/resume') {
+        if (!chatId) throw new Error('Search integration context requires a private chat ID')
+        requestPayload = {
+          ...requestPayload,
+          workspaceContext: await loadCopilotSearchIntegrations({
+            userId,
+            organizationId,
+            chatId,
+            messageId: payloadMsgId,
+            signal: lifecycleOptions.abortSignal,
+          }),
+        }
       }
+      const modelSafeRequestPayload = await prepareInitialCopilotAttachmentsForModel(
+        requestPayload,
+        lifecycleOptions.workspaceId
+      )
+      await runCheckpointLoop(
+        modelSafeRequestPayload,
+        context,
+        execContext,
+        lifecycleOptions,
+        goRoute,
+        hostedBillingRequest
+      )
     }
-    const modelSafeRequestPayload = await prepareInitialCopilotAttachmentsForModel(
-      requestPayload,
-      lifecycleOptions.workspaceId
-    )
-    await runCheckpointLoop(
-      modelSafeRequestPayload,
-      context,
-      execContext,
-      lifecycleOptions,
-      goRoute,
-      hostedBillingRequest
-    )
 
     // The backend's terminal `complete` is the turn's verdict. A failure it
     // reported in-band on the way there — a tool or a subagent that failed and

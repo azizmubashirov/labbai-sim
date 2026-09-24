@@ -6,7 +6,7 @@ import { LRUCache } from 'lru-cache'
 import { isOrganizationBYOKEntitledCached } from '@/lib/api-key/byok-entitlement'
 import { getRotatingApiKey } from '@/lib/core/config/api-keys'
 import { env } from '@/lib/core/config/env'
-import { isHosted } from '@/lib/core/config/env-flags'
+import { isHosted, platformLlmProviders } from '@/lib/core/config/env-flags'
 import { decryptSecret } from '@/lib/core/security/encryption'
 import { getHostedModels } from '@/providers/models'
 import { PROVIDER_PLACEHOLDER_KEY } from '@/providers/utils'
@@ -369,6 +369,21 @@ export async function getApiKeyWithBYOK(
         }
       }
     }
+  }
+
+  // Labbai: self-hosted platform keys (see `platformLlmProviders`). Workspace BYOK
+  // wins; otherwise the server key pool backs the block like hosted Sim does.
+  if (
+    !isHosted &&
+    !userProvidedKey &&
+    (isOpenAIModel || isClaudeModel || isGeminiModel) &&
+    platformLlmProviders.has(provider)
+  ) {
+    if (workspaceId) {
+      const byokResult = await getBYOKKey(workspaceId, byokProviderId)
+      if (byokResult) return byokResult
+    }
+    return { apiKey: getRotatingApiKey(isGeminiModel ? 'gemini' : provider), isBYOK: false }
   }
 
   if (!userProvidedKey) {

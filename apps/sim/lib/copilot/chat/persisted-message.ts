@@ -131,6 +131,8 @@ export interface PersistedMessage {
   contentBlocks?: PersistedContentBlock[]
   fileAttachments?: PersistedFileAttachment[]
   contexts?: PersistedMessageContext[]
+  /** Ephemeral Local Copilot status for live turns; never saved as assistant prose. */
+  liveStatus?: string
 }
 
 /**
@@ -771,6 +773,13 @@ export function normalizeMessage(raw: Record<string, unknown>): PersistedMessage
       ...(c.terminalId ? { terminalId: c.terminalId } : {}),
       ...(c.selection ? { selection: copyTextSelection(c.selection) } : {}),
     }))
+  }
+
+  if (typeof raw.liveStatus === 'string') {
+    // Empty string clears a previous liveStatus when the turn completes.
+    if (raw.liveStatus.trim()) {
+      msg.liveStatus = raw.liveStatus
+    }
   }
 
   return msg

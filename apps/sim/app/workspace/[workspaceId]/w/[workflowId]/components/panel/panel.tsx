@@ -82,6 +82,7 @@ import { useDuplicateWorkflowMutation, useWorkflowMap } from '@/hooks/queries/wo
 import { useCollaborativeWorkflow } from '@/hooks/use-collaborative-workflow'
 import { usePermissionConfig } from '@/hooks/use-permission-config'
 import { useSettingsNavigation } from '@/hooks/use-settings-navigation'
+import { useLocalCopilotCatalogSelection } from '@/local-copilot/hooks/use-copilot-backend-preference'
 import { useChatStore } from '@/stores/chat/store'
 import { useMothershipDraftsStore } from '@/stores/mothership-drafts/store'
 import type { ChatContext, PanelTab } from '@/stores/panel'
@@ -410,6 +411,14 @@ export const Panel = memo(function Panel() {
   )
 
   const {
+    canSwitchBackend,
+    copilotBackend,
+    setCopilotBackend,
+    localCopilotCatalogId,
+    setLocalCopilotCatalogId,
+  } = useLocalCopilotCatalogSelection()
+
+  const {
     messages: copilotMessages,
     isSending: copilotIsSending,
     isReconnecting: copilotIsReconnecting,
@@ -428,6 +437,8 @@ export const Panel = memo(function Panel() {
     copilotChatId,
     getWorkflowCopilotUseChatOptions({
       workflowId: activeWorkflowId || undefined,
+      getCopilotBackend: () => copilotBackend,
+      getLocalCopilotCatalogId: () => localCopilotCatalogId,
       onTitleUpdate: loadCopilotChats,
       onToolResult: handleCopilotToolResult,
       onRequestStarted: ({ requestId, userMessageId }) => {
@@ -996,6 +1007,11 @@ export const Panel = memo(function Panel() {
                   chatId={copilotResolvedChatId}
                   draftScopeKey={copilotDraftScopeKey}
                   layout='copilot-view'
+                  canSwitchCopilotBackend={canSwitchBackend}
+                  copilotBackend={copilotBackend}
+                  setCopilotBackend={setCopilotBackend}
+                  localCopilotCatalogId={localCopilotCatalogId}
+                  setLocalCopilotCatalogId={setLocalCopilotCatalogId}
                 />
               </div>
             )}

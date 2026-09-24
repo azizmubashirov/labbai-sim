@@ -71,6 +71,8 @@ export interface StreamLoopState {
   sawCompleteEvent: boolean
   browserAgentRunIds: Set<string>
   scheduledTextFlushFrame: number | null
+  /** Ephemeral Local Copilot status shown under the assistant message. */
+  liveStatus: string | undefined
   /** Trailing timer for the min-interval text-flush gate (see flushText). */
   scheduledTextFlushTimer: ReturnType<typeof setTimeout> | null
 }
@@ -136,6 +138,7 @@ export interface StreamLoopDeps {
     content: string
     contentBlocks: ContentBlock[]
     requestId?: string
+    liveStatus?: string
   }) => PersistedMessage
   hasTerminalPersistedAssistantForStream: (
     messages: PersistedMessage[],
@@ -213,6 +216,7 @@ export function createStreamLoopContext(deps: StreamLoopDeps): StreamLoopContext
     sawCompleteEvent: false,
     browserAgentRunIds: new Set(),
     scheduledTextFlushFrame: null,
+    liveStatus: undefined,
     scheduledTextFlushTimer: null,
   }
 
@@ -258,6 +262,13 @@ export function createStreamLoopContext(deps: StreamLoopDeps): StreamLoopContext
         content: modelContent,
         contentBlocks: modelBlocks,
       }
+      // Always stamp liveStatus when set so later flushes cannot drop it. Clear
+      // with empty string on terminal events so normalizeMessage removes it.
+      if (state.liveStatus) {
+        snapshot.liveStatus = state.liveStatus
+      } else if (state.sawCompleteEvent || state.sawStreamError) {
+        snapshot.liveStatus = ''
+      }
       if (state.streamRequestId) snapshot.requestId = state.streamRequestId
       deps.setPendingMessages((prev) => {
         if (deps.expectedGen !== undefined && deps.streamGenRef.current !== deps.expectedGen) {
@@ -280,6 +291,11 @@ export function createStreamLoopContext(deps: StreamLoopDeps): StreamLoopContext
       content: modelContent,
       contentBlocks: modelBlocks,
       ...(state.streamRequestId ? { requestId: state.streamRequestId } : {}),
+      ...(state.liveStatus
+        ? { liveStatus: state.liveStatus }
+        : state.sawCompleteEvent || state.sawStreamError
+          ? { liveStatus: '' }
+          : {}),
     })
     deps.upsertMothershipChatHistory(activeChatId, (current) => {
       const streamId = deps.streamIdRef.current ?? current.activeStreamId ?? deps.assistantId

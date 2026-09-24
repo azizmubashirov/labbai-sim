@@ -840,6 +840,8 @@ interface MessageContentProps {
   messageId?: string
   requestMode?: 'agent' | 'assistant'
   isStreaming: boolean
+  /** Local Copilot status phrase for the in-flight turn (shimmer copy). */
+  liveStatus?: string
   /**
    * True for the last message in the transcript. The last turn keeps a
    * fixed-height thinking slot at its bottom (see JSX) so the shimmer fades in
@@ -871,6 +873,7 @@ function MessageContentInner({
   messageId,
   requestMode,
   isStreaming = false,
+  liveStatus,
   isLast = false,
   questionAnswers,
   credentialSubmission,
@@ -974,7 +977,8 @@ function MessageContentInner({
   /** Open activity groups own the shimmer through gaps between tool calls. */
   // A mid-stream special tag renders nothing until complete, so its bytes are a
   // wait, not output — the shimmer bridges it without the quiet-period delay.
-  const thinkingLabel = deriveThinkingLabel(blocks)
+  const liveLabel = liveStatus?.trim() ?? ''
+  const thinkingLabel = liveLabel || deriveThinkingLabel(blocks)
   const hasActivityIndicator = assistantMessageHasVisibleActivity(segments, isStreaming)
   const hasPendingAgents =
     isStreaming &&
@@ -983,7 +987,7 @@ function MessageContentInner({
     thinkingExpanded &&
     (segments.length === 0 ||
       trailingPendingTag ||
-      (((hasPendingAgents && revealTailIndex < 0) || isStreamIdle) &&
+      (((hasPendingAgents && revealTailIndex < 0) || isStreamIdle || Boolean(liveLabel)) &&
         !trailingStreamActivity &&
         !hasActivityIndicator))
 

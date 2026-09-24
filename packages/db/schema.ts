@@ -7656,3 +7656,229 @@ export const scimRequestLog = pgTable(
     ),
   })
 )
+
+// Labbai local copilot (ported from Arena) — see migration 0380_labbai_local_copilot.
+export const localCopilotPatchStatusEnum = pgEnum('local_copilot_patch_status', [
+  'pending',
+  'applied',
+  'rejected',
+  'expired',
+])
+
+export const localCopilotAuditStatusEnum = pgEnum('local_copilot_audit_status', [
+  'success',
+  'failure',
+  'rejected',
+])
+
+/**
+ * Allowlisted Local Copilot picker ids. Keep in sync with
+ * `LOCAL_COPILOT_CATALOG` in `apps/sim/local-copilot/lib/model-catalog.ts`.
+ */
+export const localCopilotDefaultModelEnum = pgEnum('local_copilot_default_model', [
+  'openai',
+  'claude',
+  'gemini-3.8-flash',
+  'gemini-2.5-pro',
+  'gemini-3.1-pro',
+  'vertex-gemini-3.8-flash',
+  'bedrock-claude-opus-5',
+  'bedrock-claude-sonnet-5',
+  'bedrock-claude-opus-4-8',
+  'bedrock-claude-opus-4-6',
+  'bedrock-claude-sonnet-4-6',
+  'bedrock-zai-glm-5',
+  'bedrock-deepseek-v3.2',
+  'bedrock-nemotron-super-3-120b',
+  'bedrock-mistral-large-3',
+  'bedrock-llama-3.3-70b',
+])
+
+export const localCopilotConversations = pgTable(
+  'local_copilot_conversations',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    workspaceId: text('workspace_id')
+      .notNull()
+      .references(() => workspace.id, { onDelete: 'cascade' }),
+    workflowId: text('workflow_id').references(() => workflow.id, { onDelete: 'cascade' }),
+    title: text('title'),
+    model: text('model').notNull(),
+    provider: text('provider').notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: index('local_copilot_conversations_user_id_idx').on(table.userId),
+    workspaceIdIdx: index('local_copilot_conversations_workspace_id_idx').on(table.workspaceId),
+    workflowIdIdx: index('local_copilot_conversations_workflow_id_idx').on(table.workflowId),
+    userWorkflowIdx: index('local_copilot_conversations_user_workflow_idx').on(
+      table.userId,
+      table.workflowId
+    ),
+    updatedAtIdx: index('local_copilot_conversations_updated_at_idx').on(table.updatedAt),
+  })
+)
+
+export const localCopilotMessages = pgTable(
+  'local_copilot_messages',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    conversationId: uuid('conversation_id')
+      .notNull()
+      .references(() => localCopilotConversations.id, { onDelete: 'cascade' }),
+    role: text('role').notNull(),
+    content: jsonb('content').notNull(),
+    seq: integer('seq').notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    conversationSeqIdx: index('local_copilot_messages_conversation_seq_idx').on(
+      table.conversationId,
+      table.seq
+    ),
+  })
+)
+
+export const localCopilotToolCalls = pgTable(
+  'local_copilot_tool_calls',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    conversationId: uuid('conversation_id')
+      .notNull()
+      .references(() => localCopilotConversations.id, { onDelete: 'cascade' }),
+    messageId: uuid('message_id').references(() => localCopilotMessages.id, {
+      onDelete: 'set null',
+    }),
+    toolName: text('tool_name').notNull(),
+    toolCallId: text('tool_call_id').notNull(),
+    arguments: jsonb('arguments').notNull().default({}),
+    result: jsonb('result'),
+    status: text('status').notNull().default('completed'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    completedAt: timestamp('completed_at'),
+  },
+  (table) => ({
+    conversationIdIdx: index('local_copilot_tool_calls_conversation_id_idx').on(
+      table.conversationId
+    ),
+    toolCallIdIdx: index('local_copilot_tool_calls_tool_call_id_idx').on(table.toolCallId),
+  })
+)
+
+export const localCopilotPatches = pgTable(
+  'local_copilot_patches',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    conversationId: uuid('conversation_id')
+      .notNull()
+      .references(() => localCopilotConversations.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    workflowId: text('workflow_id')
+      .notNull()
+      .references(() => workflow.id, { onDelete: 'cascade' }),
+    summary: text('summary').notNull(),
+    patch: jsonb('patch').notNull(),
+    status: localCopilotPatchStatusEnum('status').notNull().default('pending'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    resolvedAt: timestamp('resolved_at'),
+  },
+  (table) => ({
+    conversationIdIdx: index('local_copilot_patches_conversation_id_idx').on(table.conversationId),
+    workflowIdIdx: index('local_copilot_patches_workflow_id_idx').on(table.workflowId),
+    statusIdx: index('local_copilot_patches_status_idx').on(table.status),
+  })
+)
+
+export const localCopilotAuditLogs = pgTable(
+  'local_copilot_audit_logs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    workspaceId: text('workspace_id')
+      .notNull()
+      .references(() => workspace.id, { onDelete: 'cascade' }),
+    workflowId: text('workflow_id').references(() => workflow.id, { onDelete: 'set null' }),
+    conversationId: uuid('conversation_id').references(() => localCopilotConversations.id, {
+      onDelete: 'set null',
+    }),
+    patchId: uuid('patch_id').references(() => localCopilotPatches.id, { onDelete: 'set null' }),
+    action: text('action').notNull(),
+    summary: text('summary'),
+    status: localCopilotAuditStatusEnum('status').notNull().default('success'),
+    metadata: jsonb('metadata').notNull().default({}),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: index('local_copilot_audit_logs_user_id_idx').on(table.userId),
+    workspaceIdIdx: index('local_copilot_audit_logs_workspace_id_idx').on(table.workspaceId),
+    workflowIdIdx: index('local_copilot_audit_logs_workflow_id_idx').on(table.workflowId),
+    createdAtIdx: index('local_copilot_audit_logs_created_at_idx').on(table.createdAt),
+  })
+)
+
+/**
+ * Per-user Arena Copilot allowlist. Access is denied unless a row exists for the
+ * user with `hasAccess = true` or `localOnly = true`. Managed via SQL only
+ * (no admin UI). New accounts default to `localOnly = true` and Gemini.
+ */
+export const localCopilotUserAccess = pgTable(
+  'local_copilot_user_access',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    email: text('email').notNull(),
+    hasAccess: boolean('has_access').notNull().default(true),
+    localOnly: boolean('local_only').notNull().default(true),
+    defaultModel: localCopilotDefaultModelEnum('default_model').notNull().default('openai'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdUnique: uniqueIndex('local_copilot_user_access_user_id_uidx').on(table.userId),
+    emailIdx: index('local_copilot_user_access_email_idx').on(table.email),
+  })
+)
+
+/**
+ * Long-lived Arena Copilot memories (preferences, entities, corrections).
+ * Scoped to a user; optional workspaceId narrows visibility to one workspace.
+ * Cloud Go `user_memory` is separate — this table is Local/self-hosted only.
+ */
+export const localCopilotUserMemory = pgTable(
+  'local_copilot_user_memory',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    workspaceId: text('workspace_id').references(() => workspace.id, { onDelete: 'cascade' }),
+    key: text('key').notNull(),
+    value: text('value').notNull(),
+    memoryType: text('memory_type').notNull().default('preference'),
+    source: text('source').notNull().default('explicit'),
+    confidence: doublePrecision('confidence').notNull().default(1),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    userKeyGlobalUnique: uniqueIndex('local_copilot_user_memory_user_key_global_uidx')
+      .on(table.userId, table.key)
+      .where(sql`${table.workspaceId} IS NULL`),
+    userWorkspaceKeyUnique: uniqueIndex('local_copilot_user_memory_user_workspace_key_uidx')
+      .on(table.userId, table.workspaceId, table.key)
+      .where(sql`${table.workspaceId} IS NOT NULL`),
+    userIdIdx: index('local_copilot_user_memory_user_id_idx').on(table.userId),
+    workspaceIdIdx: index('local_copilot_user_memory_workspace_id_idx').on(table.workspaceId),
+    memoryTypeIdx: index('local_copilot_user_memory_type_idx').on(table.memoryType),
+  })
+)
