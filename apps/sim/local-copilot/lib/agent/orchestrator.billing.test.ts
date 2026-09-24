@@ -55,7 +55,8 @@ vi.mock('@/local-copilot/lib/context/build-context', () => ({
   contextToPromptJson: () => '{}',
 }))
 
-vi.mock('@/local-copilot/lib/context/context-budget', () => ({
+vi.mock('@/local-copilot/lib/context/context-budget', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/local-copilot/lib/context/context-budget')>()),
   compactChatHistory: (messages: unknown[]) => messages,
   estimateChatMessagesTokens: () => 100,
   fitPromptToTokenBudget: (messages: unknown[]) => messages,
