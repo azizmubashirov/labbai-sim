@@ -1,0 +1,28 @@
+import type { BrandConfig } from './types'
+
+/**
+ * Default brand configuration values
+ */
+export const defaultBrandConfig: BrandConfig = {
+  name: 'Agentic AI Builder | Arena',
+  logoUrl: 'https://arenav2image.s3.us-west-1.amazonaws.com/ArenaLogo.svg',
+  logoUrlBlacktext:
+    'https://arenav2image.s3.us-west-1.amazonaws.com/rt/calibrate/Arena_Logo_WebDashboard.svg',
+  wordmarkUrl:
+    'https://arenav2image.s3.us-west-1.amazonaws.com/rt/calibrate/Arena_Logo_WebDashboard.svg',
+  faviconUrl: '/sim.svg',
+  customCssUrl: undefined,
+  supportEmail: 'arenadeveloper@position2.com',
+  documentationUrl: undefined,
+  termsUrl: 'https://thearena.ai/terms',
+  privacyUrl: 'https://thearena.ai/privacy',
+  theme: {
+    primaryColor: '#1a73e8',
+    primaryHoverColor: '#155cba',
+    secondaryColor: '#488fed',
+    accentColor: '#76abf1',
+    accentHoverColor: '#a3c7f6',
+    backgroundColor: '#F3F8FE',
+  },
+  isWhitelabeled: false,
+}

@@ -1,0 +1,632 @@
+/**
+ * Detection and sanitization helpers for rendering agent/tool-provided ECharts
+ * option objects in chat surfaces. These are intentionally conservative so that
+ * arbitrary JSON is not mistaken for a chart configuration.
+ */
+
+/** Maximum number of data points kept per series before truncation. */
+const MAX_SERIES_DATA_POINTS = 5000
+
+function isRecognizedSeriesType(type: unknown): type is string {
+  if (typeof type !== 'string') return false
+  const normalized = type.trim()
+  if (!normalized) return false
+  // Permissive: accept any non-empty series type so new ECharts types work without code changes.
+  return true
+}
+
+/**
+ * Minimal structural shape for a recognized ECharts option. The full option
+ * surface is intentionally left open ended via the index signature.
+ */
+export interface EChartsOptionLike {
+  series: Array<Record<string, unknown>>
+  [key: string]: unknown
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+/**
+ * Returns true when the value looks like a renderable ECharts option: it must be
+ * a plain object with a non-empty `series` array whose entries each declare a
+ * recognized `type`.
+ */
+export function isEChartsOption(value: unknown): value is EChartsOptionLike {
+  if (!isRecord(value)) {
+    return false
+  }
+
+  const series = value.series
+  if (!Array.isArray(series) || series.length === 0) {
+    return false
+  }
+
+  return series.every((entry) => isRecord(entry) && isRecognizedSeriesType(entry.type))
+}
+
+/**
+ * Attempts to extract an ECharts option from a string. Supports a raw JSON
+ * object or a single fenced code block (```json / ```echarts / bare fence).
+ * Returns null when the string is not a recognized ECharts option.
+ */
+export function parseEChartsOptionFromString(value: string): EChartsOptionLike | null {
+  const trimmed = value.trim()
+  if (!trimmed) {
+    return null
+  }
+
+  let candidate = trimmed
+
+  const fenceMatch = trimmed.match(/^```(?:json|echarts)?\s*([\s\S]*?)```$/i)
+  if (fenceMatch?.[1]) {
+    candidate = fenceMatch[1].trim()
+  }
+
+  if (!candidate.startsWith('{') || !candidate.endsWith('}')) {
+    return null
+  }
+
+  try {
+    const parsed = JSON.parse(candidate)
+    return isEChartsOption(parsed) ? parsed : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Resolves an ECharts option from arbitrary message content, handling both
+ * already-parsed objects and JSON strings (optionally fenced).
+ */
+export function resolveEChartsOptionFromContent(content: unknown): EChartsOptionLike | null {
+  if (isEChartsOption(content)) {
+    return content
+  }
+  if (typeof content === 'string') {
+    return parseEChartsOptionFromString(content)
+  }
+  return null
+}
+
+function resolveEChartsOptionsFromParsed(value: unknown): EChartsOptionLike[] | null {
+  if (isEChartsOption(value)) {
+    return [value]
+  }
+
+  if (Array.isArray(value)) {
+    const charts = value.filter(isEChartsOption)
+    return charts.length > 0 ? charts : null
+  }
+
+  if (!isRecord(value)) {
+    return null
+  }
+
+  const charts = value.charts
+  if (!Array.isArray(charts) || charts.length === 0) {
+    return null
+  }
+
+  if (!charts.every(isEChartsOption)) {
+    return null
+  }
+
+  return charts
+}
+
+const EMBEDDED_FENCE_REGEX = /```(?:json|echarts)?\s*([\s\S]*?)```/gi
+
+function tryParseEChartsJsonCandidate(candidate: string): EChartsOptionLike[] | null {
+  const trimmed = candidate.trim()
+  if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) {
+    return null
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed)
+    return resolveEChartsOptionsFromParsed(parsed)
+  } catch {
+    return null
+  }
+}
+
+function tryParseWholeEChartsString(value: string): EChartsOptionLike[] | null {
+  let candidate = value.trim()
+  const fenceMatch = candidate.match(/^```(?:json|echarts)?\s*([\s\S]*?)```$/i)
+  if (fenceMatch?.[1]) {
+    candidate = fenceMatch[1].trim()
+  }
+  return tryParseEChartsJsonCandidate(candidate)
+}
+
+function tryParseEmbeddedEChartsFences(value: string): EChartsOptionLike[] | null {
+  const charts: EChartsOptionLike[] = []
+  for (const match of value.matchAll(EMBEDDED_FENCE_REGEX)) {
+    const inner = match[1]?.trim()
+    if (!inner) continue
+    const parsed = tryParseEChartsJsonCandidate(inner)
+    if (parsed) charts.push(...parsed)
+  }
+  return charts.length > 0 ? charts : null
+}
+
+const BARE_JSON_LINE_START_REGEX = /^[ \t]*[[{]/gm
+
+/**
+ * Finds the end index (exclusive) of a balanced JSON object/array starting at
+ * `start` (which must point at `{` or `[`), respecting string literals and
+ * escapes. Returns null when the brackets never balance.
+ */
+function findBalancedJsonEnd(value: string, start: number): number | null {
+  let depth = 0
+  let inString = false
+  let escaped = false
+  for (let i = start; i < value.length; i++) {
+    const ch = value[i]
+    if (inString) {
+      if (escaped) {
+        escaped = false
+      } else if (ch === '\\') {
+        escaped = true
+      } else if (ch === '"') {
+        inString = false
+      }
+      continue
+    }
+    if (ch === '"') {
+      inString = true
+    } else if (ch === '{' || ch === '[') {
+      depth++
+    } else if (ch === '}' || ch === ']') {
+      depth--
+      if (depth === 0) return i + 1
+    }
+  }
+  return null
+}
+
+interface BareEChartsJsonSegment {
+  charts: EChartsOptionLike[]
+  start: number
+  end: number
+}
+
+/**
+ * Detects un-fenced chart JSON embedded anywhere in mixed prose (the chart
+ * generator's "answer text + bare option JSON" responses use no code fences).
+ * Unlike a trailing-only scan, this finds each balanced JSON segment even when
+ * more text (e.g. a markdown table) follows it, so prose before AND after the
+ * JSON can be preserved.
+ */
+function findBareEChartsJsonSegments(value: string): BareEChartsJsonSegment[] {
+  const segments: BareEChartsJsonSegment[] = []
+  let scanFrom = 0
+  for (const match of value.matchAll(BARE_JSON_LINE_START_REGEX)) {
+    const lineStart = match.index ?? 0
+    if (lineStart < scanFrom) continue
+    const jsonStart = lineStart + match[0].length - 1 // index of the `{` or `[`
+    const end = findBalancedJsonEnd(value, jsonStart)
+    if (end === null) continue
+    const charts = tryParseEChartsJsonCandidate(value.slice(jsonStart, end))
+    if (charts) {
+      segments.push({ charts, start: lineStart, end })
+      scanFrom = end
+    }
+  }
+  return segments
+}
+
+/**
+ * Backwards-compatible helper: returns all charts found in bare JSON segments,
+ * or null when none are present.
+ */
+function findBareEChartsJson(value: string): { charts: EChartsOptionLike[] } | null {
+  const segments = findBareEChartsJsonSegments(value)
+  if (segments.length === 0) return null
+  return { charts: segments.flatMap((segment) => segment.charts) }
+}
+
+/**
+ * Attempts to extract one or more ECharts options from a string. Supports a raw
+ * JSON object, a `{ charts: [...] }` dashboard wrapper, a single fenced code
+ * block, or chart JSON embedded after other text (deployed chat combines agent
+ * text + chart generator dashboard in one message).
+ */
+export function parseEChartsOptionsFromString(value: string): EChartsOptionLike[] | null {
+  const trimmed = value.trim()
+  if (!trimmed) {
+    return null
+  }
+
+  return (
+    tryParseWholeEChartsString(trimmed) ??
+    tryParseEmbeddedEChartsFences(trimmed) ??
+    findBareEChartsJson(trimmed)?.charts ??
+    null
+  )
+}
+
+/**
+ * Removes fenced or inline chart/dashboard JSON from mixed assistant text so prose
+ * and charts can render separately in deployed chat.
+ */
+export function stripEChartsJsonFromContent(content: string): string {
+  let out = content.replace(EMBEDDED_FENCE_REGEX, (full, inner: string) => {
+    if (tryParseEChartsJsonCandidate(inner)) {
+      return ''
+    }
+    return full
+  })
+
+  if (tryParseEChartsJsonCandidate(out)) {
+    return ''
+  }
+
+  // Remove each bare JSON chart segment while keeping prose on both sides, so
+  // text/tables that follow a chart still render (iterate back-to-front so
+  // earlier segment indices stay valid).
+  const segments = findBareEChartsJsonSegments(out)
+  for (let i = segments.length - 1; i >= 0; i--) {
+    const { start, end } = segments[i]
+    out = `${out.slice(0, start)}\n\n${out.slice(end)}`
+  }
+
+  return out.replace(/\n{3,}/g, '\n\n').trim()
+}
+
+/** True when a deploy output value contains at least one renderable chart. */
+export function hasRenderableChartDeployOutput(value: unknown): boolean {
+  if (typeof value === 'string') {
+    return parseEChartsOptionsFromString(value) !== null
+  }
+  return resolveEChartsOptionsFromParsed(value) !== null
+}
+
+/**
+ * Formats chart generator deploy output for chat message content, or returns null
+ * when there are no charts to show (e.g. skipped / empty dashboard).
+ */
+export function formatChartDeployOutputForChat(value: unknown): string | null {
+  if (value === null || value === undefined) {
+    return null
+  }
+  if (typeof value === 'string') {
+    return hasRenderableChartDeployOutput(value) ? value : null
+  }
+  if (!hasRenderableChartDeployOutput(value)) {
+    return null
+  }
+  try {
+    return `\`\`\`json\n${JSON.stringify(value, null, 2)}\n\`\`\``
+  } catch {
+    return String(value)
+  }
+}
+
+/**
+ * Resolves one or more ECharts options from arbitrary message content. Returns a
+ * single-item array for a lone option, or every entry from a `{ charts: [...] }`
+ * dashboard wrapper when each chart is valid.
+ */
+export function resolveEChartsOptionsFromContent(content: unknown): EChartsOptionLike[] | null {
+  if (typeof content === 'string') {
+    return parseEChartsOptionsFromString(content)
+  }
+
+  return resolveEChartsOptionsFromParsed(content)
+}
+
+/** Maximum recursion depth when scanning arbitrary tool output for charts. */
+const MAX_CHART_SCAN_DEPTH = 8
+
+function chartSignature(option: EChartsOptionLike): string {
+  try {
+    return JSON.stringify(option)
+  } catch {
+    return ''
+  }
+}
+
+/**
+ * Recursively extracts every renderable ECharts option from arbitrary data,
+ * mirroring `extractGeneratedImagesFromData` for images. This is what lets a
+ * chart produced by the Chart Generator when it is called as an Agent tool
+ * surface for rendering: the chart is nested inside the agent block output at
+ * `toolCalls.list[].result.{charts,content,dashboard}` rather than in the
+ * agent's own `content`. Detection stays permissive and type-agnostic (delegated
+ * to `resolveEChartsOptionsFromContent`), and results are de-duplicated by option
+ * signature so the same chart found via `charts`/`content`/`dashboard` counts once.
+ */
+export function extractChartsFromData(
+  data: unknown,
+  charts: EChartsOptionLike[] = [],
+  seen: Set<string> = new Set(),
+  depth = 0
+): EChartsOptionLike[] {
+  if (data === null || data === undefined || depth > MAX_CHART_SCAN_DEPTH) {
+    return charts
+  }
+
+  const direct = resolveEChartsOptionsFromContent(data)
+  if (direct && direct.length > 0) {
+    for (const option of direct) {
+      const sig = chartSignature(option)
+      if (sig && !seen.has(sig)) {
+        seen.add(sig)
+        charts.push(option)
+      }
+    }
+    return charts
+  }
+
+  if (Array.isArray(data)) {
+    for (const item of data) {
+      extractChartsFromData(item, charts, seen, depth + 1)
+    }
+    return charts
+  }
+
+  if (typeof data === 'object') {
+    for (const value of Object.values(data as Record<string, unknown>)) {
+      extractChartsFromData(value, charts, seen, depth + 1)
+    }
+  }
+
+  return charts
+}
+
+/**
+ * Formats extracted charts into chat message content (a fenced JSON block the
+ * renderers already understand), or null when there are no charts.
+ */
+export function formatChartsForChat(charts: EChartsOptionLike[]): string | null {
+  if (!charts || charts.length === 0) {
+    return null
+  }
+  const payload = charts.length === 1 ? charts[0] : { charts }
+  try {
+    return `\`\`\`json\n${JSON.stringify(payload, null, 2)}\n\`\`\``
+  } catch {
+    return null
+  }
+}
+
+/** Series types that do not use cartesian x/y + grid layout. */
+const NON_CARTESIAN_SERIES_TYPES = new Set([
+  'pie',
+  'radar',
+  'gauge',
+  'funnel',
+  'sankey',
+  'graph',
+  'treemap',
+  'sunburst',
+  'themeRiver',
+  'map',
+  'lines',
+])
+
+function asRecordArray(value: unknown): Record<string, unknown>[] {
+  if (Array.isArray(value)) return value.filter(isRecord)
+  if (isRecord(value)) return [value]
+  return []
+}
+
+function isCategoryAxis(axis: Record<string, unknown>): boolean {
+  if (axis.type === 'category') return true
+  return axis.type == null && Array.isArray(axis.data)
+}
+
+function categoryLength(axis: Record<string, unknown>): number {
+  return Array.isArray(axis.data) ? axis.data.length : 0
+}
+
+function isCartesianOption(option: EChartsOptionLike): boolean {
+  if (option.radar != null || option.polar != null || option.geo != null) {
+    return false
+  }
+  if (!Array.isArray(option.series) || option.series.length === 0) {
+    return false
+  }
+  return option.series.some(
+    (entry) => isRecord(entry) && !NON_CARTESIAN_SERIES_TYPES.has(String(entry.type ?? ''))
+  )
+}
+
+/** Raise a numeric padding; leave percent strings and other values untouched. */
+function atLeastPadding(current: unknown, min: number): unknown {
+  if (current == null) return min
+  if (typeof current === 'number' && Number.isFinite(current)) {
+    return Math.max(current, min)
+  }
+  return current
+}
+
+function axisLabelRecord(axis: Record<string, unknown>): Record<string, unknown> {
+  return isRecord(axis.axisLabel) ? { ...axis.axisLabel } : {}
+}
+
+/**
+ * Fix category-axis tick labels so they sit under/beside their bars instead of
+ * drifting (the usual LLM output is rotate without align, plus a too-small grid).
+ * Cartesian charts only — pie/radar/gauge/etc. are left unchanged.
+ */
+function applyCartesianLabelLayout(option: EChartsOptionLike): void {
+  if (!isCartesianOption(option)) return
+
+  const xAxes = asRecordArray(option.xAxis)
+  const yAxes = asRecordArray(option.yAxis)
+
+  for (const axis of xAxes) {
+    if (!isCategoryAxis(axis)) continue
+    const count = categoryLength(axis)
+    const label = axisLabelRecord(axis)
+    const existingRotate = typeof label.rotate === 'number' ? label.rotate : 0
+
+    if (count > 0 && count <= 8) {
+      label.rotate = 0
+      label.interval = label.interval ?? 0
+      label.hideOverlap = false
+      label.align = 'center'
+      label.verticalAlign = 'top'
+    } else if (count > 8) {
+      const rotate = existingRotate !== 0 ? existingRotate : 30
+      label.rotate = rotate
+      label.interval = label.interval ?? 0
+      if (rotate > 0) {
+        label.align = label.align ?? 'right'
+        label.verticalAlign = label.verticalAlign ?? 'middle'
+      } else if (rotate < 0) {
+        label.align = label.align ?? 'left'
+        label.verticalAlign = label.verticalAlign ?? 'middle'
+      }
+    }
+
+    axis.axisLabel = label
+  }
+
+  const hasRotatedCategoryX = xAxes.some((axis) => {
+    if (!isCategoryAxis(axis) || !isRecord(axis.axisLabel)) return false
+    return typeof axis.axisLabel.rotate === 'number' && axis.axisLabel.rotate !== 0
+  })
+  const categoryXCount = xAxes.reduce(
+    (max, axis) => (isCategoryAxis(axis) ? Math.max(max, categoryLength(axis)) : max),
+    0
+  )
+  const dualValueY = yAxes.filter((axis) => axis.type === 'value' || axis.type == null).length >= 2
+  const hasTitle = isRecord(option.title) && Boolean(option.title.text)
+  const hasLegend = option.legend != null
+
+  const grids = asRecordArray(option.grid)
+  const targets = grids.length > 0 ? grids : [{}]
+  for (const grid of targets) {
+    if (grid.containLabel !== false) {
+      grid.containLabel = true
+    }
+    grid.bottom = atLeastPadding(
+      grid.bottom,
+      hasRotatedCategoryX ? 88 : categoryXCount > 0 ? 56 : 48
+    )
+    if (dualValueY) {
+      grid.right = atLeastPadding(grid.right, 64)
+    }
+    if (hasTitle && hasLegend) {
+      grid.top = atLeastPadding(grid.top, 72)
+    }
+  }
+
+  if (option.grid == null || isRecord(option.grid)) {
+    option.grid = targets[0]
+  }
+}
+
+/**
+ * Returns a defensive copy of the option with oversized series data truncated
+ * and cartesian axis/grid layout corrected for chat rendering.
+ * Falls back to the original option if cloning fails.
+ */
+export function sanitizeEChartsOption(option: EChartsOptionLike): EChartsOptionLike {
+  let clone: EChartsOptionLike
+  try {
+    clone = structuredClone(option)
+  } catch {
+    return option
+  }
+
+  if (Array.isArray(clone.series)) {
+    for (const series of clone.series) {
+      if (
+        isRecord(series) &&
+        Array.isArray(series.data) &&
+        series.data.length > MAX_SERIES_DATA_POINTS
+      ) {
+        series.data = series.data.slice(0, MAX_SERIES_DATA_POINTS)
+      }
+    }
+  }
+
+  // Chat charts should paint immediately; the intro animation only delays
+  // perceived render time. Respect an explicit animation setting if present.
+  if (clone.animation === undefined) {
+    clone.animation = false
+  }
+
+  applyCartesianLabelLayout(clone)
+
+  return clone
+}
+
+/** Fields that strongly suggest a JSON payload is an ECharts option. */
+const CHART_JSON_HINT_PATTERN = /"(series|xAxis|yAxis|dataset|tooltip|legend)"\s*:/
+
+/**
+ * Returns true when every `{` in the candidate string is matched by a `}`
+ * (ignoring braces inside JSON string literals).
+ */
+function hasBalancedJsonBraces(candidate: string): boolean {
+  let depth = 0
+  let inString = false
+  let escaped = false
+
+  for (const char of candidate) {
+    if (escaped) {
+      escaped = false
+      continue
+    }
+    if (char === '\\') {
+      if (inString) escaped = true
+      continue
+    }
+    if (char === '"') {
+      inString = !inString
+      continue
+    }
+    if (inString) continue
+    if (char === '{') depth++
+    else if (char === '}') depth--
+  }
+
+  return depth <= 0
+}
+
+/**
+ * Removes a partially streamed trailing chart JSON payload from message
+ * content so raw JSON does not flash as text while an assistant response is
+ * still streaming. Complete chart payloads are left untouched. Intended to be
+ * called only while a message is streaming.
+ */
+export function stripIncompleteTrailingChartJson(content: string): string {
+  if (!content) return content
+
+  // Case 1: an unclosed ``` fence at the end of the content.
+  const fenceMatches = content.match(/```/g)
+  if (fenceMatches && fenceMatches.length % 2 === 1) {
+    const lastFence = content.lastIndexOf('```')
+    const fenceBody = content.slice(lastFence + 3)
+    const language = fenceBody.match(/^([A-Za-z0-9_-]*)/)?.[1]?.toLowerCase() ?? ''
+    const looksLikeChartFence =
+      language === '' ||
+      language === 'json' ||
+      language === 'echarts' ||
+      CHART_JSON_HINT_PATTERN.test(fenceBody)
+    if (looksLikeChartFence) {
+      return content.slice(0, lastFence).trimEnd()
+    }
+    return content
+  }
+
+  // Case 2: a bare trailing `{ ...` object that looks like an ECharts option
+  // but has not closed yet.
+  const lastBareStart = content.lastIndexOf('\n{')
+  const candidateStart = lastBareStart >= 0 ? lastBareStart + 1 : content.startsWith('{') ? 0 : -1
+  if (candidateStart >= 0) {
+    const candidate = content.slice(candidateStart)
+    if (CHART_JSON_HINT_PATTERN.test(candidate) && !hasBalancedJsonBraces(candidate)) {
+      return content.slice(0, candidateStart).trimEnd()
+    }
+  }
+
+  return content
+}

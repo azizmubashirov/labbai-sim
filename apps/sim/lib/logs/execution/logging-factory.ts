@@ -1,0 +1,414 @@
+import { db, workflow } from '@sim/db'
+import { eq } from 'drizzle-orm'
+import { BASE_EXECUTION_CHARGE } from '@/lib/billing/constants'
+import {
+  accumulateEmbeddedToolCosts,
+  buildEmbeddedToolIds,
+  extractEmbeddedToolCostsFromSpan,
+  normalizeEmbeddedToolCosts,
+  resolveBillableToolDisplayName,
+  resolveBillableToolOperationId,
+} from '@/lib/logs/embedded-tool-costs'
+import type {
+  ExecutionEnvironment,
+  ExecutionTrigger,
+  TraceSpan,
+  WorkflowState,
+} from '@/lib/logs/types'
+import {
+  loadDeployedWorkflowState,
+  loadWorkflowFromNormalizedTables,
+} from '@/lib/workflows/persistence/utils'
+
+export function createTriggerObject(
+  type: ExecutionTrigger['type'],
+  additionalData?: Record<string, unknown>
+): ExecutionTrigger {
+  return {
+    type,
+    source: type,
+    timestamp: new Date().toISOString(),
+    ...(additionalData && { data: additionalData }),
+  }
+}
+
+export function createEnvironmentObject(
+  workflowId: string,
+  executionId: string,
+  userId?: string,
+  workspaceId?: string,
+  variables?: Record<string, string>
+): ExecutionEnvironment {
+  return {
+    variables: variables || {},
+    workflowId,
+    executionId,
+    userId: userId || '',
+    workspaceId: workspaceId || '',
+  }
+}
+
+export async function loadWorkflowStateForExecution(workflowId: string): Promise<WorkflowState> {
+  const [normalizedData, workflowRecord] = await Promise.all([
+    loadWorkflowFromNormalizedTables(workflowId),
+    db
+      .select({ variables: workflow.variables })
+      .from(workflow)
+      .where(eq(workflow.id, workflowId))
+      .limit(1)
+      .then((rows) => rows[0]),
+  ])
+
+  if (!normalizedData) {
+    throw new Error(
+      `Workflow ${workflowId} has no normalized data available. Ensure the workflow is properly saved to normalized tables.`
+    )
+  }
+
+  return {
+    blocks: normalizedData.blocks || {},
+    edges: normalizedData.edges || [],
+    loops: normalizedData.loops || {},
+    parallels: normalizedData.parallels || {},
+    variables: (workflowRecord?.variables as WorkflowState['variables']) || undefined,
+  }
+}
+
+/**
+ * Load deployed workflow state for logging purposes.
+ * This fetches the active deployment state, ensuring logs capture
+ * the exact state that was executed (not the live editor state).
+ */
+export async function loadDeployedWorkflowStateForLogging(
+  workflowId: string
+): Promise<WorkflowState> {
+  const deployedData = await loadDeployedWorkflowState(workflowId)
+
+  return {
+    blocks: deployedData.blocks || {},
+    edges: deployedData.edges || [],
+    loops: deployedData.loops || {},
+    parallels: deployedData.parallels || {},
+    variables: deployedData.variables as WorkflowState['variables'],
+  }
+}
+
+type CostTraceSpan = Pick<TraceSpan, 'cost' | 'model' | 'tokens' | 'output'> & {
+  type?: TraceSpan['type']
+  name?: TraceSpan['name']
+  children?: CostTraceSpan[]
+}
+
+export interface CostSummaryModel {
+  input: number
+  output: number
+  total: number
+  toolCost?: number
+  /** Per-tool embedded costs normalized to `toolCost`; merged with max across boundaries. */
+  embeddedToolCosts?: Record<string, number>
+  /** Cost-key → Usage By Tools bucket id for {@link embeddedToolCosts} keys. */
+  embeddedToolIds?: Record<string, string>
+  tokens: { input: number; output: number; total: number }
+}
+
+/**
+ * Non-model billable charge (e.g. a standalone hosted-key tool block such as
+ * Exa/Tavily/falai run outside an agent). These spans contribute to the run's
+ * total cost but carry no `model`, so they live here rather than in `models`.
+ * Summed per canvas display name; registry operation ids go on `toolName`.
+ */
+export interface CostSummaryCharge {
+  total: number
+  /** Registry operation id (`exa_search`) when known from span input. */
+  toolName?: string
+}
+
+/**
+ * Third-party vendor spend from Cost blocks (`type: 'cost'` spans), keyed by span
+ * name for ledger reconciliation.
+ */
+export interface CostSummaryExternalCharge {
+  total: number
+  vendor?: string
+  quantity?: number
+  unit?: string
+  metadata?: {
+    originalAmount?: number
+    originalCurrency?: string
+    exchangeRate?: number
+    sourceBlockId?: string
+    responsePath?: string
+    quantityPath?: string
+    unitPrice?: number
+    source?: string
+  }
+}
+
+export interface CostSummary {
+  totalCost: number
+  totalInputCost: number
+  totalOutputCost: number
+  totalTokens: number
+  totalPromptTokens: number
+  totalCompletionTokens: number
+  baseExecutionCharge: number
+  models: Record<string, CostSummaryModel>
+  /**
+   * Model costs owned by workflow finalization. Mothership spans remain in
+   * `models` and the display totals, but Go's cumulative update-cost path owns
+   * their usage ledger rows.
+   */
+  workflowLedgerModels: Record<string, CostSummaryModel>
+  /** Non-model billable charges keyed by span name (tool/integration costs). */
+  charges: Record<string, CostSummaryCharge>
+  /** Cost-block external vendor spend keyed by span name. */
+  external: Record<string, CostSummaryExternalCharge>
+}
+
+type BillableTraceSpan = CostTraceSpan & { cost: NonNullable<TraceSpan['cost']> }
+
+interface CostBlockRawOutput {
+  amount?: number
+  currency?: string
+  exchangeRate?: number
+  vendor?: string
+  label?: string
+  source?: string
+  quantity?: number
+  unit?: string
+  unitPrice?: number
+  quantityPath?: string
+  sourceBlockId?: string
+  responsePath?: string
+}
+
+function extractExternalChargeFromSpan(span: BillableTraceSpan): {
+  description: string
+  vendor?: string
+  quantity?: number
+  unit?: string
+  metadata: CostSummaryExternalCharge['metadata']
+} {
+  const raw = (span.output?.raw ?? {}) as CostBlockRawOutput
+  const description = span.name?.trim() || raw.label?.trim() || raw.vendor?.trim() || 'external'
+
+  return {
+    description,
+    vendor: raw.vendor?.trim() || undefined,
+    quantity: typeof raw.quantity === 'number' ? raw.quantity : undefined,
+    unit: raw.unit?.trim() || undefined,
+    metadata: {
+      ...(raw.amount !== undefined ? { originalAmount: raw.amount } : {}),
+      ...(raw.currency ? { originalCurrency: raw.currency } : {}),
+      ...(raw.exchangeRate !== undefined ? { exchangeRate: raw.exchangeRate } : {}),
+      ...(raw.sourceBlockId ? { sourceBlockId: raw.sourceBlockId } : {}),
+      ...(raw.responsePath ? { responsePath: raw.responsePath } : {}),
+      ...(raw.quantityPath ? { quantityPath: raw.quantityPath } : {}),
+      ...(raw.unitPrice !== undefined ? { unitPrice: raw.unitPrice } : {}),
+      ...(raw.source ? { source: raw.source } : {}),
+    },
+  }
+}
+
+function hasBillableCost(span: CostTraceSpan): span is BillableTraceSpan {
+  return span.cost !== undefined
+}
+
+function isModelBreakdownSpan(span: CostTraceSpan): boolean {
+  return span.type === 'model'
+}
+
+/** Mothership model spend is ledgered cumulatively by Go update-cost. */
+function isMothershipUpdateCostOwned(span: CostTraceSpan): boolean {
+  return span.type === 'mothership'
+}
+
+export interface CostSummaryOptions {
+  /**
+   * Per-run fixed charge folded into the total. Defaults to
+   * `BASE_EXECUTION_CHARGE`. Pass `0` for a run whose base charge is already
+   * paid by an invoking run — a custom block's child, for instance, is one
+   * logical run with its consumer and must not add a second execution fee.
+   */
+  baseExecutionCharge?: number
+}
+
+export function calculateCostSummary(
+  traceSpans: CostTraceSpan[] | undefined,
+  options?: CostSummaryOptions
+): CostSummary {
+  const baseExecutionCharge = options?.baseExecutionCharge ?? BASE_EXECUTION_CHARGE
+
+  if (!traceSpans || traceSpans.length === 0) {
+    return {
+      totalCost: baseExecutionCharge,
+      totalInputCost: 0,
+      totalOutputCost: 0,
+      totalTokens: 0,
+      totalPromptTokens: 0,
+      totalCompletionTokens: 0,
+      baseExecutionCharge,
+      models: {},
+      workflowLedgerModels: {},
+      charges: {},
+      external: {},
+    }
+  }
+
+  /**
+   * Collects spans that contribute to the execution's billable cost.
+   *
+   * Rule: when a span has its own `cost` AND has child model segments, the
+   * parent's block-level cost is authoritative — skip the model children to
+   * avoid double-counting. The parent cost is set by the provider response
+   * (and is correctly zeroed by `executeProviderRequest` for BYOK calls);
+   * model children only carry per-segment cost from the trace enrichers,
+   * which is unaware of BYOK status. Non-model children are still visited
+   * so standalone nested costs remain billable.
+   *
+   * Spans without their own `cost` (e.g. parent workflow spans for
+   * subworkflow blocks) still recurse so nested billable spans are counted.
+   */
+  const collectCostSpans = (spans: CostTraceSpan[]): BillableTraceSpan[] => {
+    const costSpans: BillableTraceSpan[] = []
+
+    for (const span of spans) {
+      // `workflow`-typed spans are aggregate containers, not billable units: the
+      // synthetic "Workflow Execution" root (added to every run by
+      // buildTraceSpans) and any nested sub-workflow root carry a `cost.total`
+      // equal to the SUM of their descendants. Counting that aggregate in
+      // addition to the descendants double-charges the run, so treat these as
+      // pass-through: never count their own cost, always recurse into all
+      // children where the real billable leaves (agents, tools) live.
+      const isAggregateContainer = span.type === 'workflow'
+      const hasOwnCost = hasBillableCost(span)
+      const countOwnCost = hasOwnCost && !isAggregateContainer
+
+      if (countOwnCost) {
+        costSpans.push(span)
+      }
+
+      if (span.children && Array.isArray(span.children)) {
+        if (countOwnCost) {
+          // Authoritative leaf (e.g. an agent block whose block-level cost is set
+          // by the provider response and already accounts for its model
+          // segments): only recurse into non-model children to find further
+          // standalone billable units, skipping the model-breakdown duplicates.
+          const nonModelChildren = span.children.filter((child) => !isModelBreakdownSpan(child))
+          costSpans.push(...collectCostSpans(nonModelChildren))
+        } else {
+          // Container (workflow / sub-workflow root) or a no-cost parent: recurse
+          // into everything so nested billable leaves are counted exactly once.
+          costSpans.push(...collectCostSpans(span.children))
+        }
+      }
+    }
+
+    return costSpans
+  }
+
+  const costSpans = collectCostSpans(traceSpans)
+
+  let totalCost = 0
+  let totalInputCost = 0
+  let totalOutputCost = 0
+  let totalTokens = 0
+  let totalPromptTokens = 0
+  let totalCompletionTokens = 0
+  const models: Record<string, CostSummaryModel> = {}
+  const workflowLedgerModels: Record<string, CostSummaryModel> = {}
+  const charges: Record<string, CostSummaryCharge> = {}
+  const external: Record<string, CostSummaryExternalCharge> = {}
+
+  const addModelCost = (
+    target: Record<string, CostSummaryModel>,
+    model: string,
+    span: BillableTraceSpan
+  ) => {
+    if (!target[model]) {
+      target[model] = {
+        input: 0,
+        output: 0,
+        total: 0,
+        tokens: { input: 0, output: 0, total: 0 },
+      }
+    }
+    target[model].input += span.cost.input || 0
+    target[model].output += span.cost.output || 0
+    target[model].total += span.cost.total || 0
+    target[model].tokens.input += span.tokens?.input ?? span.tokens?.prompt ?? 0
+    target[model].tokens.output += span.tokens?.output ?? span.tokens?.completion ?? 0
+    target[model].tokens.total += span.tokens?.total || 0
+
+    if (span.cost.toolCost) {
+      target[model].toolCost = (target[model].toolCost || 0) + span.cost.toolCost
+      const normalized = normalizeEmbeddedToolCosts(
+        extractEmbeddedToolCostsFromSpan(span),
+        span.cost.toolCost
+      )
+      target[model].embeddedToolCosts = accumulateEmbeddedToolCosts(
+        target[model].embeddedToolCosts,
+        normalized
+      )
+      target[model].embeddedToolIds = buildEmbeddedToolIds(
+        target[model].embeddedToolCosts,
+        target[model].embeddedToolIds
+      )
+    }
+  }
+
+  for (const span of costSpans) {
+    totalCost += span.cost.total || 0
+    totalInputCost += span.cost.input || 0
+    totalOutputCost += span.cost.output || 0
+    totalTokens += span.tokens?.total || 0
+    totalPromptTokens += span.tokens?.input ?? span.tokens?.prompt ?? 0
+    totalCompletionTokens += span.tokens?.output ?? span.tokens?.completion ?? 0
+
+    if (span.model) {
+      const model = span.model
+      addModelCost(models, model, span)
+      if (!isMothershipUpdateCostOwned(span)) {
+        addModelCost(workflowLedgerModels, model, span)
+      }
+    } else if (!isMothershipUpdateCostOwned(span) && (span.cost.total || 0) > 0) {
+      if (span.type === 'cost') {
+        const { description, vendor, quantity, unit, metadata } =
+          extractExternalChargeFromSpan(span)
+        if (!external[description]) {
+          external[description] = { total: 0, vendor, quantity, unit, metadata }
+        }
+        external[description].total += span.cost.total || 0
+      } else {
+        // Non-model billable span (e.g. a standalone hosted-key tool block).
+        // Charge/display key stays the canvas title; registry operation ids are
+        // carried on `toolName` for By Tools grouping (`usage_log.tool_name`).
+        const description = resolveBillableToolDisplayName(span)
+        const toolName = resolveBillableToolOperationId(span)
+        if (!charges[description]) {
+          charges[description] = { total: 0, ...(toolName ? { toolName } : {}) }
+        }
+        charges[description].total += span.cost.total || 0
+        if (toolName && !charges[description].toolName) {
+          charges[description].toolName = toolName
+        }
+      }
+    }
+  }
+
+  totalCost += baseExecutionCharge
+
+  return {
+    totalCost,
+    totalInputCost,
+    totalOutputCost,
+    totalTokens,
+    totalPromptTokens,
+    totalCompletionTokens,
+    baseExecutionCharge,
+    models,
+    workflowLedgerModels,
+    charges,
+    external,
+  }
+}

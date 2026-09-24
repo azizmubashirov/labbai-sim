@@ -1,0 +1,434 @@
+import { db } from '@sim/db'
+import {
+  jobExecutionLogs,
+  pausedExecutions,
+  usageLog,
+  workflow,
+  workflowDeploymentVersion,
+  workflowExecutionLogs,
+} from '@sim/db/schema'
+import { and, eq, type SQL } from 'drizzle-orm'
+import type { AdditiveCostLeaf, CostLedger } from '@/lib/api/contracts/logs'
+import type { ModelUsageMetadata } from '@/lib/billing/core/usage-log'
+import {
+  formatEmbeddedToolLabel,
+  mergeEmbeddedToolCosts,
+  resolveEmbeddedToolsForModel,
+  UNATTRIBUTED_AGENT_TOOLS_ID,
+} from '@/lib/logs/embedded-tool-costs'
+import {
+  type ExecutionProgressMarkers,
+  getProgressMarkers,
+  pickLatestCompletedMarker,
+  pickLatestStartedMarker,
+} from '@/lib/logs/execution/progress-markers'
+import { materializeExecutionDataForDisplay } from '@/lib/logs/execution/trace-store'
+import { workflowExecutionOriginSql } from '@/lib/logs/execution-origin'
+import type { TraceSpan } from '@/lib/logs/types'
+import { checkWorkspaceAccess } from '@/lib/workspaces/permissions/utils'
+
+type LookupColumn = 'id' | 'executionId'
+
+type LedgerItem = CostLedger['items'][number]
+
+function mergeLedgerMetadata(existing: LedgerItem, metadata: ModelUsageMetadata): void {
+  if (typeof metadata.inputTokens === 'number') {
+    existing.inputTokens = Math.max(existing.inputTokens ?? 0, metadata.inputTokens)
+  }
+  if (typeof metadata.outputTokens === 'number') {
+    existing.outputTokens = Math.max(existing.outputTokens ?? 0, metadata.outputTokens)
+  }
+  if (typeof metadata.toolCost === 'number') {
+    existing.toolCost = Math.max(existing.toolCost ?? 0, metadata.toolCost)
+  }
+  if (metadata.embeddedToolCosts) {
+    const resolved = resolveEmbeddedToolsForModel({
+      model: existing.description,
+      toolCost: existing.toolCost,
+      embeddedToolCosts: mergeEmbeddedToolCosts(
+        Object.fromEntries((existing.embeddedTools ?? []).map((tool) => [tool.name, tool.cost])),
+        metadata.embeddedToolCosts
+      ),
+      embeddedToolIds: metadata.embeddedToolIds,
+    })
+    existing.embeddedTools = resolved.tools
+  }
+}
+
+function enrichModelItemFromTrace(item: LedgerItem, traceSpans?: TraceSpan[]): void {
+  if (item.category !== 'model' || !item.toolCost || item.toolCost <= 0) return
+  if (item.embeddedTools && item.embeddedTools.length > 0) return
+
+  const resolved = resolveEmbeddedToolsForModel({
+    model: item.description,
+    toolCost: item.toolCost,
+    traceSpans,
+  })
+  item.embeddedTools = resolved.tools
+}
+
+/** Builds additive leaf rows that reconcile exactly to the ledger total. */
+export function buildAdditiveCostLeaves(
+  items: LedgerItem[],
+  traceSpans?: TraceSpan[]
+): AdditiveCostLeaf[] {
+  const enrichedItems = items.map((item) => {
+    const copy = {
+      ...item,
+      embeddedTools: item.embeddedTools ? [...item.embeddedTools] : undefined,
+    }
+    enrichModelItemFromTrace(copy, traceSpans)
+    return copy
+  })
+
+  const leaves: AdditiveCostLeaf[] = []
+
+  for (const [index, item] of enrichedItems.entries()) {
+    if (item.category === 'fixed') {
+      leaves.push({
+        key: `fixed-${index}`,
+        group: 'base',
+        label: item.description === 'execution_fee' ? 'Base Run' : item.description,
+        dollars: item.cost,
+      })
+      continue
+    }
+
+    if (item.category === 'model') {
+      const toolCost = item.toolCost ?? 0
+      const modelOnlyCost = Math.max(0, item.cost - toolCost)
+      if (modelOnlyCost > 0) {
+        leaves.push({
+          key: `model-${index}`,
+          group: 'model',
+          label: item.description,
+          dollars: modelOnlyCost,
+        })
+      }
+
+      const resolved = resolveEmbeddedToolsForModel({
+        model: item.description,
+        toolCost,
+        embeddedToolCosts: item.embeddedTools
+          ? Object.fromEntries(item.embeddedTools.map((tool) => [tool.name, tool.cost]))
+          : undefined,
+        traceSpans,
+      })
+
+      for (const [toolIndex, tool] of resolved.tools.entries()) {
+        leaves.push({
+          key: `model-${index}-tool-${toolIndex}`,
+          group: 'tool',
+          label: formatEmbeddedToolLabel(tool.name),
+          dollars: tool.cost,
+        })
+      }
+
+      if (resolved.unattributed > 0) {
+        leaves.push({
+          key: `model-${index}-unattributed`,
+          group: 'tool',
+          label: formatEmbeddedToolLabel(UNATTRIBUTED_AGENT_TOOLS_ID),
+          dollars: resolved.unattributed,
+        })
+      }
+      continue
+    }
+
+    if (item.category === 'tool') {
+      leaves.push({
+        key: `tool-${index}`,
+        group: 'tool',
+        label: formatEmbeddedToolLabel(item.description),
+        dollars: item.cost,
+      })
+      continue
+    }
+
+    leaves.push({
+      key: `other-${index}`,
+      group: 'other',
+      label: item.description,
+      dollars: item.cost,
+    })
+  }
+
+  return leaves
+}
+
+async function buildCostLedger(
+  executionId: string,
+  traceSpans?: TraceSpan[]
+): Promise<CostLedger | null> {
+  const rows = await db
+    .select({
+      category: usageLog.category,
+      description: usageLog.description,
+      cost: usageLog.cost,
+      billableCost: usageLog.billableCost,
+      metadata: usageLog.metadata,
+    })
+    .from(usageLog)
+    .where(and(eq(usageLog.executionId, executionId), eq(usageLog.source, 'workflow')))
+
+  if (rows.length === 0) return null
+
+  const byKey = new Map<string, LedgerItem>()
+  for (const row of rows) {
+    const metadata = (row.metadata ?? {}) as ModelUsageMetadata
+    const category = row.category as LedgerItem['category']
+    const key = `${category}::${row.description}`
+    const existing = byKey.get(key)
+    if (existing) {
+      existing.cost += Number(row.billableCost ?? row.cost)
+      mergeLedgerMetadata(existing, metadata)
+    } else {
+      const item: LedgerItem = {
+        category,
+        description: row.description,
+        cost: Number(row.billableCost ?? row.cost),
+        ...(typeof metadata.inputTokens === 'number' ? { inputTokens: metadata.inputTokens } : {}),
+        ...(typeof metadata.outputTokens === 'number'
+          ? { outputTokens: metadata.outputTokens }
+          : {}),
+        ...(typeof metadata.toolCost === 'number' ? { toolCost: metadata.toolCost } : {}),
+      }
+      if (metadata.embeddedToolCosts) {
+        item.embeddedTools = resolveEmbeddedToolsForModel({
+          model: row.description,
+          toolCost: metadata.toolCost,
+          embeddedToolCosts: metadata.embeddedToolCosts,
+          embeddedToolIds: metadata.embeddedToolIds,
+        }).tools
+      }
+      byKey.set(key, item)
+    }
+  }
+
+  const items = [...byKey.values()]
+  const total = items.reduce((sum, item) => sum + item.cost, 0)
+  const leaves = buildAdditiveCostLeaves(items, traceSpans)
+  return { total, items, leaves }
+}
+
+export function jobCostTotal(raw: unknown): { total: number } | null {
+  const total = (raw as { total?: unknown } | null | undefined)?.total
+  const n = total == null ? Number.NaN : Number(total)
+  return Number.isFinite(n) ? { total: n } : null
+}
+
+interface FetchLogDetailArgs {
+  userId: string
+  workspaceId: string
+  lookupColumn: LookupColumn
+  lookupValue: string
+}
+
+/**
+ * Shared loader for the workflow-log detail shape returned by the by-id and
+ * by-execution routes. Returns `null` when no matching row exists in either
+ * the workflow-execution or job-execution tables for this user + workspace.
+ *
+ * For in-flight (running/pending) executions, live progress markers are merged
+ * from Redis, since they are only folded into the row at a terminal/pause
+ * boundary.
+ */
+export async function fetchLogDetail({
+  userId,
+  workspaceId,
+  lookupColumn,
+  lookupValue,
+}: FetchLogDetailArgs) {
+  const access = await checkWorkspaceAccess(workspaceId, userId)
+  if (!access.hasAccess) return null
+
+  const workflowMatch: SQL =
+    lookupColumn === 'id'
+      ? eq(workflowExecutionLogs.id, lookupValue)
+      : eq(workflowExecutionLogs.executionId, lookupValue)
+
+  const rows = await db
+    .select({
+      id: workflowExecutionLogs.id,
+      workflowId: workflowExecutionLogs.workflowId,
+      executionId: workflowExecutionLogs.executionId,
+      deploymentVersionId: workflowExecutionLogs.deploymentVersionId,
+      level: workflowExecutionLogs.level,
+      status: workflowExecutionLogs.status,
+      trigger: workflowExecutionLogs.trigger,
+      startedAt: workflowExecutionLogs.startedAt,
+      endedAt: workflowExecutionLogs.endedAt,
+      totalDurationMs: workflowExecutionLogs.totalDurationMs,
+      executionData: workflowExecutionLogs.executionData,
+      costTotal: workflowExecutionLogs.costTotal,
+      files: workflowExecutionLogs.files,
+      createdAt: workflowExecutionLogs.createdAt,
+      workflowName: workflow.name,
+      workflowDescription: workflow.description,
+      workflowFolderId: workflow.folderId,
+      workflowUserId: workflow.userId,
+      workflowWorkspaceId: workflow.workspaceId,
+      workflowCreatedAt: workflow.createdAt,
+      workflowUpdatedAt: workflow.updatedAt,
+      deploymentVersion: workflowDeploymentVersion.version,
+      deploymentVersionName: workflowDeploymentVersion.name,
+      pausedStatus: pausedExecutions.status,
+      pausedTotalPauseCount: pausedExecutions.totalPauseCount,
+      pausedResumedCount: pausedExecutions.resumedCount,
+      executionOrigin: workflowExecutionOriginSql().as('execution_origin'),
+    })
+    .from(workflowExecutionLogs)
+    .leftJoin(workflow, eq(workflowExecutionLogs.workflowId, workflow.id))
+    .leftJoin(
+      workflowDeploymentVersion,
+      eq(workflowDeploymentVersion.id, workflowExecutionLogs.deploymentVersionId)
+    )
+    .leftJoin(pausedExecutions, eq(pausedExecutions.executionId, workflowExecutionLogs.executionId))
+    .where(and(workflowMatch, eq(workflowExecutionLogs.workspaceId, workspaceId)))
+    .limit(1)
+
+  const log = rows[0]
+
+  if (log) {
+    const workflowSummary = log.workflowId
+      ? {
+          id: log.workflowId,
+          name: log.workflowName,
+          description: log.workflowDescription,
+          folderId: log.workflowFolderId,
+          userId: log.workflowUserId,
+          workspaceId: log.workflowWorkspaceId,
+          createdAt: log.workflowCreatedAt?.toISOString() ?? null,
+          updatedAt: log.workflowUpdatedAt?.toISOString() ?? null,
+        }
+      : null
+
+    const totalPauseCount = Number(log.pausedTotalPauseCount ?? 0)
+    const resumedCount = Number(log.pausedResumedCount ?? 0)
+    const hasPendingPause =
+      (totalPauseCount > 0 && resumedCount < totalPauseCount) ||
+      (log.pausedStatus !== null && log.pausedStatus !== 'fully_resumed')
+
+    const executionData = await materializeExecutionDataForDisplay(
+      log.executionData as Record<string, unknown> | null,
+      {
+        workspaceId,
+        workflowId: log.workflowId,
+        executionId: log.executionId,
+        userId,
+      }
+    )
+
+    const traceSpans = (executionData as { traceSpans?: TraceSpan[] }).traceSpans
+    const costLedger = await buildCostLedger(log.executionId, traceSpans)
+    const totalDollars = costLedger?.total ?? (log.costTotal != null ? Number(log.costTotal) : null)
+
+    const liveMarkers =
+      log.status === 'running' || log.status === 'pending' || log.status === 'redacting'
+        ? ((await getProgressMarkers(log.executionId)) ?? {})
+        : {}
+    const rowMarkers = (executionData ?? {}) as ExecutionProgressMarkers
+    const mergedStartedBlock = pickLatestStartedMarker(
+      liveMarkers.lastStartedBlock,
+      rowMarkers.lastStartedBlock
+    )
+    const mergedCompletedBlock = pickLatestCompletedMarker(
+      liveMarkers.lastCompletedBlock,
+      rowMarkers.lastCompletedBlock
+    )
+
+    return {
+      id: log.id,
+      workflowId: log.workflowId,
+      executionId: log.executionId,
+      deploymentVersionId: log.deploymentVersionId,
+      deploymentVersion: log.deploymentVersion ?? null,
+      deploymentVersionName: log.deploymentVersionName ?? null,
+      level: log.level,
+      status: log.status,
+      duration: log.totalDurationMs ? `${log.totalDurationMs}ms` : null,
+      trigger: log.trigger,
+      executionOrigin: log.executionOrigin ?? null,
+      createdAt: log.startedAt.toISOString(),
+      workflow: workflowSummary,
+      jobTitle: null,
+      cost: totalDollars != null ? { total: totalDollars } : null,
+      costLedger,
+      pauseSummary: {
+        status: log.pausedStatus ?? null,
+        total: totalPauseCount,
+        resumed: resumedCount,
+      },
+      hasPendingPause,
+      executionData: {
+        totalDuration: log.totalDurationMs,
+        ...executionData,
+        ...(mergedStartedBlock ? { lastStartedBlock: mergedStartedBlock } : {}),
+        ...(mergedCompletedBlock ? { lastCompletedBlock: mergedCompletedBlock } : {}),
+        enhanced: true as const,
+      },
+      files: log.files ?? null,
+    }
+  }
+
+  const jobMatch: SQL =
+    lookupColumn === 'id'
+      ? eq(jobExecutionLogs.id, lookupValue)
+      : eq(jobExecutionLogs.executionId, lookupValue)
+
+  const jobRows = await db
+    .select({
+      id: jobExecutionLogs.id,
+      executionId: jobExecutionLogs.executionId,
+      level: jobExecutionLogs.level,
+      status: jobExecutionLogs.status,
+      trigger: jobExecutionLogs.trigger,
+      startedAt: jobExecutionLogs.startedAt,
+      endedAt: jobExecutionLogs.endedAt,
+      totalDurationMs: jobExecutionLogs.totalDurationMs,
+      executionData: jobExecutionLogs.executionData,
+      cost: jobExecutionLogs.cost,
+      createdAt: jobExecutionLogs.createdAt,
+    })
+    .from(jobExecutionLogs)
+    .where(and(jobMatch, eq(jobExecutionLogs.workspaceId, workspaceId)))
+    .limit(1)
+
+  const jobLog = jobRows[0]
+  if (!jobLog) return null
+
+  const execData = await materializeExecutionDataForDisplay(
+    jobLog.executionData as Record<string, unknown> | null,
+    {
+      workspaceId,
+      workflowId: null,
+      executionId: jobLog.executionId,
+      userId,
+    }
+  )
+  return {
+    id: jobLog.id,
+    workflowId: null,
+    executionId: jobLog.executionId,
+    deploymentVersionId: null,
+    deploymentVersion: null,
+    deploymentVersionName: null,
+    level: jobLog.level,
+    status: jobLog.status,
+    duration: jobLog.totalDurationMs ? `${jobLog.totalDurationMs}ms` : null,
+    trigger: jobLog.trigger,
+    executionOrigin: null,
+    createdAt: jobLog.startedAt.toISOString(),
+    workflow: null,
+    jobTitle: ((execData.trigger as Record<string, unknown> | undefined)?.source as string) ?? null,
+    cost: jobCostTotal(jobLog.cost),
+    pauseSummary: { status: null, total: 0, resumed: 0 },
+    hasPendingPause: false,
+    executionData: {
+      totalDuration: jobLog.totalDurationMs,
+      ...execData,
+      enhanced: true as const,
+    },
+    files: null,
+  }
+}

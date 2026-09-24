@@ -1,0 +1,15 @@
+import type { Metadata } from 'next'
+import { getEnv } from '@/lib/core/config/env'
+import { SessionRequiredContent } from '@/app/session-required/session-required-content'
+
+export const metadata: Metadata = {
+  title: 'Sign in required',
+}
+
+export const dynamic = 'force-dynamic'
+
+export default function SessionRequiredPage() {
+  const arenaUrl = getEnv('NEXT_PUBLIC_ARENA_FRONTEND_APP_URL')?.trim()
+
+  return <SessionRequiredContent arenaUrl={arenaUrl} />
+}

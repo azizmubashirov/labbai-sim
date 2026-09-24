@@ -1,0 +1,19 @@
+import type { PersistedStreamEventEnvelope } from '@/lib/copilot/request/session/contract'
+import type { StreamLoopContext } from '@/app/workspace/[workspaceId]/home/hooks/stream/stream-context'
+import { setLocalLiveStatus } from '@/local-copilot/lib/client/local-live-status'
+
+type CompleteEvent = Extract<PersistedStreamEventEnvelope, { type: 'complete' }>
+
+/**
+ * Turn termination and the deterministic propagation of the outcome to any
+ * still-open node are folded into the model by `reduceEvent` (which skips an
+ * async pause). This handler only records the terminal flag and flushes.
+ */
+export function handleCompleteEvent(ctx: StreamLoopContext, _parsed: CompleteEvent): void {
+  ctx.deps.clearBrowserAgentRuns()
+  ctx.state.browserAgentRunIds.clear()
+  ctx.state.sawCompleteEvent = true
+  ctx.state.liveStatus = undefined
+  setLocalLiveStatus(undefined)
+  ctx.ops.flush()
+}

@@ -1,0 +1,547 @@
+import { db } from '@sim/db'
+import { member, type WorkspaceMode, workspace } from '@sim/db/schema'
+import { createLogger } from '@sim/logger'
+import { isOrgAdminRole } from '@sim/platform-authz/workspace'
+import { and, count, eq, isNull } from 'drizzle-orm'
+import { isArenaMaxWorkspacePlan } from '@/lib/billing/arena/access'
+import { getOrganizationSubscription } from '@/lib/billing/core/billing'
+import { getHighestPrioritySubscription } from '@/lib/billing/core/plan'
+import {
+  acquireOrganizationUserMutationLocks,
+  getUserOrganization,
+} from '@/lib/billing/organizations/membership'
+import type { PlanCategory } from '@/lib/billing/plan-helpers'
+import { getPlanType, isEnterprise, isMaxTier, isPro, isTeam } from '@/lib/billing/plan-helpers'
+import { hasUsableSubscriptionStatus } from '@/lib/billing/subscriptions/utils'
+import { isBillingEnabled } from '@/lib/core/config/env-flags'
+import type { DbOrTx } from '@/lib/db/types'
+import {
+  CONTACT_OWNER_TO_UPGRADE_REASON,
+  UPGRADE_TO_INVITE_REASON,
+} from '@/lib/workspaces/policy-constants'
+
+const logger = createLogger('WorkspacePolicy')
+
+export const WORKSPACE_MODE = {
+  PERSONAL: 'personal',
+  ORGANIZATION: 'organization',
+  GRANDFATHERED_SHARED: 'grandfathered_shared',
+} as const satisfies Record<string, WorkspaceMode>
+
+interface WorkspaceOwnershipState {
+  organizationId: string | null
+  workspaceMode: WorkspaceMode
+  billedAccountUserId: string
+  ownerId: string
+}
+
+export {
+  CONTACT_OWNER_TO_UPGRADE_REASON,
+  UPGRADE_TO_INVITE_REASON,
+} from '@/lib/workspaces/policy-constants'
+
+export interface WorkspaceInvitePolicy {
+  allowed: boolean
+  reason: string | null
+  requiresSeat: boolean
+  organizationId: string | null
+  upgradeRequired: boolean
+}
+
+/** Caller-facing invite flags derived from an evaluated invite policy. */
+export interface WorkspaceInviteFlags {
+  inviteMembersEnabled: boolean
+  inviteDisabledReason: string | null
+  inviteUpgradeRequired: boolean
+}
+
+/**
+ * Derives the caller-facing invite flags for a workspace response. Only the
+ * billed user can act on an upgrade, so everyone else gets the contact-owner
+ * message when invites are disabled.
+ */
+export function resolveInviteFlags(
+  invitePolicy: WorkspaceInvitePolicy,
+  callerIsBilledUser: boolean
+): WorkspaceInviteFlags {
+  return {
+    inviteMembersEnabled: invitePolicy.allowed,
+    inviteDisabledReason: invitePolicy.allowed
+      ? null
+      : callerIsBilledUser
+        ? (invitePolicy.reason ?? UPGRADE_TO_INVITE_REASON)
+        : CONTACT_OWNER_TO_UPGRADE_REASON,
+    inviteUpgradeRequired: invitePolicy.upgradeRequired && callerIsBilledUser,
+  }
+}
+
+export interface WorkspaceCreationPolicy {
+  canCreate: boolean
+  workspaceMode: WorkspaceMode
+  organizationId: string | null
+  billedAccountUserId: string
+  isPersonal: boolean
+  maxWorkspaces: number | null
+  currentWorkspaceCount: number
+  reason: string | null
+  status: number
+  /**
+   * The organization the caller belonged to when this decision was made
+   * (`null` for none). A PERSONAL decision is legitimate for an existing
+   * member whose organization has no usable Team/Enterprise plan, so
+   * creation compares membership against this snapshot instead of treating
+   * any membership as a mid-create join.
+   */
+  observedOrganizationId: string | null
+  /** Discriminant for blocked states the workspace mode cannot distinguish. */
+  blockedReasonCode?: 'organization-subscription-inactive'
+}
+
+export class WorkspaceCreationContextChangedError extends Error {
+  constructor() {
+    super('Workspace creation context changed before the workspace was inserted')
+    this.name = 'WorkspaceCreationContextChangedError'
+  }
+}
+
+/**
+ * Serializes the final creation-policy check with membership/ownership
+ * mutations and row-locks the paid entitlement used by organization mode.
+ * Returns the live billing owner. The caller must invoke this in the same
+ * transaction as the workspace insert.
+ */
+export async function lockWorkspaceCreationContext(
+  tx: DbOrTx,
+  {
+    userId,
+    organizationId,
+    observedOrganizationId,
+  }: {
+    userId: string
+    organizationId: string | null
+    observedOrganizationId: string | null
+  }
+): Promise<{ billedAccountUserId: string }> {
+  await acquireOrganizationUserMutationLocks(tx, {
+    userId,
+    organizationIds: organizationId ? [organizationId] : [],
+  })
+  const currentMembership = await getUserOrganization(userId, tx)
+  if (
+    (currentMembership?.organizationId ?? null) !== observedOrganizationId ||
+    (organizationId !== null && currentMembership?.organizationId !== organizationId)
+  ) {
+    throw new WorkspaceCreationContextChangedError()
+  }
+
+  if (!organizationId) return { billedAccountUserId: userId }
+
+  if (isBillingEnabled) {
+    if (!currentMembership || !isOrgAdminRole(currentMembership.role)) {
+      throw new WorkspaceCreationContextChangedError()
+    }
+    const currentSubscription = await getOrganizationSubscription(organizationId, {
+      executor: tx,
+      onError: 'throw',
+      forUpdate: true,
+    })
+    if (
+      !currentSubscription ||
+      !hasUsableSubscriptionStatus(currentSubscription.status) ||
+      (!isTeam(currentSubscription.plan) && !isEnterprise(currentSubscription.plan))
+    ) {
+      throw new WorkspaceCreationContextChangedError()
+    }
+  }
+
+  const currentOwnerId = await getOrganizationOwnerId(organizationId, tx)
+  if (!currentOwnerId) throw new WorkspaceCreationContextChangedError()
+  return { billedAccountUserId: currentOwnerId }
+}
+
+interface GetWorkspaceCreationPolicyParams {
+  userId: string
+  activeOrganizationId?: string | null
+  /**
+   * When true, `activeOrganizationId` is authoritative: it is used exactly as given
+   * (including `null`, which means a personal workspace) and never falls back to the
+   * caller's membership org. Forks set this so the child always lands in the SOURCE's
+   * org, not whatever org the acting user happens to belong to.
+   */
+  pinOrganization?: boolean
+}
+
+export function isOrganizationWorkspace(
+  workspaceState: Pick<WorkspaceOwnershipState, 'workspaceMode' | 'organizationId'>
+): boolean {
+  return (
+    workspaceState.workspaceMode === WORKSPACE_MODE.ORGANIZATION &&
+    workspaceState.organizationId !== null &&
+    workspaceState.organizationId.length > 0
+  )
+}
+
+export function isPersonalWorkspace(
+  workspaceState: Pick<{ isPersonal: boolean }, 'isPersonal'>
+): boolean {
+  return workspaceState.isPersonal === true
+}
+
+/**
+ * Computes whether new members can be invited to the given workspace
+ * under the active product policy.
+ *
+ * All workspaces are organization-scoped; invite policy follows the org
+ * subscription (seats, org subscription) like any other org workspace.
+ */
+export async function getWorkspaceInvitePolicy(
+  workspaceState: WorkspaceOwnershipState
+): Promise<WorkspaceInvitePolicy> {
+  const billedPlanCategory = isBillingEnabled
+    ? await resolveBilledPlanCategory(workspaceState)
+    : 'free'
+  return evaluateWorkspaceInvitePolicy(workspaceState, { billedPlanCategory })
+}
+
+/**
+ * Pure evaluator — given the billed account's resolved plan category,
+ * returns the policy synchronously. Exposed so bulk callers (e.g. listing
+ * every workspace a user can see) can batch the subscription lookups by
+ * unique billed account user rather than re-querying per workspace.
+ */
+export function evaluateWorkspaceInvitePolicy(
+  workspaceState: WorkspaceOwnershipState,
+  context: { billedPlanCategory: PlanCategory }
+): WorkspaceInvitePolicy {
+  if (!isBillingEnabled) {
+    return {
+      allowed: true,
+      reason: null,
+      requiresSeat: false,
+      organizationId: workspaceState.organizationId,
+      upgradeRequired: false,
+    }
+  }
+
+  if (!isOrganizationWorkspace(workspaceState)) {
+    return blockInvite(workspaceState.organizationId)
+  }
+
+  if (context.billedPlanCategory === 'free') {
+    return blockInvite(workspaceState.organizationId)
+  }
+
+  return {
+    allowed: true,
+    reason: null,
+    requiresSeat: context.billedPlanCategory === 'enterprise',
+    organizationId: workspaceState.organizationId,
+    upgradeRequired: false,
+  }
+}
+
+function blockInvite(organizationId: string | null): WorkspaceInvitePolicy {
+  return {
+    allowed: false,
+    reason: null,
+    requiresSeat: false,
+    organizationId,
+    upgradeRequired: true,
+  }
+}
+
+async function resolveBilledPlanCategory(
+  workspaceState: WorkspaceOwnershipState
+): Promise<PlanCategory> {
+  if (
+    workspaceState.workspaceMode === WORKSPACE_MODE.ORGANIZATION &&
+    workspaceState.organizationId
+  ) {
+    return getInvitePlanCategoryForOrganization(workspaceState.organizationId)
+  }
+  return getInvitePlanCategoryForUser(workspaceState.billedAccountUserId)
+}
+
+/**
+ * Resolve the invite-governing plan category for an organization from its
+ * subscription. Exposed so bulk callers can batch by unique organization id.
+ * Returns `'free'` when there is no usable subscription so lapsed orgs are
+ * blocked consistently with accept-time provisioning.
+ */
+export async function getInvitePlanCategoryForOrganization(
+  organizationId: string
+): Promise<PlanCategory> {
+  try {
+    const orgSub = await getOrganizationSubscription(organizationId)
+    if (!orgSub || !hasUsableSubscriptionStatus(orgSub.status)) return 'free'
+    return getPlanType(orgSub.plan)
+  } catch (error) {
+    logger.error('Failed to resolve organization subscription for invite policy', {
+      organizationId,
+      error,
+    })
+    return 'free'
+  }
+}
+
+/**
+ * Resolve the invite-governing plan category for a single billed account
+ * user. Exposed so bulk callers can batch by unique user id. Returns
+ * `'free'` when there is no usable paid subscription.
+ */
+export async function getInvitePlanCategoryForUser(
+  userId: string,
+  executor: DbOrTx = db
+): Promise<PlanCategory> {
+  try {
+    const sub = await getHighestPrioritySubscription(userId, { executor })
+    if (!sub || !hasUsableSubscriptionStatus(sub.status)) return 'free'
+    return getPlanType(sub.plan)
+  } catch (error) {
+    logger.error('Failed to resolve subscription for invite policy', { userId, error })
+    return 'free'
+  }
+}
+
+export async function getWorkspaceCreationPolicy({
+  userId,
+  activeOrganizationId,
+  pinOrganization = false,
+}: GetWorkspaceCreationPolicyParams): Promise<WorkspaceCreationPolicy> {
+  const membership = await getUserOrganization(userId)
+  const organizationId = pinOrganization
+    ? (activeOrganizationId ?? null)
+    : (activeOrganizationId ?? membership?.organizationId ?? null)
+  const orgRole =
+    organizationId == null
+      ? undefined
+      : membership?.organizationId === organizationId
+        ? membership.role
+        : (
+            await db
+              .select({ role: member.role })
+              .from(member)
+              .where(and(eq(member.userId, userId), eq(member.organizationId, organizationId)))
+              .limit(1)
+          )[0]?.role
+
+  if (!organizationId) {
+    return {
+      canCreate: false,
+      workspaceMode: WORKSPACE_MODE.ORGANIZATION,
+      organizationId: null,
+      billedAccountUserId: userId,
+      isPersonal: false,
+      maxWorkspaces: null,
+      currentWorkspaceCount: 0,
+      reason: 'You must belong to an organization to create a workspace.',
+      status: 403,
+      observedOrganizationId: membership?.organizationId ?? null,
+    }
+  }
+
+  if (activeOrganizationId && !orgRole) {
+    const billedAccountUserId = await requireOrganizationOwnerId(activeOrganizationId)
+
+    return {
+      canCreate: false,
+      workspaceMode: WORKSPACE_MODE.ORGANIZATION,
+      organizationId: activeOrganizationId,
+      billedAccountUserId,
+      isPersonal: false,
+      maxWorkspaces: null,
+      currentWorkspaceCount: 0,
+      reason: 'Only organization owners and admins can create organization workspaces.',
+      status: 403,
+      observedOrganizationId: membership?.organizationId ?? null,
+    }
+  }
+
+  const billedAccountUserId = await requireOrganizationOwnerId(organizationId)
+  const isPersonal = !(await userHasPersonalWorkspace(userId))
+  const currentWorkspaceCount = await countOrganizationWorkspaces(organizationId)
+  const isOrgAdmin = !!orgRole && isOrgAdminRole(orgRole)
+
+  /**
+   * Without billing, any org member may create. The admin-only rule exists
+   * because an organization workspace draws on the organization's paid seats
+   * and usage — with billing off there is nothing to draw on, and refusing
+   * plain members (SSO / instance-organization auto-join) leaves them with no
+   * workspace at all.
+   */
+  if (!isBillingEnabled) {
+    return {
+      canCreate: true,
+      workspaceMode: WORKSPACE_MODE.ORGANIZATION,
+      organizationId,
+      billedAccountUserId,
+      isPersonal,
+      maxWorkspaces: null,
+      currentWorkspaceCount,
+      reason: null,
+      status: 200,
+      observedOrganizationId: membership?.organizationId ?? null,
+    }
+  }
+
+  const organizationSubscription = await getOrganizationSubscription(organizationId)
+
+  if (
+    organizationSubscription &&
+    hasUsableSubscriptionStatus(organizationSubscription.status) &&
+    (isTeam(organizationSubscription.plan) || isEnterprise(organizationSubscription.plan))
+  ) {
+    if (!isOrgAdmin) {
+      return {
+        canCreate: false,
+        workspaceMode: WORKSPACE_MODE.ORGANIZATION,
+        organizationId,
+        billedAccountUserId,
+        isPersonal,
+        maxWorkspaces: null,
+        currentWorkspaceCount,
+        reason: 'Only organization owners and admins can create organization workspaces.',
+        status: 403,
+        observedOrganizationId: membership?.organizationId ?? null,
+      }
+    }
+
+    return {
+      canCreate: true,
+      workspaceMode: WORKSPACE_MODE.ORGANIZATION,
+      organizationId,
+      billedAccountUserId,
+      isPersonal,
+      maxWorkspaces: null,
+      currentWorkspaceCount,
+      reason: null,
+      status: 200,
+      observedOrganizationId: membership?.organizationId ?? null,
+    }
+  }
+
+  // Free / lapsed org: members may create only their first personal workspace.
+  if (!isOrgAdmin && !isPersonal) {
+    return {
+      canCreate: false,
+      workspaceMode: WORKSPACE_MODE.ORGANIZATION,
+      organizationId,
+      billedAccountUserId,
+      isPersonal,
+      maxWorkspaces: null,
+      currentWorkspaceCount,
+      reason: 'Only organization owners and admins can create organization workspaces.',
+      status: 403,
+      observedOrganizationId: membership?.organizationId ?? null,
+    }
+  }
+
+  const highestPrioritySubscription = await getHighestPrioritySubscription(billedAccountUserId)
+  const plan = highestPrioritySubscription?.plan
+  /**
+   * Cap for free/lapsed orgs (no usable Team/Enterprise subscription). Uses
+   * `isMaxTier` so Max credit tiers (`pro_25000`, `team_25000`) and enterprise
+   * get the same 10-workspace allowance — the old `isMax` helper required
+   * `isPro` and under-capped team/enterprise.
+   */
+  const maxWorkspaces = isMaxTier(plan) || isArenaMaxWorkspacePlan(plan) ? 10 : isPro(plan) ? 3 : 1
+
+  if (currentWorkspaceCount >= maxWorkspaces) {
+    return {
+      canCreate: false,
+      workspaceMode: WORKSPACE_MODE.ORGANIZATION,
+      organizationId,
+      billedAccountUserId,
+      isPersonal,
+      maxWorkspaces,
+      currentWorkspaceCount,
+      reason: `This plan supports up to ${maxWorkspaces} workspace${maxWorkspaces === 1 ? '' : 's'}.`,
+      status: 403,
+      observedOrganizationId: membership?.organizationId ?? null,
+    }
+  }
+
+  return {
+    canCreate: true,
+    workspaceMode: WORKSPACE_MODE.ORGANIZATION,
+    organizationId,
+    billedAccountUserId,
+    isPersonal,
+    maxWorkspaces,
+    currentWorkspaceCount,
+    reason: null,
+    status: 200,
+    observedOrganizationId: membership?.organizationId ?? null,
+  }
+}
+
+export async function countOrganizationWorkspaces(organizationId: string): Promise<number> {
+  const [result] = await db
+    .select({ value: count() })
+    .from(workspace)
+    .where(and(eq(workspace.organizationId, organizationId), isNull(workspace.archivedAt)))
+
+  return result?.value ?? 0
+}
+
+export async function userHasPersonalWorkspace(userId: string): Promise<boolean> {
+  const [result] = await db
+    .select({ id: workspace.id })
+    .from(workspace)
+    .where(
+      and(
+        eq(workspace.ownerId, userId),
+        eq(workspace.isPersonal, true),
+        isNull(workspace.archivedAt)
+      )
+    )
+    .limit(1)
+
+  return !!result
+}
+
+/**
+ * @deprecated Counts legacy non-org workspaces. Prefer `countOrganizationWorkspaces`.
+ */
+export async function countNonOrganizationOwnedWorkspaces(userId: string): Promise<number> {
+  const [result] = await db
+    .select({ value: count() })
+    .from(workspace)
+    .where(and(eq(workspace.ownerId, userId), isNull(workspace.organizationId)))
+
+  return result?.value ?? 0
+}
+
+/**
+ * Returns the userId of the organization owner, or `null` if the
+ * organization has no owner row. Unexpected DB errors propagate to the
+ * caller so data-integrity issues surface loudly rather than being
+ * silently fallen back to the caller's identity.
+ */
+export async function getOrganizationOwnerId(
+  organizationId: string,
+  executor: DbOrTx = db
+): Promise<string | null> {
+  const [ownerMembership] = await executor
+    .select({ userId: member.userId })
+    .from(member)
+    .where(and(eq(member.organizationId, organizationId), eq(member.role, 'owner')))
+    .limit(1)
+
+  return ownerMembership?.userId ?? null
+}
+
+/**
+ * Like `getOrganizationOwnerId` but throws when no owner row exists.
+ * Use when the caller needs a guaranteed billed-account userId — every
+ * Better Auth organization is expected to have exactly one owner, so a
+ * missing owner is a data-integrity issue that should surface loudly.
+ */
+async function requireOrganizationOwnerId(organizationId: string): Promise<string> {
+  const ownerId = await getOrganizationOwnerId(organizationId)
+  if (!ownerId) {
+    logger.error('Organization is missing its owner membership row', { organizationId })
+    throw new Error(`Organization ${organizationId} has no owner membership`)
+  }
+  return ownerId
+}

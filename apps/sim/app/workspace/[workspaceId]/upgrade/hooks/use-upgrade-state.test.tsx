@@ -1,0 +1,301 @@
+/**
+ * @vitest-environment jsdom
+ */
+import { act } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+const {
+  mockHandleUpgrade,
+  mockInvalidateQueries,
+  mockSetQueryData,
+  mockRequestJson,
+  mockToastError,
+} = vi.hoisted(() => ({
+  mockHandleUpgrade: vi.fn(),
+  mockInvalidateQueries: vi.fn(),
+  mockSetQueryData: vi.fn(),
+  mockRequestJson: vi.fn(),
+  mockToastError: vi.fn(),
+}))
+
+vi.mock('@sim/emcn', () => ({
+  toast: { error: mockToastError },
+}))
+
+vi.mock('@tanstack/react-query', () => ({
+  useQueryClient: () => ({
+    invalidateQueries: mockInvalidateQueries,
+    setQueryData: mockSetQueryData,
+  }),
+}))
+
+vi.mock('@/lib/api/client/request', () => ({
+  requestJson: mockRequestJson,
+}))
+
+vi.mock('@/lib/billing/client/upgrade', () => ({
+  useSubscriptionUpgrade: () => ({
+    handleUpgrade: mockHandleUpgrade,
+    isSessionPending: false,
+    hasAuthenticatedUser: true,
+  }),
+}))
+
+import type { WorkspaceHostContext } from '@/lib/api/contracts/workspaces'
+import {
+  type UpgradeState,
+  useUpgradeState,
+} from '@/app/workspace/[workspaceId]/upgrade/hooks/use-upgrade-state'
+
+const HOST_CONTEXT: WorkspaceHostContext = {
+  workspace: {
+    id: 'workspace-b',
+    name: 'Workspace B',
+    workspaceMode: 'organization',
+    billedAccountUserId: 'owner-b',
+  },
+  hostOrganizationId: 'org-b',
+  ownerBilling: {
+    plan: 'team_25000',
+    status: 'active',
+    isPaid: true,
+    isPro: false,
+    isTeam: true,
+    isEnterprise: false,
+    isOrgScoped: true,
+    organizationId: 'org-b',
+    billingInterval: 'month',
+    billingBlocked: false,
+    billingBlockedReason: null,
+  },
+  viewer: {
+    permission: 'admin',
+    isHostOrganizationMember: true,
+    isHostOrganizationAdmin: true,
+  },
+}
+
+let currentState: UpgradeState | null = null
+
+function Harness() {
+  currentState = useUpgradeState({
+    hostContext: HOST_CONTEXT,
+    workspaceId: HOST_CONTEXT.workspace.id,
+  })
+  return null
+}
+
+let container: HTMLDivElement
+let root: Root
+
+describe('useUpgradeState', () => {
+  beforeEach(() => {
+    currentState = null
+    container = document.createElement('div')
+    document.body.appendChild(container)
+    root = createRoot(container)
+    mockHandleUpgrade.mockResolvedValue(undefined)
+    mockInvalidateQueries.mockResolvedValue(undefined)
+    mockRequestJson.mockResolvedValue({ success: true })
+  })
+
+  afterEach(() => {
+    act(() => root.unmount())
+    container.remove()
+    vi.clearAllMocks()
+  })
+
+  it('derives plan state from the routed workspace host', async () => {
+    await act(async () => {
+      root.render(<Harness />)
+    })
+
+    expect(currentState?.subscription.plan).toBe('team_25000')
+    expect(currentState?.subscription.isOrgScoped).toBe(true)
+    expect(currentState?.isOnMax).toBe(true)
+  })
+
+  it('targets the host organization when upgrading the workspace plan', async () => {
+    await act(async () => {
+      root.render(<Harness />)
+    })
+
+    await act(async () => {
+      await currentState?.doUpgrade('team', 25000)
+    })
+
+    expect(mockHandleUpgrade).toHaveBeenCalledWith('team', {
+      creditTier: 25000,
+      annual: false,
+      organizationId: 'org-b',
+    })
+  })
+
+  it('shows checkout admission failures through the standard error toast', async () => {
+    mockHandleUpgrade.mockRejectedValueOnce(
+      new Error('Your subscription payment is still processing.')
+    )
+
+    await act(async () => {
+      root.render(<Harness />)
+    })
+
+    await act(async () => {
+      await currentState?.doUpgrade('team', 25000)
+    })
+
+    expect(mockToastError).toHaveBeenCalledWith('Your subscription payment is still processing.')
+  })
+
+  it('includes the routed workspace when switching the host billing interval', async () => {
+    await act(async () => {
+      root.render(<Harness />)
+    })
+
+    await act(async () => {
+      await currentState?.handleSwitchInterval('year')
+    })
+
+    expect(mockRequestJson).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        body: {
+          targetPlanName: 'team_25000',
+          interval: 'year',
+          workspaceId: 'workspace-b',
+        },
+      })
+    )
+  })
+
+  it('optimistically aligns the toggle and host-context interval after a switch', async () => {
+    await act(async () => {
+      root.render(<Harness />)
+    })
+
+    expect(currentState?.isAnnual).toBe(false)
+
+    await act(async () => {
+      await currentState?.handleSwitchInterval('year')
+    })
+
+    expect(currentState?.isAnnual).toBe(true)
+    expect(mockSetQueryData).toHaveBeenCalledWith(
+      ['workspace-host', 'detail', 'workspace-b'],
+      expect.any(Function)
+    )
+
+    const updater = mockSetQueryData.mock.calls[0][1] as (
+      previous: WorkspaceHostContext | undefined
+    ) => WorkspaceHostContext | undefined
+    expect(updater(HOST_CONTEXT)?.ownerBilling.billingInterval).toBe('year')
+    expect(updater(undefined)).toBeUndefined()
+  })
+
+  it('exposes checkout and interval pending flags while requests are in flight', async () => {
+    let resolveUpgrade: (() => void) | undefined
+    mockHandleUpgrade.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveUpgrade = resolve
+        })
+    )
+
+    await act(async () => {
+      root.render(<Harness />)
+    })
+
+    expect(currentState?.isStartingCheckout).toBe(false)
+    expect(currentState?.isSwitchingInterval).toBe(false)
+
+    let upgradePromise: Promise<void> | undefined
+    await act(async () => {
+      upgradePromise = currentState?.doUpgrade('team', 25000)
+    })
+
+    expect(currentState?.isStartingCheckout).toBe(true)
+
+    await act(async () => {
+      resolveUpgrade?.()
+      await upgradePromise
+    })
+
+    // Stripe redirect leaves pending locked until the page unloads.
+    expect(currentState?.isStartingCheckout).toBe(true)
+
+    let resolveSwitch: (() => void) | undefined
+    mockRequestJson.mockImplementationOnce(
+      () =>
+        new Promise<{ success: true }>((resolve) => {
+          resolveSwitch = () => resolve({ success: true })
+        })
+    )
+
+    // Simulate a fresh mount after returning from Stripe (refs reset).
+    await act(async () => {
+      root.unmount()
+      root = createRoot(container)
+      root.render(<Harness />)
+    })
+
+    let switchPromise: Promise<void> | undefined
+    await act(async () => {
+      switchPromise = currentState?.handleSwitchInterval('year')
+    })
+
+    expect(currentState?.isSwitchingInterval).toBe(true)
+
+    await act(async () => {
+      resolveSwitch?.()
+      await switchPromise
+    })
+
+    expect(currentState?.isSwitchingInterval).toBe(false)
+  })
+
+  it('ignores overlapping checkout starts while one is already in flight', async () => {
+    let resolveUpgrade: (() => void) | undefined
+    mockHandleUpgrade.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveUpgrade = resolve
+        })
+    )
+
+    await act(async () => {
+      root.render(<Harness />)
+    })
+
+    let first: Promise<void> | undefined
+    await act(async () => {
+      first = currentState?.doUpgrade('team', 25000)
+      void currentState?.doUpgrade('team', 25000)
+      void currentState?.doUpgrade('team', 25000)
+    })
+
+    expect(mockHandleUpgrade).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      resolveUpgrade?.()
+      await first
+    })
+
+    expect(mockHandleUpgrade).toHaveBeenCalledTimes(1)
+  })
+
+  it('unlocks checkout CTAs when Stripe checkout fails to start', async () => {
+    mockHandleUpgrade.mockRejectedValueOnce(new Error('Checkout could not be started.'))
+
+    await act(async () => {
+      root.render(<Harness />)
+    })
+
+    await act(async () => {
+      await currentState?.doUpgrade('team', 25000)
+    })
+
+    expect(currentState?.isStartingCheckout).toBe(false)
+    expect(mockToastError).toHaveBeenCalledWith('Checkout could not be started.')
+  })
+})

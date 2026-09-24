@@ -1,0 +1,71 @@
+# Labbai test stack (147.93.62.159). Ports bound to 127.0.0.1 only — reach via SSH tunnel.
+name: labbai
+services:
+  simstudio:
+    image: labbai/simstudio:test
+    build:
+      context: .
+      dockerfile: docker/app.Dockerfile
+      args:
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
+    env_file: .env
+    restart: unless-stopped
+    ports: ['127.0.0.1:3300:3000']
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/simstudio
+      - BETTER_AUTH_URL=${NEXT_PUBLIC_APP_URL}
+      - REDIS_URL=redis://redis:6379
+      - SOCKET_SERVER_URL=http://realtime:3002
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      realtime: {condition: service_started}
+    deploy: {resources: {limits: {memory: 3G}}}
+
+  realtime:
+    image: labbai/realtime:test
+    build: {context: ., dockerfile: docker/realtime.Dockerfile}
+    env_file: .env
+    restart: unless-stopped
+    ports: ['127.0.0.1:3302:3002']
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/simstudio
+      - BETTER_AUTH_URL=${NEXT_PUBLIC_APP_URL}
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    deploy: {resources: {limits: {memory: 512M}}}
+
+  # One-shot: journal migrations, then sync the rest of schema.ts (Arena keeps
+  # several migrations outside the drizzle journal).
+  migrations:
+    image: labbai/migrations:test
+    build: {context: ., dockerfile: docker/db.Dockerfile}
+    environment:
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/simstudio
+    depends_on:
+      db: {condition: service_healthy}
+    command: ['sh', '-c', 'bun run db:migrate && bunx drizzle-kit push --config=./drizzle.config.ts --force']
+    restart: 'no'
+    profiles: ['setup']
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck: {test: ['CMD', 'redis-cli', 'ping'], interval: 5s, timeout: 5s, retries: 5}
+
+  db:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=simstudio
+    volumes: ['labbai_pg:/var/lib/postgresql/data']
+    healthcheck: {test: ['CMD-SHELL', 'pg_isready -U postgres'], interval: 5s, timeout: 5s, retries: 5}
+
+volumes:
+  labbai_pg:

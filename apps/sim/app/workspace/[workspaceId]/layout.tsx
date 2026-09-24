@@ -1,0 +1,153 @@
+import { Suspense } from 'react'
+import { ToastProvider } from '@sim/emcn'
+import { dehydrate, HydrationBoundary } from '@tanstack/react-query'
+import type { Metadata } from 'next'
+import { cookies, headers } from 'next/headers'
+import { redirect } from 'next/navigation'
+import { getSession } from '@/lib/auth'
+import {
+  ARENA_SSO_SESSION_REQUIRED_PATH,
+  buildArenaSimResumeUrl,
+} from '@/lib/auth/arena-sim-resume'
+import { getActiveOrganizationId } from '@/lib/auth/session-response'
+import { isLocalLoginEnabled } from '@/lib/core/config/env-flags'
+import { getQueryClient } from '@/app/_shell/providers/get-query-client'
+import { AppBanner } from '@/app/workspace/[workspaceId]/app-banner'
+import { ImpersonationBanner } from '@/app/workspace/[workspaceId]/components/impersonation-banner'
+import { SessionExpired } from '@/app/workspace/[workspaceId]/components/session-expired'
+import { WorkspaceAccessDenied } from '@/app/workspace/[workspaceId]/components/workspace-access-denied'
+import { WorkspaceChrome } from '@/app/workspace/[workspaceId]/components/workspace-chrome'
+import {
+  prefetchWorkspaceHostContext,
+  prefetchWorkspaceSidebar,
+} from '@/app/workspace/[workspaceId]/prefetch'
+import { ArenaThemeSync } from '@/app/workspace/[workspaceId]/providers/arena-theme-sync'
+import { BlockVisibilityLoader } from '@/app/workspace/[workspaceId]/providers/block-visibility-loader'
+import { CustomBlocksLoader } from '@/app/workspace/[workspaceId]/providers/custom-blocks-loader'
+import { DesktopOAuthConnectListener } from '@/app/workspace/[workspaceId]/providers/desktop-oauth-connect-listener'
+import { GlobalCommandsProvider } from '@/app/workspace/[workspaceId]/providers/global-commands-provider'
+import { ProviderModelsLoader } from '@/app/workspace/[workspaceId]/providers/provider-models-loader'
+import { SettingsLoader } from '@/app/workspace/[workspaceId]/providers/settings-loader'
+import { WorkspaceHostProvider } from '@/app/workspace/[workspaceId]/providers/workspace-host-provider'
+import { WorkspacePermissionsProvider } from '@/app/workspace/[workspaceId]/providers/workspace-permissions-provider'
+import { WorkspaceScopeSync } from '@/app/workspace/[workspaceId]/providers/workspace-scope-sync'
+import { WorkspaceRouteLoading } from '@/app/workspace/workspace-route-loading'
+import { getBrandConfig } from '@/ee/whitelabeling/branding'
+import { BrandingProvider } from '@/ee/whitelabeling/components/branding-provider'
+import {
+  getActiveOrgWhitelabelSettings,
+  getOrgWhitelabelSettings,
+} from '@/ee/whitelabeling/org-branding'
+import { resolveOrgFaviconUrl } from '@/ee/whitelabeling/org-branding-utils'
+
+export async function generateMetadata(): Promise<Metadata> {
+  const orgSettings = await getActiveOrgWhitelabelSettings()
+  const faviconUrl = resolveOrgFaviconUrl(orgSettings, getBrandConfig().faviconUrl)
+
+  if (!faviconUrl) {
+    return {}
+  }
+
+  return {
+    icons: {
+      icon: [{ url: faviconUrl, sizes: 'any' }],
+      shortcut: faviconUrl,
+    },
+  }
+}
+
+export default function WorkspaceLayout({
+  children,
+  params,
+}: {
+  children: React.ReactNode
+  params: Promise<{ workspaceId: string }>
+}) {
+  return (
+    <Suspense fallback={<WorkspaceRouteLoading />}>
+      <WorkspaceLayoutInner params={params}>{children}</WorkspaceLayoutInner>
+    </Suspense>
+  )
+}
+
+async function WorkspaceLayoutInner({
+  children,
+  params,
+}: {
+  children: React.ReactNode
+  params: Promise<{ workspaceId: string }>
+}) {
+  const { workspaceId } = await params
+  const session = await getSession()
+  if (!session?.user) {
+    if (isLocalLoginEnabled) {
+      redirect('/login')
+    }
+    const headerStore = await headers()
+    const host =
+      headerStore.get('x-forwarded-host')?.split(',')[0]?.trim() ||
+      headerStore.get('host') ||
+      undefined
+    const proto = headerStore.get('x-forwarded-proto')?.split(',')[0]?.trim() || 'https'
+    const returnTo = host
+      ? `${proto}://${host}/workspace/${workspaceId}`
+      : `/workspace/${workspaceId}`
+    const resume = buildArenaSimResumeUrl(returnTo, host?.split(':')[0])
+    redirect(resume?.href ?? ARENA_SSO_SESSION_REQUIRED_PATH)
+  }
+  const queryClient = getQueryClient()
+  const hostContext = await prefetchWorkspaceHostContext(queryClient, workspaceId, session.user.id)
+  if (!hostContext) {
+    return <WorkspaceAccessDenied />
+  }
+
+  const activeOrganizationId = getActiveOrganizationId(session)
+  const [cookieStore, initialOrgSettings] = await Promise.all([
+    cookies(),
+    hostContext.hostOrganizationId
+      ? getOrgWhitelabelSettings(hostContext.hostOrganizationId)
+      : Promise.resolve(null),
+    prefetchWorkspaceSidebar(
+      queryClient,
+      workspaceId,
+      session.user.id,
+      hostContext,
+      activeOrganizationId
+    ),
+  ])
+  const initialSidebarCollapsed = cookieStore.get('sidebar_collapsed')?.value === '1'
+
+  return (
+    <HydrationBoundary state={dehydrate(queryClient)}>
+      <WorkspaceHostProvider workspaceId={workspaceId} initialContext={hostContext}>
+        <BrandingProvider
+          hostOrganizationId={hostContext.hostOrganizationId}
+          viewerIsHostOrganizationMember={hostContext.viewer.isHostOrganizationMember}
+          initialOrgSettings={initialOrgSettings}
+        >
+          <ToastProvider>
+            <DesktopOAuthConnectListener />
+            <SettingsLoader />
+            <ArenaThemeSync />
+            <ProviderModelsLoader />
+            <CustomBlocksLoader />
+            <BlockVisibilityLoader />
+            <GlobalCommandsProvider>
+              <div className='flex h-screen w-full flex-col overflow-hidden bg-[var(--surface-1)]'>
+                <AppBanner />
+                <ImpersonationBanner />
+                <SessionExpired />
+                <WorkspacePermissionsProvider>
+                  <WorkspaceScopeSync />
+                  <WorkspaceChrome initialSidebarCollapsed={initialSidebarCollapsed}>
+                    {children}
+                  </WorkspaceChrome>
+                </WorkspacePermissionsProvider>
+              </div>
+            </GlobalCommandsProvider>
+          </ToastProvider>
+        </BrandingProvider>
+      </WorkspaceHostProvider>
+    </HydrationBoundary>
+  )
+}
