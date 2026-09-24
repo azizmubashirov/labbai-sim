@@ -3,9 +3,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import { connectorHasAuthSource, isConnectorCredentialTypeAllowed } from '@/connectors/auth'
-import { confluenceConnectorMeta } from '@/connectors/confluence/meta'
 import { googleDriveConnectorMeta } from '@/connectors/google-drive/meta'
-import { slackConnectorMeta } from '@/connectors/slack/meta'
 
 describe('connectorHasAuthSource', () => {
   const none = { credentialId: null, encryptedApiKey: null }
@@ -28,7 +26,7 @@ describe('connectorHasAuthSource', () => {
 })
 
 describe('connector credential eligibility', () => {
-  it.each([confluenceConnectorMeta, googleDriveConnectorMeta])(
+  it.each([googleDriveConnectorMeta])(
     'requires a service account for $name central indexing and preserves member and workspace OAuth',
     ({ auth }) => {
       expect(isConnectorCredentialTypeAllowed(auth, 'admin', 'oauth')).toBe(false)
@@ -38,17 +36,4 @@ describe('connector credential eligibility', () => {
       expect(isConnectorCredentialTypeAllowed(auth, 'workspace', 'oauth')).toBe(true)
     }
   )
-
-  it.each(['admin', 'members', 'workspace'] as const)(
-    'never stores a managed browsing credential as the %s indexing account',
-    (mode) => {
-      expect(
-        isConnectorCredentialTypeAllowed(confluenceConnectorMeta.auth, mode, 'managed_oauth')
-      ).toBe(false)
-    }
-  )
-
-  it('preserves Slack member credentials and its dedicated content-account option', () => {
-    expect(isConnectorCredentialTypeAllowed(slackConnectorMeta.auth, 'members', 'oauth')).toBe(true)
-  })
 })

@@ -30,14 +30,14 @@ vi.mock('@/lib/selectors/client/execute-selector', () => ({
 
 import { ConnectorSelectorField } from '@/app/workspace/[workspaceId]/knowledge/[id]/components/connector-selector-field/connector-selector-field'
 
-const field: ConnectorConfigField & { selectorKey: 'confluence.spaces' } = {
+const field: ConnectorConfigField & { selectorKey: 'google.drive' } = {
   id: 'spaces',
   title: 'Spaces',
   type: 'selector',
-  selectorKey: 'confluence.spaces',
-  dependsOn: ['domain'],
+  selectorKey: 'google.drive',
+  dependsOn: ['fileId'],
 }
-const domainField: ConnectorConfigField = { id: 'domain', title: 'Domain', type: 'short-input' }
+const parentField: ConnectorConfigField = { id: 'fileId', title: 'Parent', type: 'short-input' }
 const options = [
   { id: 'ENG', label: 'Engineering (ENG)' },
   { id: 'OPS', label: 'Operations (OPS)' },
@@ -66,8 +66,8 @@ it.each([true, false])(
           value={value}
           onChange={(nextValue) => setValue(nextValue)}
           credentialId='credential-1'
-          sourceConfig={{ domain: 'acme.atlassian.net', spaces: value }}
-          configFields={[domainField, field]}
+          sourceConfig={{ fileId: 'acme-folder', spaces: value }}
+          configFields={[parentField, field]}
           canonicalModes={{}}
         />
       )
@@ -126,8 +126,8 @@ it('keeps the loaded list visible while resolving a saved selection on another p
             value={['OLD']}
             onChange={vi.fn()}
             credentialId='credential-1'
-            sourceConfig={{ domain: 'acme.atlassian.net' }}
-            configFields={[domainField, field]}
+            sourceConfig={{ fileId: 'acme-folder' }}
+            configFields={[parentField, field]}
             canonicalModes={{}}
           />
         </QueryClientProvider>
@@ -171,7 +171,7 @@ async function renderBulkSelector() {
   document.body.appendChild(container)
   const root = createRoot(container)
   const change = vi.fn()
-  const rerender = (sourceConfig = { domain: 'example.atlassian.net' }) =>
+  const rerender = (sourceConfig = { fileId: 'example-folder' }) =>
     act(async () =>
       root.render(
         <QueryClientProvider client={client}>
@@ -181,7 +181,7 @@ async function renderBulkSelector() {
             onChange={change}
             credentialId='credential-1'
             sourceConfig={sourceConfig}
-            configFields={[domainField, field]}
+            configFields={[parentField, field]}
             canonicalModes={{}}
           />
         </QueryClientProvider>
@@ -258,7 +258,7 @@ it.each(['partial', 'error'] as const)('preserves the selection on %s results', 
     expect(view.container.textContent).toContain(
       failure === 'error' ? 'Could not load all options' : 'too many results'
     )
-    await view.rerender({ domain: 'another.atlassian.net' })
+    await view.rerender({ fileId: 'another-folder' })
     expect(view.container.querySelector('[role="alert"]')).toBeNull()
   } finally {
     await view.dispose()
@@ -310,8 +310,8 @@ it('hydrates only the trigger-visible labels for large saved selections', async 
             value={Array.from({ length: 1_000 }, (_, index) => `SAVED-${index}`)}
             onChange={vi.fn()}
             credentialId='credential-1'
-            sourceConfig={{ domain: 'example.atlassian.net' }}
-            configFields={[domainField, field]}
+            sourceConfig={{ fileId: 'example-folder' }}
+            configFields={[parentField, field]}
             canonicalModes={{}}
           />
         </QueryClientProvider>

@@ -38,7 +38,7 @@ const BLOCK_ID = 'trigger-block'
 /**
  * Every way a trigger can actually be hosted, which is the unit that matters:
  * the canonical form resolves declared defaults from the BLOCK config, and a
- * dual-mode block (`slack`) hosts triggers whose ids are not block types.
+ * dual-mode block (`telegram`) hosts triggers whose ids are not block types.
  * Enumerating triggers alone would have tested a block type that never exists.
  */
 function hostedTriggers(): Array<{ blockType: string; triggerId: string }> {

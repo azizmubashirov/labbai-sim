@@ -55,17 +55,6 @@ vi.mock('@/hooks/queries/oauth/oauth-credentials', () => ({
 vi.mock('@/hooks/use-credential-refresh-triggers', () => ({
   useCredentialRefreshTriggers: vi.fn(),
 }))
-vi.mock('@/hooks/use-github-installation-setup', () => ({
-  useGitHubInstallationSetup: (props: { onConnected: (credentialId: string) => void }) => {
-    mocks.githubSetup(props)
-    return {
-      pending: false,
-      error: null,
-      cancel: vi.fn(),
-      connect: () => props.onConnected('replacement-installation'),
-    }
-  },
-}))
 vi.mock(
   '@/app/workspace/[workspaceId]/integrations/components/connect-service-account-modal',
   () => ({
@@ -113,9 +102,6 @@ vi.mock(
 )
 
 import { ConnectorSettingsFields } from '@/app/workspace/[workspaceId]/knowledge/[id]/components/edit-connector-modal/connector-settings-fields'
-import { codaConnectorMeta } from '@/connectors/coda/meta'
-import { confluenceConnectorMeta } from '@/connectors/confluence/meta'
-import { githubConnectorMeta } from '@/connectors/github/meta'
 import { googleDriveConnectorMeta } from '@/connectors/google-drive/meta'
 
 function fieldProps(connectorConfig: ConnectorMeta): ConnectorSettingsFieldsProps {
@@ -187,14 +173,6 @@ describe('connector settings service-account choices', () => {
     })
   }
 
-  it('announces blocked saves without showing persistent helper text', async () => {
-    const reason = 'Wait for the current sync to finish before saving.'
-    await render(confluenceConnectorMeta, { saveBlockedReason: reason })
-    const status = container.querySelector('[role="status"]')
-    expect(status).toHaveClass('sr-only')
-    expect(status).toHaveTextContent(reason)
-  })
-
   async function openAccountChoices() {
     const dropdown = container.querySelector<HTMLElement>('[role="combobox"]')
     if (!dropdown) throw new Error('Missing indexing-account selector')
@@ -222,215 +200,6 @@ describe('connector settings service-account choices', () => {
     accessModeChanged: false,
     accessComplete: true,
     isFieldVisible: () => true,
-  })
-
-  it('shows the GitHub connection and preserves the repository rename field for installation sources', async () => {
-    mocks.credentials = [
-      {
-        id: 'installation-1',
-        name: 'acme',
-        provider: 'github-app-installation',
-        type: 'service_account',
-      },
-    ]
-    await render(githubConnectorMeta, installationProps())
-    expect(container.textContent).toContain('GitHub')
-    expect(container.textContent).toContain('acme')
-    expect(mocks.contentField).not.toHaveBeenCalled()
-    expect(mocks.accessField).not.toHaveBeenCalled()
-    expect(container.textContent).not.toContain('Account for browsing')
-    expect(container.textContent).not.toContain('Keeps the current repository')
-    expect(mocks.configFields).toHaveBeenCalledWith(
-      expect.objectContaining({
-        connectorConfig: githubConnectorMeta,
-        sourceConfig: { repository: 'acme/platform' },
-      })
-    )
-  })
-
-  it('rotates only among GitHub installation connections through the existing access operation', async () => {
-    mocks.credentials = [
-      {
-        id: 'installation-1',
-        name: 'acme',
-        provider: 'github-app-installation',
-        type: 'service_account',
-      },
-      {
-        id: 'installation-2',
-        name: 'acme-backup',
-        provider: 'github-app-installation',
-        type: 'service_account',
-      },
-      { id: 'legacy-reader', name: 'Personal GitHub', provider: 'github', type: 'oauth' },
-    ]
-    const change = vi.fn()
-    const apply = vi.fn()
-    const reset = vi.fn()
-    const changeAccess = vi.fn()
-    await render(githubConnectorMeta, { ...installationProps(), onContentCredentialChange: change })
-    await openAccountChoices()
-    expect(document.body.textContent).not.toContain('Personal GitHub')
-    await choose('acme-backup')
-    expect(change).toHaveBeenCalledWith('installation-2')
-    await render(githubConnectorMeta, {
-      ...installationProps(),
-      contentCredentialId: 'installation-2',
-      accessDirty: true,
-      onApplyAccess: apply,
-      onResetAccess: reset,
-      onAccessChange: changeAccess,
-    })
-    expect(container.textContent).toContain(
-      'Keeps the current repository. To add another repository, add a new source.'
-    )
-    const applyButton = Array.from(container.querySelectorAll('button')).find(
-      (button) => button.textContent === 'Change connection'
-    )!
-    await act(async () => applyButton.click())
-    expect(apply).toHaveBeenCalledOnce()
-    expect(changeAccess).not.toHaveBeenCalled()
-    const cancel = Array.from(container.querySelectorAll('button')).find(
-      (button) => button.textContent === 'Cancel'
-    )!
-    await act(async () => cancel.click())
-    expect(reset).toHaveBeenCalledOnce()
-  })
-
-  it('offers GitHub recovery when the saved installation is unavailable', async () => {
-    const change = vi.fn()
-    await render(githubConnectorMeta, { ...installationProps(), onContentCredentialChange: change })
-    const connect = Array.from(container.querySelectorAll('button')).find(
-      (button) => button.textContent === 'Connect GitHub'
-    )!
-    await act(async () => connect.click())
-    expect(mocks.githubSetup).toHaveBeenCalledWith(
-      expect.objectContaining({ organizationId: 'org-1' })
-    )
-    expect(container.textContent).not.toContain('Refresh')
-    expect(change).toHaveBeenCalledWith('replacement-installation')
-    expect(mocks.accessField).not.toHaveBeenCalled()
-    expect(mocks.contentField).not.toHaveBeenCalled()
-  })
-
-  it('keeps the existing re-enable operation available without exposing access modes', async () => {
-    const apply = vi.fn()
-    await render(githubConnectorMeta, {
-      ...installationProps(),
-      canReenableMemberSync: true,
-      onApplyAccess: apply,
-    })
-    const reenable = Array.from(container.querySelectorAll('button')).find(
-      (button) => button.textContent === 'Re-enable sync'
-    )!
-    await act(async () => reenable.click())
-    expect(apply).toHaveBeenCalledOnce()
-    expect(mocks.accessField).not.toHaveBeenCalled()
-  })
-
-  it.each([
-    { isSearchIndex: false },
-    { scope: { kind: 'workspace' as const, workspaceId: 'workspace-1' } },
-  ])(
-    'keeps general knowledge-base and workspace settings on their original path: %j',
-    async (overrides) => {
-      await render(githubConnectorMeta, { ...installationProps(), ...overrides })
-      expect(mocks.contentField).toHaveBeenCalled()
-      expect(mocks.accessField).toHaveBeenCalled()
-      expect(mocks.configFields).toHaveBeenCalledWith(
-        expect.objectContaining({ connectorConfig: githubConnectorMeta })
-      )
-    }
-  )
-
-  it.each([true, false])(
-    'locks the sync method only for Search settings (%s)',
-    async (isSearchIndex) => {
-      await render(confluenceConnectorMeta, { isSearchIndex, needsWorkspaceCredential: false })
-      expect(mocks.accessField).toHaveBeenLastCalledWith(
-        expect.objectContaining({ lockAccessMode: isSearchIndex })
-      )
-    }
-  )
-
-  it.each([null, 'dedicated-github-account'])(
-    'preserves legacy GitHub member source settings with content account %s',
-    async (contentCredentialId) => {
-      await render(githubConnectorMeta, {
-        access: { accessMode: 'members' },
-        contentCredentialId,
-        sourceConfig: { repository: 'team/docs' },
-        needsWorkspaceCredential: false,
-        isFieldVisible: () => true,
-      })
-      expect(mocks.contentField).toHaveBeenLastCalledWith(
-        expect.objectContaining({ credentialId: contentCredentialId })
-      )
-      expect(mocks.configFields).toHaveBeenCalledWith(
-        expect.objectContaining({
-          sourceConfig: { repository: 'team/docs' },
-          connectorConfig: githubConnectorMeta,
-        })
-      )
-      expect(document.body.textContent).not.toContain('Connect GitHub')
-    }
-  )
-
-  it('keeps a failed availability check actionable before methods are known', async () => {
-    const refetch = vi.fn()
-    await render(confluenceConnectorMeta, {
-      availability: {
-        error: new Error('Could not load connection availability'),
-        isFetching: false,
-        isReady: false,
-        refetch,
-      },
-      allowAdmin: false,
-    })
-    expect(container.textContent).toContain('Could not load connection availability')
-    expect(mocks.accessField).toHaveBeenLastCalledWith(
-      expect.objectContaining({ isAvailabilityReady: false, allowAdmin: false })
-    )
-    const retry = Array.from(container.querySelectorAll('button')).find(
-      (button) => button.textContent === 'Try again'
-    )
-    expect(retry).toBeEnabled()
-    await act(async () => retry!.click())
-    expect(refetch).toHaveBeenCalledOnce()
-  })
-
-  it('shows the acting user’s managed connection for browsing member sources', async () => {
-    mocks.credentials = [
-      { id: 'managed-1', name: 'My Confluence', provider: 'confluence', type: 'managed_oauth' },
-    ]
-    await render(confluenceConnectorMeta, {
-      access: { accessMode: 'members' },
-      needsWorkspaceCredential: false,
-      isFieldVisible: () => true,
-    })
-    expect(mocks.credentialOptions).toHaveBeenCalledWith(
-      'confluence',
-      expect.objectContaining({ organizationId: 'org-1', purpose: 'browsing' })
-    )
-    await openAccountChoices()
-    await choose('My Confluence')
-    expect(mocks.configFields).toHaveBeenLastCalledWith(
-      expect.objectContaining({ credentialId: 'managed-1' })
-    )
-    expect(mocks.selectCredential).not.toHaveBeenCalled()
-  })
-
-  it('never offers a managed connection for central indexing', async () => {
-    mocks.credentials = [
-      { id: 'managed-1', name: 'My Confluence', provider: 'confluence', type: 'managed_oauth' },
-    ]
-    await render(confluenceConnectorMeta)
-    expect(mocks.credentialOptions).toHaveBeenCalledWith(
-      'confluence',
-      expect.objectContaining({ purpose: undefined })
-    )
-    await openAccountChoices()
-    expect(document.body.textContent).not.toContain('My Confluence')
   })
 
   it.each(['managed_oauth', 'oauth', 'service_account'] as const)(
@@ -509,74 +278,6 @@ describe('connector settings service-account choices', () => {
     )
   })
 
-  it('browses spaces with the draft replacement account without a separate save action', async () => {
-    mocks.renderConfigFields = true
-    mocks.credentials = [
-      {
-        id: 'replacement',
-        name: 'Updated account',
-        provider: 'confluence',
-        type: 'service_account',
-      },
-    ]
-    await render(confluenceConnectorMeta, {
-      credentialId: 'previous',
-      workspaceCredentialId: 'replacement',
-      accessModeChanged: false,
-      sourceConfig: { domain: 'https://example.atlassian.net', spaceKey: ['ENG'] },
-      isFieldVisible: (field) => field.id === 'spaceSelector',
-    })
-
-    expect(mocks.selectorOptions).toHaveBeenLastCalledWith(
-      'confluence.spaces',
-      expect.objectContaining({
-        context: expect.objectContaining({ oauthCredential: 'replacement' }),
-      })
-    )
-    expect(mocks.accessField).not.toHaveBeenCalled()
-    expect(container.textContent).not.toContain('Change service account')
-    expect(container.textContent).not.toContain('Cancel')
-  })
-
-  it.each([
-    {
-      meta: confluenceConnectorMeta,
-      provider: 'atlassian-service-account',
-      product: 'confluence',
-    },
-    { meta: googleDriveConnectorMeta, provider: 'google-service-account', product: undefined },
-    { meta: codaConnectorMeta, provider: 'coda-service-account', product: undefined },
-  ])(
-    'opens the correct $meta.name service-account setup from Search settings',
-    async ({ meta, provider, product }) => {
-      await render(meta)
-      expect(mocks.serviceAccountTarget).toHaveBeenLastCalledWith(
-        expect.objectContaining({ serviceAccountProviderId: provider })
-      )
-      await openAccountChoices()
-      await choose('Add service account')
-      expect(mocks.serviceAccountModal).toHaveBeenLastCalledWith(
-        expect.objectContaining({
-          open: true,
-          organizationId: 'org-1',
-          serviceAccountProviderId: provider,
-          atlassianProduct: product,
-          atlassianSetupGuideUrl:
-            product === 'confluence'
-              ? 'https://docs.sim.ai/search/confluence#using-a-service-account'
-              : undefined,
-        })
-      )
-
-      const finish = Array.from(container.querySelectorAll('button')).find(
-        (node) => node.textContent === 'Finish service account setup'
-      )
-      if (!finish) throw new Error('Missing service-account completion control')
-      await act(async () => finish.click())
-      expect(mocks.selectCredential).toHaveBeenCalledExactlyOnceWith('new-service-account')
-    }
-  )
-
   it('keeps an existing Google service account selectable without opening new setup', async () => {
     mocks.credentials = [
       {
@@ -590,57 +291,6 @@ describe('connector settings service-account choices', () => {
     await openAccountChoices()
     await choose('Search indexing account')
     expect(mocks.selectCredential).toHaveBeenCalledExactlyOnceWith('google-service-account-1')
-    expect(mocks.serviceAccountModal).not.toHaveBeenCalled()
-  })
-
-  it('only offers service accounts when replacing a central Confluence credential', async () => {
-    mocks.credentials = [
-      { id: 'personal', name: 'Personal Confluence', provider: 'confluence', type: 'oauth' },
-      {
-        id: 'service',
-        name: 'Confluence indexing',
-        provider: 'atlassian-service-account',
-        type: 'service_account',
-      },
-    ]
-    await render(confluenceConnectorMeta)
-    expect(container.textContent).toContain('Service account')
-    await openAccountChoices()
-    expect(
-      Array.from(document.querySelectorAll<HTMLElement>('[role="option"]')).map((node) =>
-        node.textContent?.trim()
-      )
-    ).toEqual(['Confluence indexing', 'Add service account'])
-    await choose('Confluence indexing')
-    expect(mocks.selectCredential).toHaveBeenCalledExactlyOnceWith('service')
-  })
-
-  it('preserves the regular knowledge-base Confluence account choices', async () => {
-    mocks.credentials = [
-      {
-        id: 'confluence-1',
-        name: 'Existing Confluence account',
-        provider: 'confluence',
-        type: 'oauth',
-      },
-    ]
-    await render(confluenceConnectorMeta, {
-      isSearchIndex: false,
-      access: { accessMode: 'workspace' },
-      allowWorkspace: true,
-      scope: { kind: 'workspace', workspaceId: 'workspace-1' },
-    })
-    expect(mocks.serviceAccountTarget).toHaveBeenLastCalledWith(
-      expect.objectContaining({ serviceAccountProviderId: undefined })
-    )
-    await openAccountChoices()
-    expect(
-      Array.from(document.querySelectorAll<HTMLElement>('[role="option"]')).map((node) =>
-        node.textContent?.trim()
-      )
-    ).toEqual(['Existing Confluence account'])
-    await choose('Existing Confluence account')
-    expect(mocks.selectCredential).toHaveBeenCalledExactlyOnceWith('confluence-1')
     expect(mocks.serviceAccountModal).not.toHaveBeenCalled()
   })
 })

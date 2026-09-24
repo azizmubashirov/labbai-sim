@@ -66,51 +66,21 @@ export interface TokenServiceAccountDescriptor {
 export const HUBSPOT_SERVICE_ACCOUNT_PROVIDER_ID = 'hubspot-service-account' as const
 export const AIRTABLE_SERVICE_ACCOUNT_PROVIDER_ID = 'airtable-service-account' as const
 export const NOTION_SERVICE_ACCOUNT_PROVIDER_ID = 'notion-service-account' as const
-export const ASANA_SERVICE_ACCOUNT_PROVIDER_ID = 'asana-service-account' as const
-export const ATTIO_SERVICE_ACCOUNT_PROVIDER_ID = 'attio-service-account' as const
-export const HARMONIC_SERVICE_ACCOUNT_PROVIDER_ID = 'harmonic-service-account' as const
-export const CLICKUP_SERVICE_ACCOUNT_PROVIDER_ID = 'clickup-service-account' as const
-export const LINEAR_SERVICE_ACCOUNT_PROVIDER_ID = 'linear-service-account' as const
-export const MONDAY_SERVICE_ACCOUNT_PROVIDER_ID = 'monday-service-account' as const
 export const SHOPIFY_SERVICE_ACCOUNT_PROVIDER_ID = 'shopify-service-account' as const
-export const WEBFLOW_SERVICE_ACCOUNT_PROVIDER_ID = 'webflow-service-account' as const
 export const TRELLO_SERVICE_ACCOUNT_PROVIDER_ID = 'trello-service-account' as const
 export const CALCOM_SERVICE_ACCOUNT_PROVIDER_ID = 'calcom-service-account' as const
-export const WEALTHBOX_SERVICE_ACCOUNT_PROVIDER_ID = 'wealthbox-service-account' as const
 export const PIPEDRIVE_SERVICE_ACCOUNT_PROVIDER_ID = 'pipedrive-service-account' as const
-export const CLAUDE_PLATFORM_SERVICE_ACCOUNT_PROVIDER_ID =
-  'claude-platform-service-account' as const
-export const SNOWFLAKE_SERVICE_ACCOUNT_PROVIDER_ID = 'snowflake-service-account' as const
-export const CODA_SERVICE_ACCOUNT_PROVIDER_ID = 'coda-service-account' as const
 
 const SHOPIFY_DOMAIN_HINT_REGEX = /^[a-z0-9][a-z0-9-]*\.myshopify\.com$/i
-
-/**
- * Account hostnames carry a variable number of labels — `myorg-myaccount`,
- * but also the legacy `xy12345.us-east-1` locator form — so dots are allowed
- * before the `snowflakecomputing` suffix. China accounts use `.cn`.
- */
-const SNOWFLAKE_HOST_HINT_REGEX = /^[a-z0-9][a-z0-9.-]*\.snowflakecomputing\.(com|cn)$/i
 
 export type TokenServiceAccountProviderId =
   | typeof HUBSPOT_SERVICE_ACCOUNT_PROVIDER_ID
   | typeof AIRTABLE_SERVICE_ACCOUNT_PROVIDER_ID
   | typeof NOTION_SERVICE_ACCOUNT_PROVIDER_ID
-  | typeof ASANA_SERVICE_ACCOUNT_PROVIDER_ID
-  | typeof ATTIO_SERVICE_ACCOUNT_PROVIDER_ID
-  | typeof HARMONIC_SERVICE_ACCOUNT_PROVIDER_ID
-  | typeof CLICKUP_SERVICE_ACCOUNT_PROVIDER_ID
-  | typeof LINEAR_SERVICE_ACCOUNT_PROVIDER_ID
-  | typeof MONDAY_SERVICE_ACCOUNT_PROVIDER_ID
   | typeof SHOPIFY_SERVICE_ACCOUNT_PROVIDER_ID
-  | typeof WEBFLOW_SERVICE_ACCOUNT_PROVIDER_ID
   | typeof TRELLO_SERVICE_ACCOUNT_PROVIDER_ID
   | typeof CALCOM_SERVICE_ACCOUNT_PROVIDER_ID
-  | typeof WEALTHBOX_SERVICE_ACCOUNT_PROVIDER_ID
   | typeof PIPEDRIVE_SERVICE_ACCOUNT_PROVIDER_ID
-  | typeof CLAUDE_PLATFORM_SERVICE_ACCOUNT_PROVIDER_ID
-  | typeof SNOWFLAKE_SERVICE_ACCOUNT_PROVIDER_ID
-  | typeof CODA_SERVICE_ACCOUNT_PROVIDER_ID
 
 export const TOKEN_SERVICE_ACCOUNT_DESCRIPTORS: Record<
   TokenServiceAccountProviderId,
@@ -173,106 +143,6 @@ export const TOKEN_SERVICE_ACCOUNT_DESCRIPTORS: Record<
     helpText:
       'Newer Notion UIs label the secret "installation access token". Remember to connect the integration to the pages and databases it should access — a valid secret with no page connections can read nothing.',
   },
-  [ASANA_SERVICE_ACCOUNT_PROVIDER_ID]: {
-    providerId: ASANA_SERVICE_ACCOUNT_PROVIDER_ID,
-    serviceLabel: 'Asana',
-    tokenNoun: 'access token',
-    connectNoun: 'access token',
-    fields: [
-      {
-        id: 'apiToken',
-        label: 'Access token',
-        placeholder: 'Paste a service account token or personal access token',
-        secret: true,
-      },
-    ],
-    docsUrl: 'https://docs.sim.ai/integrations/asana-service-account',
-    helpText:
-      'Enterprise service account tokens and personal access tokens both work — they use the same format.',
-  },
-  [ATTIO_SERVICE_ACCOUNT_PROVIDER_ID]: {
-    providerId: ATTIO_SERVICE_ACCOUNT_PROVIDER_ID,
-    serviceLabel: 'Attio',
-    tokenNoun: 'API key',
-    connectNoun: 'API key',
-    fields: [
-      {
-        id: 'apiToken',
-        label: 'API key',
-        placeholder: 'Paste workspace API key',
-        secret: true,
-      },
-    ],
-    docsUrl: 'https://docs.sim.ai/integrations/attio-service-account',
-    helpText:
-      'Check the scopes granted to the key in Attio — tools whose scopes are missing will fail at run time.',
-  },
-  [HARMONIC_SERVICE_ACCOUNT_PROVIDER_ID]: {
-    providerId: HARMONIC_SERVICE_ACCOUNT_PROVIDER_ID,
-    serviceLabel: 'Harmonic',
-    tokenNoun: 'team API key',
-    connectNoun: 'API key',
-    fields: [
-      {
-        id: 'apiToken',
-        label: 'Team API key',
-        placeholder: 'Paste Harmonic team API key',
-        secret: true,
-      },
-    ],
-    docsUrl: 'https://docs.sim.ai/integrations/harmonic',
-  },
-  [CLICKUP_SERVICE_ACCOUNT_PROVIDER_ID]: {
-    providerId: CLICKUP_SERVICE_ACCOUNT_PROVIDER_ID,
-    serviceLabel: 'ClickUp',
-    tokenNoun: 'personal API token',
-    connectNoun: 'API token',
-    fields: [
-      {
-        id: 'apiToken',
-        label: 'API token',
-        placeholder: 'pk_...',
-        secret: true,
-        hintPattern: /^pk_/,
-        hintMessage: 'ClickUp personal API tokens start with pk_.',
-      },
-    ],
-    docsUrl: 'https://docs.sim.ai/integrations/clickup-service-account',
-  },
-  [LINEAR_SERVICE_ACCOUNT_PROVIDER_ID]: {
-    providerId: LINEAR_SERVICE_ACCOUNT_PROVIDER_ID,
-    serviceLabel: 'Linear',
-    tokenNoun: 'API key',
-    connectNoun: 'API key',
-    fields: [
-      {
-        id: 'apiToken',
-        label: 'API key',
-        placeholder: 'lin_api_...',
-        secret: true,
-        hintPattern: /^lin_api_/,
-        hintMessage: 'Linear personal API keys start with lin_api_.',
-      },
-    ],
-    docsUrl: 'https://docs.sim.ai/integrations/linear-service-account',
-  },
-  [MONDAY_SERVICE_ACCOUNT_PROVIDER_ID]: {
-    providerId: MONDAY_SERVICE_ACCOUNT_PROVIDER_ID,
-    serviceLabel: 'monday.com',
-    tokenNoun: 'API token',
-    connectNoun: 'API token',
-    fields: [
-      {
-        id: 'apiToken',
-        label: 'API token',
-        placeholder: 'Paste personal API token',
-        secret: true,
-      },
-    ],
-    docsUrl: 'https://docs.sim.ai/integrations/monday-service-account',
-    helpText:
-      'monday.com issues one API token per user — regenerating it in monday breaks every integration using the old token.',
-  },
   [SHOPIFY_SERVICE_ACCOUNT_PROVIDER_ID]: {
     providerId: SHOPIFY_SERVICE_ACCOUNT_PROVIDER_ID,
     serviceLabel: 'Shopify',
@@ -301,23 +171,6 @@ export const TOKEN_SERVICE_ACCOUNT_DESCRIPTORS: Record<
       'The token is revealed once, is bound to a single store, and does not expire. Dev Dashboard apps issue tokens through OAuth rather than a UI reveal.',
     invalidCredentialsHelp:
       'Shopify rejected this token. Make sure you copied the Admin API access token (starts with shpat_) — not the API key or API secret key — for an app installed on this exact store domain, and that it has not since been revoked or regenerated.',
-  },
-  [WEBFLOW_SERVICE_ACCOUNT_PROVIDER_ID]: {
-    providerId: WEBFLOW_SERVICE_ACCOUNT_PROVIDER_ID,
-    serviceLabel: 'Webflow',
-    tokenNoun: 'site API token',
-    connectNoun: 'site token',
-    fields: [
-      {
-        id: 'apiToken',
-        label: 'Site API token',
-        placeholder: 'Paste site API token',
-        secret: true,
-      },
-    ],
-    docsUrl: 'https://docs.sim.ai/integrations/webflow-service-account',
-    helpText:
-      'Site tokens expire after 365 days without API activity, and each token grants access to a single site.',
   },
   [TRELLO_SERVICE_ACCOUNT_PROVIDER_ID]: {
     providerId: TRELLO_SERVICE_ACCOUNT_PROVIDER_ID,
@@ -355,25 +208,6 @@ export const TOKEN_SERVICE_ACCOUNT_DESCRIPTORS: Record<
     helpText:
       'Cal.com preselects a 30-day expiry when you create a key — switch on "Never expires" or runs stop on that date.',
   },
-  [WEALTHBOX_SERVICE_ACCOUNT_PROVIDER_ID]: {
-    providerId: WEALTHBOX_SERVICE_ACCOUNT_PROVIDER_ID,
-    serviceLabel: 'Wealthbox',
-    tokenNoun: 'API access token',
-    connectNoun: 'access token',
-    fields: [
-      {
-        id: 'apiToken',
-        label: 'API access token',
-        placeholder: 'Paste API access token',
-        secret: true,
-      },
-    ],
-    docsUrl: 'https://docs.sim.ai/integrations/wealthbox-service-account',
-    helpText:
-      'Trial accounts cannot use the Wealthbox API; contact Wealthbox support if API Access is missing from your Settings.',
-    invalidCredentialsHelp:
-      'Wealthbox rejected this token. Check that it is still active under API Access in your Wealthbox settings, and that the account is not on an expired trial. If the same token works elsewhere, note that Sim authenticates with a Bearer header — a token Wealthbox accepts only over its ACCESS_TOKEN header is refused here.',
-  },
   [PIPEDRIVE_SERVICE_ACCOUNT_PROVIDER_ID]: {
     providerId: PIPEDRIVE_SERVICE_ACCOUNT_PROVIDER_ID,
     serviceLabel: 'Pipedrive',
@@ -391,65 +225,6 @@ export const TOKEN_SERVICE_ACCOUNT_DESCRIPTORS: Record<
     helpText:
       'Each Pipedrive user has one API token per company — regenerating it breaks every integration using the old value, and API-token traffic gets lower rate limits than OAuth.',
     authStyle: 'x-api-token',
-  },
-  [CLAUDE_PLATFORM_SERVICE_ACCOUNT_PROVIDER_ID]: {
-    providerId: CLAUDE_PLATFORM_SERVICE_ACCOUNT_PROVIDER_ID,
-    serviceLabel: 'Claude Platform',
-    tokenNoun: 'API key',
-    connectNoun: 'API key',
-    fields: [
-      {
-        id: 'apiToken',
-        label: 'API key',
-        placeholder: 'sk-ant-...',
-        secret: true,
-        hintPattern: /^sk-ant-/,
-        hintMessage: 'Claude Platform API keys usually start with sk-ant-.',
-      },
-    ],
-    docsUrl: 'https://docs.sim.ai/integrations/managed-agent',
-  },
-  [CODA_SERVICE_ACCOUNT_PROVIDER_ID]: {
-    providerId: CODA_SERVICE_ACCOUNT_PROVIDER_ID,
-    serviceLabel: 'Coda',
-    tokenNoun: 'API token',
-    connectNoun: 'API token',
-    fields: [
-      {
-        id: 'apiToken',
-        label: 'API token',
-        placeholder: 'Paste a Coda API token',
-        secret: true,
-      },
-    ],
-    docsUrl: 'https://docs.sim.ai/integrations/coda',
-    helpText:
-      'Create a token under Account settings → API connections. A token restricted to specific docs or tables can only read and write those.',
-  },
-  [SNOWFLAKE_SERVICE_ACCOUNT_PROVIDER_ID]: {
-    providerId: SNOWFLAKE_SERVICE_ACCOUNT_PROVIDER_ID,
-    serviceLabel: 'Snowflake',
-    tokenNoun: 'programmatic access token',
-    connectNoun: 'programmatic access token',
-    fields: [
-      {
-        id: 'domain',
-        label: 'Account host',
-        placeholder: 'myorg-myaccount.snowflakecomputing.com',
-        secret: false,
-        hintPattern: SNOWFLAKE_HOST_HINT_REGEX,
-        hintMessage: 'Snowflake account hosts end in .snowflakecomputing.com.',
-      },
-      {
-        id: 'apiToken',
-        label: 'Programmatic access token',
-        placeholder: 'Paste a programmatic access token',
-        secret: true,
-      },
-    ],
-    docsUrl: 'https://docs.sim.ai/integrations/snowflake-service-account',
-    invalidCredentialsHelp:
-      'Snowflake rejected this token. Check that it belongs to a user on this exact account host, that it has not expired or been revoked, that a network policy allows Sim to reach the account, and that the SQL API is enabled for the account.',
   },
 }
 

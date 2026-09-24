@@ -211,17 +211,12 @@ export const POST = withRouteHandler(async (request: NextRequest) => {
     // Determine final path with special handling for credential-based providers
     // to avoid generating a new path on every save.
     let finalPath = path
-    const credentialBasedProviders = ['gmail', 'outlook']
+    const credentialBasedProviders = ['gmail']
     const isCredentialBased = credentialBasedProviders.includes(provider)
-    // Treat Microsoft Teams chat subscription as credential-based for path generation purposes
-    const isMicrosoftTeamsChatSubscription =
-      provider === 'microsoft-teams' &&
-      typeof providerConfig === 'object' &&
-      providerConfig?.triggerId === 'microsoftteams_chat_subscription'
 
     // If path is missing
     if (!finalPath || finalPath.trim() === '') {
-      if (isCredentialBased || isMicrosoftTeamsChatSubscription) {
+      if (isCredentialBased) {
         // Try to reuse existing path for this workflow+block if one exists
         if (blockId) {
           const existingForBlock = await db

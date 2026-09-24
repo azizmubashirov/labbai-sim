@@ -5,7 +5,7 @@ import { ChipConfirmModal, ChipModalError } from '@sim/emcn'
 import { ArrowLeft, Plus } from '@sim/emcn/icons'
 import { format } from 'date-fns'
 import { useRouter } from 'next/navigation'
-import { useQueryState, useQueryStates } from 'nuqs'
+import { useQueryStates } from 'nuqs'
 import type { SettingsAction } from '@/components/settings/settings-header'
 import { SettingsPanel } from '@/components/settings/settings-panel'
 import { organizationRoutes } from '@/lib/navigation/paths'
@@ -15,11 +15,8 @@ import { searchSetupAccessParam, searchSetupParam } from '@/lib/sim-search/searc
 import { SEARCH_DEBOUNCE_MS } from '@/lib/url-state'
 import { useOrganizationContext } from '@/app/o/[organizationId]/providers/organization-provider'
 import { organizationSearchStatusLabel } from '@/app/o/[organizationId]/settings/components/integrations/organization-search-status'
-import { connectedAccountsParam } from '@/app/o/[organizationId]/settings/components/integrations/search-params'
 import { SearchSourcePagination } from '@/app/o/[organizationId]/settings/components/integrations/search-source-pagination'
 import { SearchSourceSetup } from '@/app/o/[organizationId]/settings/components/integrations/search-source-setup'
-import { OrganizationSlackAccountRemoval } from '@/app/o/[organizationId]/settings/components/integrations/slack-account-removal'
-import { OrganizationSlackAccountSetup } from '@/app/o/[organizationId]/settings/components/integrations/slack-account-setup'
 import {
   SettingsEmptyState,
   SettingsQueryErrorState,
@@ -31,7 +28,6 @@ import {
 import { useSettingsSearch } from '@/app/workspace/[workspaceId]/settings/components/use-settings-search'
 import { CONNECTOR_META_REGISTRY } from '@/connectors/registry'
 import { useOrganizationSearchOverview, useSearchSources } from '@/hooks/queries/kb/connectors'
-import { useOrganizationAccounts } from '@/hooks/queries/organization-accounts'
 import { useUpdateSearchIntegration } from '@/hooks/queries/search-integrations'
 import { useDebounce } from '@/hooks/use-debounce'
 import { usePermissionConfig } from '@/hooks/use-permission-config'
@@ -47,7 +43,6 @@ export function OrganizationProviderDetail({ connectorType }: OrganizationProvid
   const [search, setSearch] = useSettingsSearch()
   const sourceSearch = useDebounce(search.trim(), SEARCH_DEBOUNCE_MS)
   const [deactivating, setDeactivating] = useState(false)
-  const [removingSlackAccounts, setRemovingSlackAccounts] = useState(false)
   const scope = { kind: 'organization', organizationId: organization.id } as const
   const overview = useOrganizationSearchOverview(organization.id, { enabled: viewer.isAdmin })
   const sources = useSearchSources(scope, {
@@ -57,19 +52,12 @@ export function OrganizationProviderDetail({ connectorType }: OrganizationProvid
   })
   const availability = usePermissionConfig()
   const approval = useUpdateSearchIntegration()
-  const accounts = useOrganizationAccounts(
-    viewer.isAdmin && connectorType === 'slack' ? organization.id : undefined
-  )
   const [, setSetup] = useQueryStates(
     {
       [searchSetupParam.key]: searchSetupParam.parser,
       [searchSetupAccessParam.key]: searchSetupAccessParam.parser,
     },
     { history: 'replace' }
-  )
-  const [, setConnectedAccounts] = useQueryState(
-    connectedAccountsParam.key,
-    connectedAccountsParam.parser
   )
   const provider = overview.data?.providers.find((item) => item.connectorType === connectorType)
   const approved = provider?.approved === true
@@ -106,26 +94,6 @@ export function OrganizationProviderDetail({ connectorType }: OrganizationProvid
     docsLink: meta.searchDocsUrl,
     search: searchField,
   }
-  const option = accounts.data?.credentialGroup?.options.find(
-    (item) => item.provider === 'slack' && item.status === 'active'
-  )
-  const group = accounts.data?.credentialGroup
-  const removalActions: SettingsAction[] =
-    connectorType === 'slack' &&
-    !accounts.isError &&
-    group?.options.some((item) => item.provider === 'slack')
-      ? [
-          {
-            id: 'delete',
-            text: 'Remove app setup',
-            disabled: accounts.isFetching,
-            onSelect: () => setRemovingSlackAccounts(true),
-          },
-        ]
-      : []
-  const needsSlackSetup =
-    connectorType === 'slack' &&
-    (option?.provider !== 'slack' || option.configurationStatus !== 'ready')
   const pending =
     overview.isPending ||
     overview.isError ||
@@ -143,16 +111,12 @@ export function OrganizationProviderDetail({ connectorType }: OrganizationProvid
         ...(access.admin || access.members
           ? [
               {
-                text: needsSlackSetup
-                  ? 'Set up Slack app'
-                  : getSearchConnectionLabels(connectorType, access.admin ? 'admin' : 'members')
-                      .add,
+                text: getSearchConnectionLabels(connectorType, access.admin ? 'admin' : 'members')
+                  .add,
                 icon: Plus,
                 variant: 'primary' as const,
-                disabled:
-                  pending ||
-                  (connectorType === 'slack' && (accounts.isPending || accounts.isError)),
-                onSelect: needsSlackSetup ? () => void setConnectedAccounts('slack') : startSource,
+                disabled: pending,
+                onSelect: startSource,
               },
             ]
           : []),
@@ -174,7 +138,6 @@ export function OrganizationProviderDetail({ connectorType }: OrganizationProvid
           onSelect: activate,
         },
       ]
-  actions.push(...removalActions)
   if (overview.isError)
     return (
       <SettingsPanel {...panel}>
@@ -207,15 +170,6 @@ export function OrganizationProviderDetail({ connectorType }: OrganizationProvid
           fallback='Could not load connection availability'
           isRetrying={availability.isIntegrationAvailabilityFetching}
           onRetry={() => void availability.refetchIntegrationAvailability()}
-          variant='inline'
-        />
-      )}
-      {connectorType === 'slack' && accounts.isError && (
-        <SettingsQueryErrorState
-          error={accounts.error}
-          fallback='Could not load account connections'
-          isRetrying={accounts.isFetching}
-          onRetry={() => void accounts.refetch()}
           variant='inline'
         />
       )}
@@ -292,15 +246,6 @@ export function OrganizationProviderDetail({ connectorType }: OrganizationProvid
         memberAccessAvailable={searchAccess.memberScoped}
         mirroredAccessAvailable={searchAccess.sourceMirrored}
       />
-      <OrganizationSlackAccountSetup />
-      {removingSlackAccounts && group && (
-        <OrganizationSlackAccountRemoval
-          organizationId={organization.id}
-          group={group}
-          onClose={() => setRemovingSlackAccounts(false)}
-          onRemoved={() => setRemovingSlackAccounts(false)}
-        />
-      )}
       <ChipConfirmModal
         open={deactivating}
         onOpenChange={(open) => {

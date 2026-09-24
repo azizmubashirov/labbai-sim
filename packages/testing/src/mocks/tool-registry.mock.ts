@@ -9,7 +9,7 @@
  * ```ts
  * vi.mock('@/tools/registry', async () => {
  *   const { partialToolRegistry } = await import('@sim/testing/mocks/tool-registry.mock')
- *   return { tools: partialToolRegistry(await import('@/tools/pitchbook')) }
+ *   return { tools: partialToolRegistry(await import('@/tools/firecrawl')) }
  * })
  * ```
  *

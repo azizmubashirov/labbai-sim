@@ -13,13 +13,10 @@ import {
   getCredentialGroupContract,
   inviteCredentialGroupEnrollmentsContract,
   resendCredentialGroupEnrollmentContract,
-  type StartSlackCredentialGroupConfigurationBody,
-  startSlackCredentialGroupConfigurationContract,
   updateCredentialGroupAccessContract,
   updateCredentialGroupContract,
   updateCredentialGroupMcpConnectorContract,
 } from '@/lib/api/contracts/credential-groups'
-import { startOrganizationSlackConfigurationContract } from '@/lib/api/contracts/organization-accounts'
 import type { ContractJsonResponse } from '@/lib/api/contracts/types'
 import { resourceScopeFromOwner } from '@/lib/core/resource-scope'
 import {
@@ -264,41 +261,6 @@ export function useDeleteCredentialGroupMcpConnector() {
       }),
     onSettled: (_data, _error, variables) =>
       invalidateManagedMcpConnectorQueries(queryClient, variables.workspaceId, variables.groupId),
-  })
-}
-
-export function useStartSlackCredentialGroupConfiguration() {
-  return useMutation({
-    mutationFn: async ({
-      workspaceId,
-      organizationId,
-      credentialGroupId,
-      body,
-    }: {
-      credentialGroupId: string
-      body: StartSlackCredentialGroupConfigurationBody
-    } & (
-      | { workspaceId: string; organizationId?: never }
-      | { organizationId: string; workspaceId?: never }
-    )) => {
-      const scope = resourceScopeFromOwner({ workspaceId, organizationId })
-      if (scope.kind === 'organization') {
-        if (!body.appId || !body.teamId)
-          throw new Error('Slack App ID and workspace ID are required')
-        return requestJson(startOrganizationSlackConfigurationContract, {
-          params: { id: scope.organizationId, groupId: credentialGroupId },
-          body: {
-            appId: body.appId,
-            teamId: body.teamId,
-            requiredScopes: body.requiredScopes,
-          },
-        })
-      }
-      return requestJson(startSlackCredentialGroupConfigurationContract, {
-        params: { id: scope.workspaceId, groupId: credentialGroupId },
-        body,
-      })
-    },
   })
 }
 

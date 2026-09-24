@@ -48,7 +48,6 @@ vi.mock('@/lib/credentials/application/resolve-managed-oauth-token', () => ({
 vi.mock('@/tools/metadata', () => ({ getToolMetadata: mockGetToolMetadata }))
 
 import { TokenServiceAccountValidationError } from '@/lib/credentials/token-service-accounts/errors'
-import { createQuickBooksAccountId } from '@/lib/oauth/quickbooks'
 import { GET, POST } from '@/app/api/auth/oauth/token/route'
 
 describe('OAuth Token API Routes', () => {
@@ -94,76 +93,6 @@ describe('OAuth Token API Routes', () => {
       expect(mockAuthorizeCredentialUse).toHaveBeenCalled()
       expect(authOAuthUtilsMockFns.mockGetCredential).toHaveBeenCalled()
       expect(authOAuthUtilsMockFns.mockRefreshTokenIfNeeded).toHaveBeenCalled()
-    })
-
-    it('returns realmId only for QuickBooks credentials', async () => {
-      mockAuthorizeCredentialUse.mockResolvedValueOnce({
-        ok: true,
-        authType: 'session',
-        requesterUserId: 'test-user-id',
-        credentialOwnerUserId: 'owner-user-id',
-      })
-      authOAuthUtilsMockFns.mockGetCredential.mockResolvedValueOnce({
-        id: 'credential-id',
-        accountId: createQuickBooksAccountId(
-          '123456789',
-          'intuit-subject-01234567-89ab-4def-8abc-0123456789ab',
-          {
-            clientId: 'client-id',
-            environment: 'sandbox',
-          }
-        ),
-        accessToken: 'test-token',
-        refreshToken: 'refresh-token',
-        accessTokenExpiresAt: new Date(Date.now() + 3600 * 1000),
-        providerId: 'quickbooks',
-      })
-      authOAuthUtilsMockFns.mockRefreshTokenIfNeeded.mockResolvedValueOnce({
-        accessToken: 'fresh-token',
-        refreshed: false,
-      })
-
-      const response = await POST(
-        createMockRequest('POST', {
-          credentialId: 'credential-id',
-        })
-      )
-
-      expect(response.status).toBe(200)
-      expect(await response.json()).toEqual({
-        accessToken: 'fresh-token',
-        credentialType: 'oauth',
-        realmId: '123456789',
-        quickBooksEnvironment: 'sandbox',
-      })
-    })
-
-    it('rejects a malformed QuickBooks company identity with reconnect guidance', async () => {
-      mockAuthorizeCredentialUse.mockResolvedValueOnce({
-        ok: true,
-        authType: 'session',
-        requesterUserId: 'test-user-id',
-        credentialOwnerUserId: 'owner-user-id',
-      })
-      authOAuthUtilsMockFns.mockGetCredential.mockResolvedValueOnce({
-        id: 'credential-id',
-        accountId: 'malformed',
-        accessToken: 'test-token',
-        refreshToken: 'refresh-token',
-        accessTokenExpiresAt: new Date(Date.now() + 3600 * 1000),
-        providerId: 'quickbooks',
-      })
-
-      const response = await POST(
-        createMockRequest('POST', {
-          credentialId: 'credential-id',
-        })
-      )
-      const data = await response.json()
-
-      expect(response.status).toBe(401)
-      expect(data.error).toMatch(/Reconnect the QuickBooks credential/)
-      expect(authOAuthUtilsMockFns.mockRefreshTokenIfNeeded).not.toHaveBeenCalled()
     })
 
     it('should handle workflowId for server-side authentication', async () => {
@@ -539,11 +468,11 @@ describe('OAuth Token API Routes', () => {
         })
       })
 
-      it('uses the trusted provider scope policy when a Slack tool omits narrower scopes', async () => {
+      it('uses the trusted provider scope policy when a HubSpot tool omits narrower scopes', async () => {
         mockGetToolMetadata.mockReturnValueOnce({
           oauth: {
             required: true,
-            provider: 'slack',
+            provider: 'hubspot',
           },
         })
         const principal = {
@@ -563,14 +492,14 @@ describe('OAuth Token API Routes', () => {
         }
         mockAuthenticateManagedOAuthDelegation.mockResolvedValueOnce(principal)
         mockResolveManagedOAuthCredentialToken.mockResolvedValueOnce({
-          accessToken: 'managed-slack-token',
+          accessToken: 'managed-hubspot-token',
           refreshed: false,
         })
 
         const response = await POST(
           createMockRequest(
             'POST',
-            { credentialId: 'managed-credential-id', toolId: 'slack_message' },
+            { credentialId: 'managed-credential-id', toolId: 'hubspot_get_contacts' },
             { 'x-sim-managed-oauth-delegation': 'Bearer delegated-token' }
           )
         )
@@ -580,13 +509,13 @@ describe('OAuth Token API Routes', () => {
           principal,
           input: {
             credentialId: 'managed-credential-id',
-            expectedProviderId: 'slack',
+            expectedProviderId: 'hubspot',
             requiredScopes: expect.arrayContaining([
-              'channels:read',
-              'channels:history',
-              'chat:write',
+              'crm.objects.contacts.read',
+              'crm.objects.contacts.write',
+              'crm.objects.deals.read',
             ]),
-            toolId: 'slack_message',
+            toolId: 'hubspot_get_contacts',
           },
           request: expect.any(NextRequest),
         })
@@ -809,36 +738,6 @@ describe('OAuth Token API Routes', () => {
       expect(data).toHaveProperty('error')
     })
 
-    it('rejects a malformed QuickBooks identity before reporting a missing token', async () => {
-      mockAuthorizeCredentialUse.mockResolvedValueOnce({
-        ok: true,
-        authType: 'session',
-        requesterUserId: 'test-user-id',
-        credentialOwnerUserId: 'test-user-id',
-      })
-      authOAuthUtilsMockFns.mockGetCredential.mockResolvedValueOnce({
-        id: 'credential-id',
-        accountId: 'malformed',
-        accessToken: null,
-        refreshToken: 'refresh-token',
-        providerId: 'quickbooks',
-      })
-
-      const response = await GET(
-        createMockRequest(
-          'GET',
-          undefined,
-          {},
-          'http://localhost:3000/api/auth/oauth/token?credentialId=credential-id'
-        )
-      )
-      const data = await response.json()
-
-      expect(response.status).toBe(401)
-      expect(data.error).toMatch(/Reconnect the QuickBooks credential/)
-      expect(authOAuthUtilsMockFns.mockRefreshTokenIfNeeded).not.toHaveBeenCalled()
-    })
-
     it('should handle token refresh failure', async () => {
       mockAuthorizeCredentialUse.mockResolvedValueOnce({
         ok: true,
@@ -867,66 +766,5 @@ describe('OAuth Token API Routes', () => {
       expect(response.status).toBe(401)
       expect(data).toHaveProperty('error')
     })
-  })
-})
-
-describe('Salesforce instance URL resolution', () => {
-  const INSTANCE = 'https://acme--sbx.sandbox.my.salesforce.com'
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    authOAuthUtilsMockFns.mockResolveOAuthAccountId.mockResolvedValue(null)
-    mockAuthorizeCredentialUse.mockResolvedValue({
-      ok: true,
-      authType: 'session',
-      requesterUserId: 'test-user-id',
-      credentialOwnerUserId: 'owner-user-id',
-    })
-    authOAuthUtilsMockFns.mockRefreshTokenIfNeeded.mockResolvedValue({
-      accessToken: 'fresh-token',
-      refreshed: false,
-    })
-  })
-
-  /**
-   * The org host is smuggled through `scope` because the token response has
-   * nowhere to put it; the tools read it back as their `instanceUrl` param.
-   */
-  function credentialForProvider(providerId: string) {
-    return {
-      id: 'credential-id',
-      accessToken: 'test-token',
-      refreshToken: 'refresh-token',
-      accessTokenExpiresAt: new Date(Date.now() + 3600 * 1000),
-      providerId,
-      scope: `__sf_instance__:${INSTANCE} api refresh_token openid`,
-    }
-  }
-
-  it.each(['salesforce', 'salesforce-sandbox'])(
-    'returns the stored instance URL for a %s credential',
-    async (providerId) => {
-      authOAuthUtilsMockFns.mockGetCredential.mockResolvedValueOnce(
-        credentialForProvider(providerId)
-      )
-
-      const response = await POST(createMockRequest('POST', { credentialId: 'credential-id' }))
-      const data = await response.json()
-
-      expect(response.status).toBe(200)
-      expect(data.instanceUrl).toBe(INSTANCE)
-    }
-  )
-
-  it('omits instanceUrl for a non-Salesforce provider carrying a lookalike scope', async () => {
-    authOAuthUtilsMockFns.mockGetCredential.mockResolvedValueOnce({
-      ...credentialForProvider('google'),
-    })
-
-    const response = await POST(createMockRequest('POST', { credentialId: 'credential-id' }))
-    const data = await response.json()
-
-    expect(response.status).toBe(200)
-    expect(data.instanceUrl).toBeUndefined()
   })
 })

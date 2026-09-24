@@ -19,9 +19,6 @@
  * 2. Add the ID to ErrorExtractorId constant at the bottom of this file
  */
 
-import { parseGraphErrorFromData } from '@/tools/microsoft_excel/utils'
-import { formatQuickBooksFaultDetail, sanitizeQuickBooksFaultData } from '@/tools/quickbooks/fault'
-
 export interface ErrorInfo {
   status?: number
   statusText?: string
@@ -381,13 +378,6 @@ const ERROR_EXTRACTORS: ErrorExtractorConfig[] = [
     extract: (errorInfo) => errorInfo?.data?.error_description,
   },
   {
-    id: 'microsoft-graph-errors',
-    description:
-      'Microsoft Graph error format with nested innerError chain and details[] (Excel, OneDrive, SharePoint, Outlook). See https://learn.microsoft.com/en-us/graph/errors',
-    examples: ['Microsoft Excel', 'Microsoft OneDrive', 'Microsoft SharePoint'],
-    extract: (errorInfo) => parseGraphErrorFromData(errorInfo?.data),
-  },
-  {
     id: 'nested-error-object',
     description: 'Error field containing nested object or string',
     examples: ['Airtable', 'Google APIs'],
@@ -469,35 +459,6 @@ const ERROR_EXTRACTORS: ErrorExtractorConfig[] = [
       if (typeof detail !== 'string' || !detail.trim()) return undefined
       const attr = errorInfo?.data?.attr
       return typeof attr === 'string' && attr ? `${detail} (${attr})` : detail
-    },
-  },
-  {
-    id: 'quickbooks-fault',
-    description: 'QuickBooks Online Fault.Error[] responses with authentication and rate guidance',
-    examples: ['QuickBooks Online Accounting API'],
-    extract: (errorInfo) => {
-      const status = errorInfo?.status
-      const data = errorInfo?.data
-      const fault =
-        sanitizeQuickBooksFaultData(data) ??
-        (data && typeof data === 'object' && !Array.isArray(data)
-          ? sanitizeQuickBooksFaultData((data as Record<string, unknown>).QueryResponse)
-          : null)
-      if (!fault) return null
-
-      const guidance =
-        status === 401
-          ? 'Reconnect the QuickBooks credential.'
-          : status === 403
-            ? 'Confirm the QuickBooks accounting scope and access to this company.'
-            : status === 429
-              ? 'QuickBooks rate limit reached; retry after the indicated delay.'
-              : ''
-      const statusMessage =
-        typeof status === 'number'
-          ? `QuickBooks request failed with HTTP ${status}.`
-          : 'QuickBooks request failed.'
-      return [statusMessage, guidance, formatQuickBooksFaultDetail(fault)].filter(Boolean).join(' ')
     },
   },
   {
@@ -657,7 +618,6 @@ export function extractErrorMessage(errorInfo?: ErrorInfo, extractorId?: string)
 
 export const ErrorExtractorId = {
   ATLASSIAN_ERRORS: 'atlassian-errors',
-  MICROSOFT_GRAPH_ERRORS: 'microsoft-graph-errors',
   GRAPHQL_ERRORS: 'graphql-errors',
   TWITTER_ERRORS: 'twitter-errors',
   DETAILS_ARRAY: 'details-array',
@@ -678,7 +638,6 @@ export const ErrorExtractorId = {
   DYNATRACE_ERRORS: 'dynatrace-errors',
   SMARTLEAD_ERRORS: 'smartlead-errors',
   POSTHOG_ERRORS: 'posthog-errors',
-  QUICKBOOKS_FAULT: 'quickbooks-fault',
   PROSPEO_ERRORS: 'prospeo-errors',
   CRUNCHBASE_ERRORS: 'crunchbase-errors',
   PITCHBOOK_ERRORS: 'pitchbook-errors',

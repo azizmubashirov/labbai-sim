@@ -99,7 +99,10 @@ describe('executeOAuthGetAuthLink', () => {
   })
 
   it('rejects service-account providers before OAuth resolution', async () => {
-    const result = await executeOAuthGetAuthLink({ providerName: 'slack custom bot' }, context)
+    const result = await executeOAuthGetAuthLink(
+      { providerName: 'hubspot service account' },
+      context
+    )
 
     expect(result.success).toBe(false)
     expect(result.error).toContain('service account, not an OAuth provider')
@@ -107,7 +110,7 @@ describe('executeOAuthGetAuthLink', () => {
   })
 
   it('does not confuse integrations that also offer service accounts', async () => {
-    const result = await executeOAuthGetAuthLink({ providerName: 'slack' }, context)
+    const result = await executeOAuthGetAuthLink({ providerName: 'hubspot' }, context)
 
     expect(result.success).toBe(true)
     expect(mocks.execute).toHaveBeenCalledOnce()
@@ -130,8 +133,8 @@ describe('executeOAuthGetAuthLink', () => {
 
   it.each([
     { kind: 'personal_token', providerId: 'gitlab', serviceName: 'GitLab' },
-    { kind: 'managed_oauth', providerId: 'slack', serviceName: 'Slack' },
-    { kind: 'oauth', providerId: 'confluence', serviceName: 'Confluence' },
+    { kind: 'managed_oauth', providerId: 'google-drive', serviceName: 'Google Drive' },
+    { kind: 'oauth', providerId: 'notion', serviceName: 'Notion' },
   ])('offers a provider-only personal connection card for $serviceName', async (provider) => {
     mocks.execute.mockResolvedValue(provider)
     const result = await executeOAuthGetAuthLink(
@@ -150,7 +153,7 @@ describe('executeOAuthGetAuthLink', () => {
 
   it('does not offer a service-account card or fallback link in Assistant', async () => {
     const result = await executeOAuthGetAuthLink(
-      { providerName: 'slack custom bot' },
+      { providerName: 'hubspot service account' },
       { ...context, requestMode: 'assistant' }
     )
     expect(result.success).toBe(false)

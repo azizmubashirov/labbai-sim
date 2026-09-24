@@ -1,12 +1,6 @@
 import { AuditAction, AuditResourceType, auditUpdatedFields, recordAudit } from '@sim/audit'
 import { db } from '@sim/db'
-import {
-  credential,
-  credentialGroup,
-  environment,
-  webhook,
-  workspaceEnvironment,
-} from '@sim/db/schema'
+import { credential, credentialGroup, environment, workspaceEnvironment } from '@sim/db/schema'
 import { createLogger } from '@sim/logger'
 import { generateId } from '@sim/utils/id'
 import { and, eq, sql } from 'drizzle-orm'
@@ -15,11 +9,6 @@ import { OrchestrationError } from '@/lib/core/orchestration/types'
 import { resourceScopeColumns, resourceScopeFromOwner } from '@/lib/core/resource-scope'
 import { resourceScopeCondition } from '@/lib/core/resource-scope.server'
 import { decryptSecret } from '@/lib/core/security/encryption'
-import { listSlackCredentialGroupConfigurationsForBot } from '@/lib/credential-groups/provider-configuration'
-import {
-  SlackManagedUsersError,
-  verifySlackCustomBotAppIdentity,
-} from '@/lib/credential-groups/slack-managed-users'
 import { getCredentialActorContext } from '@/lib/credentials/access'
 import { AtlassianValidationError } from '@/lib/credentials/atlassian-service-account'
 import {
@@ -47,7 +36,6 @@ import {
 } from '@/lib/credentials/service-account-secret'
 import { TokenServiceAccountValidationError } from '@/lib/credentials/token-service-accounts/errors'
 import { invalidateEffectiveDecryptedEnvCache } from '@/lib/environment/utils'
-import { findSlackSearchInstallation } from '@/lib/knowledge/application/slack-search/repository'
 import {
   ATLASSIAN_SERVICE_ACCOUNT_PROVIDER_ID,
   GOOGLE_SERVICE_ACCOUNT_PROVIDER_ID,
@@ -289,7 +277,6 @@ export async function updateCredentialRecord(
       }
     }
 
-    let rotatedSlackBotUserId: string | undefined
     let rotatedAuditMetadata: Record<string, string> | undefined
     if (hasRotationSecret) {
       const providerId = params.credential.providerId ?? ''
@@ -333,51 +320,6 @@ export async function updateCredentialRecord(
           : null
 
       try {
-        const slackConfigurations =
-          providerId === SLACK_CUSTOM_BOT_PROVIDER_ID
-            ? await listSlackCredentialGroupConfigurationsForBot({
-                workspaceId: params.credential.workspaceId,
-                ...(params.credential.organizationId
-                  ? { organizationId: params.credential.organizationId }
-                  : {}),
-                slackBotCredentialId: params.credential.id,
-              })
-            : []
-        const searchInstallation =
-          providerId === SLACK_CUSTOM_BOT_PROVIDER_ID
-            ? await findSlackSearchInstallation(params.credential.id)
-            : null
-        if (slackConfigurations.length > 0 || searchInstallation) {
-          if (!params.botToken) {
-            throw new ServiceAccountSecretError(
-              'Bot token is required to reconnect a managed-user Slack app'
-            )
-          }
-          try {
-            const identity = await verifySlackCustomBotAppIdentity(params.botToken)
-            if (
-              (searchInstallation &&
-                (identity.appId !== searchInstallation.appId ||
-                  identity.teamId !== searchInstallation.teamId)) ||
-              slackConfigurations.some(
-                (configuration) =>
-                  identity.appId !== configuration.appId || identity.teamId !== configuration.teamId
-              )
-            ) {
-              throw new ServiceAccountSecretError(
-                'This bot token belongs to a different Slack app or workspace. Create a new custom bot credential for a different Slack app.'
-              )
-            }
-          } catch (error) {
-            if (error instanceof ServiceAccountSecretError) throw error
-            if (error instanceof SlackManagedUsersError) {
-              throw new ServiceAccountSecretError(error.message)
-            }
-            throw new ServiceAccountSecretError(
-              'Could not verify that the replacement bot token belongs to the configured Slack app'
-            )
-          }
-        }
         const secret = await verifyAndBuildServiceAccountSecret(providerId, {
           signingSecret: params.signingSecret,
           botToken: params.botToken,
@@ -403,7 +345,6 @@ export async function updateCredentialRecord(
           username: needsStoredUsername ? readStoredField(storedBlob, 'username') : params.username,
         })
         updates.encryptedServiceAccountKey = secret.encryptedServiceAccountKey
-        rotatedSlackBotUserId = secret.botUserId
         rotatedAuditMetadata = secret.auditMetadata
 
         if (needsStoredIdentity) {
@@ -463,20 +404,6 @@ export async function updateCredentialRecord(
     // bounded by that cache's short TTL instead.
     if (updates.unredacted !== undefined && params.credential.workspaceId) {
       invalidateEffectiveDecryptedEnvCache({ workspaceId: params.credential.workspaceId })
-    }
-
-    // Reconnecting to a recreated Slack app changes the bot user id, but each
-    // deployed webhook cached the old one at deploy for reaction self-drop.
-    // Propagate the rotated id to the credential's live custom-bot webhooks so
-    // the bot's own reactions keep being dropped (a stale id lets them re-enter).
-    if (rotatedSlackBotUserId) {
-      await db
-        .update(webhook)
-        .set({
-          providerConfig: sql`jsonb_set((${webhook.providerConfig})::jsonb, '{bot_user_id}', to_jsonb(${rotatedSlackBotUserId}::text))::json`,
-          updatedAt: new Date(),
-        })
-        .where(and(eq(webhook.provider, 'slack'), eq(webhook.routingKey, params.credentialId)))
     }
 
     const updatedFields = auditUpdatedFields(updates)

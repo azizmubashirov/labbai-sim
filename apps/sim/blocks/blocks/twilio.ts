@@ -128,42 +128,12 @@ export const TwilioSMSBlockMeta = {
     },
     {
       icon: TwilioIcon,
-      title: 'Twilio incident escalation alerts',
-      prompt:
-        'Build a workflow triggered by a PagerDuty incident that sends a Twilio SMS to the on-call engineer with the service name and severity so critical alerts reach them even when they are away from Slack.',
-      modules: ['agent', 'workflows'],
-      category: 'engineering',
-      tags: ['messaging', 'incident-management', 'automation'],
-      alsoIntegrations: ['pagerduty'],
-    },
-    {
-      icon: TwilioIcon,
-      title: 'Twilio lead speed-to-text',
-      prompt:
-        'Create a workflow that fires when a new lead submits a form, drafts a friendly intro message, and sends it via Twilio SMS within seconds so reps engage hot leads while they are still interested.',
-      modules: ['agent', 'workflows'],
-      category: 'sales',
-      tags: ['messaging', 'sales', 'automation'],
-      alsoIntegrations: ['typeform'],
-    },
-    {
-      icon: TwilioIcon,
       title: 'Twilio two-factor code sender',
       prompt:
         'Build a workflow that receives a verification request from an application, generates a one-time code, sends it to the user via Twilio SMS, and logs the send for audit.',
       modules: ['agent', 'workflows'],
       category: 'engineering',
       tags: ['messaging', 'identity', 'automation'],
-    },
-    {
-      icon: TwilioIcon,
-      title: 'Twilio payment-failure outreach',
-      prompt:
-        'Create a workflow triggered by a Stripe failed-payment event that sends the customer a Twilio SMS with a secure update-payment link and logs the recovery attempt to a table.',
-      modules: ['tables', 'agent', 'workflows'],
-      category: 'operations',
-      tags: ['messaging', 'finance', 'automation'],
-      alsoIntegrations: ['stripe'],
     },
     {
       icon: TwilioIcon,

@@ -17,7 +17,7 @@ const DELEGATED_TOOL_DESCRIPTIONS: Record<string, string> = {
   get_workflow_data:
     'Loads workflow structure and metadata by workflowId (useful on home chat when no workflow is open).',
   list_integration_tools:
-    'Lists available operations for a connected integration service (e.g. gmail, google_sheets, slack). Then call invoke_integration_tool with the exact tool id — do not call load_integration_tool.',
+    'Lists available operations for a connected integration service (e.g. gmail, google_sheets, hubspot). Then call invoke_integration_tool with the exact tool id — do not call load_integration_tool.',
   read: 'Reads a workspace file by canonical VFS path. For file bytes/text use files/<name>/content (e.g. files/page.html/content). Required before workspace_file operation=update on existing HTML/text so the edit starts from the current file.',
   glob: 'Finds workspace files by glob pattern (e.g. files/**/*.csv).',
   grep: 'Searches file contents under a workspace path pattern.',
@@ -90,7 +90,7 @@ const DELEGATED_TOOL_DESCRIPTIONS: Record<string, string> = {
   manage_credential:
     'Renames or deletes stored OAuth credentials (operation: rename | delete). Delete is destructive — only call when the user explicitly asked. Never exposes secret values.',
   oauth_get_auth_link:
-    'Returns an OAuth connect link for a provider (e.g. google-email, slack) so the user can authorize it. Share the returned URL — never ask for an API key when an OAuth flow exists.',
+    'Returns an OAuth connect link for a provider (e.g. google-email, hubspot) so the user can authorize it. Share the returned URL — never ask for an API key when an OAuth flow exists.',
   oauth_request_access:
     'Requests access to an OAuth provider connection owned by another workspace member.',
   generate_audio:

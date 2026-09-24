@@ -33,7 +33,7 @@ describe('POLLING_PROVIDERS sync with TriggerConfig.polling', () => {
    * `POLLING_PROVIDERS` would 404 its real deliveries. Providers gated wholesale for a
    * provider-level reason (internal, or an app-level ingress route) never serve that route, so
    * mixing is harmless there and they are exempt. Split dual-delivery services into two providers
-   * instead, as Slack does with `slack` and `slack_app`.
+   * instead.
    */
   it('no path-delivered provider also owns a polling trigger', () => {
     const byProvider = new Map<string, { polling: string[]; path: string[] }>()

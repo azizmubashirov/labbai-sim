@@ -9,7 +9,6 @@ import {
   ChipModalHeader,
 } from '@sim/emcn'
 import type { SearchConnector } from '@/lib/sim-search/connectors'
-import { AtlassianSourceSetupModal } from '@/app/workspace/[workspaceId]/home/components/search-sources/atlassian-source-setup-modal'
 
 interface SourceSetupModalProps {
   organizationId?: string
@@ -27,21 +26,6 @@ interface SourceSetupModalProps {
  * a space. Everyone after the first person clicks straight through.
  */
 export function SourceSetupModal(props: SourceSetupModalProps) {
-  if (
-    props.organizationId &&
-    (props.connector.type === 'jira' || props.connector.type === 'confluence')
-  ) {
-    return (
-      <AtlassianSourceSetupModal
-        key={`${props.organizationId}:${props.connector.type}`}
-        organizationId={props.organizationId}
-        connector={props.connector}
-        connectorType={props.connector.type}
-        onClose={props.onClose}
-        onConnected={props.onConnected}
-      />
-    )
-  }
   return <ManualSourceSetupModal {...props} />
 }
 

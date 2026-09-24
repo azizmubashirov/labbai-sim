@@ -5,13 +5,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/blocks/registry-maps', () => ({
   BLOCK_REGISTRY: {
-    slack: {
-      type: 'slack',
+    notion: {
+      type: 'notion',
       tools: {
-        access: ['slack_message_v1', 'slack_canvas_v1'],
+        access: ['notion_write_v1', 'notion_query_v1'],
         config: {
           tool: ({ operation }: { operation?: string }) =>
-            operation === 'canvas' ? 'slack_canvas_v1' : 'slack_message_v1',
+            operation === 'query' ? 'notion_query_v1' : 'notion_write_v1',
         },
       },
       subBlocks: [
@@ -19,8 +19,8 @@ vi.mock('@/blocks/registry-maps', () => ({
           id: 'operation',
           type: 'dropdown',
           options: [
-            { label: 'Send Message', id: 'send' },
-            { label: 'Create Canvas', id: 'canvas' },
+            { label: 'Write Page', id: 'write' },
+            { label: 'Query Database', id: 'query' },
           ],
         },
       ],
@@ -44,8 +44,8 @@ vi.mock('@/blocks/registry-maps', () => ({
 
 vi.mock('@/tools/registry', () => ({
   tools: {
-    slack_message_v1: { name: 'Send Message' },
-    slack_canvas_v1: { name: 'Create Canvas' },
+    notion_write_v1: { name: 'Write Page' },
+    notion_query_v1: { name: 'Query Database' },
     gmail_send_v1: { name: 'Send Email' },
     sqs_send_v1: { name: 'Send' },
     sqs_receive_v1: { name: 'Receive' },
@@ -80,38 +80,38 @@ describe('projectIntegrationToolsForViewer', () => {
   it('exposes everything to a viewer with no permission group', () => {
     expect(toolIds(null)).toEqual([
       'gmail_send_v1',
-      'slack_canvas_v1',
-      'slack_message_v1',
+      'notion_query_v1',
+      'notion_write_v1',
       'sqs_receive_v1',
       'sqs_send_v1',
     ])
   })
 
   it('withholds a tool the group denies while keeping its siblings', () => {
-    expect(toolIds({ allowedIntegrations: null, deniedTools: ['slack_canvas_v1'] })).toEqual([
+    expect(toolIds({ allowedIntegrations: null, deniedTools: ['notion_query_v1'] })).toEqual([
       'gmail_send_v1',
-      'slack_message_v1',
+      'notion_write_v1',
       'sqs_receive_v1',
       'sqs_send_v1',
     ])
   })
 
   it('applies the block allowlist and the tool denylist together', () => {
-    expect(toolIds({ allowedIntegrations: ['slack'], deniedTools: ['slack_canvas_v1'] })).toEqual([
-      'slack_message_v1',
+    expect(toolIds({ allowedIntegrations: ['notion'], deniedTools: ['notion_query_v1'] })).toEqual([
+      'notion_write_v1',
     ])
   })
 
   it('reports the allowed block types and the tool gate it applied', () => {
     const projection = projectIntegrationToolsForViewer(null, {
-      allowedIntegrations: ['Slack'],
-      deniedTools: ['slack_canvas_v1'],
+      allowedIntegrations: ['Notion'],
+      deniedTools: ['notion_query_v1'],
     })
 
     /** The set is in the resolved vocabulary, which is what the gate compares against. */
-    expect(projection.allowedBlockTypes).toEqual(new Set(['slack_v2']))
-    expect(projection.isToolAllowed('slack_canvas_v1')).toBe(false)
-    expect(projection.isToolAllowed('slack_message_v1')).toBe(true)
+    expect(projection.allowedBlockTypes).toEqual(new Set(['notion_v2']))
+    expect(projection.isToolAllowed('notion_query_v1')).toBe(false)
+    expect(projection.isToolAllowed('notion_write_v1')).toBe(true)
   })
 
   it('leaves the gate unrestricted when the group denies nothing', () => {
@@ -121,7 +121,7 @@ describe('projectIntegrationToolsForViewer', () => {
     })
 
     expect(projection.allowedBlockTypes).toBeNull()
-    expect(projection.isToolAllowed('slack_canvas_v1')).toBe(true)
+    expect(projection.isToolAllowed('notion_query_v1')).toBe(true)
   })
 })
 
@@ -136,19 +136,19 @@ describe('resolveDeniedBlockOperations', () => {
   })
 
   it('reports the operation ids to withhold from a partly denied block', () => {
-    const denied = ['slack_canvas_v1']
+    const denied = ['notion_query_v1']
     const resolved = resolveDeniedBlockOperations(denied, allow(denied))
 
-    expect(resolved.needsProjection.get('slack')).toEqual(new Set(['canvas']))
-    expect(resolved.fullyDenied.has('slack')).toBe(false)
+    expect(resolved.needsProjection.get('notion')).toEqual(new Set(['query']))
+    expect(resolved.fullyDenied.has('notion')).toBe(false)
   })
 
   it('withholds a block whose every operation is denied', () => {
-    const denied = ['slack_message_v1', 'slack_canvas_v1']
+    const denied = ['notion_write_v1', 'notion_query_v1']
     const resolved = resolveDeniedBlockOperations(denied, allow(denied))
 
-    expect(resolved.fullyDenied.has('slack')).toBe(true)
-    expect(resolved.needsProjection.has('slack')).toBe(false)
+    expect(resolved.fullyDenied.has('notion')).toBe(true)
+    expect(resolved.needsProjection.has('notion')).toBe(false)
   })
 
   it('withholds a single-tool block whose only tool is denied', () => {
@@ -167,7 +167,7 @@ describe('resolveDeniedBlockOperations', () => {
   })
 
   it('ignores blocks that own no denied tool', () => {
-    const denied = ['slack_canvas_v1']
+    const denied = ['notion_query_v1']
     const resolved = resolveDeniedBlockOperations(denied, allow(denied))
 
     expect(resolved.needsProjection.has('gmail')).toBe(false)

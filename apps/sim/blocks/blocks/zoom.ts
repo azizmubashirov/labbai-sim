@@ -730,26 +730,6 @@ export const ZoomBlockMeta = {
   templates: [
     {
       icon: ZoomIcon,
-      title: 'Zoom recording recap',
-      prompt:
-        'Build a workflow that runs after a Zoom meeting ends, pulls the cloud recording transcript, summarizes decisions and action items, and posts the recap to the linked Slack channel.',
-      modules: ['agent', 'workflows'],
-      category: 'productivity',
-      tags: ['team', 'reporting'],
-      alsoIntegrations: ['slack'],
-    },
-    {
-      icon: ZoomIcon,
-      title: 'Zoom meeting prep brief',
-      prompt:
-        'Create a scheduled workflow that runs each morning, lists today’s Zoom meetings, researches attendees with Apollo and the web, and emails a prep brief 30 minutes before each meeting.',
-      modules: ['scheduled', 'agent', 'workflows'],
-      category: 'productivity',
-      tags: ['research', 'sales'],
-      alsoIntegrations: ['apollo', 'gmail'],
-    },
-    {
-      icon: ZoomIcon,
       title: 'Zoom webinar follow-up',
       prompt:
         'Build a workflow that runs after a Zoom webinar, pulls the registrant and attendee lists, sends a follow-up email with the recording link, and writes attendance into HubSpot for marketing scoring.',
@@ -767,26 +747,6 @@ export const ZoomBlockMeta = {
       category: 'productivity',
       tags: ['team', 'content'],
       alsoIntegrations: ['notion'],
-    },
-    {
-      icon: ZoomIcon,
-      title: 'Zoom sales-call deal updater',
-      prompt:
-        'Build a workflow that runs after a Zoom sales call, summarizes objections, next steps, and stage signals from the transcript, and updates the linked Salesforce or HubSpot opportunity.',
-      modules: ['agent', 'workflows'],
-      category: 'sales',
-      tags: ['sales', 'crm'],
-      alsoIntegrations: ['salesforce', 'hubspot'],
-    },
-    {
-      icon: ZoomIcon,
-      title: 'Zoom recurring 1:1 logger',
-      prompt:
-        'Create a workflow that captures Zoom 1:1 meeting recaps, appends them to a per-employee log file, and surfaces talking points for the next 1:1 to the manager in Slack.',
-      modules: ['agent', 'files', 'workflows'],
-      category: 'productivity',
-      tags: ['team', 'individual'],
-      alsoIntegrations: ['slack'],
     },
     {
       icon: ZoomIcon,

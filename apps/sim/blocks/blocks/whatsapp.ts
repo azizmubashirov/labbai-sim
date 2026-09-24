@@ -732,26 +732,6 @@ export const WhatsAppBlockMeta = {
     },
     {
       icon: WhatsAppIcon,
-      title: 'WhatsApp customer support agent',
-      prompt:
-        'Build a WhatsApp business agent that answers customer questions using a knowledge base, hands off to a human in Zendesk on complex tickets, and writes the conversation back to the contact record.',
-      modules: ['knowledge-base', 'agent', 'workflows'],
-      category: 'support',
-      tags: ['support', 'communication'],
-      alsoIntegrations: ['zendesk'],
-    },
-    {
-      icon: WhatsAppIcon,
-      title: 'WhatsApp lead qualifier',
-      prompt:
-        'Create a workflow that engages new leads via WhatsApp with a guided qualification script, scores them based on responses, and pushes qualified leads into Salesforce with the conversation log attached.',
-      modules: ['agent', 'workflows'],
-      category: 'sales',
-      tags: ['sales', 'communication'],
-      alsoIntegrations: ['salesforce'],
-    },
-    {
-      icon: WhatsAppIcon,
       title: 'WhatsApp campaign sender',
       prompt:
         'Build a workflow that reads a segmented audience from a table and sends a personalized WhatsApp template message to each, throttling to stay under provider limits.',

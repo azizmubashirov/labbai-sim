@@ -1349,42 +1349,12 @@ export const WordPressBlockMeta = {
     },
     {
       icon: WordpressIcon,
-      title: 'WordPress release-notes publisher',
-      prompt:
-        'Create a scheduled workflow that runs every Friday, pulls merged GitHub PRs for the week, drafts a user-facing changelog, and publishes it as a WordPress post.',
-      modules: ['scheduled', 'agent', 'workflows'],
-      category: 'marketing',
-      tags: ['marketing', 'engineering'],
-      alsoIntegrations: ['github'],
-    },
-    {
-      icon: WordpressIcon,
       title: 'WordPress comment moderator',
       prompt:
         'Build a scheduled workflow that polls new WordPress comments, classifies each as spam, question, or constructive, auto-moderates spam, and replies to questions using a knowledge base.',
       modules: ['scheduled', 'knowledge-base', 'agent', 'workflows'],
       category: 'marketing',
       tags: ['marketing', 'automation'],
-    },
-    {
-      icon: WordpressIcon,
-      title: 'WordPress SEO refresher',
-      prompt:
-        'Create a scheduled monthly workflow that finds underperforming WordPress posts, runs Ahrefs keyword analysis, drafts refreshed sections, and stages the update as a draft revision.',
-      modules: ['scheduled', 'agent', 'workflows'],
-      category: 'marketing',
-      tags: ['marketing', 'content'],
-      alsoIntegrations: ['ahrefs'],
-    },
-    {
-      icon: WordpressIcon,
-      title: 'WordPress newsletter republisher',
-      prompt:
-        'Build a workflow that publishes a new WordPress post and then drafts an adapted Mailchimp newsletter version, links back to the post, and queues it for the editor’s review.',
-      modules: ['agent', 'workflows'],
-      category: 'marketing',
-      tags: ['marketing', 'communication'],
-      alsoIntegrations: ['mailchimp'],
     },
     {
       icon: WordpressIcon,

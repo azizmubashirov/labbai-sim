@@ -38,7 +38,6 @@ import {
   OrganizationAccountProviderCatalog,
   type OrganizationAccountProviderChoice,
 } from '@/ee/credential-groups/components/organization-account-provider-catalog'
-import { SlackManagedUsersModal } from '@/ee/credential-groups/components/slack-managed-users-modal'
 import {
   useAddOrganizationAccountMcpProvider,
   useRemoveOrganizationAccountMcpProvider,
@@ -64,7 +63,6 @@ export function OrganizationAccountProviders({
   const setSearchTerm = useDebouncedSearchSetter(setSearchParam)
   const [catalogOpen, setCatalogOpen] = useState(false)
   const [removing, setRemoving] = useState<OrganizationAccountProviderChoice | null>(null)
-  const [slackOpen, setSlackOpen] = useState(false)
   const [databricksOpen, setDatabricksOpen] = useState(false)
   const update = useUpdateOrganizationAccounts()
   const addMcp = useAddOrganizationAccountMcpProvider()
@@ -100,11 +98,6 @@ export function OrganizationAccountProviders({
       return
     }
     const { provider } = choice
-    if (provider === 'slack') {
-      setCatalogOpen(false)
-      setSlackOpen(true)
-      return
-    }
     const service = getCredentialGroupProviderService(provider)
     update.mutate(
       {
@@ -146,7 +139,7 @@ export function OrganizationAccountProviders({
         id: option.id,
         name: service.name,
         icon: service.icon,
-        configure: option.provider === 'slack' ? () => setSlackOpen(true) : undefined,
+        configure: undefined as (() => void) | undefined,
         choice: { kind: 'oauth', provider: option.provider } as const,
       }
     }),
@@ -265,20 +258,6 @@ export function OrganizationAccountProviders({
             (server) => server.managedConnectorId === 'databricks'
           )}
           onOpenChange={setDatabricksOpen}
-        />
-      )}
-      {slackOpen && (
-        <SlackManagedUsersModal
-          open
-          organizationId={organizationId}
-          credentialGroupId={group.id}
-          bots={[]}
-          isLoading={false}
-          error={null}
-          onOpenChange={setSlackOpen}
-          initialRequiredScopes={
-            group.options.find((option) => option.provider === 'slack')?.requiredScopes
-          }
         />
       )}
       {removing && (

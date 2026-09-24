@@ -18,7 +18,6 @@ import {
   resolveIntegrationAvailabilityStateForVisibility,
 } from '@/lib/integrations/availability'
 import {
-  getOAuthServiceAvailability,
   isIntegrationDeploymentAvailable,
   isIntegrationDeploymentAvailableForVisibility,
 } from '@/lib/integrations/availability.server'
@@ -41,26 +40,20 @@ function availabilityFor(
 }
 
 describe('integration availability', () => {
-  it('does not infer GitHub repository OAuth readiness from its API-key workflow block', () => {
-    expect(availabilityFor('github_v2')).toMatchObject({ state: 'ready', oauthAvailable: false })
-    expect(
-      getOAuthServiceAvailability([{ providerId: 'github-repositories', authType: 'oauth' }])
-    ).toEqual([{ providerId: 'github-repositories', available: false }])
-  })
   it('marks a configured OAuth integration ready', () => {
     expect(
-      availabilityFor('slack_v2', {
-        SLACK_CLIENT_ID: 'client',
-        SLACK_CLIENT_SECRET: 'secret',
+      availabilityFor('hubspot', {
+        HUBSPOT_CLIENT_ID: 'client',
+        HUBSPOT_CLIENT_SECRET: 'secret',
       })
     ).toMatchObject({
-      name: 'Slack',
-      slug: 'slack',
+      name: 'HubSpot',
+      slug: 'hubspot',
       state: 'ready',
       oauthAvailable: true,
       serviceAccountAvailable: true,
       missingFields: [],
-      setupCommand: 'npx sim-setup add integration slack',
+      setupCommand: 'npx sim-setup add integration hubspot',
     })
   })
 
@@ -84,73 +77,54 @@ describe('integration availability', () => {
   })
 
   it('marks an unconfigured OAuth-only integration unavailable', () => {
-    expect(availabilityFor('x')).toMatchObject({
+    expect(availabilityFor('wordpress')).toMatchObject({
       state: 'unavailable',
       oauthAvailable: false,
-      setupCommand: 'npx sim-setup add integration x',
+      setupCommand: 'npx sim-setup add integration wordpress',
     })
   })
 
-  it('keeps credential-configured OAuth integrations independent of deployment secrets', () => {
-    expect(availabilityFor('quickbooks')).toMatchObject({
-      state: 'ready',
-      oauthAvailable: true,
-      serviceAccountAvailable: false,
-      missingFields: [],
-    })
-    expect(availabilityFor('quickbooks').setupCommand).toBeUndefined()
-    expect(resolveOAuthClientCapabilityId('quickbooks')).toBeNull()
-  })
-
-  it('keeps custom bots available when the Slack OAuth client is partial', () => {
-    expect(availabilityFor('slack_v2', { SLACK_CLIENT_ID: 'client' })).toMatchObject({
-      state: 'limited',
-      oauthAvailable: false,
-      serviceAccountAvailable: true,
-      missingFields: ['SLACK_CLIENT_SECRET'],
-      setupCommand: 'npx sim-setup add integration slack',
-    })
-  })
-
-  it('keeps the released custom-bot path independent of preview visibility', () => {
-    const limitedSlack = availabilityFor('slack_v2')
+  it('keeps a released service-account path independent of preview visibility', () => {
+    const limitedNotion = availabilityFor('notion_v2')
     const disabled = {
-      revealed: new Set(['slack_v2']),
-      disabled: new Set(['slack_v2']),
-      previewTagged: new Set(['slack_v2']),
+      revealed: new Set(['notion_v2']),
+      disabled: new Set(['notion_v2']),
+      previewTagged: new Set(['notion_v2']),
     }
 
-    expect(resolveIntegrationAvailabilityStateForVisibility(limitedSlack, null)).toBe('limited')
-    expect(resolveIntegrationAvailabilityStateForVisibility(limitedSlack, disabled)).toBe('limited')
-    expect(resolveIntegrationAvailabilityStateForVisibility(availabilityFor('x'), disabled)).toBe(
-      'unavailable'
+    expect(resolveIntegrationAvailabilityStateForVisibility(limitedNotion, null)).toBe('limited')
+    expect(resolveIntegrationAvailabilityStateForVisibility(limitedNotion, disabled)).toBe(
+      'limited'
     )
+    expect(
+      resolveIntegrationAvailabilityStateForVisibility(availabilityFor('wordpress'), disabled)
+    ).toBe('unavailable')
   })
 
   it('projects base and versioned deployment availability through explicit visibility', () => {
     const revealed = {
-      revealed: new Set(['slack_v2']),
+      revealed: new Set(['notion_v2']),
       disabled: new Set<string>(),
-      previewTagged: new Set(['slack_v2']),
+      previewTagged: new Set(['notion_v2']),
     }
     const disabled = {
       ...revealed,
-      disabled: new Set(['slack_v2']),
+      disabled: new Set(['notion_v2']),
     }
 
-    expect(isIntegrationDeploymentAvailable('slack')).toBe(true)
-    expect(isIntegrationDeploymentAvailable('slack_v2')).toBe(true)
-    expect(isIntegrationDeploymentAvailable('slack-v2')).toBe(true)
-    expect(isIntegrationDeploymentAvailableForVisibility('slack', null)).toBe(true)
-    expect(isIntegrationDeploymentAvailableForVisibility('slack_v2', null)).toBe(true)
-    expect(isIntegrationDeploymentAvailableForVisibility('slack-v2', null)).toBe(true)
-    expect(isIntegrationDeploymentAvailableForVisibility('slack', revealed)).toBe(true)
-    expect(isIntegrationDeploymentAvailableForVisibility('slack_v2', revealed)).toBe(true)
-    expect(isIntegrationDeploymentAvailableForVisibility('slack-v2', revealed)).toBe(true)
-    expect(isIntegrationDeploymentAvailableForVisibility('x', revealed)).toBe(false)
-    expect(isIntegrationDeploymentAvailableForVisibility('slack', disabled)).toBe(true)
-    expect(isIntegrationDeploymentAvailableForVisibility('slack_v2', disabled)).toBe(true)
-    expect(isIntegrationDeploymentAvailableForVisibility('slack-v2', disabled)).toBe(true)
+    expect(isIntegrationDeploymentAvailable('notion')).toBe(true)
+    expect(isIntegrationDeploymentAvailable('notion_v2')).toBe(true)
+    expect(isIntegrationDeploymentAvailable('notion-v2')).toBe(true)
+    expect(isIntegrationDeploymentAvailableForVisibility('notion', null)).toBe(true)
+    expect(isIntegrationDeploymentAvailableForVisibility('notion_v2', null)).toBe(true)
+    expect(isIntegrationDeploymentAvailableForVisibility('notion-v2', null)).toBe(true)
+    expect(isIntegrationDeploymentAvailableForVisibility('notion', revealed)).toBe(true)
+    expect(isIntegrationDeploymentAvailableForVisibility('notion_v2', revealed)).toBe(true)
+    expect(isIntegrationDeploymentAvailableForVisibility('notion-v2', revealed)).toBe(true)
+    expect(isIntegrationDeploymentAvailableForVisibility('wordpress', revealed)).toBe(false)
+    expect(isIntegrationDeploymentAvailableForVisibility('notion', disabled)).toBe(true)
+    expect(isIntegrationDeploymentAvailableForVisibility('notion_v2', disabled)).toBe(true)
+    expect(isIntegrationDeploymentAvailableForVisibility('notion-v2', disabled)).toBe(true)
   })
 
   it('requires the deployment Trello API key for OAuth and pasted member tokens', () => {
@@ -170,9 +144,9 @@ describe('integration availability', () => {
 
   it('maps OAuth service ids to the integration allowlist without loading registries', () => {
     expect(getIntegrationTypesForOAuthServiceId('gmail')).toContain('gmail_v2')
-    expect(isOAuthServiceAllowedByIntegrationTypes('gmail', new Set(['slack']))).toBe(false)
-    expect(isOAuthServiceAllowedByIntegrationTypes('slack', new Set(['slack_v2']))).toBe(true)
-    expect(isOAuthServiceAllowedByIntegrationTypes('spotify', null)).toBe(true)
+    expect(isOAuthServiceAllowedByIntegrationTypes('gmail', new Set(['notion_v2']))).toBe(false)
+    expect(isOAuthServiceAllowedByIntegrationTypes('notion', new Set(['notion_v2']))).toBe(true)
+    expect(isOAuthServiceAllowedByIntegrationTypes('hubspot', null)).toBe(true)
   })
 
   it('returns every visible integration and only emits accepted setup commands', () => {
@@ -222,7 +196,7 @@ describe('integration availability', () => {
     expect([...CREDENTIAL_CONFIGURED_OAUTH_SERVICE_IDS].sort()).toEqual(
       expectedCredentialConfiguredServiceIds.sort()
     )
-    expect(SERVICE_ACCOUNT_METADATA_BY_OAUTH_SERVICE_ID.slack.deploymentRequirement).toBeUndefined()
+    expect(SERVICE_ACCOUNT_METADATA_BY_OAUTH_SERVICE_ID.hubspot.deploymentRequirement).toBeUndefined()
     expect(SERVICE_ACCOUNT_METADATA_BY_OAUTH_SERVICE_ID.trello.deploymentRequirement).toBe(
       'oauth-client'
     )

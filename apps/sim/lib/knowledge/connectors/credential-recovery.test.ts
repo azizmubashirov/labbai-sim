@@ -21,9 +21,7 @@ describe('resumeConnectorsAfterCredentialReconnect', () => {
   })
 
   it('resumes the connectors of every credential on the reconnected account', async () => {
-    queueTableRows(schemaMock.account, [
-      { providerId: 'confluence', providerAccountId: 'subject-1' },
-    ])
+    queueTableRows(schemaMock.account, [{ id: 'account-1' }])
     await resumeConnectorsAfterCredentialReconnect('account-1', now)
     expect(dbChainMockFns.set).toHaveBeenCalledWith({ ...RESUMED, nextSyncAt: now, updatedAt: now })
     const guard = JSON.stringify(dbChainMockFns.where.mock.calls.at(-1))
@@ -31,17 +29,6 @@ describe('resumeConnectorsAfterCredentialReconnect', () => {
     expect(guard).toContain(CREDENTIAL_REVOKED_SYNC_ERROR)
     const credentials = JSON.stringify(dbChainMockFns.where.mock.calls)
     expect(credentials).toContain('"left":"credential.accountId","right":"account-1"')
-  })
-
-  it('resumes across the Slack installation, whose sibling accounts share the repaired chain', async () => {
-    queueTableRows(schemaMock.account, [
-      { providerId: 'slack', providerAccountId: 'TEXAMPLE-usr_U1' },
-    ])
-    await resumeConnectorsAfterCredentialReconnect('account-1', now)
-    expect(dbChainMockFns.set).toHaveBeenCalledWith({ ...RESUMED, nextSyncAt: now, updatedAt: now })
-    const conditions = JSON.stringify(dbChainMockFns.where.mock.calls)
-    expect(conditions).toContain('"pattern":"TEXAMPLE-%"')
-    expect(conditions).not.toContain('"left":"credential.accountId","right":"account-1"')
   })
 
   it('does nothing for an account that no longer exists', async () => {

@@ -238,7 +238,6 @@ export function IntegrationBlockDetail({ integration, workspaceId }: Integration
           requiredScopes={oauthService.requiredScopes}
           serviceName={oauthService.serviceName}
           serviceIcon={oauthService.serviceIcon}
-          requireDataverseEnvironment={integration.type === 'microsoft_dynamics_365'}
         />
       )}
       {hasServiceAccount && serviceAccountTarget && (

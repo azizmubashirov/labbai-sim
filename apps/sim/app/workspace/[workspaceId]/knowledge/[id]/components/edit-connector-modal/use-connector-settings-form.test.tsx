@@ -35,14 +35,8 @@ vi.mock('@/app/workspace/[workspaceId]/knowledge/[id]/hooks/use-connector-scope'
 }))
 vi.mock('@/hooks/use-permission-config', () => ({
   usePermissionConfig: () => ({
-    integrationAvailability: new Map([
-      ['slack', { oauthAvailable: true, state: 'ready' }],
-      ['slack_v2', { oauthAvailable: true, state: 'ready' }],
-    ]),
-    oauthServiceAvailability: new Map([
-      ['github-repositories', true],
-      ['confluence', true],
-    ]),
+    integrationAvailability: new Map([['google_drive', { oauthAvailable: true, state: 'ready' }]]),
+    oauthServiceAvailability: new Map([['google-drive', true]]),
     isIntegrationAvailabilityReady: true,
     isIntegrationAvailabilityFetching: false,
     integrationAvailabilityError: null,
@@ -56,7 +50,7 @@ function connector(overrides: Partial<ConnectorData> = {}): ConnectorData {
   return {
     id: 'connector-1',
     knowledgeBaseId: 'kb-search',
-    connectorType: 'slack',
+    connectorType: 'google_drive',
     credentialId: null,
     sourceConfig: {},
     syncMode: 'full',
@@ -123,23 +117,6 @@ describe('shared connector settings form', () => {
     container.remove()
   })
 
-  it.each([
-    { sourceConfig: { repository: 'acme/platform', githubRepositoryId: '9010' }, expected: true },
-    { sourceConfig: { repository: 'acme/platform' }, expected: false },
-  ])(
-    'identifies installation settings from the persisted repository binding: $expected',
-    ({ sourceConfig, expected }) => {
-      render(
-        connector({ connectorType: 'github', credentialId: 'installation-1', sourceConfig }),
-        'github'
-      )
-      expect(form.fieldsProps.usesGitHubInstallation).toBe(expected)
-      expect(form.fieldsProps.access.accessMode).toBe('members')
-      expect(form.fieldsProps.sourceConfig.repository).toBe('acme/platform')
-      expect(mocks.applyAccess).not.toHaveBeenCalled()
-    }
-  )
-
   it('treats persisted JSONB label key order as an unchanged draft', () => {
     render(
       connector({
@@ -161,58 +138,26 @@ describe('shared connector settings form', () => {
     expect(form.dirty).toBe(true)
   })
 
-  it('keeps a new member Gmail source clean and preserves its derived listing cap on save', () => {
+  it('offers central account replacement without making an unchanged source dirty', () => {
     const sourceConfig = {
-      label: ['INBOX'],
-      dateRange: '7d',
-      query: 'subject:SIM-SEARCH-QA',
-      _canonicalModes: { label: 'advanced' },
-      maxThreads: 0,
-    }
-    render(connector({ connectorType: 'gmail', sourceConfig }), 'gmail-members')
-
-    const capField = form.fieldsProps.connectorConfig?.configFields.find(
-      (field) => field.id === 'maxThreads'
-    )!
-    expect(capField).toBeDefined()
-    expect(form.fieldsProps.isFieldVisible(capField)).toBe(false)
-    expect(form.dirty).toBe(false)
-    expect(form.canSave).toBe(false)
-
-    act(() => form.fieldsProps.onFieldChange('query', 'subject:updated'))
-    expect(form.dirty).toBe(true)
-    expect(form.canSave).toBe(true)
-    act(() => form.save())
-    expect(mocks.update).toHaveBeenCalledWith(
-      {
-        knowledgeBaseId: 'kb-search',
-        connectorId: baseline.id,
-        updates: { sourceConfig: { ...sourceConfig, query: 'subject:updated' } },
-      },
-      expect.any(Object)
-    )
-  })
-
-  it('offers central Confluence account replacement without making an unchanged source dirty', () => {
-    const sourceConfig = {
-      domain: 'team.atlassian.net',
-      spaceKey: ['ENG'],
-      labelFilter: 'approved',
+      adminEmail: 'admin@example.com',
+      folderId: ['folder-1'],
+      fileType: 'all',
     }
     render(
       connector({
-        connectorType: 'confluence',
+        connectorType: 'google_drive',
         accessMode: 'admin',
         credentialId: 'service-account-1',
         sourceConfig,
       }),
-      'confluence-central'
+      'central'
     )
     expect(form.fieldsProps.needsWorkspaceCredential).toBe(true)
     expect(form.dirty).toBe(false)
     expect(form.canSave).toBe(false)
 
-    act(() => form.fieldsProps.onFieldChange('labelFilter', 'published'))
+    act(() => form.fieldsProps.onFieldChange('fileType', 'documents'))
     expect(form.canSave).toBe(true)
     act(() => form.save())
     expect(mocks.update).toHaveBeenCalledWith(
@@ -222,8 +167,8 @@ describe('shared connector settings form', () => {
         updates: {
           sourceConfig: {
             ...sourceConfig,
-            labelFilter: 'published',
-            _canonicalModes: { spaceKey: 'basic' },
+            fileType: 'documents',
+            _canonicalModes: { folderId: 'basic' },
           },
         },
       },
@@ -234,14 +179,14 @@ describe('shared connector settings form', () => {
 
   it('saves an account replacement and source edits together and retains the draft on rejection', () => {
     const row = connector({
-      connectorType: 'confluence',
+      connectorType: 'google_drive',
       accessMode: 'admin',
       credentialId: 'old-account',
-      sourceConfig: { domain: 'example.atlassian.net', spaceKey: ['ENG'] },
+      sourceConfig: { adminEmail: 'admin@example.com', folderId: ['folder-1'] },
     })
     render(row, 'replacement')
     act(() => form.fieldsProps.onWorkspaceCredentialChange('new-account'))
-    act(() => form.fieldsProps.onFieldChange('labelFilter', 'published'))
+    act(() => form.fieldsProps.onFieldChange('fileType', 'documents'))
     expect(form.canSave).toBe(true)
     act(() => form.save())
     expect(mocks.update).not.toHaveBeenCalled()
@@ -250,16 +195,16 @@ describe('shared connector settings form', () => {
         access: expect.objectContaining({
           accessMode: 'admin',
           credentialId: 'new-account',
-          sourceConfig: expect.objectContaining({ labelFilter: 'published' }),
+          sourceConfig: expect.objectContaining({ fileType: 'documents' }),
         }),
       }),
       expect.any(Object)
     )
     act(() =>
-      mocks.applyAccess.mock.calls[0][1].onError(new Error('Account cannot access this space'))
+      mocks.applyAccess.mock.calls[0][1].onError(new Error('Account cannot access this folder'))
     )
     expect(form.fieldsProps.workspaceCredentialId).toBe('new-account')
-    expect(form.fieldsProps.sourceConfig.labelFilter).toBe('published')
+    expect(form.fieldsProps.sourceConfig.fileType).toBe('documents')
     expect(form.canSave).toBe(true)
     expect(onSaved).not.toHaveBeenCalled()
   })
@@ -268,11 +213,11 @@ describe('shared connector settings form', () => {
     'keeps the account draft while %s and enables Save when idle',
     (status) => {
       const row = connector({
-        connectorType: 'confluence',
+        connectorType: 'google_drive',
         accessMode: 'admin',
         credentialId: 'old-account',
         status,
-        sourceConfig: { domain: 'example.atlassian.net', spaceKey: ['ENG'] },
+        sourceConfig: { adminEmail: 'admin@example.com', folderId: ['folder-1'] },
       })
       render(row, 'syncing')
       act(() => form.fieldsProps.onWorkspaceCredentialChange('new-account'))
@@ -287,46 +232,13 @@ describe('shared connector settings form', () => {
     }
   )
 
-  it('keeps general knowledge-base listing caps editable and includes their changes on save', () => {
-    const sourceConfig = {
-      label: ['INBOX'],
-      _canonicalModes: { label: 'basic' },
-      maxThreads: '100',
-    }
-    render(
-      connector({ connectorType: 'gmail', accessMode: 'workspace', sourceConfig }),
-      'gmail-workspace',
-      false
-    )
-
-    const capField = form.fieldsProps.connectorConfig?.configFields.find(
-      (field) => field.id === 'maxThreads'
-    )!
-    expect(capField).toBeDefined()
-    expect(form.fieldsProps.isFieldVisible(capField)).toBe(true)
-    expect(form.dirty).toBe(false)
-
-    act(() => form.fieldsProps.onFieldChange('maxThreads', '200'))
-    expect(form.dirty).toBe(true)
-    expect(form.canSave).toBe(true)
-    act(() => form.save())
-    expect(mocks.update).toHaveBeenCalledWith(
-      {
-        knowledgeBaseId: 'kb-search',
-        connectorId: baseline.id,
-        updates: { sourceConfig: { ...sourceConfig, maxThreads: '200' } },
-      },
-      expect.any(Object)
-    )
-  })
-
   it('guards access drafts separately from a settings save', () => {
     expect(form.dirty).toBe(false)
     expect(form.canSave).toBe(false)
     act(() => form.fieldsProps.onContentCredentialChange('indexing-account'))
     expect(form.dirty).toBe(true)
     expect(form.canSave).toBe(false)
-    act(() => form.fieldsProps.onFieldChange('excludeChannels', 'legal'))
+    act(() => form.fieldsProps.onFieldChange('fileType', 'documents'))
     act(() => form.save())
     expect(mocks.update).not.toHaveBeenCalled()
     expect(mocks.applyAccess).not.toHaveBeenCalled()
@@ -334,32 +246,32 @@ describe('shared connector settings form', () => {
     act(() => form.fieldsProps.onResetAccess())
     expect(form.dirty).toBe(true)
     expect(form.canSave).toBe(true)
-    act(() => form.fieldsProps.onFieldChange('excludeChannels', ''))
+    act(() => form.fieldsProps.onFieldChange('fileType', ''))
     expect(form.dirty).toBe(false)
   })
 
   it('returns the canonical saved row for an explicit editor reset', () => {
-    act(() => form.fieldsProps.onFieldChange('excludeChannels', 'legal'))
+    act(() => form.fieldsProps.onFieldChange('fileType', 'documents'))
     act(() => form.save())
     expect(mocks.update).toHaveBeenCalledWith(
       {
         knowledgeBaseId: 'kb-search',
         connectorId: baseline.id,
         updates: {
-          sourceConfig: { excludeChannels: 'legal', _canonicalModes: { channel: 'basic' } },
+          sourceConfig: { fileType: 'documents', _canonicalModes: { folderId: 'basic' } },
         },
       },
       expect.any(Object)
     )
     expect(mocks.applyAccess).not.toHaveBeenCalled()
     const saved = connector({
-      sourceConfig: { excludeChannels: 'legal', _canonicalModes: { channel: 'basic' } },
+      sourceConfig: { fileType: 'documents', _canonicalModes: { folderId: 'basic' } },
     })
     act(() => mocks.update.mock.calls[0][1].onSuccess(saved))
     expect(onSaved).toHaveBeenCalledExactlyOnceWith(saved)
 
     render(saved, 'saved')
-    expect(form.fieldsProps.sourceConfig.excludeChannels).toBe('legal')
+    expect(form.fieldsProps.sourceConfig.fileType).toBe('documents')
     expect(form.dirty).toBe(false)
     expect(form.canSave).toBe(false)
   })
@@ -382,7 +294,7 @@ describe('shared connector settings form', () => {
   })
 
   it('keeps a failed settings draft editable without signaling a save', () => {
-    act(() => form.fieldsProps.onFieldChange('excludeChannels', 'legal'))
+    act(() => form.fieldsProps.onFieldChange('fileType', 'documents'))
     act(() => form.save())
     act(() => mocks.update.mock.calls[0][1].onError(new Error('Source update failed')))
     expect(form.fieldsProps.error).toBe('Source update failed')
@@ -391,56 +303,10 @@ describe('shared connector settings form', () => {
     expect(onSaved).not.toHaveBeenCalled()
   })
 
-  it('preserves the GitHub repository and pending connection after an incompatible replacement is refused', () => {
-    const sourceConfig = { repository: 'acme/platform', branch: 'main' }
-    render(
-      connector({
-        connectorType: 'github',
-        credentialId: 'installation-1',
-        sourceConfig: { ...sourceConfig, githubRepositoryId: '123' },
-      }),
-      'github-replacement'
-    )
-    act(() => form.fieldsProps.onContentCredentialChange('installation-1'))
-    expect(form.fieldsProps.accessDirty).toBe(false)
-    expect(form.fieldsProps.sourceConfig).toMatchObject(sourceConfig)
-    expect(form.fieldsProps.usesGitHubInstallation).toBe(true)
-
-    act(() => form.fieldsProps.onFieldChange('pathPrefix', 'docs/'))
-    act(() => form.fieldsProps.onContentCredentialChange('installation-2'))
-    expect(form.fieldsProps.sourceConfig).toMatchObject({ ...sourceConfig, pathPrefix: 'docs/' })
-    expect(form.fieldsProps.accessDirty).toBe(true)
-    expect(form.canSave).toBe(false)
-    act(() => form.fieldsProps.onApplyAccess())
-    expect(mocks.applyAccess).toHaveBeenCalledExactlyOnceWith(
-      {
-        knowledgeBaseId: 'kb-search',
-        connectorId: 'connector-1',
-        access: { accessMode: 'members', credentialId: 'installation-2' },
-      },
-      expect.any(Object)
-    )
-    const message =
-      "This GitHub connection cannot access this source's repository. Choose a connection with access to the same repository, or add a new source for a different repository."
-    act(() => mocks.applyAccess.mock.calls[0][1].onError(new Error(message)))
-    expect(form.fieldsProps.error).toBe(message)
-    expect(form.fieldsProps.contentCredentialId).toBe('installation-2')
-    expect(form.fieldsProps.sourceConfig).toMatchObject({ ...sourceConfig, pathPrefix: 'docs/' })
-    expect(form.fieldsProps.accessDirty).toBe(true)
-    expect(onSaved).not.toHaveBeenCalled()
-    expect(mocks.update).not.toHaveBeenCalled()
-
-    act(() => form.fieldsProps.onResetAccess())
-    expect(form.fieldsProps.contentCredentialId).toBe('installation-1')
-    expect(form.fieldsProps.accessDirty).toBe(false)
-    expect(form.fieldsProps.sourceConfig).toMatchObject({ ...sourceConfig, pathPrefix: 'docs/' })
-    expect(form.canSave).toBe(true)
-  })
-
   it.each(['settingsPending', 'accessPending'] as const)(
     'blocks page saving while %s is pending',
     (pending) => {
-      act(() => form.fieldsProps.onFieldChange('excludeChannels', 'legal'))
+      act(() => form.fieldsProps.onFieldChange('fileType', 'documents'))
       mocks[pending] = true
       render()
       expect(form.saving).toBe(true)

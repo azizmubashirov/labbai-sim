@@ -1314,36 +1314,6 @@ export const GoogleSheetsBlockMeta = {
   templates: [
     {
       icon: GoogleSheetsIcon,
-      title: 'Google Sheets approval gate',
-      prompt:
-        'Build a workflow that watches a Google Sheets row for a status change to "review", posts the row context to Slack with approval buttons, and writes the decision back.',
-      modules: ['agent', 'workflows'],
-      category: 'operations',
-      tags: ['team', 'automation'],
-      alsoIntegrations: ['slack'],
-    },
-    {
-      icon: GoogleSheetsIcon,
-      title: 'Google Sheets to Stripe payouts',
-      prompt:
-        'Create a workflow that reads a Google Sheets payouts ledger, validates each row, processes Stripe payouts in batches, and writes the result and Stripe ID back.',
-      modules: ['agent', 'workflows'],
-      category: 'operations',
-      tags: ['finance', 'automation'],
-      alsoIntegrations: ['stripe'],
-    },
-    {
-      icon: GoogleSheetsIcon,
-      title: 'Google Sheets CRM updater',
-      prompt:
-        'Build a scheduled workflow that pulls Salesforce opportunities, refreshes the Google Sheets spreadsheet that ops uses for weekly forecasting, and notes the last-updated timestamp.',
-      modules: ['scheduled', 'agent', 'workflows'],
-      category: 'sales',
-      tags: ['sales', 'reporting'],
-      alsoIntegrations: ['salesforce'],
-    },
-    {
-      icon: GoogleSheetsIcon,
       title: 'Google Sheets data validator',
       prompt:
         'Create a scheduled workflow that validates a Google Sheets spreadsheet against a typed schema, flags rows with errors, writes a remediation column, and emails the sheet owner.',
@@ -1373,17 +1343,6 @@ export const GoogleSheetsBlockMeta = {
       alsoIntegrations: ['google_forms'],
     },
 
-    {
-      icon: GoogleSheetsIcon,
-      title: 'Send Slack messages from Google Sheets',
-      prompt:
-        'Build a workflow that watches a Google Sheets spreadsheet for new rows or changes, then posts formatted Slack updates to keep stakeholders informed in real time.',
-      modules: ['agent', 'workflows'],
-      category: 'productivity',
-      tags: ['automation', 'communication'],
-      featured: true,
-      alsoIntegrations: ['slack'],
-    },
     {
       icon: GoogleSheetsIcon,
       title: 'Sync Google Sheets data into Notion',

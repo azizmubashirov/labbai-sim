@@ -45,17 +45,8 @@ const standardOAuthCredentialGroupOptionInputSchema = z
   })
   .strict()
 
-const slackCredentialGroupOptionInputSchema = z
-  .object({
-    provider: z.literal('slack'),
-    ...credentialGroupOptionFields,
-    slackBotCredentialId: z.string().uuid('Select a custom Slack bot').optional(),
-  })
-  .strict()
-
 export const credentialGroupOptionInputSchema = z.discriminatedUnion('provider', [
   standardOAuthCredentialGroupOptionInputSchema,
-  slackCredentialGroupOptionInputSchema,
 ])
 
 export const credentialGroupOptionSchema = z.discriminatedUnion('provider', [
@@ -64,19 +55,12 @@ export const credentialGroupOptionSchema = z.discriminatedUnion('provider', [
     status: z.enum(['active', 'disabled']),
     configurationStatus: credentialGroupOptionConfigurationStatusSchema,
   }),
-  slackCredentialGroupOptionInputSchema.extend({
-    id: z.string().min(1),
-    status: z.enum(['active', 'disabled']),
-    configurationStatus: credentialGroupOptionConfigurationStatusSchema,
-    requiredScopes: z.array(z.string().min(1).max(255)).max(100).optional(),
-  }),
 ])
 
 export const credentialGroupOptionUpdateInputSchema = z.discriminatedUnion('provider', [
   standardOAuthCredentialGroupOptionInputSchema.extend({
     id: z.string().min(1).max(128).optional(),
   }),
-  slackCredentialGroupOptionInputSchema.extend({ id: z.string().min(1).max(128).optional() }),
 ])
 
 export const credentialGroupMcpServerSchema = z.object({
@@ -253,10 +237,6 @@ export const credentialGroupOAuthCallbackQuerySchema = z
     }
   })
 
-export const credentialGroupOAuthCallbackParamsSchema = z.object({
-  provider: z.literal('slack'),
-})
-
 export const sharedCredentialGroupOAuthCallbackParamsSchema = z.object({
   providerId: z.string().min(1, 'OAuth provider ID is required').max(128),
 })
@@ -264,28 +244,6 @@ export const sharedCredentialGroupOAuthCallbackParamsSchema = z.object({
 export type CredentialGroupOAuthCallbackQuery = z.output<
   typeof credentialGroupOAuthCallbackQuerySchema
 >
-
-export const startSlackCredentialGroupConfigurationBodySchema = z
-  .object({
-    slackBotCredentialId: z.string().uuid('Select a custom Slack bot').optional(),
-    appId: z
-      .string()
-      .regex(/^A[A-Z0-9]+$/, 'Enter the Slack App ID')
-      .max(64)
-      .optional(),
-    teamId: z
-      .string()
-      .regex(/^T[A-Z0-9]+$/, 'Enter the Slack workspace ID')
-      .max(64)
-      .optional(),
-    clientId: z.string().trim().min(1, 'Slack Client ID is required').max(256).optional(),
-    clientSecret: z.string().trim().min(1, 'Slack Client Secret is required').max(512).optional(),
-    requiredScopes: z.array(z.string().trim().min(1).max(255)).min(1).max(100).optional(),
-  })
-  .strict()
-
-export const slackCredentialGroupConfigurationCallbackQuerySchema =
-  credentialGroupOAuthCallbackQuerySchema
 
 export const credentialGroupEnrollmentListQuerySchema = z.object({
   cursor: z.string().min(1, 'Enrollment cursor cannot be empty').max(128).optional(),
@@ -537,31 +495,6 @@ export const updateCredentialGroupAccessContract = defineRouteContract({
   response: { mode: 'json', schema: credentialGroupAccessPolicySchema },
 })
 
-export type StartSlackCredentialGroupConfigurationBody = z.input<
-  typeof startSlackCredentialGroupConfigurationBodySchema
->
-
-export const startSlackCredentialGroupConfigurationContract = defineRouteContract({
-  method: 'POST',
-  path: '/api/workspaces/[id]/credential-groups/[groupId]/slack-managed-users',
-  params: credentialGroupDetailParamsSchema,
-  body: startSlackCredentialGroupConfigurationBodySchema,
-  response: {
-    mode: 'json',
-    schema: z.object({
-      authorizationUrl: z.string().url(),
-      state: z.string().min(1),
-    }),
-  },
-})
-
-export const slackCredentialGroupConfigurationCallbackContract = defineRouteContract({
-  method: 'GET',
-  path: '/api/credential-groups/slack-managed-users/callback',
-  query: slackCredentialGroupConfigurationCallbackQuerySchema,
-  response: { mode: 'text' },
-})
-
 export const startCredentialGroupOAuthQuerySchema = z.object({
   returnTo: z.enum(['search', 'accounts']).optional(),
 })
@@ -586,14 +519,6 @@ export const completeCredentialGroupEnrollmentContract = defineRouteContract({
   method: 'POST',
   path: '/api/credential-groups/enroll/[token]/complete',
   params: publicCredentialGroupEnrollmentParamsSchema,
-  response: { mode: 'empty' },
-})
-
-export const credentialGroupOAuthCallbackContract = defineRouteContract({
-  method: 'GET',
-  path: '/api/credential-groups/oauth/[provider]/callback',
-  params: credentialGroupOAuthCallbackParamsSchema,
-  query: credentialGroupOAuthCallbackQuerySchema,
   response: { mode: 'empty' },
 })
 

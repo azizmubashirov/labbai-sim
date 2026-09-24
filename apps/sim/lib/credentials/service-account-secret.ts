@@ -1,4 +1,3 @@
-import { getErrorMessage } from '@sim/utils/errors'
 import { serviceAccountJsonSchema } from '@/lib/api/contracts/credentials'
 import { getValidationErrorMessage } from '@/lib/api/server'
 import { encryptSecret } from '@/lib/core/security/encryption'
@@ -19,7 +18,6 @@ import {
   type ClientCredentialAccountSecretBlob,
   getClientCredentialAccountMinter,
 } from '@/lib/credentials/client-credential-accounts/server'
-import { slackCustomBotDisplayName } from '@/lib/credentials/display-name'
 import {
   type ServiceAccountPrincipal,
   serviceAccountPrincipalMetadata,
@@ -34,15 +32,11 @@ import {
   getTokenServiceAccountValidator,
   type TokenServiceAccountSecretBlob,
 } from '@/lib/credentials/token-service-accounts/server'
-import { GITHUB_INSTALLATION_PROVIDER_ID } from '@/lib/oauth/github-installation-types'
 import {
   ATLASSIAN_SERVICE_ACCOUNT_PROVIDER_ID,
   ATLASSIAN_SERVICE_ACCOUNT_SECRET_TYPE,
   GOOGLE_SERVICE_ACCOUNT_PROVIDER_ID,
-  SLACK_CUSTOM_BOT_PROVIDER_ID,
-  SLACK_CUSTOM_BOT_SECRET_TYPE,
 } from '@/lib/oauth/types'
-import { fetchSlackTeamId } from '@/lib/webhooks/providers/slack'
 
 /** Provider-specific secret inputs a service-account credential can carry. */
 export interface ServiceAccountSecretFields {
@@ -128,57 +122,6 @@ async function buildAtlassianServiceAccountSecret(
       ...serviceAccountPrincipalMetadata(principal),
     },
     principal,
-  }
-}
-
-/**
- * Builds a custom Slack bot secret. The workspace/team identity is derived via
- * `auth.test` and never trusted from the client.
- */
-async function buildSlackCustomBotSecret(
-  fields: ServiceAccountSecretFields
-): Promise<ServiceAccountSecretResult> {
-  const { signingSecret, botToken } = fields
-  if (!signingSecret || !botToken) {
-    throw new ServiceAccountSecretError(
-      'signingSecret and botToken are required for a custom Slack bot credential'
-    )
-  }
-  let teamId: string
-  let botUserId: string | undefined
-  let teamName: string | undefined
-  try {
-    const auth = await fetchSlackTeamId(botToken)
-    teamId = auth.teamId
-    botUserId = auth.userId
-    teamName = auth.teamName
-  } catch (error) {
-    throw new ServiceAccountSecretError(
-      `Could not verify the Slack bot token: ${getErrorMessage(error)}`
-    )
-  }
-  // `auth.test` returns the bot user only for bot tokens; a token without one
-  // is workspace-scoped, so the team is the finest identity available.
-  const principal: ServiceAccountPrincipal = botUserId
-    ? { kind: 'user', id: botUserId }
-    : { kind: 'tenant', id: teamId, ...(teamName ? { label: teamName } : {}) }
-  const blob = JSON.stringify({
-    type: SLACK_CUSTOM_BOT_SECRET_TYPE,
-    signingSecret,
-    botToken,
-    teamId,
-    botUserId,
-    teamName,
-    metadata: serviceAccountPrincipalMetadata(principal),
-  })
-  const { encrypted } = await encryptSecret(blob)
-  return {
-    providerId: SLACK_CUSTOM_BOT_PROVIDER_ID,
-    encryptedServiceAccountKey: encrypted,
-    displayName: slackCustomBotDisplayName(teamName),
-    auditMetadata: { slackTeamId: teamId, ...serviceAccountPrincipalMetadata(principal) },
-    principal,
-    botUserId,
   }
 }
 
@@ -353,7 +296,6 @@ type ServiceAccountSecretBuilder = (
  */
 const SERVICE_ACCOUNT_SECRET_BUILDERS: Record<string, ServiceAccountSecretBuilder> = {
   [ATLASSIAN_SERVICE_ACCOUNT_PROVIDER_ID]: buildAtlassianServiceAccountSecret,
-  [SLACK_CUSTOM_BOT_PROVIDER_ID]: buildSlackCustomBotSecret,
   [GOOGLE_SERVICE_ACCOUNT_PROVIDER_ID]: buildGoogleServiceAccountSecret,
 }
 
@@ -372,11 +314,6 @@ export async function verifyAndBuildServiceAccountSecret(
   providerId: string,
   fields: ServiceAccountSecretFields
 ): Promise<ServiceAccountSecretResult> {
-  if (providerId === GITHUB_INSTALLATION_PROVIDER_ID) {
-    throw new ServiceAccountSecretError(
-      'Connect a GitHub App installation through your organization’s Search integrations'
-    )
-  }
   const builder = Object.hasOwn(SERVICE_ACCOUNT_SECRET_BUILDERS, providerId)
     ? SERVICE_ACCOUNT_SECRET_BUILDERS[providerId]
     : undefined

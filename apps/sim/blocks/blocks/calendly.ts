@@ -682,26 +682,6 @@ export const CalendlyBlockMeta = {
     },
     {
       icon: CalendlyIcon,
-      title: 'Calendly meeting-prep brief',
-      prompt:
-        'Build a workflow that runs 30 minutes before a Calendly booking, researches the attendee and company with Apollo, and emails the host a structured prep brief.',
-      modules: ['scheduled', 'agent', 'workflows'],
-      category: 'sales',
-      tags: ['sales', 'research'],
-      alsoIntegrations: ['apollo', 'gmail'],
-    },
-    {
-      icon: CalendlyIcon,
-      title: 'Calendly post-meeting recap',
-      prompt:
-        'Create a workflow that runs after a Calendly meeting ends, pulls the meeting notes from the calendar, writes a CRM-ready summary, and updates the linked Salesforce opportunity.',
-      modules: ['agent', 'workflows'],
-      category: 'sales',
-      tags: ['sales', 'crm'],
-      alsoIntegrations: ['salesforce'],
-    },
-    {
-      icon: CalendlyIcon,
       title: 'Calendly no-show recovery',
       prompt:
         'Build a workflow that detects Calendly no-shows, sends a polite reschedule email with a one-tap link, and updates the deal record with the no-show event.',
@@ -709,26 +689,6 @@ export const CalendlyBlockMeta = {
       category: 'sales',
       tags: ['sales', 'communication'],
       alsoIntegrations: ['gmail'],
-    },
-    {
-      icon: CalendlyIcon,
-      title: 'Calendly + Loops nurture',
-      prompt:
-        'Create a workflow that on a Calendly booking enrolls the attendee into a Loops nurture campaign tailored to the meeting topic, ensuring follow-up emails reach them before the meeting.',
-      modules: ['agent', 'workflows'],
-      category: 'marketing',
-      tags: ['marketing', 'communication'],
-      alsoIntegrations: ['loops'],
-    },
-    {
-      icon: CalendlyIcon,
-      title: 'Calendly no-show tracker',
-      prompt:
-        "Build a scheduled workflow that lists yesterday's Calendly scheduled events, checks invitee status to find no-shows, logs them to a table for follow-up, and posts a recap of attended versus missed meetings to Slack.",
-      modules: ['scheduled', 'tables', 'agent', 'workflows'],
-      category: 'sales',
-      tags: ['sales', 'reporting', 'monitoring'],
-      alsoIntegrations: ['slack'],
     },
     {
       icon: CalendlyIcon,

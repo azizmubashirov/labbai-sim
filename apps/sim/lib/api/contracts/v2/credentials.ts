@@ -1,7 +1,6 @@
 import { z } from 'zod'
 import {
   atlassianProductSchema,
-  quickBooksOAuthClientConfigSchema,
   workspaceCredentialRoleSchema,
 } from '@/lib/api/contracts/credentials'
 import {
@@ -231,73 +230,24 @@ export const v2ListCredentialProvidersContract = defineRouteContract({
 })
 
 export const V2_OAUTH_CONNECTION_PROVIDER_IDS = [
-  'github-repositories',
   'google-email',
   'google-drive',
   'google-docs',
   'google-sheets',
   'google-forms',
   'google-calendar',
-  'google-contacts',
-  'google-ads',
-  'google-bigquery',
-  'google-tasks',
-  'google-vault',
-  'google-groups',
-  'google-chat',
-  'google-meet',
   'vertex-ai',
-  'microsoft-ad',
-  'microsoft-dataverse',
-  'microsoft-excel',
-  'microsoft-planner',
-  'microsoft-teams',
-  'microsoft-word',
-  'outlook',
-  'onedrive',
-  'sharepoint',
-  'x',
-  'tiktok',
-  'confluence',
-  'jira',
   'airtable',
-  'bitbucket',
   'notion',
-  'clickup',
-  'linear',
-  'manageengine-sdp',
-  'monday',
-  'box',
-  'dropbox',
   'shopify',
-  'slack',
-  'reddit',
-  'wealthbox',
-  'webflow',
   'trello',
-  'asana',
-  'attio',
   'calcom',
-  'docusign',
   'pipedrive',
-  'quickbooks',
   'hubspot',
-  'linkedin',
   'instagram',
-  'salesforce',
-  'salesforce-sandbox',
-  'zoho-desk',
   'zoom',
   'wordpress',
-  'spotify',
 ] as const
-
-const V2_NON_QUICKBOOKS_OAUTH_CONNECTION_PROVIDER_IDS = V2_OAUTH_CONNECTION_PROVIDER_IDS.filter(
-  (
-    providerId
-  ): providerId is Exclude<(typeof V2_OAUTH_CONNECTION_PROVIDER_IDS)[number], 'quickbooks'> =>
-    providerId !== 'quickbooks'
-)
 
 const v2CredentialConnectionBaseFields = {
   workspaceId: workspaceIdSchema.describe('Workspace that will own the credential.'),
@@ -309,31 +259,17 @@ const v2CredentialConnectionBaseFields = {
     .describe('Name shown for the new credential in Sim.'),
 }
 
-const v2CreateQuickBooksCredentialConnectionSchema = z
-  .object({
-    ...v2CredentialConnectionBaseFields,
-    providerId: z
-      .literal('quickbooks')
-      .describe('QuickBooks OAuth provider ID returned by credential-provider discovery.'),
-    oauthClientConfig: quickBooksOAuthClientConfigSchema.describe(
-      'Write-only caller-managed Intuit OAuth app configuration.'
-    ),
-  })
-  .strict()
-
 const v2CreateStandardOAuthCredentialConnectionSchema = z
   .object({
     ...v2CredentialConnectionBaseFields,
     providerId: z
-      .enum(V2_NON_QUICKBOOKS_OAUTH_CONNECTION_PROVIDER_IDS)
+      .enum(V2_OAUTH_CONNECTION_PROVIDER_IDS)
       .describe('Exact OAuth provider ID returned by credential-provider discovery.'),
   })
   .strict()
 
-const v2CreateCredentialConnectionByProviderSchema = z.union([
-  v2CreateQuickBooksCredentialConnectionSchema,
-  v2CreateStandardOAuthCredentialConnectionSchema,
-])
+const v2CreateCredentialConnectionByProviderSchema =
+  v2CreateStandardOAuthCredentialConnectionSchema
 
 const v2CreateCredentialConnectionByCredentialSchema = z
   .object({
@@ -344,12 +280,7 @@ const v2CreateCredentialConnectionByCredentialSchema = z
       .min(1, 'credentialId cannot be empty')
       .max(255, 'credentialId must be at most 255 characters')
       .describe(
-        'Existing OAuth credential to reconnect in place. QuickBooks reconnects also require oauthClientConfig with the Intuit client ID, client secret, environment, and webhook verifier token.'
-      ),
-    oauthClientConfig: quickBooksOAuthClientConfigSchema
-      .optional()
-      .describe(
-        'Write-only Intuit OAuth app configuration. Required when credentialId identifies a QuickBooks credential; omit it for other providers.'
+        'Existing OAuth credential to reconnect in place.'
       ),
   })
   .strict()

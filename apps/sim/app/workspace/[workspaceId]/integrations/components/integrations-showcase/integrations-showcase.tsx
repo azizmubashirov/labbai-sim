@@ -33,20 +33,20 @@ const SHOWCASE_OUTLINE_PATH =
  * Coordinates are 1-based and match the 48px CSS grid.
  */
 const SHOWCASE_TILES = [
-  { id: 'slack', col: 2, row: 1 },
-  { id: 'outlook', col: 5, row: 1 },
+  { id: 'telegram', col: 2, row: 1 },
+  { id: 'gmail', col: 5, row: 1 },
   { id: 'notion', col: 8, row: 1 },
-  { id: 'linear', col: 10, row: 1 },
-  { id: 'jira', col: 13, row: 1 },
+  { id: 'whatsapp', col: 10, row: 1 },
+  { id: 'pipedrive', col: 13, row: 1 },
   { id: 'google_calendar', col: 15, row: 1 },
   { id: 'airtable', col: 3, row: 2 },
   { id: 'hubspot', col: 7, row: 2 },
-  { id: 'salesforce', col: 11, row: 2 },
-  { id: 'microsoft_teams', col: 14, row: 2 },
+  { id: 'shopify', col: 11, row: 2 },
+  { id: 'zoom', col: 14, row: 2 },
   { id: 'google_sheets', col: 4, row: 3 },
-  { id: 'asana', col: 6, row: 3 },
-  { id: 'confluence', col: 8, row: 3 },
-  { id: 'dropbox', col: 12, row: 3 },
+  { id: 'trello', col: 6, row: 3 },
+  { id: 'google_drive', col: 8, row: 3 },
+  { id: 'calendly', col: 12, row: 3 },
 ] as const
 
 /**

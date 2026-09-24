@@ -59,48 +59,6 @@ export interface SubblockIdMigration {
 }
 
 /**
- * Whether a stored value could plausibly be a comma-separated field
- * projection rather than a JSON body.
- *
- * The shipped ServiceNow block declared `fields` three times — the Create and
- * Update Record JSON bodies and the Read Records projection — so one stored
- * value served both spaces. A block configured for Create Record and later
- * switched to Read Records without clearing the field carries the JSON body
- * under `fields` while `operation` already reads `servicenow_read_record`, so
- * the operation scope alone cannot tell a projection from a body. Promoting a
- * body onto `readFields` would send it as `sysparm_fields`, which is exactly
- * the cross-space leak the rename closed.
- *
- * The test is a positive allowlist, not a check for body-shaped input, because
- * a body is only reliably recognisable when it is well formed. A saved body can
- * be a half-typed draft (`{"short_description": `) or carry an unquoted
- * `<block.output>` reference, so neither "opens with a brace" nor "fails to
- * parse as JSON" identifies one: the first misses a bare scalar body like
- * `true`, the second misses both of those. Migrating one would move it to
- * `readFields` AND drop the original key, losing the draft.
- *
- * A projection is a comma-separated list of ServiceNow field names, which are
- * word characters plus the dot of a dotted walk. Anything carrying a brace,
- * quote, colon, angle bracket or interior space fails that shape. `JSON.parse`
- * then removes the bare scalars (`true`, `42`, `null`) that satisfy it by
- * accident. Ambiguity resolves to "not a projection", leaving the value on
- * `fields` where the Create/Update control still owns it.
- */
-const SERVICENOW_FIELD_LIST = /^[A-Za-z0-9_.]+(?:\s*,\s*[A-Za-z0-9_.]+)*$/
-
-function isFieldProjection(value: unknown): boolean {
-  if (typeof value !== 'string') return false
-  const trimmed = value.trim()
-  if (!SERVICENOW_FIELD_LIST.test(trimmed)) return false
-  try {
-    JSON.parse(trimmed)
-    return false
-  } catch {
-    return true
-  }
-}
-
-/**
  * Maps old subblock IDs to their current equivalents per block type.
  *
  * When a subblock is renamed in a block definition, old deployed/saved states
@@ -119,60 +77,12 @@ export const SUBBLOCK_ID_MIGRATIONS: Record<string, readonly SubblockIdMigration
     { from: 'connection', to: '_removed_connection' },
     { from: 'operationPolicy', to: '_removed_operationPolicy' },
   ],
-  /** List Channels now returns one page and a cursor; automatic page limits are retired. */
-  slack: [{ from: 'channelMaxPages', to: '_removed_channelMaxPages' }],
-  slack_v2: [{ from: 'channelMaxPages', to: '_removed_channelMaxPages' }],
   instagram: [{ from: 'metrics', to: 'insightMetrics' }],
   knowledge: [{ from: 'knowledgeBaseId', to: 'knowledgeBaseSelector' }],
   /** Connected accounts resolve from the workspace; group selectors have no replacement. */
   credential_group: [
     { from: 'credentialGroup', to: '_removed_credentialGroup' },
     { from: 'manualCredentialGroup', to: '_removed_manualCredentialGroup' },
-  ],
-  algolia: [
-    { from: 'listPage', to: 'page' },
-    { from: 'listHitsPerPage', to: 'hitsPerPage' },
-  ],
-  kalshi: [{ from: 'settlementStatus', to: '_removed_settlementStatus' }],
-  dynamodb: [
-    { from: 'key', to: 'getKey' },
-    { from: 'filterExpression', to: 'queryFilterExpression' },
-    { from: 'expressionAttributeNames', to: 'queryExpressionAttributeNames' },
-    { from: 'expressionAttributeValues', to: 'queryExpressionAttributeValues' },
-    { from: 'limit', to: 'queryLimit' },
-    { from: 'conditionExpression', to: 'updateConditionExpression' },
-  ],
-  ashby: [
-    { from: 'emailType', to: '_removed_emailType' },
-    { from: 'phoneType', to: '_removed_phoneType' },
-    { from: 'expandApplicationFormDefinition', to: '_removed_expandApplicationFormDefinition' },
-    { from: 'expandSurveyFormDefinitions', to: '_removed_expandSurveyFormDefinitions' },
-    { from: 'filterCandidateId', to: '_removed_filterCandidateId' },
-  ],
-  clickup: [
-    { from: 'workspaceId', to: 'workspaceSelector' },
-    { from: 'spaceId', to: 'spaceSelector' },
-    { from: 'listSpaceId', to: 'listSpaceSelector' },
-    { from: 'folderId', to: 'folderSelector' },
-    { from: 'listId', to: 'listSelector' },
-  ],
-  confluence_v2: [
-    {
-      from: 'spaceSelector',
-      to: 'spaceKeySelector',
-      whenOperation: ['search_in_space'],
-    },
-    { from: 'spaceId', to: 'manualSpaceKey', whenOperation: ['search_in_space'] },
-  ],
-  apollo: [
-    { from: 'contact_ids_bulk', to: 'contacts' },
-    { from: 'account_ids_bulk', to: 'accounts' },
-    { from: 'close_date', to: 'closed_date' },
-    { from: 'stage_id', to: 'opportunity_stage_id' },
-    { from: 'note', to: 'task_notes' },
-    { from: 'description', to: '_removed_description' },
-    { from: 'stage_ids', to: '_removed_stage_ids' },
-    { from: 'owner_ids', to: '_removed_owner_ids' },
   ],
   /**
    * Exa deprecated both fields. `useAutoprompt` is gone from the API, and
@@ -185,197 +95,6 @@ export const SUBBLOCK_ID_MIGRATIONS: Record<string, readonly SubblockIdMigration
   exa: [
     { from: 'useAutoprompt', to: '_removed_useAutoprompt' },
     { from: 'livecrawl', to: '_removed_livecrawl' },
-  ],
-  /**
-   * The Snowflake block moved from per-block `host` + `apiKey` fields to a
-   * stored credential, and gave every object field a basic picker paired with
-   * an advanced text input.
-   *
-   * The old free-text values map onto the ADVANCED members, not the pickers: a
-   * migrated block has no credential yet, so a picker cannot hydrate a name and
-   * would render an empty control over a non-empty value. `fileFormat` is the
-   * clearest case — legacy values were fully qualified (`DB.SCHEMA.FORMAT`)
-   * while the picker lists bare names, so it could never resolve. The host and
-   * token have no in-block equivalent and are dropped.
-   */
-  snowflake: [
-    { from: 'database', to: 'databaseName' },
-    { from: 'schema', to: 'schemaName' },
-    { from: 'table', to: 'tableName' },
-    { from: 'fileFormat', to: 'fileFormatName' },
-    { from: 'warehouseName', to: 'warehouseNameManual' },
-    { from: 'procedureName', to: 'procedureNameManual' },
-    { from: 'warehouse', to: 'warehouseManual' },
-    { from: 'role', to: 'roleManual' },
-    { from: 'host', to: '_removed_host' },
-    { from: 'apiKey', to: '_removed_apiKey' },
-  ],
-  /**
-   * Two unrelated Cloudflare changes land here.
-   *
-   * The `_removed_` entries: #6740 briefly gave the DNS/zone read filters and
-   * the cache-purge tag list operation-suffixed IDs, and added a single shared
-   * `cursor`. A later change restored the shipped filter IDs and split the
-   * cursor per endpoint. Those suffixed IDs existed only between #6740 and that
-   * change and never appeared in a release, so no saved workflow carries a
-   * value worth recovering; they are dropped rather than renamed so nothing
-   * stays parked in state and rides along in exports.
-   *
-   * The scoped entries: #6740 also renamed the DNS write controls off the bare
-   * IDs the SHIPPED block stored them under. Before it, one `type` control
-   * served `list_dns_records`, `create_dns_record`, AND `update_dns_record` —
-   * a single stored value for all three, which is exactly the ambiguity the
-   * rename removed. Every affected ID stayed live for the read filter, so each
-   * rename is scoped to the operation that owned the written value. Without
-   * these, a saved proxied A record is recreated UNPROXIED — publishing the
-   * origin IP and bypassing the WAF/CDN — and `update_dns_record` silently
-   * becomes a no-op.
-   */
-  cloudflare: [
-    { from: 'zoneNameFilter', to: '_removed_zoneNameFilter' },
-    { from: 'dnsNameFilter', to: '_removed_dnsNameFilter' },
-    { from: 'dnsTypeFilter', to: '_removed_dnsTypeFilter' },
-    { from: 'dnsContentFilter', to: '_removed_dnsContentFilter' },
-    { from: 'dnsProxiedFilter', to: '_removed_dnsProxiedFilter' },
-    { from: 'purgeTags', to: '_removed_purgeTags' },
-    { from: 'cursor', to: '_removed_cursor' },
-    { from: 'type', to: 'recordType', whenOperation: ['create_dns_record'] },
-    { from: 'proxied', to: 'recordProxied', whenOperation: ['create_dns_record'] },
-    { from: 'tags', to: 'recordTags', whenOperation: ['create_dns_record'] },
-    { from: 'type', to: 'updateRecordType', whenOperation: ['update_dns_record'] },
-    { from: 'name', to: 'updateRecordName', whenOperation: ['update_dns_record'] },
-    { from: 'content', to: 'updateRecordContent', whenOperation: ['update_dns_record'] },
-    { from: 'proxied', to: 'updateRecordProxied', whenOperation: ['update_dns_record'] },
-    { from: 'tags', to: 'updateRecordTags', whenOperation: ['update_dns_record'] },
-    { from: 'order', to: 'dnsOrder', whenOperation: ['list_dns_records'] },
-    { from: 'status', to: 'certificateStatus', whenOperation: ['list_certificates'] },
-  ],
-  /**
-   * Read Records moved its field projection off `fields`, which the shipped
-   * block shared with the Create/Update Record JSON body. The two value spaces
-   * are incompatible — a body sent as `sysparm_fields` goes out as
-   * `[object Object]` — so the rename is scoped to Read Records and the body
-   * keeps `fields` untouched on create and update.
-   *
-   * The operation scope is not enough on its own: a block configured for
-   * Create Record and then switched to Read Records still holds the JSON body
-   * under `fields`, so the value is guarded as well.
-   */
-  servicenow: [
-    {
-      from: 'fields',
-      to: 'readFields',
-      whenOperation: ['servicenow_read_record'],
-      whenValue: isFieldProjection,
-    },
-  ],
-  /**
-   * One `sendEmail` switch used to serve activation, password reset,
-   * deactivation, and deletion. Okta's API default is not uniform across those
-   * — activation and reset default to sending, deactivation and removal to not
-   * sending — so the switch split in two. `sendEmail` remains live for the
-   * activation/reset half, so only the deactivation half is renamed.
-   */
-  okta: [
-    {
-      from: 'sendEmail',
-      to: 'sendDeactivationEmail',
-      whenOperation: ['okta_deactivate_user', 'okta_delete_user'],
-    },
-  ],
-  rippling: [
-    { from: 'action', to: '_removed_action' },
-    { from: 'candidateDepartment', to: '_removed_candidateDepartment' },
-    { from: 'candidatePhone', to: '_removed_candidatePhone' },
-    { from: 'candidateStartDate', to: '_removed_candidateStartDate' },
-    { from: 'email', to: '_removed_email' },
-    { from: 'employeeId', to: '_removed_employeeId' },
-    { from: 'endDate', to: '_removed_endDate' },
-    { from: 'firstName', to: '_removed_firstName' },
-    { from: 'groupId', to: '_removed_groupId' },
-    { from: 'groupName', to: '_removed_groupName' },
-    { from: 'groupVersion', to: '_removed_groupVersion' },
-    { from: 'jobTitle', to: '_removed_jobTitle' },
-    { from: 'lastName', to: '_removed_lastName' },
-    { from: 'leaveRequestId', to: '_removed_leaveRequestId' },
-    { from: 'managedBy', to: '_removed_managedBy' },
-    { from: 'nextCursor', to: '_removed_nextCursor' },
-    { from: 'offset', to: '_removed_offset' },
-    { from: 'roleId', to: '_removed_roleId' },
-    { from: 'spokeId', to: '_removed_spokeId' },
-    { from: 'startDate', to: '_removed_startDate' },
-    { from: 'status', to: '_removed_status' },
-    { from: 'users', to: '_removed_users' },
-  ],
-  /**
-   * `forwardId` fed a `concur-forwardid` request header on the receipt upload.
-   * That header is documented nowhere in Concur's Receipts v4 or Image v1
-   * references, so it was never honored — the value rode along on every upload
-   * and did nothing. There is no replacement subblock to carry it to, and the
-   * value is an opaque caller-chosen string rather than a secret, so it is
-   * dropped outright.
-   */
-  sap_concur: [{ from: 'forwardId', to: '_removed_forwardId' }],
-  /**
-   * `uploadMimeType` was an advanced MIME Type input on Upload Document File whose
-   * value the upload path never read: the content type is resolved from storage and
-   * that resolution is never empty, so the field's value lost the `||` chain every
-   * time. Dropped rather than renamed — there is no field for the value to move to.
-   */
-  vanta: [{ from: 'uploadMimeType', to: '_removed_uploadMimeType' }],
-  /** Parallel's V1 Extract always returns excerpts; the opt-out toggle has no replacement. */
-  parallel_ai: [{ from: 'excerpts', to: '_removed_excerpts' }],
-  /**
-   * Three unrelated QuickBooks changes land here.
-   *
-   * The by-ID read moved off `transactionId`, which the shipped block shared
-   * with every update and void. `tools.config.params` republishes that one
-   * stored value as the read target AND as `paymentId`, `billId`,
-   * `journalEntryId` and the rest, so a bill ID entered under Read Purchasing
-   * Transactions survived a switch to Update Purchase Order and addressed the
-   * wrong entity while the block still validated. `transactionId` stays live
-   * for the mutations, so the rename is scoped to the three read operations
-   * and a mutation's target is left where it is.
-   *
-   * The three `summarize_column_by` subsets collapsed into `reportSummarizeBy`,
-   * which kept its ID. Every value the retired dropdowns could hold is in the
-   * collapsed option list — Intuit documents the identical twelve values on all
-   * fourteen report models that advertise the control, which is why the subsets
-   * collapsed at all — so the stored value moves as-is rather than being
-   * dropped, and no value guard is needed. The renames are unconditional so
-   * that an occupied `reportSummarizeBy` wins and the retired key is discarded:
-   * a block created before the collapse was seeded with `reportSummarizeBy`
-   * too, so its live pick must never be clobbered by a subset control that was
-   * hidden for the selected report type. The value is therefore recovered
-   * exactly where nothing owns the target — YAML- and Copilot-authored blocks,
-   * which persist only the fields they set. Order decides which subset wins if
-   * a hand-authored state carries more than one; the three were mutually
-   * exclusive per report type, so at most one can hold a real pick.
-   *
-   * `attachmentFileName` split: it now carries an `attachmentKind: 'file'`
-   * clause for the upload path and the download-side name moved to
-   * `downloadAttachmentFileName`. The source ID is still the upload override,
-   * so the rename is scoped to the download operation and an add-side value
-   * stays put.
-   */
-  quickbooks: [
-    {
-      from: 'transactionId',
-      to: 'readTransactionId',
-      whenOperation: [
-        'quickbooks_read_sales_transactions',
-        'quickbooks_read_purchasing_transactions',
-        'quickbooks_read_accounting_transactions',
-      ],
-    },
-    { from: 'reportCustomerSalesSummarizeBy', to: 'reportSummarizeBy' },
-    { from: 'reportVendorExpenseSummarizeBy', to: 'reportSummarizeBy' },
-    { from: 'reportTimeSummarizeBy', to: 'reportSummarizeBy' },
-    {
-      from: 'attachmentFileName',
-      to: 'downloadAttachmentFileName',
-      whenOperation: ['quickbooks_download_attachment'],
-    },
   ],
 }
 
@@ -625,13 +344,6 @@ export interface CanonicalIdMigration {
 
 /** Canonical-id renames per block type. */
 export const CANONICAL_ID_MIGRATIONS: Record<string, readonly CanonicalIdMigration[]> = {
-  /**
-   * The tool parameter is `file`, and `check-block-registry.ts` requires the
-   * canonical id to match it once the parameter is `user-only` — which it
-   * became so a direct `POST /api/v2/tools/{toolId}/execute` caller could
-   * supply the document at all.
-   */
-  mistral_parse_v3: [{ from: 'document', to: 'file' }],
 }
 
 /**

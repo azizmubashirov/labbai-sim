@@ -71,7 +71,6 @@ export const POLLING_PROVIDERS = new Set([
   'google-sheets',
   'hubspot',
   'imap',
-  'outlook',
   'rss',
 ])
 

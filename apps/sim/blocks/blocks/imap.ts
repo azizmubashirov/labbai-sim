@@ -67,16 +67,6 @@ export const ImapBlockMeta = {
   tags: ['automation', 'messaging'],
   templates: [
     {
-      icon: MailServerIcon,
-      title: 'Inbound email to Slack',
-      prompt:
-        'Build a workflow that triggers when a new email arrives via IMAP, summarizes the subject and body with an agent, and posts the summary with the sender to a Slack channel.',
-      modules: ['agent', 'workflows'],
-      category: 'operations',
-      tags: ['communication', 'automation'],
-      alsoIntegrations: ['slack'],
-    },
-    {
       icon: ClipboardList,
       title: 'Support inbox triage',
       prompt:

@@ -5,7 +5,6 @@ import {
   credentialIdParamsSchema,
   oauthCredentialSchema,
   refineCredentialCreate,
-  refineOAuthClientConfigForProvider,
   updateCredentialByIdBodySchema,
   workspaceCredentialSchema,
 } from '@/lib/api/contracts/credentials'
@@ -43,7 +42,6 @@ export const createOrganizationCredentialDraftBodySchema = z
     workspaceId: z.never().optional(),
     organizationId: organizationIdSchema,
   })
-  .superRefine(refineOAuthClientConfigForProvider)
 export type CreateOrganizationCredentialDraftBody = z.input<
   typeof createOrganizationCredentialDraftBodySchema
 >

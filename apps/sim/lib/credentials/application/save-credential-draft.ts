@@ -4,7 +4,6 @@ import { OrchestrationError } from '@/lib/core/orchestration/types'
 import { type CredentialActorContext, getCredentialActorContext } from '@/lib/credentials/access'
 import { credentialOperations } from '@/lib/credentials/application/operations'
 import { createConnectDraft } from '@/lib/credentials/connect-draft'
-import type { QuickBooksOAuthClientConfig } from '@/lib/oauth/quickbooks-client-config'
 import { loadActiveWorkspaceApplicationContext } from '@/lib/workspaces/application/workspace-context'
 
 export interface SaveCredentialDraftInput {
@@ -13,7 +12,6 @@ export interface SaveCredentialDraftInput {
   displayName: string
   description?: string
   credentialId?: string
-  oauthClientConfig?: QuickBooksOAuthClientConfig
 }
 
 interface SaveCredentialDraftContext {
@@ -62,7 +60,6 @@ export const saveCredentialDraft = defineAuthorizedWorkspaceUseCase({
       displayName: input.displayName,
       description: input.description,
       credentialId: input.credentialId,
-      oauthClientConfig: input.oauthClientConfig,
     })
     return { success: true as const, draftId: draft.id }
   },

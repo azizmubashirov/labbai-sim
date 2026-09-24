@@ -149,13 +149,6 @@ vi.mock('@/hooks/queries/oauth/oauth-connections', () => ({
   }),
 }))
 
-vi.mock('@/hooks/queries/oauth/microsoft-dataverse-connections', () => ({
-  useConnectMicrosoftDataverseOAuthService: () => ({
-    mutateAsync: vi.fn(),
-    isPending: false,
-  }),
-}))
-
 import {
   ConnectOAuthModal,
   type ConnectOAuthModalProps,

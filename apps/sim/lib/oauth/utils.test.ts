@@ -60,32 +60,18 @@ describe('getAllOAuthServices', () => {
     expect(driveService?.baseProvider).toBe('google')
   })
 
-  it.concurrent('should include Microsoft services', () => {
-    const services = getAllOAuthServices()
-
-    const outlookService = services.find((s) => s.providerId === 'outlook')
-    expect(outlookService).toBeDefined()
-    expect(outlookService?.name).toBe('Outlook')
-    expect(outlookService?.baseProvider).toBe('microsoft')
-
-    const excelService = services.find((s) => s.providerId === 'microsoft-excel')
-    expect(excelService).toBeDefined()
-    expect(excelService?.name).toBe('Microsoft Excel')
-    expect(excelService?.baseProvider).toBe('microsoft')
-  })
-
   it.concurrent('should include single-service providers', () => {
     const services = getAllOAuthServices()
 
-    const slackService = services.find((s) => s.providerId === 'slack')
-    expect(slackService).toBeDefined()
-    expect(slackService?.name).toBe('Slack')
-    expect(slackService?.baseProvider).toBe('slack')
+    const notionService = services.find((s) => s.providerId === 'notion')
+    expect(notionService).toBeDefined()
+    expect(notionService?.name).toBe('Notion')
+    expect(notionService?.baseProvider).toBe('notion')
 
-    const quickbooksService = services.find((s) => s.providerId === 'quickbooks')
-    expect(quickbooksService).toBeDefined()
-    expect(quickbooksService?.name).toBe('QuickBooks')
-    expect(quickbooksService?.baseProvider).toBe('quickbooks')
+    const hubspotService = services.find((s) => s.providerId === 'hubspot')
+    expect(hubspotService).toBeDefined()
+    expect(hubspotService?.name).toBe('HubSpot')
+    expect(hubspotService?.baseProvider).toBe('hubspot')
   })
 
   it.concurrent('should not include duplicate services', () => {
@@ -113,8 +99,10 @@ describe('getAllOAuthServices', () => {
   it.concurrent('preserves service-account auth metadata', () => {
     const services = getAllOAuthServices()
 
-    expect(services.find((service) => service.providerId === 'claude-platform')).toMatchObject({
-      serviceId: 'claude-platform',
+    expect(
+      services.find((service) => service.providerId === 'google-service-account')
+    ).toMatchObject({
+      serviceId: 'google-service-account',
       authType: 'service_account',
     })
     expect(services.find((service) => service.providerId === 'google-email')).toMatchObject({
@@ -155,20 +143,12 @@ describe('getServiceByProviderAndId', () => {
     }).toThrow('Provider invalid-provider not found')
   })
 
-  it.concurrent('should work with Microsoft provider', () => {
-    const service = getServiceByProviderAndId('microsoft')
+  it.concurrent('should work with a single-service provider', () => {
+    const service = getServiceByProviderAndId('hubspot')
 
     expect(service).toBeDefined()
-    expect(service.providerId).toBe('outlook')
-    expect(service.name).toBe('Outlook')
-  })
-
-  it.concurrent('should work with Microsoft Excel serviceId', () => {
-    const service = getServiceByProviderAndId('microsoft', 'microsoft-excel')
-
-    expect(service).toBeDefined()
-    expect(service.providerId).toBe('microsoft-excel')
-    expect(service.name).toBe('Microsoft Excel')
+    expect(service.providerId).toBe('hubspot')
+    expect(service.name).toBe('HubSpot')
   })
 
   it.concurrent('should include scopes in returned service config', () => {
@@ -182,9 +162,9 @@ describe('getServiceByProviderAndId', () => {
 })
 
 describe('usesCredentialConfiguredOAuthClient', () => {
-  it.concurrent('distinguishes user-supplied OAuth apps from deployment OAuth clients', () => {
-    expect(usesCredentialConfiguredOAuthClient('quickbooks')).toBe(true)
-    expect(usesCredentialConfiguredOAuthClient('slack')).toBe(false)
+  it.concurrent('uses the deployment OAuth client for every registered provider', () => {
+    expect(usesCredentialConfiguredOAuthClient('google-email')).toBe(false)
+    expect(usesCredentialConfiguredOAuthClient('hubspot')).toBe(false)
     expect(usesCredentialConfiguredOAuthClient('unknown-provider')).toBe(false)
   })
 })
@@ -200,18 +180,6 @@ describe('getProviderIdFromServiceId', () => {
     const providerId = getProviderIdFromServiceId('google-drive')
 
     expect(providerId).toBe('google-drive')
-  })
-
-  it.concurrent('should return correct providerId for Outlook', () => {
-    const providerId = getProviderIdFromServiceId('outlook')
-
-    expect(providerId).toBe('outlook')
-  })
-
-  it.concurrent('should return correct providerId for Microsoft Excel', () => {
-    const providerId = getProviderIdFromServiceId('microsoft-excel')
-
-    expect(providerId).toBe('microsoft-excel')
   })
 
   it.concurrent('should return serviceId as fallback for unknown service', () => {
@@ -234,8 +202,6 @@ describe('getProviderIdFromServiceId', () => {
       { serviceId: 'google-sheets', expectedProviderId: 'google-sheets' },
       { serviceId: 'google-forms', expectedProviderId: 'google-forms' },
       { serviceId: 'google-calendar', expectedProviderId: 'google-calendar' },
-      { serviceId: 'google-vault', expectedProviderId: 'google-vault' },
-      { serviceId: 'google-groups', expectedProviderId: 'google-groups' },
       { serviceId: 'vertex-ai', expectedProviderId: 'vertex-ai' },
     ]
 
@@ -268,34 +234,12 @@ describe('getServiceConfigByProviderId', () => {
     expect(service).toBeNull()
   })
 
-  it.concurrent('should work for Microsoft services', () => {
-    const outlookService = getServiceConfigByProviderId('outlook')
-
-    expect(outlookService).toBeDefined()
-    expect(outlookService?.providerId).toBe('outlook')
-    expect(outlookService?.name).toBe('Outlook')
-
-    const excelService = getServiceConfigByProviderId('microsoft-excel')
-
-    expect(excelService).toBeDefined()
-    expect(excelService?.providerId).toBe('microsoft-excel')
-    expect(excelService?.name).toBe('Microsoft Excel')
-  })
-
-  it.concurrent('should work for Slack', () => {
-    const service = getServiceConfigByProviderId('slack')
+  it.concurrent('should resolve a service-account provider id to its owning service', () => {
+    const service = getServiceConfigByProviderId('hubspot-service-account')
 
     expect(service).toBeDefined()
-    expect(service?.providerId).toBe('slack')
-    expect(service?.name).toBe('Slack')
-  })
-
-  it.concurrent('should work for QuickBooks', () => {
-    const service = getServiceConfigByProviderId('quickbooks')
-
-    expect(service).toBeDefined()
-    expect(service?.providerId).toBe('quickbooks')
-    expect(service?.name).toBe('QuickBooks')
+    expect(service?.providerId).toBe('hubspot')
+    expect(service?.name).toBe('HubSpot')
   })
 
   it.concurrent('should return service with scopes', () => {
@@ -321,14 +265,6 @@ describe('getServiceConfigByServiceId', () => {
     expect(service).toBeDefined()
     expect(service?.providerId).toBe('google-email')
     expect(service?.name).toBe('Gmail')
-  })
-
-  it.concurrent('should resolve the shared Jira service used by Jira Service Management', () => {
-    const service = getServiceConfigByServiceId('jira')
-
-    expect(service).toBeDefined()
-    expect(service?.providerId).toBe('jira')
-    expect(service?.name).toBe('Jira')
   })
 
   it.concurrent('should not match on providerId values that are not service keys', () => {
@@ -376,38 +312,6 @@ describe('getCanonicalScopesForProvider', () => {
     expect(scopes.length).toBeGreaterThan(0)
   })
 
-  it.concurrent('should return scopes for Microsoft services', () => {
-    const outlookScopes = getCanonicalScopesForProvider('outlook')
-
-    expect(outlookScopes.length).toBeGreaterThan(0)
-    expect(outlookScopes).toContain('Mail.ReadWrite')
-    expect(outlookScopes).toContain('Calendars.ReadWrite')
-    // .Shared is deliberately absent: unconfirmed for personal MSA, and this provider
-    // serves personal accounts whose mail access would break if consent failed.
-    expect(outlookScopes).not.toContain('Calendars.ReadWrite.Shared')
-
-    const excelScopes = getCanonicalScopesForProvider('microsoft-excel')
-
-    expect(excelScopes.length).toBeGreaterThan(0)
-    expect(excelScopes).toContain('Files.Read')
-  })
-
-  it.concurrent('should return the exact canonical QuickBooks scopes', () => {
-    const expected = ['openid', 'profile', 'email', 'com.intuit.quickbooks.accounting']
-
-    expect(getCanonicalScopesForProvider('quickbooks')).toEqual(expected)
-    expect(getScopesForService('quickbooks')).toEqual(expected)
-  })
-
-  it.concurrent('requests the group and user reads used by Confluence permission syncing', () => {
-    const scopes = getCanonicalScopesForProvider('confluence')
-
-    expect(scopes).toEqual(
-      expect.arrayContaining(['read:group:confluence', 'read:user:confluence'])
-    )
-    expect(getScopesForService('confluence')).toEqual(scopes)
-  })
-
   it.concurrent('should handle providers with empty scopes array', () => {
     const scopes = getCanonicalScopesForProvider('notion')
 
@@ -424,53 +328,29 @@ describe('getCanonicalScopesForProvider', () => {
 })
 
 describe('getScopeDescription', () => {
-  it('describes Confluence directory access', () => {
-    expect(getScopeDescription('read:group:confluence', 'confluence')).toBe(
-      'View Confluence groups and memberships'
+  it.concurrent('describes a known scope', () => {
+    expect(getScopeDescription('https://www.googleapis.com/auth/drive.file')).toBe(
+      'View and manage Google Drive files'
     )
+    expect(
+      getScopeDescription('https://www.googleapis.com/auth/calendar', 'google-calendar')
+    ).toBe('View and manage calendar')
   })
-  it.concurrent('uses provider-specific labels for Bitbucket scope names', () => {
-    expect(getScopeDescription('account', 'bitbucket')).toBe(
-      'View your Bitbucket account and workspace memberships'
+
+  it.concurrent('falls back to the raw scope string for an unknown scope', () => {
+    expect(getScopeDescription('crm.objects.contacts.read', 'hubspot')).toBe(
+      'crm.objects.contacts.read'
     )
-    expect(getScopeDescription('pipeline:write', 'bitbucket')).toBe('Run and stop pipelines')
-    expect(getScopeDescription('webhook', 'bitbucket')).toBe('Manage repository webhooks')
-  })
-
-  it.concurrent('preserves the existing Reddit meaning of the account scope', () => {
-    expect(getScopeDescription('account', 'reddit')).toBe('Update account preferences and settings')
-    expect(getScopeDescription('account')).toBe('Update account preferences and settings')
-  })
-
-  /**
-   * The consent screen is where a user decides what to grant, so a write scope
-   * has to read as one. `w_member_social` previously said 'Access LinkedIn
-   * profile', describing a posting grant as a profile read.
-   *
-   * The wording tracks LinkedIn's own: "Post, comment, and like posts on behalf
-   * of an authenticated member." It names all three verbs even though Sim only
-   * posts -- the label describes the grant the token carries, not Sim's current
-   * use of it, and LinkedIn's scopes cannot be sub-selected.
-   */
-  it.concurrent('describes w_member_social as the write grant it is', () => {
-    const description = getScopeDescription('w_member_social', 'linkedin')
-
-    expect(description).toBe('Post, comment, and like posts on your behalf')
-    expect(description).not.toMatch(/access .*profile/i)
-  })
-
-  it.concurrent('leaves the read-only LinkedIn scopes read-only', () => {
-    expect(getScopeDescription('profile', 'linkedin')).toBe('Access profile information')
-    expect(getScopeDescription('email', 'linkedin')).toBe('Access email address')
+    expect(getScopeDescription('unknown-scope')).toBe('unknown-scope')
   })
 })
 
 describe('parseProvider', () => {
   it.concurrent('should parse simple provider without hyphen', () => {
-    const config = parseProvider('slack' as OAuthProvider)
+    const config = parseProvider('notion' as OAuthProvider)
 
-    expect(config.baseProvider).toBe('slack')
-    expect(config.featureType).toBe('slack')
+    expect(config.baseProvider).toBe('notion')
+    expect(config.featureType).toBe('notion')
   })
 
   it.concurrent('should parse compound provider', () => {
@@ -487,34 +367,6 @@ describe('parseProvider', () => {
     expect(config.featureType).toBe('google-drive')
   })
 
-  it.concurrent('should parse Microsoft services', () => {
-    const outlookConfig = parseProvider('outlook' as OAuthProvider)
-    expect(outlookConfig.baseProvider).toBe('microsoft')
-    expect(outlookConfig.featureType).toBe('outlook')
-
-    const excelConfig = parseProvider('microsoft-excel' as OAuthProvider)
-    expect(excelConfig.baseProvider).toBe('microsoft')
-    expect(excelConfig.featureType).toBe('microsoft-excel')
-
-    const teamsConfig = parseProvider('microsoft-teams' as OAuthProvider)
-    expect(teamsConfig.baseProvider).toBe('microsoft')
-    expect(teamsConfig.featureType).toBe('microsoft-teams')
-  })
-
-  it.concurrent('should parse Slack provider', () => {
-    const config = parseProvider('slack' as OAuthProvider)
-
-    expect(config.baseProvider).toBe('slack')
-    expect(config.featureType).toBe('slack')
-  })
-
-  it.concurrent('should parse X provider', () => {
-    const config = parseProvider('x' as OAuthProvider)
-
-    expect(config.baseProvider).toBe('x')
-    expect(config.featureType).toBe('x')
-  })
-
   it.concurrent('should parse all Google services correctly', () => {
     const googleServices: Array<{ provider: OAuthProvider; expectedFeature: string }> = [
       { provider: 'google-email', expectedFeature: 'gmail' },
@@ -523,8 +375,6 @@ describe('parseProvider', () => {
       { provider: 'google-sheets', expectedFeature: 'google-sheets' },
       { provider: 'google-forms', expectedFeature: 'google-forms' },
       { provider: 'google-calendar', expectedFeature: 'google-calendar' },
-      { provider: 'google-vault', expectedFeature: 'google-vault' },
-      { provider: 'google-groups', expectedFeature: 'google-groups' },
       { provider: 'vertex-ai', expectedFeature: 'vertex-ai' },
     ]
 
@@ -533,20 +383,6 @@ describe('parseProvider', () => {
       expect(config.baseProvider).toBe('google')
       expect(config.featureType).toBe(expectedFeature)
     })
-  })
-
-  it.concurrent('should parse Confluence provider', () => {
-    const config = parseProvider('confluence' as OAuthProvider)
-
-    expect(config.baseProvider).toBe('confluence')
-    expect(config.featureType).toBe('confluence')
-  })
-
-  it.concurrent('should parse Jira provider', () => {
-    const config = parseProvider('jira' as OAuthProvider)
-
-    expect(config.baseProvider).toBe('jira')
-    expect(config.featureType).toBe('jira')
   })
 
   it.concurrent('should parse Airtable provider', () => {
@@ -563,20 +399,6 @@ describe('parseProvider', () => {
     expect(config.featureType).toBe('notion')
   })
 
-  it.concurrent('should parse Linear provider', () => {
-    const config = parseProvider('linear' as OAuthProvider)
-
-    expect(config.baseProvider).toBe('linear')
-    expect(config.featureType).toBe('linear')
-  })
-
-  it.concurrent('should parse Dropbox provider', () => {
-    const config = parseProvider('dropbox' as OAuthProvider)
-
-    expect(config.baseProvider).toBe('dropbox')
-    expect(config.featureType).toBe('dropbox')
-  })
-
   it.concurrent('should parse Shopify provider', () => {
     const config = parseProvider('shopify' as OAuthProvider)
 
@@ -584,39 +406,11 @@ describe('parseProvider', () => {
     expect(config.featureType).toBe('shopify')
   })
 
-  it.concurrent('should parse Reddit provider', () => {
-    const config = parseProvider('reddit' as OAuthProvider)
-
-    expect(config.baseProvider).toBe('reddit')
-    expect(config.featureType).toBe('reddit')
-  })
-
-  it.concurrent('should parse Wealthbox provider', () => {
-    const config = parseProvider('wealthbox' as OAuthProvider)
-
-    expect(config.baseProvider).toBe('wealthbox')
-    expect(config.featureType).toBe('wealthbox')
-  })
-
-  it.concurrent('should parse Webflow provider', () => {
-    const config = parseProvider('webflow' as OAuthProvider)
-
-    expect(config.baseProvider).toBe('webflow')
-    expect(config.featureType).toBe('webflow')
-  })
-
   it.concurrent('should parse Trello provider', () => {
     const config = parseProvider('trello' as OAuthProvider)
 
     expect(config.baseProvider).toBe('trello')
     expect(config.featureType).toBe('trello')
-  })
-
-  it.concurrent('should parse Asana provider', () => {
-    const config = parseProvider('asana' as OAuthProvider)
-
-    expect(config.baseProvider).toBe('asana')
-    expect(config.featureType).toBe('asana')
   })
 
   it.concurrent('should parse Pipedrive provider', () => {
@@ -633,20 +427,6 @@ describe('parseProvider', () => {
     expect(config.featureType).toBe('hubspot')
   })
 
-  it.concurrent('should parse LinkedIn provider', () => {
-    const config = parseProvider('linkedin' as OAuthProvider)
-
-    expect(config.baseProvider).toBe('linkedin')
-    expect(config.featureType).toBe('linkedin')
-  })
-
-  it.concurrent('should parse Salesforce provider', () => {
-    const config = parseProvider('salesforce' as OAuthProvider)
-
-    expect(config.baseProvider).toBe('salesforce')
-    expect(config.featureType).toBe('salesforce')
-  })
-
   it.concurrent('should parse Zoom provider', () => {
     const config = parseProvider('zoom' as OAuthProvider)
 
@@ -659,13 +439,6 @@ describe('parseProvider', () => {
 
     expect(config.baseProvider).toBe('wordpress')
     expect(config.featureType).toBe('wordpress')
-  })
-
-  it.concurrent('should parse Spotify provider', () => {
-    const config = parseProvider('spotify' as OAuthProvider)
-
-    expect(config.baseProvider).toBe('spotify')
-    expect(config.featureType).toBe('spotify')
   })
 
   it.concurrent('should fallback to default for unknown compound provider', () => {
@@ -682,19 +455,6 @@ describe('parseProvider', () => {
     expect(config.featureType).toBe('default')
   })
 
-  it.concurrent('should parse OneDrive provider correctly', () => {
-    const config = parseProvider('onedrive' as OAuthProvider)
-
-    expect(config.baseProvider).toBe('microsoft')
-    expect(config.featureType).toBe('onedrive')
-  })
-
-  it.concurrent('should parse SharePoint provider correctly', () => {
-    const config = parseProvider('sharepoint' as OAuthProvider)
-
-    expect(config.baseProvider).toBe('microsoft')
-    expect(config.featureType).toBe('sharepoint')
-  })
 })
 
 describe('getScopesForService', () => {
@@ -721,28 +481,6 @@ describe('getScopesForService', () => {
     expect(scopes1).toEqual(scopes2)
   })
 
-  it.concurrent('should work for Microsoft services', () => {
-    const scopes = getScopesForService('outlook')
-
-    expect(scopes.length).toBeGreaterThan(0)
-    expect(scopes).toContain('Mail.ReadWrite')
-    expect(scopes).toContain('Calendars.ReadWrite')
-    expect(scopes).not.toContain('Calendars.ReadWrite.Shared')
-  })
-
-  it.concurrent('should include webhook management in Bitbucket consent scopes', () => {
-    expect(getScopesForService('bitbucket')).toEqual([
-      'account',
-      'repository',
-      'repository:write',
-      'pullrequest',
-      'pullrequest:write',
-      'pipeline',
-      'pipeline:write',
-      'webhook',
-    ])
-  })
-
   it.concurrent('should return empty array for empty string', () => {
     const scopes = getScopesForService('')
 
@@ -764,16 +502,6 @@ describe('getMissingRequiredScopes', () => {
     const missing = getMissingRequiredScopes(credential, ['read', 'write'])
 
     expect(missing).toEqual(['write'])
-  })
-
-  it.concurrent('requires older Confluence OAuth grants to reconnect for group access', () => {
-    const scopes = getCanonicalScopesForProvider('confluence')
-    const previousGrant = scopes.filter((scope) => scope !== 'read:group:confluence')
-
-    expect(getMissingRequiredScopes({ scopes: previousGrant }, scopes)).toEqual([
-      'read:group:confluence',
-    ])
-    expect(getMissingRequiredScopes({ scopes }, scopes)).toEqual([])
   })
 
   it.concurrent('should return all required scopes when credential is undefined', () => {
@@ -869,23 +597,9 @@ describe('getMissingRequiredScopes', () => {
 })
 
 describe('providerIdsForService', () => {
-  it('widens a service primary id to its alternate authorization servers', () => {
-    // The SQL counterpart to credentialProviderMatchesService: the block
-    // picker queries by 'salesforce', and a sandbox credential is stored under
-    // 'salesforce-sandbox'. Without the widening it is filtered out at the DB
-    // and never reaches the picker, however correct the in-memory resolvers.
-    expect(providerIdsForService('salesforce')).toEqual(['salesforce', 'salesforce-sandbox'])
-  })
-
-  it('does not widen an alternate server id back into the primary', () => {
-    expect(providerIdsForService('salesforce-sandbox')).toEqual(['salesforce-sandbox'])
-  })
-
   it('does not widen a service-account id into the OAuth family', () => {
     // Broadening here would leak OAuth credentials into a service-account query.
-    expect(providerIdsForService('salesforce-service-account')).toEqual([
-      'salesforce-service-account',
-    ])
+    expect(providerIdsForService('hubspot-service-account')).toEqual(['hubspot-service-account'])
   })
 
   it('returns a single-id list for providers with no alternate server', () => {
@@ -894,32 +608,37 @@ describe('providerIdsForService', () => {
   })
 })
 
-describe('credentialProviderMatchesService', () => {
-  const salesforce = OAUTH_PROVIDERS.salesforce.services.salesforce
+/**
+ * No registered service declares a second authorization server, so the
+ * alternate-server id here is synthetic; both helpers read it off the service
+ * identity they are handed rather than from the registry.
+ */
+const hubspot = OAUTH_PROVIDERS.hubspot.services.hubspot
+const hubspotWithAlternate = { ...hubspot, additionalProviderIds: ['hubspot-sandbox'] }
 
+describe('credentialProviderMatchesService', () => {
   it('matches the primary OAuth id, an alternate server, and the service account', () => {
-    expect(credentialProviderMatchesService('salesforce', salesforce)).toBe(true)
-    // The alternate-server clause: without it a sandbox credential is invisible
-    // to every surface that resolves a credential to its service.
-    expect(credentialProviderMatchesService('salesforce-sandbox', salesforce)).toBe(true)
-    expect(credentialProviderMatchesService('salesforce-service-account', salesforce)).toBe(true)
+    expect(credentialProviderMatchesService('hubspot', hubspotWithAlternate)).toBe(true)
+    expect(credentialProviderMatchesService('hubspot-sandbox', hubspotWithAlternate)).toBe(true)
+    expect(credentialProviderMatchesService('hubspot-service-account', hubspotWithAlternate)).toBe(
+      true
+    )
   })
 
   it('does not match an unrelated provider', () => {
-    expect(credentialProviderMatchesService('hubspot', salesforce)).toBe(false)
+    expect(credentialProviderMatchesService('pipedrive', hubspot)).toBe(false)
   })
 })
 
 describe('canonicalizeServiceProviderId', () => {
-  const salesforce = OAUTH_PROVIDERS.salesforce.services.salesforce
   const gmail = OAUTH_PROVIDERS.google.services.gmail
 
   it('folds an alternate authorization server onto its service', () => {
-    expect(canonicalizeServiceProviderId('salesforce-sandbox', salesforce)).toBe('salesforce')
+    expect(canonicalizeServiceProviderId('hubspot-sandbox', hubspotWithAlternate)).toBe('hubspot')
   })
 
   it('leaves the primary id untouched', () => {
-    expect(canonicalizeServiceProviderId('salesforce', salesforce)).toBe('salesforce')
+    expect(canonicalizeServiceProviderId('hubspot', hubspotWithAlternate)).toBe('hubspot')
   })
 
   it('never folds a family-wide service-account id onto one product', () => {
@@ -931,8 +650,6 @@ describe('canonicalizeServiceProviderId', () => {
   })
 
   it('leaves an id untouched when no service resolved', () => {
-    expect(canonicalizeServiceProviderId('salesforce-sandbox', undefined)).toBe(
-      'salesforce-sandbox'
-    )
+    expect(canonicalizeServiceProviderId('hubspot-sandbox', undefined)).toBe('hubspot-sandbox')
   })
 })

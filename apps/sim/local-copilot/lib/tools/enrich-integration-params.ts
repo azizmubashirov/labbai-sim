@@ -33,7 +33,7 @@ function findMatchingCredential(
   )
 }
 
-/** Internal marker: fan out one Gmail/Outlook draft per recipient. */
+/** Internal marker: fan out one Gmail draft per recipient. */
 export const SEPARATE_DRAFT_RECIPIENTS_KEY = '_localCopilotSeparateDraftRecipients'
 
 function collectEmailStrings(value: unknown): string[] {
@@ -50,7 +50,7 @@ function collectEmailStrings(value: unknown): string[] {
 }
 
 /**
- * Normalizes Gmail/Outlook draft/send recipient fields. Models often pass
+ * Normalizes Gmail draft/send recipient fields. Models often pass
  * `to` as an array or use aliases (`recipient`). Multiple `to` values are
  * marked for separate draft fan-out instead of one multi-recipient draft.
  */
@@ -60,9 +60,7 @@ function normalizeEmailToolParams(
 ): Record<string, unknown> {
   const isEmailDraftOrSend =
     baseName.startsWith('gmail_draft') ||
-    baseName.startsWith('gmail_send') ||
-    baseName.startsWith('outlook_draft') ||
-    baseName.startsWith('outlook_send')
+    baseName.startsWith('gmail_send')
   if (!isEmailDraftOrSend) return params
 
   const next: Record<string, unknown> = { ...params }
@@ -84,7 +82,7 @@ function normalizeEmailToolParams(
     if (key === 'to' && emails.length > 1 && baseName.includes('draft')) {
       next[SEPARATE_DRAFT_RECIPIENTS_KEY] = emails
       next.to = emails[0]
-      logger.info('Marked multi-recipient Gmail/Outlook draft for separate fan-out', {
+      logger.info('Marked multi-recipient Gmail draft for separate fan-out', {
         toolId: baseName,
         recipientCount: emails.length,
       })
@@ -101,7 +99,7 @@ function normalizeEmailToolParams(
  * Enriches Arena Copilot `invoke_integration_tool` params before execution:
  * - Injects OAuth credentialId from connectedIntegrations when missing
  * - Maps legacy Google Sheets `range` into v2 `sheetName`/`cellRange`
- * - Normalizes Gmail/Outlook recipient fields for drafts/sends
+ * - Normalizes Gmail recipient fields for drafts/sends
  */
 export function enrichLocalIntegrationToolParams(
   toolId: string,

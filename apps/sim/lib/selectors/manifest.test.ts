@@ -9,9 +9,9 @@ describe('selector manifest', () => {
     const count = (classification: (typeof classifications)[number]) =>
       classifications.filter((value) => value === classification).length
 
-    expect(Object.keys(selectorManifest)).toHaveLength(107)
-    expect(count('provider-server')).toBe(94)
-    expect(count('internal-server')).toBe(12)
+    expect(Object.keys(selectorManifest)).toHaveLength(33)
+    expect(count('provider-server')).toBe(21)
+    expect(count('internal-server')).toBe(11)
     expect(count('local')).toBe(1)
     expect(classifications).not.toContain('provider-legacy')
   })
@@ -36,33 +36,8 @@ describe('selector manifest', () => {
     const rawConnectionKeys = providerKeys.filter(
       (key) => !serverSelectorRegistry[key as keyof typeof serverSelectorRegistry].credential
     )
-    expect(providerKeys).toHaveLength(94)
-    expect(rawConnectionKeys.sort()).toEqual([
-      'cloudwatch.logGroups',
-      'cloudwatch.logStreams',
-      'imap.mailboxes',
-      'mcp.tools',
-    ])
-  })
-
-  it('keeps shared Microsoft selectors bound only to their intended credential families', () => {
-    expect(serverSelectorRegistry['onedrive.files'].credential?.serviceIds).toEqual(['onedrive'])
-    expect(serverSelectorRegistry['onedrive.folders'].credential?.serviceIds).toEqual([
-      'onedrive',
-      'microsoft-word',
-    ])
-    expect(serverSelectorRegistry['sharepoint.lists'].credential?.serviceIds).toEqual([
-      'sharepoint',
-    ])
-    expect(serverSelectorRegistry['sharepoint.sites'].credential?.serviceIds).toEqual([
-      'sharepoint',
-      'microsoft-excel',
-    ])
-  })
-
-  it('declares both CloudWatch selectors as paginated', () => {
-    expect(selectorManifest['cloudwatch.logGroups'].listMode).toBe('paginated')
-    expect(selectorManifest['cloudwatch.logStreams'].listMode).toBe('paginated')
+    expect(providerKeys).toHaveLength(21)
+    expect(rawConnectionKeys.sort()).toEqual(['imap.mailboxes', 'mcp.tools'])
   })
 
   /**
@@ -86,12 +61,6 @@ describe('selector manifest', () => {
     expect(serverSelectorRegistry['google.drive'].credential?.resourceServiceId).toBe(
       'google-drive'
     )
-    expect(serverSelectorRegistry['onedrive.folders'].credential?.resourceServiceId).toBe(
-      'onedrive'
-    )
-    expect(serverSelectorRegistry['sharepoint.sites'].credential?.resourceServiceId).toBe(
-      'sharepoint'
-    )
   })
 
   it('requires executable preparation for every non-fixed destination', () => {
@@ -99,7 +68,7 @@ describe('selector manifest', () => {
       (attachment) => attachment.destination !== 'fixed'
     )
 
-    expect(preparedDestinations).toHaveLength(14)
+    expect(preparedDestinations).toHaveLength(2)
     for (const attachment of preparedDestinations) {
       expect(attachment.destination).toEqual(
         expect.objectContaining({
@@ -108,22 +77,5 @@ describe('selector manifest', () => {
         })
       )
     }
-  })
-
-  it('preserves credential-use auditing for the declared selectors', () => {
-    const auditedKeys = Object.entries(serverSelectorRegistry)
-      .flatMap(([key, attachment]) => (attachment.auditCredentialUse ? [key] : []))
-      .sort()
-
-    expect(auditedKeys).toEqual([
-      'confluence.pages',
-      'jira.issues',
-      'jira.projectKeys',
-      'jira.projects',
-      'managedAgent.agents',
-      'managedAgent.environments',
-      'managedAgent.memoryStores',
-      'managedAgent.vaults',
-    ])
   })
 })

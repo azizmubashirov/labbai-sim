@@ -531,16 +531,6 @@ export const ElevenLabsBlockMeta = {
   templates: [
     {
       icon: ElevenLabsIcon,
-      title: 'ElevenLabs blog-to-podcast',
-      prompt:
-        'Build a workflow that takes a blog post, narrates it with an ElevenLabs voice, saves the audio file, and posts a player-ready link to the marketing Slack channel.',
-      modules: ['agent', 'files', 'workflows'],
-      category: 'marketing',
-      tags: ['marketing', 'content'],
-      alsoIntegrations: ['slack'],
-    },
-    {
-      icon: ElevenLabsIcon,
       title: 'ElevenLabs voice greeting generator',
       prompt:
         'Create a workflow that reads a table of new enterprise customers, generates a personalized ElevenLabs voice greeting with their account manager voice, and emails the audio file to the customer on day one.',
@@ -557,26 +547,6 @@ export const ElevenLabsBlockMeta = {
       modules: ['tables', 'files', 'agent', 'workflows'],
       category: 'support',
       tags: ['support', 'automation'],
-    },
-    {
-      icon: ElevenLabsIcon,
-      title: 'ElevenLabs + Pulse meeting voice digest',
-      prompt:
-        'Build a workflow that takes Pulse meeting insights, narrates them with an ElevenLabs voice, and emails the audio digest to the team for asynchronous review.',
-      modules: ['agent', 'files', 'workflows'],
-      category: 'sales',
-      tags: ['sales', 'communication'],
-      alsoIntegrations: ['pulse', 'gmail'],
-    },
-    {
-      icon: ElevenLabsIcon,
-      title: 'ElevenLabs daily voice digest',
-      prompt:
-        'Build a scheduled daily workflow that generates an ElevenLabs voice digest of the day’s key metrics, saves the audio, and Slacks the player link to leadership.',
-      modules: ['scheduled', 'agent', 'files', 'workflows'],
-      category: 'operations',
-      tags: ['founder', 'reporting'],
-      alsoIntegrations: ['slack'],
     },
     {
       icon: ElevenLabsIcon,

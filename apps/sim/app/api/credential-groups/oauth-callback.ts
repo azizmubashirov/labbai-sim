@@ -3,7 +3,6 @@ import { sha256Hex } from '@sim/security/hash'
 import { describeError, getErrorMessage } from '@sim/utils/errors'
 import { type NextRequest, NextResponse } from 'next/server'
 import type { CredentialGroupOAuthCallbackQuery } from '@/lib/api/contracts/credential-groups'
-import { internalSessionAuth } from '@/lib/api/server/routes'
 import { asOrchestrationError, statusForOrchestrationError } from '@/lib/core/orchestration/types'
 import { credentialGroupOAuthAttemptPrincipal } from '@/lib/credential-groups/application/enrollment-auth'
 import { completePublicCredentialGroupOAuth } from '@/lib/credential-groups/application/public-enrollment'
@@ -16,8 +15,6 @@ import {
   CredentialGroupProviderConfigurationError,
 } from '@/lib/credential-groups/provider-adapter'
 import type { CredentialGroupProvider } from '@/lib/credential-groups/providers'
-import { completeGitHubSetupReaderOAuth } from '@/lib/knowledge/application/github-setup'
-import { githubSetupContinueUrl } from '@/lib/knowledge/github-setup-urls'
 import {
   createCredentialGroupCompletionRedirect,
   createCredentialGroupEnrollmentRedirect,
@@ -70,26 +67,10 @@ export async function handleCredentialGroupOAuthCallback({
   const focus: Record<string, string> = attempt.returnTo
     ? { optionId: attempt.optionId, returnTo: attempt.returnTo }
     : {}
-  const setupRedirect = (oauth?: CredentialGroupOAuthFailure) =>
-    new NextResponse(null, {
-      status: 303,
-      headers: {
-        Location: githubSetupContinueUrl(
-          { organizationId: attempt.organizationId!, setupId: attempt.completionId! },
-          oauth
-        ),
-        'Cache-Control': 'no-store',
-        'Referrer-Policy': 'no-referrer',
-      },
-    })
-  const installationSetup =
-    attempt.returnTo === 'github-installation' && attempt.organizationId && attempt.completionId
   const failureRedirect = (oauth: CredentialGroupOAuthFailure) =>
-    installationSetup
-      ? setupRedirect(oauth)
-      : attempt.completionRedirect
-        ? createCredentialGroupCompletionRedirect(oauth, attempt.completionId)
-        : createCredentialGroupEnrollmentRedirect(attempt.invitationToken, { ...focus, oauth })
+    attempt.completionRedirect
+      ? createCredentialGroupCompletionRedirect(oauth, attempt.completionId)
+      : createCredentialGroupEnrollmentRedirect(attempt.invitationToken, { ...focus, oauth })
   if (limited) {
     return failureRedirect('rate_limited')
   }
@@ -100,15 +81,8 @@ export async function handleCredentialGroupOAuthCallback({
     return failureRedirect('failed')
   }
 
-  let stage = 'session_authentication'
+  let stage = 'enrollment_authentication'
   try {
-    if (installationSetup) {
-      const principal = await internalSessionAuth.authenticate()
-      stage = 'setup_completion'
-      await completeGitHubSetupReaderOAuth.execute({ principal, input: { attempt, code }, request })
-      return setupRedirect()
-    }
-    stage = 'enrollment_authentication'
     const principal = await credentialGroupOAuthAttemptPrincipal(attempt)
     stage = 'enrollment_completion'
     await completePublicCredentialGroupOAuth.execute({
@@ -136,13 +110,10 @@ export async function handleCredentialGroupOAuthCallback({
     if (identityFailure) {
       switch (identityFailure.reason) {
         case 'email_unverified':
-          status = provider === 'github-repositories' ? 'github_email_unverified' : 'failed'
+          status = 'failed'
           break
         case 'email_access_denied':
-          status =
-            provider === 'github-repositories'
-              ? 'github_email_access_denied'
-              : 'permissions_required'
+          status = 'permissions_required'
           break
         case 'rate_limited':
           status = 'rate_limited'

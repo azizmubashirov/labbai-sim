@@ -1174,16 +1174,6 @@ export const GoogleCalendarBlockMeta = {
     },
     {
       icon: GoogleCalendarIcon,
-      title: 'Calendar daily agenda digest',
-      prompt:
-        'Create a scheduled weekday workflow that lists my Google Calendar events for the day, summarizes them with attendee context and prep notes, and posts a clean morning agenda to Slack.',
-      modules: ['scheduled', 'agent', 'workflows'],
-      category: 'productivity',
-      tags: ['individual', 'reporting', 'communication'],
-      alsoIntegrations: ['slack'],
-    },
-    {
-      icon: GoogleCalendarIcon,
       title: 'Calendar interview scheduler',
       prompt:
         "Build a workflow that when a candidate reaches the interview stage finds open slots across the panel's Google Calendars, creates the interview event with the video link, invites everyone, and emails the candidate the confirmation.",

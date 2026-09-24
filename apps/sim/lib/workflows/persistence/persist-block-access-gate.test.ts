@@ -60,7 +60,7 @@ describe('saveWorkflowToNormalizedTables permission-group gate', () => {
 
   it('refuses a block type the governed subject’s allowlist withholds, before any write', async () => {
     permissionGroupScopeMockFns.mockResolvePermissionGroupConfig.mockResolvedValue({
-      allowedIntegrations: ['slack'],
+      allowedIntegrations: ['notion'],
     })
 
     await expect(
@@ -75,11 +75,11 @@ describe('saveWorkflowToNormalizedTables permission-group gate', () => {
 
   it('writes a block type the allowlist names', async () => {
     permissionGroupScopeMockFns.mockResolvePermissionGroupConfig.mockResolvedValue({
-      allowedIntegrations: ['slack'],
+      allowedIntegrations: ['notion'],
     })
 
     await expect(
-      saveWorkflowToNormalizedTables('workflow-1', stateWith('slack'), GOVERNED, dbChainMock.db)
+      saveWorkflowToNormalizedTables('workflow-1', stateWith('notion'), GOVERNED, dbChainMock.db)
     ).resolves.toMatchObject({ success: true })
     expect(mocks.saveRaw).toHaveBeenCalled()
   })
@@ -92,7 +92,7 @@ describe('saveWorkflowToNormalizedTables permission-group gate', () => {
    */
   it('writes for an actorless caller even when the workspace withholds the block type', async () => {
     permissionGroupScopeMockFns.mockResolvePermissionGroupConfig.mockResolvedValue({
-      allowedIntegrations: ['slack'],
+      allowedIntegrations: ['notion'],
     })
 
     await expect(
@@ -109,7 +109,7 @@ describe('saveWorkflowToNormalizedTables permission-group gate', () => {
 
   it('writes when no workspace, and therefore no permission group, scopes the workflow', async () => {
     permissionGroupScopeMockFns.mockResolvePermissionGroupConfig.mockResolvedValue({
-      allowedIntegrations: ['slack'],
+      allowedIntegrations: ['notion'],
     })
 
     await expect(
@@ -129,7 +129,7 @@ describe('saveWorkflowToNormalizedTables permission-group gate', () => {
    */
   it('throws the refusal rather than returning it, on the external-transaction path too', async () => {
     permissionGroupScopeMockFns.mockResolvePermissionGroupConfig.mockResolvedValue({
-      allowedIntegrations: ['slack'],
+      allowedIntegrations: ['notion'],
     })
 
     const thrown = await saveWorkflowToNormalizedTables(

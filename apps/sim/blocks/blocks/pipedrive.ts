@@ -926,26 +926,6 @@ export const PipedriveBlockMeta = {
   templates: [
     {
       icon: PipedriveIcon,
-      title: 'Pipedrive deal pipeline tracker',
-      prompt:
-        'Create a scheduled workflow that mirrors Pipedrive deals into a Sim table, calculates pipeline velocity per stage, and posts a daily Slack summary of deals at risk.',
-      modules: ['scheduled', 'tables', 'agent', 'workflows'],
-      category: 'sales',
-      tags: ['sales', 'crm', 'monitoring'],
-      alsoIntegrations: ['slack'],
-    },
-    {
-      icon: PipedriveIcon,
-      title: 'Pipedrive lead enrichment pipeline',
-      prompt:
-        'Build a scheduled workflow that polls Pipedrive for new leads, enriches each via Apollo with role, seniority, and tech stack, and updates the lead with the enriched details.',
-      modules: ['scheduled', 'agent', 'workflows'],
-      category: 'sales',
-      tags: ['sales', 'crm', 'research'],
-      alsoIntegrations: ['apollo'],
-    },
-    {
-      icon: PipedriveIcon,
       title: 'Pipedrive activity-from-email logger',
       prompt:
         'Create a workflow that watches Gmail for emails to or from Pipedrive contacts, logs each as an activity, and creates a follow-up task if next steps are mentioned.',
@@ -953,16 +933,6 @@ export const PipedriveBlockMeta = {
       category: 'sales',
       tags: ['sales', 'communication'],
       alsoIntegrations: ['gmail'],
-    },
-    {
-      icon: PipedriveIcon,
-      title: 'Pipedrive call-summary updater',
-      prompt:
-        'Build a workflow that runs after a Fireflies sales call, summarizes the transcript, and updates the matching Pipedrive deal with the call summary and next steps.',
-      modules: ['agent', 'workflows'],
-      category: 'sales',
-      tags: ['sales', 'crm'],
-      alsoIntegrations: ['fireflies'],
     },
     {
       icon: PipedriveIcon,
@@ -982,16 +952,6 @@ export const PipedriveBlockMeta = {
       category: 'sales',
       tags: ['sales', 'crm'],
       alsoIntegrations: ['gmail'],
-    },
-    {
-      icon: PipedriveIcon,
-      title: 'Pipedrive Slack channel-per-deal',
-      prompt:
-        'Create a workflow that for Pipedrive deals above a threshold creates a Slack channel, invites the account team, and pins the deal record link.',
-      modules: ['agent', 'workflows'],
-      category: 'sales',
-      tags: ['sales', 'enterprise'],
-      alsoIntegrations: ['slack'],
     },
   ],
   skills: [

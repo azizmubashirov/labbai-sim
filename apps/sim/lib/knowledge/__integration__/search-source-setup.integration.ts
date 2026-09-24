@@ -251,7 +251,7 @@ describe('Search source identity and concurrent creation', () => {
       .update(knowledgeBase)
       .set({ name: 'Sim Search' })
       .where(eq(knowledgeBase.id, other.knowledgeBaseId))
-    const input = { workspaceId: other.workspaceId, connectorType: 'gitlab' }
+    const input = { workspaceId: other.workspaceId, connectorType: 'google_drive' }
     const reader = {
       kind: 'session' as const,
       userId: other.bobId,
@@ -349,7 +349,6 @@ describe('Search source identity and concurrent creation', () => {
         connectorId: sourceIds[0],
         sourceConfig: { folderId: 'changed-folder' },
       },
-      { connectorType: 'confluence', connectorId: sourceIds[0] },
       { connectorType: 'google_drive', connectorId: other.connectorId },
       { connectorType: 'google_drive', connectorId: extraSource },
     ]) {
@@ -405,7 +404,7 @@ describe('Search source identity and concurrent creation', () => {
     expect(policy!.revision).toBe(previousPolicy!.revision)
     const prepared = await prepareSearchSource.execute({
       principal: { kind: 'session', userId: ids.aliceId, sessionId: 'fixture-admin' },
-      input: { workspaceId: ids.workspaceId, connectorType: 'slack', accessMode: 'members' },
+      input: { workspaceId: ids.workspaceId, connectorType: 'google_drive', accessMode: 'members' },
     })
     expect(prepared.credentialGroupId).toBe(searchGroupId)
   })
@@ -540,8 +539,8 @@ describe('Search source identity and concurrent creation', () => {
     })
     await locked
     const append = ensureWorkspaceAccountsGroup(ids.workspaceId, ids.aliceId, {
-      provider: 'jira',
-      label: 'Jira',
+      provider: 'notion',
+      label: 'Notion',
       required: false,
     })
     releaseGrant()
@@ -612,8 +611,8 @@ describe('Search source identity and concurrent creation', () => {
     })
     await expect(
       ensureWorkspaceAccountsGroup(ids.workspaceId, ids.aliceId, {
-        provider: 'jira',
-        label: 'Jira',
+        provider: 'notion',
+        label: 'Notion',
         required: false,
       })
     ).rejects.toThrow('has MCP access')

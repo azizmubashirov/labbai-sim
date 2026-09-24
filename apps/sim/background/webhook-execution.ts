@@ -10,7 +10,7 @@ import { createLogger, type RequestContext, runWithRequestContext } from '@sim/l
 import { toError } from '@sim/utils/errors'
 import { interruptibleSleep } from '@sim/utils/helpers'
 import { generateId } from '@sim/utils/id'
-import { isRecordLike, toRecord } from '@sim/utils/object'
+import { isRecordLike } from '@sim/utils/object'
 import { backoffWithJitter } from '@sim/utils/retry'
 import { task, timeout } from '@trigger.dev/sdk'
 import { eq } from 'drizzle-orm'
@@ -68,8 +68,6 @@ import {
   createWebhookExecutionPrincipal,
 } from '@/lib/webhooks/execution-principal'
 import { getProviderHandler } from '@/lib/webhooks/providers'
-import { SlackExecutionStreamController } from '@/lib/webhooks/slack-execution-stream'
-import { readSlackStreamResponseConfig } from '@/lib/webhooks/slack-stream-config'
 import {
   executeWorkflowCore,
   wasExecutionFinalizedByCore,
@@ -1091,70 +1089,25 @@ async function executeWebhookJobInternal(
         })
       }
 
-      const persistedProviderConfig = toRecord(resolvedWebhookRecord.providerConfig)
-      const slackStreamConfig =
-        payload.provider === 'slack' || payload.provider === 'slack_app'
-          ? readSlackStreamResponseConfig(persistedProviderConfig)
-          : null
-      if (slackStreamConfig && payload.provider !== 'slack') {
-        throw new Error('Slack trigger response streaming is only supported for custom bots')
-      }
-      const slackStreamCredentialId =
-        typeof persistedProviderConfig.credentialId === 'string'
-          ? persistedProviderConfig.credentialId
-          : null
-      if (slackStreamConfig && !slackStreamCredentialId) {
-        throw new Error('Slack stream configuration is missing its custom bot credential')
-      }
-      const slackStreamController = slackStreamConfig
-        ? await SlackExecutionStreamController.create({
-            credentialId: slackStreamCredentialId!,
-            workspaceId,
-            workflowId: payload.workflowId,
-            executionId,
-            userId: actorUserId,
-            triggerInput,
-            config: slackStreamConfig,
-            loggingSession,
-            abortSignal: timeoutController.signal,
-          })
-        : null
-
       const snapshot = new ExecutionSnapshot(
         metadata,
         workflowRecord,
         triggerInput,
         workflowVariables,
-        slackStreamController?.selectedOutputs ?? []
+        []
       )
 
       workflowCoreStarted = true
-      let executionResult: ExecutionResult
-      try {
-        executionResult = await executeWorkflowCore({
-          snapshot,
-          callbacks: slackStreamController?.callbacks ?? {},
-          loggingSession,
-          trustedInitialResolvedSecretTraceProvenance:
-            resolvedSecretTraceRegistry.exportProvenanceForValue(triggerInput),
-          includeFileBase64: false,
-          base64MaxBytes: undefined,
-          abortSignal: timeoutController.signal,
-        })
-      } catch (error) {
-        if (slackStreamController) {
-          await slackStreamController.finalize({
-            success: false,
-            output: {},
-            error: toError(error).message,
-          })
-        }
-        throw error
-      }
-      if (slackStreamController) {
-        await slackStreamController.finalize(executionResult)
-        slackStreamController.assertSucceeded()
-      }
+      const executionResult: ExecutionResult = await executeWorkflowCore({
+        snapshot,
+        callbacks: {},
+        loggingSession,
+        trustedInitialResolvedSecretTraceProvenance:
+          resolvedSecretTraceRegistry.exportProvenanceForValue(triggerInput),
+        includeFileBase64: false,
+        base64MaxBytes: undefined,
+        abortSignal: timeoutController.signal,
+      })
 
       await handleExecutionResult(executionResult, {
         loggingSession,

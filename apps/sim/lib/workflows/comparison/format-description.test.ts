@@ -138,7 +138,7 @@ describe('resolveValueForDisplay', () => {
           id: 'channel',
           title: 'Channel',
           type: 'channel-selector',
-          selectorKey: 'slack.channels',
+          selectorKey: 'zoom.meetings',
         },
       ],
     })

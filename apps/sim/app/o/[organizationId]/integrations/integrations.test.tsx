@@ -5,7 +5,6 @@ import { NuqsTestingAdapter } from 'nuqs/adapters/testing'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SearchSourceSummary } from '@/lib/api/contracts/knowledge/connectors'
-import type { OrganizationAccountConnectionResponse } from '@/lib/api/contracts/organization-accounts'
 import type { SearchConnector } from '@/lib/sim-search/connectors'
 
 const mocks = vi.hoisted(() => ({
@@ -13,7 +12,6 @@ const mocks = vi.hoisted(() => ({
   sources: vi.fn(),
   overview: vi.fn(),
   integrations: vi.fn(),
-  slackInventory: vi.fn(),
   filters: vi.fn(),
   connect: vi.fn(),
   connectSearchSource: vi.fn(),
@@ -42,9 +40,6 @@ vi.mock('@/hooks/queries/organization-accounts', () => ({
     isPending: false,
   }),
 }))
-vi.mock('@/app/o/[organizationId]/integrations/slack-search-actions', () => ({
-  SlackSearchActions: () => <span>Return to Slack</span>,
-}))
 vi.mock(
   '@/app/workspace/[workspaceId]/home/components/message-content/components/special-tags/search-integration-connection',
   () => ({
@@ -54,9 +49,6 @@ vi.mock(
     },
   })
 )
-vi.mock('@/hooks/queries/personal-search-integrations', () => ({
-  usePersonalSearchIntegrations: mocks.slackInventory,
-}))
 vi.mock('@/hooks/queries/search-integrations', () => ({
   useSearchIntegrations: mocks.integrations,
 }))
@@ -140,7 +132,7 @@ const account = {
 const memberSource: SearchSourceSummary = {
   knowledgeBaseId: 'search-index',
   connectorId: 'source-a',
-  connectorType: 'gmail',
+  connectorType: 'google_drive',
   sourceDescription: 'Inbox',
   accessMode: 'members',
   availability: 'available',
@@ -189,29 +181,20 @@ beforeEach(() => {
     searchAccess: { memberScoped: true, sourceMirrored: true },
   })
   mocks.filters.mockReturnValue({ search: '' })
-  mocks.slackInventory.mockReturnValue({
-    data: { available: [] },
-    isPending: false,
-    isError: false,
-  })
   mocks.integrations.mockReturnValue({
-    data: [{ connectorType: 'gmail', approved: true }],
+    data: [{ connectorType: 'google_drive', approved: true }],
     isPending: false,
   })
   mocks.overview.mockReturnValue({
     data: {
-      providers: [{ connectorType: 'gmail', isSyncing: false }],
+      providers: [{ connectorType: 'google_drive', isSyncing: false }],
       hasSearchableDocuments: false,
     },
     isPending: false,
   })
   mocks.availability.mockReturnValue({
     integrationAvailability: new Map(),
-    oauthServiceAvailability: new Map([
-      ['google-email', true],
-      ['confluence', true],
-      ['jira', true],
-    ]),
+    oauthServiceAvailability: new Map([['google-drive', true]]),
     isIntegrationAvailabilityReady: true,
     integrationAvailabilityError: null,
   })
@@ -255,266 +238,20 @@ function buttons(label: string) {
   )
 }
 
-async function openMenu(name: string) {
-  const trigger = document.querySelector<HTMLButtonElement>(
-    `[aria-label="${name} integration actions"]`
-  )!
-  await act(async () =>
-    trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
-  )
-}
-function menuItem(label: string) {
-  return [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(
-    (item) => item.textContent === label
-  )!
-}
-
-function expectConnectionRedirect(
-  onSuccess: (response: OrganizationAccountConnectionResponse) => void,
-  authorizationUrl?: string
-) {
-  const invitationLink = 'https://sim.test/credential-groups/enroll/fixture-token'
-  const assign = vi.fn()
-  const browserWindow = window
-  vi.stubGlobal('window', { location: { assign } })
-  try {
-    onSuccess({ invitationLink, ...(authorizationUrl ? { authorizationUrl } : {}) })
-    expect(assign).toHaveBeenCalledExactlyOnceWith(authorizationUrl ?? invitationLink)
-  } finally {
-    vi.stubGlobal('window', browserWindow)
-  }
-}
-
-describe('GitHub member account inventory', () => {
-  const githubAccount = {
-    credentialId: 'github-account',
-    providerId: 'github-repositories',
-    groupId: 'accounts-group',
-    optionId: 'github-option',
-    displayName: 'My GitHub',
-    status: 'active' as const,
-  }
-  const githubGroup = {
-    id: 'accounts-group',
-    status: 'active',
-    options: [{ id: 'github-option', provider: 'github-repositories', status: 'active' }],
-  }
-
-  beforeEach(() => {
-    rows = ['repo-one', 'repo-two'].map((connectorId) => ({
-      ...memberSource,
-      connectorId,
-      connectorType: 'github',
-      sourceDescription: connectorId,
-    }))
-    mocks.overview.mockReturnValue({
-      data: { providers: [{ connectorType: 'github' }] },
-      isPending: false,
-    })
-    mocks.integrations.mockReturnValue({
-      data: [{ connectorType: 'github', approved: true }],
-      isPending: false,
-    })
-    mocks.availability.mockReturnValue({
-      integrationAvailability: new Map(),
-      oauthServiceAvailability: new Map([['github-repositories', true]]),
-      isIntegrationAvailabilityReady: true,
-    })
-    mocks.organizationAccounts.mockReturnValue({
-      data: { credentialGroup: githubGroup, viewerAccounts: [] },
-      isPending: false,
-      isError: false,
-      refetch: mocks.refetchAccounts,
-    })
-  })
-
-  it.each([
-    undefined,
-    'https://sim.test/api/credential-groups/enroll/fixture-token/oauth/github-option?returnTo=search',
-  ])('connects once through the account operation with compatible redirect %s', async (url) => {
-    await render()
-    expect(buttons('Connect')).toHaveLength(1)
-    expect(container.textContent).toContain('Connect once')
-    await act(async () => buttons('Connect')[0].click())
-    expect(mocks.connectOrganizationAccount).toHaveBeenCalledExactlyOnceWith(
-      { organizationId: scope.organizationId, optionId: 'github-option' },
-      expect.any(Object)
-    )
-    expectConnectionRedirect(mocks.connectOrganizationAccount.mock.calls[0][1].onSuccess, url)
-    expect(mocks.sources).not.toHaveBeenCalled()
-    expect(mocks.connect).not.toHaveBeenCalled()
-    expect(mocks.connectSearchSource).not.toHaveBeenCalled()
-    expect(document.querySelector('[role="dialog"]')).toBeNull()
-    expect(container.textContent).not.toContain('repo-one')
-  })
-
-  it('keeps one account row when an admin adds another repository', async () => {
-    mocks.organizationAccounts.mockReturnValue({
-      data: { credentialGroup: githubGroup, viewerAccounts: [githubAccount] },
-      isPending: false,
-    })
-    await render()
-    rows.push({
-      ...rows[0],
-      connectorId: 'future-repository',
-      sourceDescription: 'future-repository',
-    })
-    await render()
-    expect(document.querySelectorAll('[aria-label="GitHub integration actions"]')).toHaveLength(1)
-    expect(mocks.accountMenu).toHaveBeenLastCalledWith(
-      expect.objectContaining({ accounts: [githubAccount] })
-    )
-    expect(buttons('Connect')).toHaveLength(0)
-    expect(buttons('Reconnect')).toHaveLength(0)
-    expect(mocks.sources).not.toHaveBeenCalled()
-    expect(container.textContent).not.toContain('future-repository')
-  })
-
-  it('keeps an owned account visible before any repository source exists', async () => {
-    mocks.overview.mockReturnValue({ data: { providers: [] }, isPending: false })
-    mocks.integrations.mockReturnValue({ data: [], isPending: false })
-    mocks.organizationAccounts.mockReturnValue({
-      data: { credentialGroup: githubGroup, viewerAccounts: [githubAccount] },
-      isPending: false,
-    })
-    await render('', <OrganizationIntegrations />)
-    expect(container.textContent).toContain('My GitHub · Connected')
-    expect(document.querySelectorAll('[aria-label="GitHub integration actions"]')).toHaveLength(1)
-    expect(mocks.sources).not.toHaveBeenCalled()
-    expect(buttons('Connect')).toHaveLength(0)
-    expect(container.textContent).not.toContain('No integrations are available')
-  })
-
-  it.each(['group', 'option'] as const)(
-    'keeps Disconnect but hides Reconnect when the canonical %s is disabled',
-    async (disabled) => {
-      const expired = { ...githubAccount, status: 'needs_reauth' }
-      mocks.organizationAccounts.mockReturnValue({
-        data: {
-          credentialGroup: {
-            ...githubGroup,
-            status: disabled === 'group' ? 'disabled' : 'active',
-            options: [
-              { ...githubGroup.options[0], status: disabled === 'option' ? 'disabled' : 'active' },
-            ],
-          },
-          viewerAccounts: [expired],
-        },
-        isPending: false,
-      })
-      await render()
-      expect(buttons('Reconnect')).toHaveLength(0)
-      expect(mocks.accountMenu).toHaveBeenLastCalledWith(
-        expect.objectContaining({ accounts: [expired] })
-      )
-      await openMenu('GitHub')
-      expect(menuItem('Disconnect github-account')).toBeDefined()
-    }
-  )
-
-  it.each([
-    undefined,
-    'https://sim.test/api/credential-groups/enroll/fixture-token/oauth/github-option?returnTo=accounts',
-  ])('allows personal reauthorization while Search is disabled with redirect %s', async (url) => {
-    mocks.overview.mockReturnValue({ data: { providers: [] }, isPending: false })
-    mocks.integrations.mockReturnValue({
-      data: [{ connectorType: 'github', approved: false }],
-      isPending: false,
-    })
-    mocks.context.mockReturnValue({
-      organization: { id: scope.organizationId },
-      searchAccess: { memberScoped: false, sourceMirrored: false },
-    })
-    mocks.organizationAccounts.mockReturnValue({
-      data: {
-        credentialGroup: githubGroup,
-        viewerAccounts: [{ ...githubAccount, status: 'needs_reauth' }],
-      },
-      isPending: false,
-    })
-    await render()
-    expect(buttons('Reconnect')).toHaveLength(1)
-    await act(async () => buttons('Reconnect')[0].click())
-    expect(mocks.reconnectOrganizationAccount).toHaveBeenCalledExactlyOnceWith(
-      'github-account',
-      expect.any(Object)
-    )
-    expectConnectionRedirect(mocks.reconnectOrganizationAccount.mock.calls[0][1].onSuccess, url)
-    expect(mocks.connect).not.toHaveBeenCalled()
-  })
-
-  it('does not reconnect an account through a different active option', async () => {
-    mocks.organizationAccounts.mockReturnValue({
-      data: {
-        credentialGroup: githubGroup,
-        viewerAccounts: [{ ...githubAccount, optionId: 'other-option', status: 'needs_reauth' }],
-      },
-      isPending: false,
-    })
-    await render()
-    expect(buttons('Reconnect')).toHaveLength(0)
-    expect(document.querySelector('[aria-label="GitHub integration actions"]')).not.toBeNull()
-  })
-
-  it.each(['pending', 'error'] as const)(
-    'does not fall through to repository setup when the inventory is %s',
-    async (state) => {
-      mocks.organizationAccounts.mockReturnValue({
-        data: undefined,
-        isPending: state === 'pending',
-        isError: state === 'error',
-        error: state === 'error' ? new Error('Could not load accounts') : null,
-        isFetching: false,
-        refetch: mocks.refetchAccounts,
-      })
-      await render()
-      expect(container.textContent).toContain('GitHub')
-      expect(mocks.sources).not.toHaveBeenCalled()
-      expect(buttons('Connect')).toHaveLength(0)
-      expect(mocks.connectSearchSource).not.toHaveBeenCalled()
-      if (state === 'error') {
-        await act(async () => buttons('Retry')[0].click())
-        expect(mocks.refetchAccounts).toHaveBeenCalledOnce()
-      }
-    }
-  )
-
-  it('retains legacy account management only after a successful response omits the inventory', async () => {
-    mocks.organizationAccounts.mockReturnValue({
-      data: { credentialGroup: githubGroup },
-      isPending: false,
-      isError: false,
-    })
-    rows = rows.map((source) => ({
-      ...source,
-      viewerMembership: 'connected',
-      viewerAccounts: [githubAccount],
-    }))
-    await render()
-    expect(mocks.sources).toHaveBeenCalledWith(scope, { connectorType: 'github', enabled: true })
-    expect(document.querySelectorAll('[aria-label="GitHub integration actions"]')).toHaveLength(1)
-    expect(mocks.accountMenu).toHaveBeenLastCalledWith(
-      expect.objectContaining({ accounts: [githubAccount] })
-    )
-    expect(buttons('Connect')).toHaveLength(0)
-  })
-})
-
 describe('grouped member integrations', () => {
   it('renders one provider row and loads bounded pages per configured provider', async () => {
     mocks.overview.mockReturnValue({
-      data: { providers: [{ connectorType: 'gmail' }, { connectorType: 'google_drive' }] },
+      data: { providers: [{ connectorType: 'google_drive' }] },
       isPending: false,
     })
     rows = Array.from({ length: 25 }, (_, index) => ({
       ...memberSource,
-      connectorId: `gmail-${index}`,
+      connectorId: `drive-${index}`,
     }))
     await render()
     expect(buttons('Connect')).toHaveLength(1)
     expect(container.textContent).toContain('Google Drive')
     expect(container.textContent).not.toContain('Inbox')
-    expect(mocks.sources).toHaveBeenCalledWith(scope, { connectorType: 'gmail', enabled: true })
     expect(mocks.sources).toHaveBeenCalledWith(scope, {
       connectorType: 'google_drive',
       enabled: true,
@@ -526,12 +263,12 @@ describe('grouped member integrations', () => {
       memberSource,
       { ...memberSource, connectorId: 'source-b', sourceDescription: 'Archive' },
     ]
-    await render('?integration=gmail')
+    await render('?integration=google_drive')
     expect(document.querySelector('[role="region"]')).toBeNull()
     expect(document.querySelector('[role="dialog"]')).toBeNull()
     expect(container.textContent).not.toContain('Inbox')
     expect(container.textContent).not.toContain('Archive')
-    expect(document.querySelector('[aria-label="Gmail integration actions"]')).toBeNull()
+    expect(document.querySelector('[aria-label="Google Drive integration actions"]')).toBeNull()
     expect(buttons('Connect')).toHaveLength(1)
   })
   it('connects one configured target even with many same-provider content scopes', async () => {
@@ -539,7 +276,7 @@ describe('grouped member integrations', () => {
       memberSource,
       { ...memberSource, connectorId: 'source-b', sourceDescription: 'Archive' },
     ]
-    await render('?integration=gmail')
+    await render('?integration=google_drive')
     expect(buttons('Connect')).toHaveLength(1)
     await act(async () => buttons('Connect')[0].click())
     expect(mocks.connect).toHaveBeenCalledExactlyOnceWith('search-index', 'source-a')
@@ -550,7 +287,7 @@ describe('grouped member integrations', () => {
       viewerMembership: 'connected',
       viewerAccounts: [account],
     }))
-    await render('?integration=gmail')
+    await render('?integration=google_drive')
     expect(mocks.accountMenu).toHaveBeenCalledWith(expect.objectContaining({ accounts: [account] }))
     expect(buttons('Connect')).toHaveLength(0)
     expect(buttons('Reconnect')).toHaveLength(0)
@@ -597,7 +334,7 @@ describe('grouped member integrations', () => {
       const connected: SearchSourceSummary =
         kind === 'personal'
           ? { ...memberSource, viewerMembership: 'connected', viewerAccounts: [account] }
-          : { ...centralSource, connectorType: 'gmail' }
+          : { ...centralSource, connectorType: 'google_drive' }
       rows = [connected, { ...memberSource, connectorId: 'additional-source' }]
       await render()
       expect(container.textContent).toContain('Additional connection required')
@@ -631,7 +368,7 @@ describe('grouped member integrations', () => {
       },
       { ...memberSource, connectorId: 'unconnected-source' },
     ]
-    await render('?integration=gmail')
+    await render('?integration=google_drive')
     await act(async () => buttons('Reconnect')[0].click())
     expect(mocks.connect).toHaveBeenCalledExactlyOnceWith('search-index', 'expired-source')
   })
@@ -660,7 +397,7 @@ describe('grouped member integrations', () => {
           ...override,
         },
       ]
-      await render('?integration=gmail')
+      await render('?integration=google_drive')
       expect(mocks.accountMenu).toHaveBeenCalledWith(
         expect.objectContaining({ accounts: [account] })
       )
@@ -718,7 +455,7 @@ describe('grouped member integrations', () => {
   it('preserves explicit pagination instead of pretending loaded scope counts are complete', async () => {
     queryOverrides = { hasNextPage: true }
     rows = []
-    await render('?integration=gmail')
+    await render('?integration=google_drive')
     expect(container.textContent).toContain('More connections to check')
     await act(async () => buttons('Check connections')[0].click())
     expect(mocks.nextPage).toHaveBeenCalledOnce()
@@ -779,182 +516,72 @@ describe('grouped member integrations', () => {
     await act(async () => buttons('Connect')[0].click())
     expect(mocks.connectSearchSource).toHaveBeenCalledWith(
       scope,
-      expect.objectContaining({ type: 'gmail' }),
+      expect.objectContaining({ type: 'google_drive' }),
       undefined
     )
     expect(document.querySelector('[role="dialog"]')).toBeNull()
   })
-  it.each([
-    { data: undefined, isPending: true, isError: false },
-    { data: undefined, isPending: false, isError: true, error: new Error('Slack unavailable') },
-  ])(
-    'keeps other integrations usable when Slack inventory is unavailable: %o',
-    async (inventory) => {
-      mocks.slackInventory.mockReturnValue(inventory)
-      await render()
-      expect(buttons('Connect')).toHaveLength(1)
-      await act(async () => buttons('Connect')[0].click())
-      expect(mocks.connect).toHaveBeenCalledExactlyOnceWith('search-index', 'source-a')
-      expect(container.textContent).toContain('Gmail')
-    }
-  )
-  it.each([false, true])(
-    'preserves shared Slack onboarding without a duplicate row (configured: %s)',
-    async (configured) => {
-      mocks.overview.mockReturnValue({
-        data: { providers: configured ? [{ connectorType: 'slack' }] : [] },
-        isPending: false,
-      })
-      mocks.integrations.mockReturnValue({
-        data: [{ connectorType: 'slack', approved: true }],
-        isPending: false,
-      })
-      mocks.availability.mockReturnValue({
-        integrationAvailability: new Map([['slack_v2', { state: 'ready', oauthAvailable: true }]]),
-        oauthServiceAvailability: new Map([['slack', true]]),
-        isIntegrationAvailabilityReady: true,
-      })
-      mocks.slackInventory.mockReturnValue({
-        data: { available: [{ target: { connectorType: 'slack' } }] },
-        isPending: false,
-        isError: false,
-      })
-      rows = configured ? [{ ...memberSource, connectorType: 'slack' }] : []
-      await render()
-      expect(buttons('Connect')).toHaveLength(1)
-      expect(mocks.slackInventory).toHaveBeenCalledWith({
-        organizationId: scope.organizationId,
-        connectorType: 'slack',
-      })
-      await act(async () => buttons('Connect')[0].click())
-      if (configured) {
-        expect(mocks.connect).toHaveBeenCalledExactlyOnceWith('search-index', 'source-a')
-        expect(mocks.connectSearchSource).not.toHaveBeenCalled()
-      } else {
-        expect(mocks.connectSearchSource).toHaveBeenCalledExactlyOnceWith(
-          scope,
-          expect.objectContaining({ type: 'slack' }),
-          undefined
-        )
-        expect(mocks.connect).not.toHaveBeenCalled()
-      }
-      expect(document.querySelector('[role="dialog"]')).toBeNull()
-    }
-  )
-  it('keeps Slack setup errors relevant to the selected integration filter', async () => {
-    mocks.integrations.mockReturnValue({
-      data: [
-        { connectorType: 'gmail', approved: true },
-        { connectorType: 'slack', approved: true },
-      ],
-      isPending: false,
-    })
-    mocks.slackInventory.mockReturnValue({
-      isPending: false,
-      isError: true,
-      error: new Error('Could not load Slack setup'),
-    })
-    await render('', <MemberIntegrationsList search='Gmail' />)
-    expect(container.textContent).not.toContain('Could not load Slack setup')
-    expect(buttons('Connect')).toHaveLength(1)
-    await render('', <MemberIntegrationsList search='Slack' />)
-    expect(container.textContent).toContain('Could not load Slack setup')
-    expect(container.textContent).not.toContain('No integrations are available to connect')
-    expect(container.textContent).not.toContain('No matching integrations')
-  })
-  it.each([
-    { data: { available: [] }, isPending: false, isError: false },
-    {
-      data: { available: [{ target: { connectorType: 'slack', connectorId: 'existing' } }] },
-      isPending: false,
-      isError: false,
-    },
-    { data: undefined, isPending: true, isError: false },
-    { data: undefined, isPending: false, isError: true, error: new Error('Could not load Slack') },
-  ])('withholds new Slack setup without a ready shared-app target: %o', async (inventory) => {
-    mocks.overview.mockReturnValue({ data: { providers: [] }, isPending: false })
-    mocks.integrations.mockReturnValue({
-      data: [{ connectorType: 'slack', approved: true }],
-      isPending: false,
-    })
-    mocks.availability.mockReturnValue({
-      integrationAvailability: new Map([['slack_v2', { state: 'ready', oauthAvailable: true }]]),
-      oauthServiceAvailability: new Map([['slack', true]]),
-      isIntegrationAvailabilityReady: true,
-    })
-    mocks.slackInventory.mockReturnValue(inventory)
-    await render()
-    expect(buttons('Connect')).toHaveLength(0)
-    expect(mocks.connectSearchSource).not.toHaveBeenCalled()
-  })
   it('withholds new setup on failed/incomplete provider data', async () => {
     mocks.overview.mockReturnValue({
-      data: { providers: [{ connectorType: 'confluence', isSyncing: false }] },
+      data: { providers: [{ connectorType: 'google_drive', isSyncing: false }] },
       isPending: false,
     })
     mocks.integrations.mockReturnValue({
-      data: [{ connectorType: 'confluence', approved: true }],
+      data: [{ connectorType: 'google_drive', approved: true }],
       isPending: false,
     })
-    rows = [{ ...memberSource, connectorType: 'confluence' }]
+    rows = [{ ...memberSource, connectorType: 'google_drive' }]
     queryOverrides = { isError: true, error: new Error('Could not load'), hasNextPage: false }
-    await render('?integration=confluence')
+    await render('?integration=google_drive')
     expect(
       mocks.accountMenu.mock.calls.at(-1)?.[0].actions.map((action: RowAction) => action.label)
     ).toEqual([])
     queryOverrides = { hasNextPage: true }
-    await render('?integration=confluence')
+    await render('?integration=google_drive')
     expect(
       mocks.accountMenu.mock.calls.at(-1)?.[0].actions.map((action: RowAction) => action.label)
     ).toEqual([])
   })
   it('keeps the integration menu open during background indexing refreshes', async () => {
     mocks.overview.mockReturnValue({
-      data: { providers: [{ connectorType: 'confluence', isSyncing: true }] },
+      data: { providers: [{ connectorType: 'google_drive', isSyncing: true }] },
       isPending: false,
     })
     mocks.integrations.mockReturnValue({
-      data: [{ connectorType: 'confluence', approved: true }],
+      data: [{ connectorType: 'google_drive', approved: true }],
       isPending: false,
     })
-    rows = [{ ...memberSource, connectorType: 'confluence' }]
-    await render('?integration=confluence')
+    rows = [{ ...memberSource, connectorType: 'google_drive' }]
+    await render('?integration=google_drive')
     const trigger = document.querySelector<HTMLButtonElement>(
-      '[aria-label="Confluence integration actions"]'
+      '[aria-label="Google Drive integration actions"]'
     )!
     await act(async () =>
       trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
     )
     expect(document.querySelector('[role="menu"]')).not.toBeNull()
     queryOverrides = { isFetching: true }
-    await render('?integration=confluence')
-    expect(document.querySelector('[aria-label="Confluence integration actions"]')).toBe(trigger)
+    await render('?integration=google_drive')
+    expect(document.querySelector('[aria-label="Google Drive integration actions"]')).toBe(trigger)
     expect(document.querySelector('[role="menu"]')).not.toBeNull()
   })
-  it('retains typed connection requests and Slack onboarding on the main page', async () => {
+  it('retains typed connection requests on the main page', async () => {
     const connectionRequest = {
       userId: 'person',
       target: {
         type: 'link' as const,
-        provider: 'google-email',
-        connectorType: 'gmail',
+        provider: 'google-drive',
+        connectorType: 'google_drive',
         connectorId: 'source-a',
       },
     }
-    await render(
-      '',
-      <OrganizationIntegrations
-        connectionRequest={connectionRequest}
-        slackOnboarding={{ token: 'onboarding', userId: 'person' }}
-      />
-    )
+    await render('', <OrganizationIntegrations connectionRequest={connectionRequest} />)
     expect(mocks.request).toHaveBeenCalledWith(
       expect.objectContaining({ ...connectionRequest, organizationId: scope.organizationId })
     )
-    expect(container.textContent).toContain('Return to Slack')
   })
   it('keeps scoped enrollment invalidations and toast error handling', async () => {
-    await render('?integration=gmail')
+    await render('?integration=google_drive')
     const options = mocks.enrollment.mock.calls.at(-1)?.[0] as {
       membershipQueryKeys: unknown[]
       onConnectionError: (message: string) => void

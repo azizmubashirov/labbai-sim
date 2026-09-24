@@ -106,7 +106,6 @@ const testData = {
 
 const {
   handleWhatsAppVerificationMock,
-  handleSlackChallengeMock,
   processWhatsAppDeduplicationMock,
   processGenericDeduplicationMock,
   processWebhookMock,
@@ -119,12 +118,8 @@ const {
   shouldSkipWebhookEventMock,
   admissionRejectedResponseMock,
   tryAdmitMock,
-  getLegacySlackCustomBotCredentialIdMock,
-  verifySlackCustomBotCredentialRequestMock,
-  dispatchSlackCustomBotCredentialMock,
 } = vi.hoisted(() => ({
   handleWhatsAppVerificationMock: vi.fn().mockResolvedValue(null),
-  handleSlackChallengeMock: vi.fn().mockReturnValue(null),
   processWhatsAppDeduplicationMock: vi.fn().mockResolvedValue(null),
   processGenericDeduplicationMock: vi.fn().mockResolvedValue(null),
   processWebhookMock: vi.fn().mockResolvedValue(new Response('Webhook processed', { status: 200 })),
@@ -179,20 +174,11 @@ const {
   shouldSkipWebhookEventMock: vi.fn().mockReturnValue(false),
   admissionRejectedResponseMock: vi.fn(),
   tryAdmitMock: vi.fn<() => { release: () => void } | null>(() => ({ release: vi.fn() })),
-  getLegacySlackCustomBotCredentialIdMock: vi.fn(),
-  verifySlackCustomBotCredentialRequestMock: vi.fn(),
-  dispatchSlackCustomBotCredentialMock: vi.fn(),
 }))
 
 vi.mock('@/lib/core/admission/gate', () => ({
   admissionRejectedResponse: admissionRejectedResponseMock,
   tryAdmit: tryAdmitMock,
-}))
-
-vi.mock('@/lib/webhooks/slack-custom-ingress', () => ({
-  getLegacySlackCustomBotCredentialId: getLegacySlackCustomBotCredentialIdMock,
-  verifySlackCustomBotCredentialRequest: verifySlackCustomBotCredentialRequestMock,
-  dispatchSlackCustomBotCredential: dispatchSlackCustomBotCredentialMock,
 }))
 
 vi.mock('@trigger.dev/sdk', () => ({
@@ -214,7 +200,6 @@ vi.mock('@/background/webhook-execution', () => ({
 
 vi.mock('@/lib/webhooks/utils', () => ({
   handleWhatsAppVerification: handleWhatsAppVerificationMock,
-  handleSlackChallenge: handleSlackChallengeMock,
   processWhatsAppDeduplication: processWhatsAppDeduplicationMock,
   processGenericDeduplication: processGenericDeduplicationMock,
   processWebhook: processWebhookMock,
@@ -513,20 +498,6 @@ describe('Webhook Trigger API Route', () => {
     workflowsPersistenceUtilsMockFns.mockBlockExistsInDeployment.mockResolvedValue(true)
     handleWebhookEventFilterMock.mockResolvedValue(null)
     shouldSkipWebhookEventMock.mockReturnValue(false)
-    getLegacySlackCustomBotCredentialIdMock.mockImplementation((foundWebhook: TestWebhook) => {
-      const providerConfig = foundWebhook.providerConfig ?? {}
-      return providerConfig.ingressMode === 'legacy_custom_bot'
-        ? (providerConfig.credentialId as string)
-        : null
-    })
-    verifySlackCustomBotCredentialRequestMock.mockResolvedValue(null)
-    dispatchSlackCustomBotCredentialMock.mockResolvedValue([
-      {
-        outcome: 'queued',
-        reason: 'queued',
-        response: new NextResponse(null, { status: 200 }),
-      },
-    ])
 
     // Set up default workflow for tests
     testData.workflows.push({
@@ -658,7 +629,7 @@ describe('Webhook Trigger API Route', () => {
 
   describe('Non-path trigger providers', () => {
     /** Sourced from the registries so a newly added trigger is covered automatically. */
-    it.each([...INTERNAL_TRIGGER_PROVIDERS, ...POLLING_PROVIDERS, 'tiktok'])(
+    it.each([...INTERNAL_TRIGGER_PROVIDERS, ...POLLING_PROVIDERS])(
       'rejects HTTP deliveries to %s trigger paths with 404',
       async (provider) => {
         testData.webhooks.push({
@@ -836,8 +807,8 @@ describe('Webhook Trigger API Route', () => {
 
     it('rejects a GET delivery to a provider that only accepts POST', async () => {
       testData.webhooks.push({
-        id: 'stripe-webhook-id',
-        provider: 'stripe',
+        id: 'telegram-webhook-id',
+        provider: 'telegram',
         path: 'post-only-path',
         isActive: true,
         providerConfig: {},
@@ -914,8 +885,8 @@ describe('Webhook Trigger API Route', () => {
 
     it('rejects a PUT delivery to a provider that only accepts POST', async () => {
       testData.webhooks.push({
-        id: 'stripe-webhook-id',
-        provider: 'stripe',
+        id: 'telegram-webhook-id',
+        provider: 'telegram',
         path: 'post-only-path',
         isActive: true,
         providerConfig: {},
@@ -975,237 +946,6 @@ describe('Webhook Trigger API Route', () => {
       const response = await DELETE(req, { params: Promise.resolve({ path: 'unknown-path' }) })
 
       expect(response.status).toBe(405)
-      expect(dispatchResolvedWebhookTargetMock).not.toHaveBeenCalled()
-    })
-  })
-
-  describe('Migrated legacy Slack paths', () => {
-    it('authenticates by custom-bot credential and replaces direct dispatch with fan-out', async () => {
-      testData.webhooks.push({
-        id: 'legacy-slack-webhook',
-        provider: 'slack',
-        path: 'legacy-slack-path',
-        routingKey: 'credential-1',
-        isActive: true,
-        providerConfig: {
-          triggerId: 'slack_webhook',
-          credentialId: 'credential-1',
-          ingressMode: 'legacy_custom_bot',
-        },
-        workflowId: 'test-workflow-id',
-      })
-
-      const response = await POST(createMockRequest('POST', { type: 'event_callback' }), {
-        params: Promise.resolve({ path: 'legacy-slack-path' }),
-      })
-
-      expect(response.status).toBe(200)
-      expect(verifySlackCustomBotCredentialRequestMock).toHaveBeenCalledWith(
-        expect.objectContaining({ credentialId: 'credential-1' })
-      )
-      expect(dispatchSlackCustomBotCredentialMock).toHaveBeenCalledWith(
-        expect.objectContaining({ credentialId: 'credential-1' })
-      )
-      expect(dispatchResolvedWebhookTargetMock).not.toHaveBeenCalled()
-    })
-
-    it('rejects a legacy alias when its credential signature is invalid', async () => {
-      testData.webhooks.push({
-        id: 'legacy-slack-webhook',
-        provider: 'slack',
-        path: 'legacy-slack-path',
-        routingKey: 'credential-1',
-        isActive: true,
-        providerConfig: {
-          triggerId: 'slack_webhook',
-          credentialId: 'credential-1',
-          ingressMode: 'legacy_custom_bot',
-        },
-        workflowId: 'test-workflow-id',
-      })
-      verifySlackCustomBotCredentialRequestMock.mockResolvedValueOnce(
-        new NextResponse('Unauthorized', { status: 401 })
-      )
-
-      const response = await POST(createMockRequest('POST', { type: 'event_callback' }), {
-        params: Promise.resolve({ path: 'legacy-slack-path' }),
-      })
-
-      expect(response.status).toBe(401)
-      expect(dispatchSlackCustomBotCredentialMock).not.toHaveBeenCalled()
-      expect(dispatchResolvedWebhookTargetMock).not.toHaveBeenCalled()
-    })
-
-    it('continues past a missing credential to another valid legacy credential', async () => {
-      testData.webhooks.push(
-        {
-          id: 'missing-legacy-slack-webhook',
-          provider: 'slack',
-          path: 'shared-legacy-slack-path',
-          routingKey: 'missing-credential',
-          isActive: true,
-          providerConfig: {
-            triggerId: 'slack_webhook',
-            credentialId: 'missing-credential',
-            ingressMode: 'legacy_custom_bot',
-          },
-          workflowId: 'test-workflow-id',
-        },
-        {
-          id: 'valid-legacy-slack-webhook',
-          provider: 'slack',
-          path: 'shared-legacy-slack-path',
-          routingKey: 'valid-credential',
-          isActive: true,
-          providerConfig: {
-            triggerId: 'slack_webhook',
-            credentialId: 'valid-credential',
-            ingressMode: 'legacy_custom_bot',
-          },
-          workflowId: 'test-workflow-id',
-        }
-      )
-      verifySlackCustomBotCredentialRequestMock.mockImplementation(
-        async ({ credentialId }: { credentialId: string }) =>
-          credentialId === 'missing-credential' ? new NextResponse(null, { status: 404 }) : null
-      )
-
-      const response = await POST(createMockRequest('POST', { type: 'event_callback' }), {
-        params: Promise.resolve({ path: 'shared-legacy-slack-path' }),
-      })
-
-      expect(response.status).toBe(200)
-      expect(dispatchSlackCustomBotCredentialMock).toHaveBeenCalledOnce()
-      expect(dispatchSlackCustomBotCredentialMock).toHaveBeenCalledWith(
-        expect.objectContaining({ credentialId: 'valid-credential' })
-      )
-    })
-
-    it('continues to a direct webhook when every legacy credential is unavailable', async () => {
-      testData.webhooks.push(
-        {
-          id: 'missing-legacy-slack-webhook',
-          provider: 'slack',
-          path: 'shared-direct-path',
-          routingKey: 'missing-credential',
-          isActive: true,
-          providerConfig: {
-            triggerId: 'slack_webhook',
-            credentialId: 'missing-credential',
-            ingressMode: 'legacy_custom_bot',
-          },
-          workflowId: 'test-workflow-id',
-        },
-        {
-          id: 'direct-webhook',
-          provider: 'generic',
-          path: 'shared-direct-path',
-          isActive: true,
-          providerConfig: { requireAuth: false },
-          workflowId: 'test-workflow-id',
-        }
-      )
-      verifySlackCustomBotCredentialRequestMock.mockResolvedValueOnce(
-        new NextResponse(null, { status: 404 })
-      )
-
-      const response = await POST(createMockRequest('POST', { type: 'event_callback' }), {
-        params: Promise.resolve({ path: 'shared-direct-path' }),
-      })
-
-      expect(response.status).toBe(200)
-      expect(dispatchSlackCustomBotCredentialMock).not.toHaveBeenCalled()
-      expect(dispatchResolvedWebhookTargetMock).toHaveBeenCalledOnce()
-    })
-
-    it('propagates a legacy fan-out failure when no target queues successfully', async () => {
-      testData.webhooks.push({
-        id: 'legacy-slack-webhook',
-        provider: 'slack',
-        path: 'legacy-slack-path',
-        routingKey: 'credential-1',
-        isActive: true,
-        providerConfig: {
-          triggerId: 'slack_webhook',
-          credentialId: 'credential-1',
-          ingressMode: 'legacy_custom_bot',
-        },
-        workflowId: 'test-workflow-id',
-      })
-      dispatchSlackCustomBotCredentialMock.mockResolvedValueOnce([
-        {
-          outcome: 'failed',
-          reason: 'preprocessing',
-          response: NextResponse.json({ error: 'Preprocessing failed' }, { status: 500 }),
-        },
-      ])
-
-      const response = await POST(createMockRequest('POST', { type: 'event_callback' }), {
-        params: Promise.resolve({ path: 'legacy-slack-path' }),
-      })
-
-      expect(response.status).toBe(500)
-      expect(dispatchResolvedWebhookTargetMock).not.toHaveBeenCalled()
-    })
-
-    it('acknowledges a legacy fan-out when every target filters the event', async () => {
-      testData.webhooks.push({
-        id: 'legacy-slack-webhook',
-        provider: 'slack',
-        path: 'legacy-slack-path',
-        routingKey: 'credential-1',
-        isActive: true,
-        providerConfig: {
-          triggerId: 'slack_webhook',
-          credentialId: 'credential-1',
-          ingressMode: 'legacy_custom_bot',
-        },
-        workflowId: 'test-workflow-id',
-      })
-      dispatchSlackCustomBotCredentialMock.mockResolvedValueOnce([
-        {
-          outcome: 'ignored',
-          reason: 'filtered',
-          response: NextResponse.json({ message: 'Webhook event ignored' }),
-        },
-      ])
-
-      const response = await POST(createMockRequest('POST', { type: 'event_callback' }), {
-        params: Promise.resolve({ path: 'legacy-slack-path' }),
-      })
-
-      expect(response.status).toBe(200)
-      await expect(response.json()).resolves.toEqual({ message: 'Webhook event ignored' })
-      expect(dispatchResolvedWebhookTargetMock).not.toHaveBeenCalled()
-    })
-
-    it('acknowledges a legacy fan-out when every target permanently lacks its trigger block', async () => {
-      testData.webhooks.push({
-        id: 'legacy-slack-webhook',
-        provider: 'slack',
-        path: 'legacy-slack-path',
-        routingKey: 'credential-1',
-        isActive: true,
-        providerConfig: {
-          triggerId: 'slack_webhook',
-          credentialId: 'credential-1',
-          ingressMode: 'legacy_custom_bot',
-        },
-        workflowId: 'test-workflow-id',
-      })
-      dispatchSlackCustomBotCredentialMock.mockResolvedValueOnce([
-        {
-          outcome: 'ignored',
-          reason: 'block-missing',
-          response: new NextResponse('Trigger block not found in deployment', { status: 404 }),
-        },
-      ])
-
-      const response = await POST(createMockRequest('POST', { type: 'event_callback' }), {
-        params: Promise.resolve({ path: 'legacy-slack-path' }),
-      })
-
-      expect(response.status).toBe(200)
       expect(dispatchResolvedWebhookTargetMock).not.toHaveBeenCalled()
     })
   })

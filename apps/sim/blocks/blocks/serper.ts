@@ -116,36 +116,6 @@ export const SerperBlockMeta = {
   templates: [
     {
       icon: SerperIcon,
-      title: 'Serper SERP digest',
-      prompt:
-        'Build a scheduled daily workflow that runs Serper searches for tracked keywords, writes the SERP positions of my domain into a tables-based SEO log, and pings on changes.',
-      modules: ['scheduled', 'tables', 'agent', 'workflows'],
-      category: 'marketing',
-      tags: ['marketing', 'monitoring'],
-      alsoIntegrations: ['slack'],
-    },
-    {
-      icon: SerperIcon,
-      title: 'Serper competitor SERP watcher',
-      prompt:
-        'Create a workflow that runs Serper searches for competitor keywords weekly, captures top SERP entries, and writes a competitive SEO digest to Slack.',
-      modules: ['scheduled', 'agent', 'workflows'],
-      category: 'marketing',
-      tags: ['marketing', 'monitoring'],
-      alsoIntegrations: ['slack'],
-    },
-    {
-      icon: SerperIcon,
-      title: 'Serper news monitor',
-      prompt:
-        'Build a scheduled workflow that uses Serper news search for brand keywords, classifies each result, and posts notable mentions to a Slack PR channel.',
-      modules: ['scheduled', 'agent', 'workflows'],
-      category: 'marketing',
-      tags: ['marketing', 'monitoring'],
-      alsoIntegrations: ['slack'],
-    },
-    {
-      icon: SerperIcon,
       title: 'Serper local-pack tracker',
       prompt:
         'Create a workflow that uses Serper to track Google local-pack rankings for tracked queries by city, writes the results to a tables-based SEO log, and surfaces wins.',

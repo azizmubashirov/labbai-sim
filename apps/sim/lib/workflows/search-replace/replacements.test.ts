@@ -454,7 +454,7 @@ describe('buildWorkflowSearchReplacePlan', () => {
           value: [
             {
               type: 'slack',
-              toolId: 'slack_message',
+              toolId: 'telegram_send_document',
               operation: 'send',
               title: 'Slack message',
               params: {
@@ -553,7 +553,7 @@ describe('buildWorkflowSearchReplacePlan', () => {
           value: [
             {
               type: 'slack',
-              toolId: 'slack_message',
+              toolId: 'telegram_send_document',
               operation: 'send',
               title: 'Slack message',
               params: {
@@ -644,7 +644,7 @@ describe('buildWorkflowSearchReplacePlan', () => {
           value: [
             {
               type: 'slack',
-              toolId: 'slack_message',
+              toolId: 'telegram_send_document',
               operation: 'send',
               title: 'Slack message',
               params: {
@@ -674,7 +674,7 @@ describe('buildWorkflowSearchReplacePlan', () => {
     workflow.blocks['tool-input-1'].subBlocks.tools.value = [
       {
         type: 'slack',
-        toolId: 'slack_message',
+        toolId: 'telegram_send_document',
         operation: 'send',
         title: 'Slack message',
         params: {
@@ -739,7 +739,7 @@ describe('buildWorkflowSearchReplacePlan', () => {
           value: [
             {
               type: 'slack',
-              toolId: 'slack_message',
+              toolId: 'telegram_send_document',
               operation: 'send',
               title: 'Slack message',
               params: {
@@ -769,7 +769,7 @@ describe('buildWorkflowSearchReplacePlan', () => {
     workflow.blocks['tool-input-1'].subBlocks.tools.value = [
       {
         type: 'slack',
-        toolId: 'slack_message',
+        toolId: 'telegram_send_document',
         operation: 'send',
         title: 'Slack message',
         params: {

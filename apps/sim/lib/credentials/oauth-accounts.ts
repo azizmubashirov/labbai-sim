@@ -8,17 +8,11 @@ import type { OAuthConnection } from '@/lib/api/contracts/oauth-connections'
 import { deleteCredentialRecord } from '@/lib/credentials/orchestration'
 import type { OAuthProvider } from '@/lib/oauth'
 import { parseProvider } from '@/lib/oauth'
-import { QuickBooksTokenRevocationError, revokeQuickBooksToken } from '@/lib/oauth/quickbooks'
-import {
-  decryptQuickBooksOAuthClientConfig,
-  QuickBooksOAuthClientConfigurationError,
-} from '@/lib/oauth/quickbooks-client-config'
 import { providerIdsForService } from '@/lib/oauth/utils'
 
 const logger = createLogger('CredentialOAuthAccounts')
 const MAX_DISCONNECT_ACCOUNTS = 100
 const MAX_DISCONNECT_CREDENTIALS = 1000
-const QUICKBOOKS_DISCONNECT_TIMEOUT_MS = 30_000
 
 interface GoogleIdToken {
   email?: string
@@ -200,65 +194,9 @@ export async function disconnectOAuthAccounts(params: DisconnectOAuthAccountsPar
     credentialsByAccount.set(credentialRow.accountId, rows)
   }
 
-  const quickBooksDisconnectSignal = AbortSignal.timeout(QUICKBOOKS_DISCONNECT_TIMEOUT_MS)
   const deletedCredentials: typeof credentialRows = []
   try {
     for (const targetAccount of targetAccounts) {
-      let expectedAccountVersion: Date | undefined
-      if (targetAccount.providerId === 'quickbooks') {
-        const token = targetAccount.refreshToken?.trim() || targetAccount.accessToken?.trim()
-        if (token) {
-          if (!targetAccount.oauthConfig) {
-            throw new OAuthDisconnectConfigurationError(
-              'QuickBooks OAuth client configuration is missing. Reconnect the account and try again.'
-            )
-          }
-          let clientConfig
-          try {
-            clientConfig = await decryptQuickBooksOAuthClientConfig(targetAccount.oauthConfig)
-          } catch (error) {
-            if (!(error instanceof QuickBooksOAuthClientConfigurationError)) throw error
-            throw new OAuthDisconnectConfigurationError(
-              'QuickBooks OAuth client configuration is invalid. Reconnect the account and try again.',
-              error
-            )
-          }
-          try {
-            await revokeQuickBooksToken(token, clientConfig, quickBooksDisconnectSignal)
-          } catch (error) {
-            if (error instanceof QuickBooksTokenRevocationError && !error.retryable) {
-              throw new OAuthDisconnectConfigurationError(
-                'Intuit rejected the QuickBooks revocation request. Reconnect the account and try again.',
-                error
-              )
-            }
-            throw new OAuthProviderRevocationError('QuickBooks', error)
-          }
-        }
-
-        const cleanupVersion = new Date()
-        const claimedAccounts = await db
-          .update(account)
-          .set({
-            accessToken: null,
-            refreshToken: null,
-            idToken: null,
-            accessTokenExpiresAt: null,
-            refreshTokenExpiresAt: null,
-            updatedAt: cleanupVersion,
-          })
-          .where(
-            and(
-              eq(account.id, targetAccount.id),
-              eq(account.userId, params.userId),
-              eq(account.updatedAt, targetAccount.updatedAt)
-            )
-          )
-          .returning({ id: account.id })
-        if (claimedAccounts.length === 0) continue
-        expectedAccountVersion = cleanupVersion
-      }
-
       for (const credentialRow of credentialsByAccount.get(targetAccount.id) ?? []) {
         const deleted = await deleteCredentialRecord({
           credential: credentialRow,
@@ -268,13 +206,7 @@ export async function disconnectOAuthAccounts(params: DisconnectOAuthAccountsPar
       }
       await db
         .delete(account)
-        .where(
-          and(
-            eq(account.id, targetAccount.id),
-            eq(account.userId, params.userId),
-            expectedAccountVersion ? eq(account.updatedAt, expectedAccountVersion) : undefined
-          )
-        )
+        .where(and(eq(account.id, targetAccount.id), eq(account.userId, params.userId)))
     }
   } catch (error) {
     if (deletedCredentials.length === 0) throw error

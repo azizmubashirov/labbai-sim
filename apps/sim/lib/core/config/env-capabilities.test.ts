@@ -633,18 +633,18 @@ describe('env capabilities', () => {
 
   describe('OAuth and deployment metadata', () => {
     it('uses exact OAuth environment names and reports partial pairs', () => {
-      expect(inspectOAuthClientCapability('zoho-desk', { ZOHO_CLIENT_ID: 'client' })).toMatchObject(
-        {
-          state: 'partial',
-          missingFields: ['ZOHO_CLIENT_SECRET'],
-        }
-      )
+      expect(
+        inspectOAuthClientCapability('hubspot', { HUBSPOT_CLIENT_ID: 'client' })
+      ).toMatchObject({
+        state: 'partial',
+        missingFields: ['HUBSPOT_CLIENT_SECRET'],
+      })
     })
 
     it('fails fast when an OAuth client is partially configured', () => {
-      expect(() => requireOAuthClientCapability('slack', { SLACK_CLIENT_ID: 'client' })).toThrow(
-        /SLACK_CLIENT_SECRET/
-      )
+      expect(() =>
+        requireOAuthClientCapability('notion', { NOTION_CLIENT_ID: 'client' })
+      ).toThrow(/NOTION_CLIENT_SECRET/)
     })
 
     it('covers every OAuth integration', () => {

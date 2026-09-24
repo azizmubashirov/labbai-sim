@@ -162,16 +162,16 @@ describe('getUserPermissionConfig (org + entitlement gating)', () => {
 
   /**
    * The env list is written by hand against whatever ids its author knew, so it
-   * is canonicalized on the way in: `slack` and `slack_v2` are the same policy,
+   * is canonicalized on the way in: `notion` and `notion_v2` are the same policy,
    * and the merged config carries the id every gate resolves a block type to.
    */
   it('still applies the env allowlist on a no-org workspace', async () => {
     mockGetWorkspaceWithOwner.mockResolvedValue({ organizationId: null })
-    mockGetAllowedIntegrationsFromEnv.mockReturnValue(['slack'])
+    mockGetAllowedIntegrationsFromEnv.mockReturnValue(['notion'])
 
     const config = await getUserPermissionConfig('user-123', 'workspace-1')
 
-    expect(config?.allowedIntegrations).toEqual(['slack_v2'])
+    expect(config?.allowedIntegrations).toEqual(['notion_v2'])
   })
 
   it('returns null when the organization is not on an enterprise plan', async () => {
@@ -334,19 +334,19 @@ describe('access control context resolution', () => {
   /**
    * The group and the deployment name the same integrations by different
    * vintages — the editor only offers current ids, `ALLOWED_INTEGRATIONS` is
-   * hand-written. Intersecting them textually left Slack out of a policy both
+   * hand-written. Intersecting them textually left Notion out of a policy both
    * layers permit, so both sides are successor-resolved first.
    */
   it('identifies the default group and preserves the environment allowlist', async () => {
     mockIsOrganizationOnEnterprisePlan.mockResolvedValue(true)
-    mockGetAllowedIntegrationsFromEnv.mockReturnValue(['slack'])
+    mockGetAllowedIntegrationsFromEnv.mockReturnValue(['notion'])
     queueGroupResolution(
       [],
       [
         {
           id: 'group-default',
           name: 'Organization default',
-          config: { allowedIntegrations: ['slack_v2', 'github'] },
+          config: { allowedIntegrations: ['notion_v2', 'telegram'] },
         },
       ]
     )
@@ -362,7 +362,7 @@ describe('access control context resolution', () => {
       name: 'Organization default',
       resolution: 'default',
     })
-    expect(context.config?.allowedIntegrations).toEqual(['slack_v2'])
+    expect(context.config?.allowedIntegrations).toEqual(['notion_v2'])
   })
 })
 
@@ -455,7 +455,7 @@ describe('validateBlockType', () => {
     })
 
     it('allows multi-word block types', async () => {
-      await validateBlockType(undefined, undefined, 'microsoft_excel')
+      await validateBlockType(undefined, undefined, 'google_forms')
     })
 
     it('always allows start_trigger', async () => {
@@ -464,34 +464,34 @@ describe('validateBlockType', () => {
 
     it('case-folds a stored allowlist so a mixed-case entry still matches', async () => {
       setEnterpriseOrgWorkspace()
-      queueGroupResolution([{ config: { allowedIntegrations: ['Slack'] } }])
+      queueGroupResolution([{ config: { allowedIntegrations: ['Telegram'] } }])
 
-      await validateBlockType('user-123', 'workspace-1', 'slack')
+      await validateBlockType('user-123', 'workspace-1', 'telegram')
     })
 
     /**
      * Registry keys are lowercase, so a mixed-case block type must be folded
-     * *before* the successor lookup. Resolving first makes `getBlock('Slack')`
-     * miss, the successor answer `Slack`, and the comparison fall back to
-     * `slack` — refusing a block the allowlist permits as `slack_v2`.
+     * *before* the successor lookup. Resolving first makes `getBlock('Notion')`
+     * miss, the successor answer `Notion`, and the comparison fall back to
+     * `notion` — refusing a block the allowlist permits as `notion_v2`.
      */
     it('resolves a superseded block supplied with different casing', async () => {
       setEnterpriseOrgWorkspace()
       mockGetBlock.mockImplementation((type: string) =>
-        type === 'slack'
-          ? { hideFromToolbar: true, sunset: { status: 'legacy', replacedBy: 'slack_v2' } }
-          : type === 'slack_v2'
+        type === 'notion'
+          ? { hideFromToolbar: true, sunset: { status: 'legacy', replacedBy: 'notion_v2' } }
+          : type === 'notion_v2'
             ? {}
             : undefined
       )
-      queueGroupResolution([{ config: { allowedIntegrations: ['slack_v2'] } }])
+      queueGroupResolution([{ config: { allowedIntegrations: ['notion_v2'] } }])
 
-      await validateBlockType('user-123', 'workspace-1', 'Slack')
+      await validateBlockType('user-123', 'workspace-1', 'Notion')
     })
 
     it('still rejects a block absent from a mixed-case stored allowlist', async () => {
       setEnterpriseOrgWorkspace()
-      queueGroupResolution([{ config: { allowedIntegrations: ['Slack'] } }])
+      queueGroupResolution([{ config: { allowedIntegrations: ['Telegram'] } }])
 
       await expect(validateBlockType('user-123', 'workspace-1', 'discord')).rejects.toThrow(
         IntegrationNotAllowedError
@@ -502,16 +502,16 @@ describe('validateBlockType', () => {
   describe('when env allowlist is configured', () => {
     beforeEach(() => {
       mockGetAllowedIntegrationsFromEnv.mockReturnValue([
-        'slack',
+        'telegram',
         'google_drive',
-        'microsoft_excel',
+        'google_forms',
       ])
     })
 
     it('allows block types on the allowlist', async () => {
-      await validateBlockType(undefined, undefined, 'slack')
+      await validateBlockType(undefined, undefined, 'telegram')
       await validateBlockType(undefined, undefined, 'google_drive')
-      await validateBlockType(undefined, undefined, 'microsoft_excel')
+      await validateBlockType(undefined, undefined, 'google_forms')
     })
 
     it('rejects block types not on the allowlist', async () => {
@@ -551,7 +551,7 @@ describe('validateBlockType', () => {
     })
 
     it('matches case-insensitively', async () => {
-      await validateBlockType(undefined, undefined, 'Slack')
+      await validateBlockType(undefined, undefined, 'Telegram')
       await validateBlockType(undefined, undefined, 'GOOGLE_DRIVE')
     })
 

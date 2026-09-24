@@ -14,7 +14,6 @@ import {
 import { type ProcessOutboxResult, processOutboxEvents } from '@/lib/core/outbox/service'
 import { DeadlineExceededError } from '@/lib/core/utils/deadline'
 import { directGrantOutboxHandlers } from '@/lib/invitations/direct-grant'
-import { slackSearchOutboxHandlers } from '@/lib/knowledge/application/slack-search/outbox'
 import { getConnectorFailureDiagnostic } from '@/lib/knowledge/connectors/connector-error'
 import { knowledgeDocumentProcessingOutboxHandlers } from '@/lib/knowledge/documents/processing-outbox-handler'
 import { recoverKnowledgeDocumentProcessing } from '@/lib/knowledge/documents/processing-recovery'
@@ -31,7 +30,6 @@ import { reapStaleBackgroundWork } from '@/ee/workspace-forking/lib/background-w
 const logger = createLogger('OutboxProcessor')
 
 const handlers = {
-  ...slackSearchOutboxHandlers,
   ...adminInvitationOperationOutboxHandlers,
   ...adminMemberOperationOutboxHandlers,
   ...billingOutboxHandlers,

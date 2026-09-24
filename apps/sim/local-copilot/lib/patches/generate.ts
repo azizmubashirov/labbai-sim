@@ -24,15 +24,15 @@ export async function generateWorkflowPatchFromRequest(
   const warnings: string[] = []
   const recommendations: string[] = []
 
-  if (request.includes('slack') && request.includes('notification')) {
+  if (request.includes('telegram') && request.includes('notification')) {
     const anchorId = targetBlockId ?? findLastNonTriggerBlock(context)
-    const slackBlockId = generateId()
+    const telegramBlockId = generateId()
     changes.push({
       operation: 'add_block',
       block: {
-        id: slackBlockId,
-        type: 'slack',
-        name: 'Slack Notification',
+        id: telegramBlockId,
+        type: 'telegram',
+        name: 'Telegram Notification',
         position: nextPosition(context, anchorId),
         subBlocks: {},
         outputs: {},
@@ -45,15 +45,15 @@ export async function generateWorkflowPatchFromRequest(
         edge: {
           id: generateId(),
           source: anchorId,
-          target: slackBlockId,
+          target: telegramBlockId,
           sourceHandle: 'source',
           targetHandle: 'target',
         },
       })
     } else {
-      warnings.push('No anchor block found — connect the new Slack block manually')
+      warnings.push('No anchor block found — connect the new Telegram block manually')
     }
-    recommendations.push('Configure Slack channel and message content')
+    recommendations.push('Configure the Telegram chat and message content')
   }
 
   if (request.includes('retry')) {
@@ -121,7 +121,7 @@ export async function generateWorkflowPatchFromRequest(
 
   if (changes.length === 0 && request.includes('create')) {
     recommendations.push(
-      'Describe triggers, integrations, and data flow — e.g. "webhook → OpenAI → Slack"'
+      'Describe triggers, integrations, and data flow — e.g. "webhook → OpenAI → Telegram"'
     )
     warnings.push('Could not infer specific blocks — provide more detail for generation')
   }

@@ -3,7 +3,7 @@ import { OrchestrationError } from '@/lib/core/orchestration/types'
 import { resourceScopeFromOwner, sameResourceScope } from '@/lib/core/resource-scope'
 import { decryptSecret, encryptSecret } from '@/lib/core/security/encryption'
 import { secureFetchWithValidation } from '@/lib/core/security/input-validation.server'
-import { normalizeGitLabHost } from '@/tools/gitlab/utils'
+import { normalizeGitLabHost } from '@/lib/credentials/gitlab-host'
 
 const gitLabUserSchema = z.object({
   id: z.number().int().positive(),

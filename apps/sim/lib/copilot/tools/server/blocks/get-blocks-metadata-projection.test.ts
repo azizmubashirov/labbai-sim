@@ -9,15 +9,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
  * off `@/tools/registry`.
  *
  * The sibling suite exercises this tool's gating against a mocked registry; this
- * one runs it against the real Slack block config and the real generated tool
+ * one runs it against the real Notion block config and the real generated tool
  * metadata, because the thing worth proving is exactly that the metadata
  * artifacts can answer everything the executable registry used to. Only the
- * Slack block is read, so only it is registered.
+ * Notion block is read, so only it is registered.
  */
 vi.unmock('@/blocks/registry')
 vi.mock('@/blocks/registry-maps', async () => {
   const { partialBlockRegistry } = await import('@sim/testing/mocks/block-registry.mock')
-  return partialBlockRegistry(await import('@/blocks/blocks/slack'))
+  return partialBlockRegistry(await import('@/blocks/blocks/notion'))
 })
 
 const mocks = vi.hoisted(() => ({
@@ -62,15 +62,15 @@ describe('get_blocks_metadata against the real registries', () => {
 
   it('resolves an integration block’s operations and their tool-derived inputs', async () => {
     const result = await getBlocksMetadataServerTool.execute(
-      { blockIds: ['slack_v2'] },
+      { blockIds: ['notion_v2'] },
       { userId: 'user-1', workspaceId: 'workspace-1' }
     )
 
-    const slack = result.metadata.slack_v2 as AgentBlockMetadata
-    expect(slack.blockType).toBe('slack_v2')
-    expect(slack.name).toBe('Slack')
+    const notion = result.metadata.notion_v2 as AgentBlockMetadata
+    expect(notion.blockType).toBe('notion_v2')
+    expect(notion.name).toBe('Notion')
 
-    const operations = slack.operations ?? {}
+    const operations = notion.operations ?? {}
     expect(Object.keys(operations).length).toBeGreaterThan(0)
     for (const [operationId, operation] of Object.entries(operations)) {
       expect(operation.name, operationId).toBeTruthy()

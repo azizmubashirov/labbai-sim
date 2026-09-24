@@ -30,11 +30,6 @@ const OrganizationConnectedAccounts = dynamic(() =>
     (m) => m.OrganizationConnectedAccounts
   )
 )
-const OrganizationSearchSlack = dynamic(() =>
-  import('@/app/o/[organizationId]/settings/components/organization-search-slack').then(
-    (m) => m.OrganizationSearchSlack
-  )
-)
 
 const TeamManagement = dynamic(() =>
   import('@/app/workspace/[workspaceId]/settings/components/team-management/team-management').then(
@@ -95,7 +90,6 @@ export function OrganizationSettings({ section }: OrganizationSettingsProps) {
         <OrganizationConnectedAccounts organizationId={organizationId} />
       )}
       {section === 'search-mcp' && <OrganizationSearchMcp />}
-      {section === 'search-slack' && <OrganizationSearchSlack />}
       {section === 'members' && (
         <TeamManagement
           organizationId={organizationId}

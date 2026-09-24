@@ -1,7 +1,6 @@
 import { AuditAction, AuditResourceType, recordAudit } from '@sim/audit'
 import { type DelegatedPrincipal, resolvePrincipalSubject } from '@sim/auth/principal'
 import { createLogger } from '@sim/logger'
-import { getErrorMessage } from '@sim/utils/errors'
 import {
   impersonateEmailSchema,
   type OAuthTokenResponse,
@@ -20,16 +19,9 @@ import {
   resolveOAuthAccountId,
   resolveServiceAccountToken,
 } from '@/lib/oauth/credential-service'
-import {
-  extractMicrosoftDataverseEnvironmentUrl,
-  MICROSOFT_DATAVERSE_PROVIDER_ID,
-} from '@/lib/oauth/microsoft-dataverse'
-import { parseQuickBooksAccountId } from '@/lib/oauth/quickbooks'
-import { extractSalesforceInstanceUrl, isSalesforceOAuthProviderId } from '@/lib/oauth/salesforce'
 import { getCanonicalScopesForProvider } from '@/lib/oauth/utils'
 import { captureServerEvent } from '@/lib/posthog/server'
 import { getToolMetadata } from '@/tools/metadata'
-import { extractZohoDeskBaseFromScope } from '@/tools/zoho_desk/host-allowlist'
 
 const logger = createLogger('OAuthTokenResolution')
 
@@ -72,23 +64,11 @@ interface OAuthCredentialContext {
   accountId?: string | null
 }
 
+/** Hook for provider-specific credential identity checks; no kept provider needs one. */
 export function validateOAuthCredentialContext(
-  credential: OAuthCredentialContext
+  _credential: OAuthCredentialContext
 ): { ok: true } | { ok: false; error: string } {
-  if (credential.providerId !== 'quickbooks') return { ok: true }
-
-  try {
-    parseQuickBooksAccountId(credential.accountId ?? '')
-    return { ok: true }
-  } catch (error) {
-    return {
-      ok: false,
-      error: getErrorMessage(
-        error,
-        'QuickBooks company identity is invalid. Reconnect the QuickBooks credential.'
-      ),
-    }
-  }
+  return { ok: true }
 }
 
 /**
@@ -131,8 +111,6 @@ export function recordCredentialAccess(params: {
 
 /**
  * Projects a stored OAuth credential plus its access token into the wire payload.
- * Provider hosts come out of the scope string through shared allowlisted helpers, never a
- * local regex — these values are injected into tool calls that carry the token.
  */
 function buildOAuthTokenPayload(
   credential: {
@@ -143,32 +121,10 @@ function buildOAuthTokenPayload(
   },
   accessToken: string
 ): CredentialTokenPayload {
-  const instanceUrl = isSalesforceOAuthProviderId(credential.providerId)
-    ? extractSalesforceInstanceUrl(credential.scope ?? undefined)
-    : credential.providerId === MICROSOFT_DATAVERSE_PROVIDER_ID
-      ? extractMicrosoftDataverseEnvironmentUrl(credential.scope)
-      : undefined
-
-  let apiDomain: string | undefined
-  if (credential.providerId === 'zoho-desk' && credential.scope) {
-    apiDomain = extractZohoDeskBaseFromScope(credential.scope)
-  }
-
-  const quickBooksIdentity =
-    credential.providerId === 'quickbooks'
-      ? parseQuickBooksAccountId(credential.accountId ?? '')
-      : undefined
-
   return {
     accessToken,
     credentialType: 'oauth',
     idToken: credential.idToken || undefined,
-    ...(instanceUrl && { instanceUrl }),
-    ...(apiDomain && { apiDomain }),
-    ...(quickBooksIdentity && {
-      realmId: quickBooksIdentity.realmId,
-      quickBooksEnvironment: quickBooksIdentity.environment,
-    }),
   }
 }
 

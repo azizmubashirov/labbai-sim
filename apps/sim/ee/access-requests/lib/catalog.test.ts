@@ -126,16 +126,16 @@ describe('access request catalog deployment ceilings', () => {
       id === 'missing' ? undefined : { id, name: id }
     )
     mocks.blocks.mockReturnValue({
-      slack_v2: {
-        type: 'slack_v2',
-        name: 'Slack',
-        tools: { access: ['slack_send_message_v2', 'missing'] },
+      gmail_v2: {
+        type: 'gmail_v2',
+        name: 'Gmail',
+        tools: { access: ['gmail_send_v2', 'missing'] },
       },
-      github_v2: { type: 'github_v2', name: 'GitHub', tools: { access: ['github_create_issue'] } },
-      github: {
-        type: 'github',
-        name: 'Retired GitHub',
-        tools: { access: ['retired_github_tool'] },
+      notion_v2: { type: 'notion_v2', name: 'Notion', tools: { access: ['notion_create_page'] } },
+      notion: {
+        type: 'notion',
+        name: 'Retired Notion',
+        tools: { access: ['retired_notion_tool'] },
       },
       hidden: { type: 'hidden', name: 'Hidden', hideFromToolbar: true },
       unrevealed: { type: 'unrevealed', name: 'Unrevealed', preview: true },
@@ -153,11 +153,11 @@ describe('access request catalog deployment ceilings', () => {
     expect([...catalog.integrations.keys()]).toEqual([
       'loop',
       'parallel',
-      'slack_v2',
-      'github_v2',
+      'gmail_v2',
+      'notion_v2',
       'revealed',
     ])
-    expect([...catalog.tools.keys()]).toEqual(['slack_send_message_v2', 'github_create_issue'])
+    expect([...catalog.tools.keys()]).toEqual(['gmail_send_v2', 'notion_create_page'])
     expect(mocks.visibility).toHaveBeenCalledWith({
       userId: 'viewer',
       orgId: 'org',
@@ -192,28 +192,28 @@ describe('access request catalog deployment ceilings', () => {
   })
 
   it('canonicalizes the deployment integration allowlist before matching', async () => {
-    mocks.allowedIntegrations.mockReturnValue(['SLACK'])
+    mocks.allowedIntegrations.mockReturnValue(['GMAIL'])
     const catalog = await loadAccessRequestCatalog(context)
-    expect([...catalog.integrations.keys()]).toEqual(['slack_v2'])
-    expect([...catalog.tools.keys()]).toEqual(['slack_send_message_v2'])
+    expect([...catalog.integrations.keys()]).toEqual(['gmail_v2'])
+    expect([...catalog.tools.keys()]).toEqual(['gmail_send_v2'])
     mocks.allowedIntegrations.mockReturnValue([])
     expect((await loadAccessRequestCatalog(context)).integrations.size).toBe(0)
   })
 
   it('enforces deployment ceilings without removing unrelated stored grants from an approval', async () => {
-    mocks.allowedIntegrations.mockReturnValue(['slack'])
+    mocks.allowedIntegrations.mockReturnValue(['gmail'])
     const catalog = await loadAccessRequestCatalog(context, 'integration')
     expect(
-      validateAccessRequestTarget({ kind: 'integration', id: 'github_v2' }, catalog)
+      validateAccessRequestTarget({ kind: 'integration', id: 'notion_v2' }, catalog)
     ).toBeNull()
-    const config = { ...DEFAULT_PERMISSION_GROUP_CONFIG, allowedIntegrations: ['github_v2'] }
+    const config = { ...DEFAULT_PERMISSION_GROUP_CONFIG, allowedIntegrations: ['notion_v2'] }
     const delta = buildAccessRequestPolicyDelta(
-      { kind: 'integration', id: 'slack_v2' },
+      { kind: 'integration', id: 'gmail_v2' },
       config,
       catalog
     )
-    expect(delta.config.allowedIntegrations).toEqual(['github_v2', 'slack_v2'])
-    expect(config.allowedIntegrations).toEqual(['github_v2'])
+    expect(delta.config.allowedIntegrations).toEqual(['notion_v2', 'gmail_v2'])
+    expect(config.allowedIntegrations).toEqual(['notion_v2'])
   })
 
   it('omits blacklisted/retired models, unconfigured endpoints, and private dynamic names', async () => {

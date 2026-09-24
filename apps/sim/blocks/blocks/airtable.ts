@@ -492,26 +492,6 @@ export const AirtableBlockMeta = {
   templates: [
     {
       icon: AirtableIcon,
-      title: 'Airtable data sync',
-      prompt:
-        'Create a scheduled workflow that syncs records from my Airtable base into a Sim table every hour, keeping both in sync. Use an agent to detect changes, resolve conflicts, and flag any discrepancies for review in Slack.',
-      modules: ['tables', 'scheduled', 'agent', 'workflows'],
-      category: 'operations',
-      tags: ['sync', 'automation'],
-      alsoIntegrations: ['slack'],
-    },
-    {
-      icon: AirtableIcon,
-      title: 'Airtable two-way sync',
-      prompt:
-        'Build a scheduled workflow that mirrors records between an Airtable base and a Sim table, detects conflicts, and pings Slack on records that need manual resolution.',
-      modules: ['scheduled', 'tables', 'agent', 'workflows'],
-      category: 'operations',
-      tags: ['sync', 'automation'],
-      alsoIntegrations: ['slack'],
-    },
-    {
-      icon: AirtableIcon,
       title: 'Airtable form-to-CRM',
       prompt:
         'Create a workflow that watches Airtable form submissions, enriches each row with company data, and pushes qualifying leads into HubSpot with the right owner.',
@@ -532,16 +512,6 @@ export const AirtableBlockMeta = {
     },
     {
       icon: AirtableIcon,
-      title: 'Airtable approval workflow',
-      prompt:
-        'Create a workflow that watches Airtable for new approval rows, posts a Slack message with quick-action buttons, captures the decision, and updates the row state.',
-      modules: ['tables', 'agent', 'workflows'],
-      category: 'operations',
-      tags: ['team', 'automation'],
-      alsoIntegrations: ['slack'],
-    },
-    {
-      icon: AirtableIcon,
       title: 'Airtable digest reporter',
       prompt:
         'Build a scheduled weekly workflow that summarizes activity in a chosen Airtable base — new rows, status changes, completed items — and emails a digest to the project owner.',
@@ -549,16 +519,6 @@ export const AirtableBlockMeta = {
       category: 'productivity',
       tags: ['team', 'reporting'],
       alsoIntegrations: ['gmail'],
-    },
-    {
-      icon: AirtableIcon,
-      title: 'Airtable to data-warehouse sync',
-      prompt:
-        'Create a scheduled workflow that exports an Airtable base to BigQuery nightly with schema mapping, partitions by ingestion date, and writes the run history to a control table.',
-      modules: ['scheduled', 'tables', 'agent', 'workflows'],
-      category: 'operations',
-      tags: ['sync', 'enterprise'],
-      alsoIntegrations: ['google_bigquery'],
     },
 
     {

@@ -16,8 +16,8 @@ import { blockAdvertisesWebhookUrl } from '@/triggers/webhook-url'
 function block(overrides: Partial<BlockState> = {}): BlockState {
   return {
     id: 'blk',
-    type: 'slack',
-    name: 'Slack',
+    type: 'generic_webhook',
+    name: 'Webhook',
     subBlocks: {},
     outputs: {},
     enabled: true,
@@ -121,38 +121,34 @@ describe('provider registries agree with the webhook-URL marker', () => {
 })
 
 /**
- * Slack ships BOTH delivery families, so it is the sharpest test of the marker - and the trigger
- * the fork sync's URL preservation exists for. `slack_webhook` is path-based and its URL is what
- * a user pastes into a Slack app's Request URL; `slack_oauth` arrives on a shared endpoint routed
- * by `routingKey`, so `lib/webhooks/deploy.ts` nulls its path and there is no URL to preserve.
- *
- * The block configs spread these exact arrays (`blocks/blocks/slack.ts` `...getTrigger(...)
- * .subBlocks`), so asserting on the trigger definitions is asserting on what the predicate reads.
+ * The generic webhook is the path-based trigger whose URL a user pastes into another service, and
+ * the Gmail poller is one whose events Sim pulls. Asserting on the trigger definitions is asserting
+ * on what the predicate reads, since trigger blocks spread these exact sub-block arrays.
  */
-describe('Slack: both delivery families classify correctly', () => {
-  function slackBlock(triggerId: 'slack_webhook' | 'slack_oauth'): BlockState {
+describe('path-based and polling triggers classify correctly', () => {
+  function triggerBlock(triggerId: 'generic_webhook' | 'gmail_poller'): BlockState {
     vi.mocked(getBlock).mockReturnValue({
       category: 'triggers',
       subBlocks: TRIGGER_REGISTRY[triggerId].subBlocks,
     } as never)
-    return block({ type: triggerId === 'slack_webhook' ? 'slack' : 'slack_v2' })
+    return block({ type: triggerId === 'generic_webhook' ? 'generic_webhook' : 'gmail_v2' })
   }
 
-  it('slack_webhook advertises a URL, so the fork sync can preserve it', () => {
-    expect(blockAdvertisesWebhookUrl(slackBlock('slack_webhook'))).toBe(true)
+  it('generic_webhook advertises a URL, so the fork sync can preserve it', () => {
+    expect(blockAdvertisesWebhookUrl(triggerBlock('generic_webhook'))).toBe(true)
   })
 
-  it('slack_oauth does NOT, so it is never offered a URL it cannot serve', () => {
-    expect(blockAdvertisesWebhookUrl(slackBlock('slack_oauth'))).toBe(false)
+  it('gmail_poller does NOT, so it is never offered a URL it cannot serve', () => {
+    expect(blockAdvertisesWebhookUrl(triggerBlock('gmail_poller'))).toBe(false)
   })
 
   /**
-   * The URL field must stay UNCONDITIONAL on the single-trigger Slack block. A `selectedTriggerId`
-   * condition would evaluate false there (no dropdown ⇒ no value), silently dropping Slack from
-   * the Trigger URLs section - the one trigger this feature was built for.
+   * The URL field must stay UNCONDITIONAL on the single-trigger webhook block. A
+   * `selectedTriggerId` condition would evaluate false there (no dropdown ⇒ no value), silently
+   * dropping it from the Trigger URLs section.
    */
-  it('slack_webhook gates its URL field on nothing', () => {
-    const urlField = TRIGGER_REGISTRY.slack_webhook.subBlocks.find(
+  it('generic_webhook gates its URL field on nothing', () => {
+    const urlField = TRIGGER_REGISTRY.generic_webhook.subBlocks.find(
       (subBlock) => subBlock.useWebhookUrl === true
     )
     expect(urlField).toBeDefined()

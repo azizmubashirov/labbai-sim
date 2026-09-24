@@ -586,7 +586,6 @@ const TOOL_TITLES: Record<string, string> = {
   list_workspace_mcp_servers: 'Listing MCP servers',
   load_deployment: 'Loading deployment',
   save_upload: 'Saving upload',
-  connect_slack_bot: 'Connecting Slack bot',
   move_file: 'Moving file',
   move_file_folder: 'Moving folder',
   move_workflow: 'Moving workflow',

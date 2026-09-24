@@ -37,8 +37,8 @@ import { type PermissionConfigResult, usePermissionConfig } from '@/hooks/use-pe
 
 const AVAILABILITY: GetAllowedIntegrationsResponse = {
   allowedIntegrations: null,
-  integrationAvailability: [{ type: 'github_v2', state: 'ready', oauthAvailable: false }],
-  oauthServiceAvailability: [{ providerId: 'github-repositories', available: false }],
+  integrationAvailability: [{ type: 'notion_v2', state: 'ready', oauthAvailable: false }],
+  oauthServiceAvailability: [{ providerId: 'notion', available: false }],
 }
 
 describe('usePermissionConfig deployment readiness', () => {
@@ -96,8 +96,8 @@ describe('usePermissionConfig deployment readiness', () => {
     render()
     expect(current!.isIntegrationAvailabilityReady).toBe(true)
     expect(current!.isIntegrationAvailabilityLoading).toBe(false)
-    expect(current!.oauthServiceAvailability.get('github-repositories')).toBe(false)
-    expect(current!.isBlockAllowed('github_v2')).toBe(true)
+    expect(current!.oauthServiceAvailability.get('notion')).toBe(false)
+    expect(current!.isBlockAllowed('notion_v2')).toBe(true)
     expect(mockRequestJson).not.toHaveBeenCalled()
   })
 
@@ -113,7 +113,7 @@ describe('usePermissionConfig deployment readiness', () => {
     render()
     expect(current!.isBlockAllowed('gmail')).toBe(false)
     expect(current!.isBlockRequestable('gmail')).toBe(true)
-    expect(current!.isBlockRequestable('slack')).toBe(false)
+    expect(current!.isBlockRequestable('telegram')).toBe(false)
     expect(current!.isBlockRequestable('credential_group')).toBe(false)
   })
 
@@ -145,13 +145,13 @@ describe('usePermissionConfig deployment readiness', () => {
     })
     expect(current!.integrationAvailabilityError).toBeNull()
     expect(current!.isIntegrationAvailabilityReady).toBe(true)
-    expect(current!.oauthServiceAvailability.get('github-repositories')).toBe(false)
+    expect(current!.oauthServiceAvailability.get('notion')).toBe(false)
   })
 
   it('does not treat cached readiness as successful after a failed refresh', async () => {
     queryClient.setQueryData(integrationAvailabilityKeys.environments(), {
       ...AVAILABILITY,
-      oauthServiceAvailability: [{ providerId: 'github-repositories', available: true }],
+      oauthServiceAvailability: [{ providerId: 'notion', available: true }],
     })
     render()
     expect(current!.isIntegrationAvailabilityReady).toBe(true)
@@ -160,7 +160,7 @@ describe('usePermissionConfig deployment readiness', () => {
       await current!.refetchIntegrationAvailability()
       await vi.runOnlyPendingTimersAsync()
     })
-    expect(current!.oauthServiceAvailability.get('github-repositories')).toBe(true)
+    expect(current!.oauthServiceAvailability.get('notion')).toBe(true)
     expect(current!.isIntegrationAvailabilityReady).toBe(false)
     expect(current!.integrationAvailabilityError?.message).toBe('Network unavailable')
   })

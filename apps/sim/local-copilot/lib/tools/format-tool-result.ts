@@ -284,7 +284,7 @@ export function isOAuthOnlyEditResult(output: unknown): boolean {
     /blocks missing required fields/i.test(message) &&
     /\b(account|credential|oauth)\b/i.test(message) &&
     !/\b(query|prompt|model|to|subject|body|url)\b/i.test(
-      message.replace(/\b(gmail account|google account|slack account)\b/gi, '')
+      message.replace(/\b(gmail account|google account|telegram account)\b/gi, '')
     )
   )
 }

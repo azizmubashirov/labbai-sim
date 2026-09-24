@@ -1,19 +1,5 @@
 /** @vitest-environment node */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { boxDownloadFileTool, boxDownloadFileV2Tool } from '@/tools/box/download_file'
-import { daytonaDownloadFileTool } from '@/tools/daytona/download_file'
-import { dropboxDownloadTool, dropboxDownloadV2Tool } from '@/tools/dropbox/download'
-import { getQrCodeTool, getQrCodeV2Tool } from '@/tools/dub/get_qr_code'
-import {
-  dataverseDownloadFileTool,
-  dataverseDownloadFileV2Tool,
-} from '@/tools/microsoft_dataverse/download_file'
-import { personaPrintInquiryPdfTool } from '@/tools/persona/print_inquiry_pdf'
-import { s3GetObjectTool } from '@/tools/s3/get_object'
-import {
-  downloadAttachmentTool,
-  downloadAttachmentV2Tool,
-} from '@/tools/servicenow/download_attachment'
 import { storageDownloadTool } from '@/tools/supabase/storage_download'
 
 interface BinaryResult {
@@ -32,46 +18,6 @@ interface DownloadCase {
 
 const DOWNLOAD_CASES: DownloadCase[] = [
   {
-    tool: boxDownloadFileV2Tool,
-    transform: (response) => boxDownloadFileV2Tool.transformResponse!(response),
-    name: 'download.pdf',
-    outputKeys: ['file'],
-  },
-  {
-    tool: dropboxDownloadV2Tool,
-    transform: (response) =>
-      dropboxDownloadV2Tool.transformResponse!(response, { path: '/download.pdf' }),
-    name: 'download.pdf',
-    outputKeys: ['file', 'metadata', 'temporaryLink'],
-    checkMetadata: (output, size) => {
-      expect(output.metadata).toEqual({ id: 'file-1', name: 'download.pdf', size })
-      expect(output.temporaryLink).toBeUndefined()
-    },
-  },
-  {
-    tool: s3GetObjectTool,
-    transform: (response) =>
-      s3GetObjectTool.transformResponse!(response, {
-        accessKeyId: 'test-access-key',
-        secretAccessKey: 'test-secret-key',
-        bucketName: 'test-bucket',
-        region: 'us-east-1',
-        objectKey: 'folder/download.pdf',
-      }),
-    name: 'download.pdf',
-    checkMetadata: (output, size) => {
-      expect(output.metadata).toEqual({
-        fileType: 'application/pdf',
-        size,
-        name: 'download.pdf',
-        lastModified: 'Fri, 11 Sep 2026 12:00:00 GMT',
-      })
-      expect(output.url).toMatch(
-        /^https:\/\/test-bucket\.s3\.us-east-1\.amazonaws\.com\/folder\/download\.pdf\?/
-      )
-    },
-  },
-  {
     tool: storageDownloadTool,
     transform: (response) =>
       storageDownloadTool.transformResponse!(response, {
@@ -82,59 +28,6 @@ const DOWNLOAD_CASES: DownloadCase[] = [
         fileName: 'renamed.pdf',
       }),
     name: 'renamed.pdf',
-  },
-  {
-    tool: daytonaDownloadFileTool,
-    transform: (response) =>
-      daytonaDownloadFileTool.transformResponse!(response, {
-        apiKey: 'test-key',
-        sandboxId: 'sandbox-1',
-        filePath: '/workspace/download.pdf',
-      }),
-    name: 'download.pdf',
-    checkMetadata: (output, size) => {
-      expect(output.name).toBe('download.pdf')
-      expect(output.mimeType).toBe('application/pdf')
-      expect(output.size).toBe(size)
-    },
-  },
-  {
-    tool: dataverseDownloadFileV2Tool,
-    transform: (response) =>
-      dataverseDownloadFileV2Tool.transformResponse!(response, {
-        accessToken: 'test-token',
-        environmentUrl: 'https://test.crm.dynamics.com',
-        entitySetName: 'accounts',
-        recordId: 'record-1',
-        fileColumn: 'cr_document',
-      }),
-    name: 'download.pdf',
-    outputKeys: ['file', 'fileColumn'],
-    checkMetadata: (output) => {
-      expect(output.fileColumn).toBe('cr_document')
-    },
-  },
-  {
-    tool: personaPrintInquiryPdfTool,
-    transform: (response) =>
-      personaPrintInquiryPdfTool.transformResponse!(response, {
-        apiKey: 'test-key',
-        inquiryId: 'inq_test',
-      }),
-    name: 'inq_test.pdf',
-  },
-  {
-    tool: downloadAttachmentV2Tool,
-    transform: (response) => downloadAttachmentV2Tool.transformResponse!(response),
-    name: 'download.pdf',
-    outputKeys: ['file'],
-  },
-  {
-    tool: getQrCodeV2Tool,
-    transform: (response) => getQrCodeV2Tool.transformResponse!(response),
-    name: 'qrcode.png',
-    mimeType: 'image/png',
-    outputKeys: ['file'],
   },
 ]
 
@@ -210,14 +103,6 @@ describe.each(DOWNLOAD_CASES)('$tool.id binary download', (provider) => {
     expectBinaryFile(result, buffer, provider)
   })
 })
-
-const LEGACY_DOWNLOAD_CASES = [
-  { tool: boxDownloadFileTool, content: 'content' },
-  { tool: dropboxDownloadTool, content: 'content' },
-  { tool: getQrCodeTool, content: 'content' },
-  { tool: dataverseDownloadFileTool, content: 'fileContent' },
-  { tool: downloadAttachmentTool, content: 'content' },
-] as const
 
 describe.each(LEGACY_DOWNLOAD_CASES)(
   '$tool.id legacy download compatibility',

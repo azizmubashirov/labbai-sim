@@ -785,7 +785,7 @@ async function executeLocalCopilotToolInner(
         success: true,
         result: {
           integrations: ctx.structuredContext.availableIntegrations,
-          // Every integration block (e.g. telegram, slack, gmail) with its auth mode, so the
+          // Every integration block (e.g. telegram, whatsapp, gmail) with its auth mode, so the
           // model never concludes a service is unsupported from the category list alone.
           integrationBlocks: (ctx.structuredContext.availableBlocks ?? [])
             .filter((block) => block.category === 'tools' || block.category === 'triggers')

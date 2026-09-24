@@ -128,7 +128,7 @@ describe('useWorkspaceAccounts', () => {
         createdAt: '2026-09-04T00:00:00Z',
         updatedAt: '2026-09-04T00:00:00Z',
       },
-      availableProviders: ['slack'],
+      availableProviders: ['gmail'],
     }
     queryClient.setQueryData(credentialGroupKeys.workspace(WORKSPACE_ID), settings)
     mocks.requestJson.mockImplementation(() => new Promise<WorkspaceAccountsSettings>(() => {}))

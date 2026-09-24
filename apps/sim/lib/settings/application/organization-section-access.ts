@@ -27,7 +27,7 @@ export async function authorizeOrganizationSettingsSection({
   if (section === 'connected-accounts') {
     return isScopedCredentialGroupsAvailable({ kind: 'organization', organizationId })
   }
-  if (section === 'search-mcp' || section === 'search-slack' || section === 'integrations')
+  if (section === 'search-mcp' || section === 'integrations')
     return isKnowledgeMemberAccessAvailable({ organizationId })
 
   const deployment = getDeploymentShape()

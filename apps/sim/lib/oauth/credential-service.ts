@@ -21,14 +21,6 @@ import {
   parseTokenServiceAccountSecretBlob,
   type TokenServiceAccountSecretBlob,
 } from '@/lib/credentials/token-service-accounts/server'
-import {
-  parseGitHubInstallationBinding,
-  resolveGitHubInstallationAccessToken,
-} from '@/lib/oauth/github-installation'
-import {
-  GITHUB_INSTALLATION_PROVIDER_ID,
-  type GitHubInstallationRepositoryScope,
-} from '@/lib/oauth/github-installation-types'
 import { exchangeGoogleServiceAccountJwt } from '@/lib/oauth/google-service-account-transport'
 import { isInstagramProvider, shouldProactivelyRefreshInstagramToken } from '@/lib/oauth/instagram'
 import {
@@ -37,15 +29,7 @@ import {
   PROACTIVE_REFRESH_THRESHOLD_DAYS,
 } from '@/lib/oauth/microsoft'
 import { refreshOAuthToken, TOKEN_REFRESH_TIMEOUT_MS } from '@/lib/oauth/oauth'
-import { decryptQuickBooksOAuthClientConfig } from '@/lib/oauth/quickbooks-client-config'
 import { getOAuthRefreshCoordinationIdentity } from '@/lib/oauth/refresh-coordination'
-import {
-  extractSlackTeamId,
-  fanOutSlackTokenChain,
-  getFreshestSlackChain,
-  hasSlackChainMoved,
-  isSlackProvider,
-} from '@/lib/oauth/slack'
 import {
   getRecentTerminalError,
   isTerminalRefreshError,
@@ -57,10 +41,6 @@ import {
   GOOGLE_SERVICE_ACCOUNT_PROVIDER_ID,
   SLACK_CUSTOM_BOT_PROVIDER_ID,
 } from '@/lib/oauth/types'
-import {
-  loadSlackAppConfiguration,
-  slackBotCredentialVersion,
-} from '@/lib/slack-search/app-configuration'
 
 const logger = createLogger('OAuthCredentialService')
 const OAUTH_ACCESS_TOKEN_REFRESH_WINDOW_MS = 5 * 60 * 1000
@@ -73,8 +53,6 @@ export interface CredentialTokenResolutionOptions {
    * mode so selector and ordinary calls share the same locks and dead flags.
    */
   privacyMode?: 'selector'
-  /** GitHub installation content tokens may only address one connector repository. */
-  githubRepositoryScope?: GitHubInstallationRepositoryScope
   /** Cancels Google service-account token exchange and retry waits. */
   signal?: AbortSignal
 }
@@ -346,77 +324,6 @@ export async function getServiceAccountToken(
   return tokenData.access_token
 }
 
-export interface SlackBotCredentialSecrets {
-  credentialVersion: string
-  /** Required only when the bot receives Slack events; action-only bots may omit it. */
-  signingSecret?: string
-  botToken: string
-  /** Present on newly connected bots; legacy backfills resolve it only when needed. */
-  teamId?: string
-  botUserId?: string
-  teamName?: string
-  /** Owning workspace — callers with a user/workflow context must verify it. */
-  workspaceId: string | null
-}
-
-/**
- * Decrypt a reusable custom Slack bot credential — a `service_account` credential
- * with `providerId='slack-custom-bot'` whose encrypted blob holds the bring-your-own
- * app's bot token and, when configured for event ingestion, its signing secret.
- * Newly connected bots also hold derived team identity; legacy backfills may not.
- * Returns null if the id is not such a credential or the action-capable portion
- * of its blob is incomplete.
- *
- * @remarks Server-internal. The native custom ingest route authenticates each
- * request via the app's signing secret (not a user session), so this reader does
- * no per-user authorization; callers with a user context authorize separately.
- */
-export async function getSlackBotCredential(
-  credentialId: string
-): Promise<SlackBotCredentialSecrets | null> {
-  const [row] = await db
-    .select({
-      type: credential.type,
-      providerId: credential.providerId,
-      encryptedServiceAccountKey: credential.encryptedServiceAccountKey,
-      workspaceId: credential.workspaceId,
-      slackAppId: credential.slackAppId,
-    })
-    .from(credential)
-    .where(eq(credential.id, credentialId))
-    .limit(1)
-
-  if (
-    !row ||
-    row.type !== 'service_account' ||
-    row.providerId !== SLACK_CUSTOM_BOT_PROVIDER_ID ||
-    !row.encryptedServiceAccountKey
-  ) {
-    return null
-  }
-
-  const { decrypted } = await decryptSecret(row.encryptedServiceAccountKey)
-  const blob = JSON.parse(decrypted) as Partial<SlackBotCredentialSecrets>
-  if (!blob.botToken) {
-    return null
-  }
-  const appConfiguration = row.slackAppId ? await loadSlackAppConfiguration(row.slackAppId) : null
-  if (row.slackAppId && !appConfiguration)
-    throw new Error('Slack credential references a missing app configuration')
-  const signingSecret = appConfiguration ? appConfiguration.signingSecret : blob.signingSecret
-  return {
-    credentialVersion: slackBotCredentialVersion(
-      row.encryptedServiceAccountKey,
-      appConfiguration?.app.revision
-    ),
-    ...(typeof signingSecret === 'string' && signingSecret ? { signingSecret } : {}),
-    botToken: blob.botToken,
-    ...(typeof blob.teamId === 'string' && blob.teamId ? { teamId: blob.teamId } : {}),
-    ...(typeof blob.botUserId === 'string' && blob.botUserId ? { botUserId: blob.botUserId } : {}),
-    ...(typeof blob.teamName === 'string' && blob.teamName ? { teamName: blob.teamName } : {}),
-    workspaceId: row.workspaceId ?? null,
-  }
-}
 
 interface AtlassianServiceAccountSecret {
   type: typeof ATLASSIAN_SERVICE_ACCOUNT_SECRET_TYPE
@@ -693,50 +600,9 @@ type ServiceAccountTokenResolver = (
  * generically: the stored token IS the access token.
  */
 const SERVICE_ACCOUNT_TOKEN_RESOLVERS: Record<string, ServiceAccountTokenResolver> = {
-  [GITHUB_INSTALLATION_PROVIDER_ID]: async (credentialId, { githubRepositoryScope }) => {
-    if (!githubRepositoryScope)
-      throw new Error('GitHub installation tokens require a source repository')
-    const [row] = await db
-      .select({
-        type: credential.type,
-        providerId: credential.providerId,
-        encryptedServiceAccountKey: credential.encryptedServiceAccountKey,
-        providerSubjectId: credential.providerSubjectId,
-        providerTenantId: credential.providerTenantId,
-        revokedAt: credential.revokedAt,
-      })
-      .from(credential)
-      .where(eq(credential.id, credentialId))
-      .limit(1)
-    if (
-      row?.type !== 'service_account' ||
-      row.providerId !== GITHUB_INSTALLATION_PROVIDER_ID ||
-      row.revokedAt ||
-      !row.encryptedServiceAccountKey ||
-      row.encryptedServiceAccountKey.length > 16_384
-    ) {
-      throw new Error('GitHub installation credential is unavailable')
-    }
-    const { decrypted } = await decryptSecret(row.encryptedServiceAccountKey)
-    const binding = parseGitHubInstallationBinding(JSON.parse(decrypted))
-    if (
-      row.providerSubjectId !== binding.installationId ||
-      row.providerTenantId !== binding.accountId
-    ) {
-      throw new Error('GitHub installation credential identity does not match its binding')
-    }
-    return resolveGitHubInstallationAccessToken(binding, githubRepositoryScope)
-  },
   [ATLASSIAN_SERVICE_ACCOUNT_PROVIDER_ID]: async (credentialId) => {
     const secret = await getAtlassianServiceAccountSecret(credentialId)
     return { accessToken: secret.apiToken, cloudId: secret.cloudId, domain: secret.domain }
-  },
-  [SLACK_CUSTOM_BOT_PROVIDER_ID]: async (credentialId) => {
-    const botCredential = await getSlackBotCredential(credentialId)
-    if (!botCredential) {
-      throw new Error('Slack bot credential not found')
-    }
-    return { accessToken: botCredential.botToken }
   },
   [GOOGLE_SERVICE_ACCOUNT_PROVIDER_ID]: async (
     credentialId,
@@ -850,7 +716,6 @@ interface CoalescedRefreshOptions {
   accountId: string
   providerId: string
   refreshToken: string
-  /** External provider account id (`account.accountId`), used to scope Slack refreshes per installation. */
   providerAccountId?: string | null
   oauthConfig?: string | null
   requestId?: string
@@ -880,23 +745,19 @@ function isOAuthAccessTokenExpiring(
  * rather than reported as a failure. Both are latency knobs, not correctness
  * guarantees: a lease is only ever a lease, and chain integrity under lock expiry or
  * an unlocked writer is enforced at the write, which rotates a chain only from the
- * refresh token it started from (`ifChainUnchangedSince` for a Slack installation).
+ * refresh token it started from.
  */
 const REFRESH_LOCK_HEADROOM_MS = 15_000
 const REFRESH_LOCK_TTL_SEC = Math.ceil((TOKEN_REFRESH_TIMEOUT_MS + REFRESH_LOCK_HEADROOM_MS) / 1000)
 const REFRESH_FOLLOWER_MAX_WAIT_MS = REFRESH_LOCK_TTL_SEC * 1000
 
-/**
- * The raw scope one refresh coordinates on: the account row, or the installation for a Slack
- * bot token, whose sibling rows all hold one chain.
- */
+/** The raw scope one refresh coordinates on: the account row. */
 function refreshCoordinationScope(
   accountId: string,
-  providerId: string,
-  providerAccountId: string | null | undefined
+  _providerId: string,
+  _providerAccountId: string | null | undefined
 ): string {
-  const slackTeamId = isSlackProvider(providerId) ? extractSlackTeamId(providerAccountId) : null
-  return slackTeamId ? `slack:${slackTeamId}` : accountId
+  return accountId
 }
 
 /** A terminal refresh rejection recorded for a credential's account. */
@@ -973,12 +834,6 @@ async function performCoalescedRefresh({
   userId,
   privacyMode,
 }: CoalescedRefreshOptions): Promise<string | null> {
-  /**
-   * Slack bot tokens are per-installation (team × app): every account row for
-   * one team holds a copy of the same rotating chain, so refreshes are locked,
-   * dead-flagged, and written per installation rather than per row.
-   */
-  const slackTeamId = isSlackProvider(providerId) ? extractSlackTeamId(providerAccountId) : null
   const scopeKey = getOAuthRefreshCoordinationIdentity(
     refreshCoordinationScope(accountId, providerId, providerAccountId)
   )
@@ -986,7 +841,6 @@ async function performCoalescedRefresh({
   const logContext = {
     ...(requestId ? { requestId } : {}),
     ...(privacyMode === 'selector' || !userId ? {} : { userId }),
-    ...(privacyMode === 'selector' || !slackTeamId ? {} : { slackTeamId }),
     providerId,
     ...(privacyMode === 'selector' ? {} : { accountId }),
   }
@@ -1009,46 +863,8 @@ async function performCoalescedRefresh({
       maxWaitMs: REFRESH_FOLLOWER_MAX_WAIT_MS,
       onLeader: async () => {
         try {
-          let refreshTokenToUse = refreshToken
-          let slackChainVersion: Date | null = null
-          if (slackTeamId) {
-            const freshest = await getFreshestSlackChain(slackTeamId)
-            if (!freshest) {
-              throw new Error(
-                `No refresh-capable account row found for Slack installation ${slackTeamId}`
-              )
-            }
-            slackChainVersion = freshest.chainVersion
-            if (
-              freshest.accessToken &&
-              freshest.accessTokenExpiresAt &&
-              !isOAuthAccessTokenExpiring(freshest.accessTokenExpiresAt, providerId)
-            ) {
-              await fanOutSlackTokenChain(
-                slackTeamId,
-                {
-                  accessToken: freshest.accessToken,
-                  refreshToken: freshest.refreshToken,
-                  accessTokenExpiresAt: freshest.accessTokenExpiresAt,
-                },
-                { ifChainUnchangedSince: freshest.chainVersion }
-              )
-              logger.info('Reused freshest Slack installation token', logContext)
-              return freshest.accessToken
-            }
-            refreshTokenToUse = freshest.refreshToken
-          }
-
-          let quickBooksClientConfig
-          if (providerId === 'quickbooks') {
-            if (!oauthConfig) {
-              throw new Error('QuickBooks OAuth client configuration is missing')
-            }
-            quickBooksClientConfig = await decryptQuickBooksOAuthClientConfig(oauthConfig)
-          }
-          const result = quickBooksClientConfig
-            ? await refreshOAuthToken(providerId, refreshTokenToUse, quickBooksClientConfig)
-            : await refreshOAuthToken(providerId, refreshTokenToUse)
+          const refreshTokenToUse = refreshToken
+          const result = await refreshOAuthToken(providerId, refreshTokenToUse)
 
           if (!result.ok) {
             logger.error('Failed to refresh token', {
@@ -1061,19 +877,10 @@ async function performCoalescedRefresh({
               // rotation fails with a revoked/rotated-out token even though the
               // account just got a live chain — dead-flagging then would take
               // down a healthy credential for an hour.
-              if (
-                slackChainVersion &&
-                (await hasSlackChainMoved(slackTeamId!, slackChainVersion))
-              ) {
-                logger.info('Skipping dead flag: Slack chain moved during refresh', logContext)
-                return null
-              }
-              if (!slackTeamId) {
-                const stored = await readStoredChain(accountId)
-                if (stored && stored.refreshToken !== refreshToken) {
-                  logger.info('Skipping dead flag: chain moved during refresh', logContext)
-                  return usableStoredToken(stored, providerId)
-                }
+              const stored = await readStoredChain(accountId)
+              if (stored && stored.refreshToken !== refreshToken) {
+                logger.info('Skipping dead flag: chain moved during refresh', logContext)
+                return usableStoredToken(stored, providerId)
               }
               await markCredentialDead(scopeKey, result.errorCode)
             }
@@ -1082,17 +889,7 @@ async function performCoalescedRefresh({
 
           const accessTokenExpiresAt = new Date(Date.now() + result.expiresIn * 1000)
 
-          if (slackTeamId) {
-            await fanOutSlackTokenChain(
-              slackTeamId,
-              {
-                accessToken: result.accessToken,
-                refreshToken: result.refreshToken || refreshTokenToUse,
-                accessTokenExpiresAt,
-              },
-              { ifChainUnchangedSince: slackChainVersion ?? undefined }
-            )
-          } else {
+          {
             const updateData: Record<string, unknown> = {
               accessToken: result.accessToken,
               accessTokenExpiresAt,

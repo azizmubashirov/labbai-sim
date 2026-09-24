@@ -228,9 +228,6 @@ export const env = createEnv({
     GMAIL_SENDER:                          z.string().min(1).optional(),           // Google Workspace user the Gmail service account impersonates when sending (e.g., noreply@yourdomain.com)
 
     // SMS & Messaging
-    TWILIO_ACCOUNT_SID:                    z.string().min(1).optional(),           // Twilio Account SID for SMS sending
-    TWILIO_AUTH_TOKEN:                     z.string().min(1).optional(),           // Twilio Auth Token for API authentication
-    TWILIO_PHONE_NUMBER:                   z.string().min(1).optional(),           // Twilio phone number for sending SMS
 
     // AI/LLM Provider API Keys
     OPENAI_API_KEY:                        z.string().min(1).optional(),           // Primary OpenAI API key
@@ -310,8 +307,6 @@ export const env = createEnv({
     GRAFANA_DEPLOYMENT_ENVIRONMENT:        z.string().min(1).optional(),           // Deployment tier label (e.g., "production", "staging", "development"). Emitted as the stable `deployment.environment.name` resource attribute on Trigger.dev telemetry to match the rest of the Sim OTEL stack.
 
     // External Services
-    BROWSERBASE_API_KEY:                   z.string().min(1).optional(),           // Browserbase API key for browser automation
-    BROWSERBASE_PROJECT_ID:                z.string().min(1).optional(),           // Browserbase project ID
     GITHUB_TOKEN:                          z.string().optional(),                  // GitHub personal access token for API access
 
     // Admin API
@@ -489,78 +484,24 @@ export const env = createEnv({
     GOOGLE_CLIENT_SECRET:                  z.string().optional(),                  // Google OAuth client secret
     GITHUB_CLIENT_ID:                      z.string().optional(),                  // GitHub OAuth client ID for GitHub integration
     GITHUB_CLIENT_SECRET:                  z.string().optional(),                  // GitHub OAuth client secret
-    GITHUB_APP_CLIENT_ID: z.string().optional(),
-    GITHUB_APP_CLIENT_SECRET: z.string().optional(),
-    GITHUB_APP_ID: z.string().optional(),
-    GITHUB_APP_PRIVATE_KEY: z.string().optional(),
-    GITHUB_APP_SLUG: z.string().optional(),
     DISABLE_GOOGLE_AUTH:                   z.boolean().optional(),                 // Disable Google OAuth login even when credentials are configured
     DISABLE_GITHUB_AUTH:                   z.boolean().optional(),                 // Disable GitHub OAuth login even when credentials are configured
     DISABLE_MICROSOFT_AUTH:               z.boolean().optional(),                 // Disable Microsoft OAuth login even when credentials are configured
     DISABLE_EMAIL_SIGNUP:                  z.boolean().optional(),                 // Block new email/password registrations while keeping email login working
 
-    X_CLIENT_ID:                           z.string().optional(),                  // X (Twitter) OAuth client ID
-    X_CLIENT_SECRET:                       z.string().optional(),                  // X (Twitter) OAuth client secret
-    TIKTOK_CLIENT_ID:                      z.string().optional(),                  // TikTok OAuth client key (TikTok calls this "client_key")
-    TIKTOK_CLIENT_SECRET:                  z.string().optional(),                  // TikTok OAuth client secret
-    CONFLUENCE_CLIENT_ID:                  z.string().optional(),                  // Atlassian Confluence OAuth client ID
-    CONFLUENCE_CLIENT_SECRET:              z.string().optional(),                  // Atlassian Confluence OAuth client secret
-    JIRA_CLIENT_ID:                        z.string().optional(),                  // Atlassian Jira OAuth client ID
-    JIRA_CLIENT_SECRET:                    z.string().optional(),                  // Atlassian Jira OAuth client secret
-    ASANA_CLIENT_ID:                       z.string().optional(),                  // Asana OAuth client ID
-    ASANA_CLIENT_SECRET:                   z.string().optional(),                  // Asana OAuth client secret
     AIRTABLE_CLIENT_ID:                    z.string().optional(),                  // Airtable OAuth client ID
     AIRTABLE_CLIENT_SECRET:                z.string().optional(),                  // Airtable OAuth client secret
-    BITBUCKET_CLIENT_ID:                   z.string().optional(),                  // Bitbucket OAuth consumer key
-    BITBUCKET_CLIENT_SECRET:               z.string().optional(),                  // Bitbucket OAuth consumer secret
-    APOLLO_API_KEY:                        z.string().optional(),                  // Apollo API key (optional system-wide config)
     SUPABASE_CLIENT_ID:                    z.string().optional(),                  // Supabase OAuth client ID
     SUPABASE_CLIENT_SECRET:                z.string().optional(),                  // Supabase OAuth client secret
     NOTION_CLIENT_ID:                      z.string().optional(),                  // Notion OAuth client ID
     NOTION_CLIENT_SECRET:                  z.string().optional(),                  // Notion OAuth client secret
-    MONDAY_CLIENT_ID:                      z.string().optional(),                  // Monday.com OAuth client ID
-    MONDAY_CLIENT_SECRET:                  z.string().optional(),                  // Monday.com OAuth client secret
-    DISCORD_CLIENT_ID:                     z.string().optional(),                  // Discord OAuth client ID
-    DISCORD_CLIENT_SECRET:                 z.string().optional(),                  // Discord OAuth client secret
-    DOCUSIGN_CLIENT_ID:                    z.string().optional(),                  // DocuSign OAuth client ID
-    DOCUSIGN_CLIENT_SECRET:                z.string().optional(),                  // DocuSign OAuth client secret
-    DOCUSIGN_AUTH_HOST:                    z.string().optional(),                  // DocuSign auth host: account-d.docusign.com (demo, default) or account.docusign.com (production)
     MICROSOFT_CLIENT_ID:                   z.string().optional(),                  // Microsoft OAuth client ID for Office 365/Teams
     MICROSOFT_CLIENT_SECRET:               z.string().optional(),                  // Microsoft OAuth client secret
     HUBSPOT_CLIENT_ID:                     z.string().optional(),                  // HubSpot OAuth client ID
     HUBSPOT_CLIENT_SECRET:                 z.string().optional(),                  // HubSpot OAuth client secret
-    SALESFORCE_CLIENT_ID:                  z.string().optional(),                  // Salesforce OAuth client ID
-    SALESFORCE_CLIENT_SECRET:              z.string().optional(),                  // Salesforce OAuth client secret
-    ZOHO_CLIENT_ID:                        z.string().optional(),                  // Zoho OAuth client ID (Zoho Desk)
-    ZOHO_CLIENT_SECRET:                    z.string().optional(),                  // Zoho OAuth client secret (Zoho Desk)
-    WEALTHBOX_CLIENT_ID:                   z.string().optional(),                  // WealthBox OAuth client ID
-    WEALTHBOX_CLIENT_SECRET:               z.string().optional(),                  // WealthBox OAuth client secret
     PIPEDRIVE_CLIENT_ID:                   z.string().optional(),                  // Pipedrive OAuth client ID
     PIPEDRIVE_CLIENT_SECRET:               z.string().optional(),                  // Pipedrive OAuth client secret
-    LINEAR_CLIENT_ID:                      z.string().optional(),                  // Linear OAuth client ID
-    LINEAR_CLIENT_SECRET:                  z.string().optional(),                  // Linear OAuth client secret
-    CLICKUP_CLIENT_ID:                     z.string().optional(),                  // ClickUp OAuth client ID
-    CLICKUP_CLIENT_SECRET:                 z.string().optional(),                  // ClickUp OAuth client secret
-    BOX_CLIENT_ID:                         z.string().optional(),                  // Box OAuth client ID
-    BOX_CLIENT_SECRET:                     z.string().optional(),                  // Box OAuth client secret
-    DROPBOX_CLIENT_ID:                     z.string().optional(),                  // Dropbox OAuth client ID
-    DROPBOX_CLIENT_SECRET:                 z.string().optional(),                  // Dropbox OAuth client secret
-    SLACK_CLIENT_ID:                       z.string().optional(),                  // Slack OAuth client ID
-    SLACK_SEARCH_APP_ID:                   z.string().optional(),
-    SLACK_SEARCH_CLIENT_ID:                z.string().optional(),
-    SLACK_SEARCH_CLIENT_SECRET:            z.string().optional(),
-    SLACK_SEARCH_SIGNING_SECRET:           z.string().optional(),
-    SLACK_SEARCH_SHARED_APP:               z.boolean().optional(),
-    SLACK_CLIENT_SECRET:                   z.string().optional(),                  // Slack OAuth client secret
-    SLACK_SIGNING_SECRET:                  z.string().optional(),                  // Official Sim Slack app signing secret (verifies inbound events for the native OAuth trigger)
-    SLACK_EXTENDED_SCOPES:                 z.boolean().optional(),                 // Request app_mentions:read, assistant:write, im:history — only where the Slack app is approved for them
-    REDDIT_CLIENT_ID:                      z.string().optional(),                  // Reddit OAuth client ID
-    REDDIT_CLIENT_SECRET:                  z.string().optional(),                  // Reddit OAuth client secret
-    WEBFLOW_CLIENT_ID:                     z.string().optional(),                  // Webflow OAuth client ID
-    WEBFLOW_CLIENT_SECRET:                 z.string().optional(),                  // Webflow OAuth client secret
     TRELLO_API_KEY:                        z.string().optional(),                  // Trello API Key
-    LINKEDIN_CLIENT_ID:                    z.string().optional(),                  // LinkedIn OAuth client ID
-    LINKEDIN_CLIENT_SECRET:                z.string().optional(),                  // LinkedIn OAuth client secret
     INSTAGRAM_CLIENT_ID:                   z.string().optional(),                  // Instagram App ID (Business Login)
     INSTAGRAM_CLIENT_SECRET:               z.string().optional(),                  // Instagram App Secret (Business Login)
     SHOPIFY_CLIENT_ID:                     z.string().optional(),                  // Shopify OAuth client ID
@@ -569,11 +510,7 @@ export const env = createEnv({
     ZOOM_CLIENT_SECRET:                    z.string().optional(),                  // Zoom OAuth client secret
     WORDPRESS_CLIENT_ID:                   z.string().optional(),                  // WordPress.com OAuth client ID
     WORDPRESS_CLIENT_SECRET:               z.string().optional(),                  // WordPress.com OAuth client secret
-    SPOTIFY_CLIENT_ID:                     z.string().optional(),                  // Spotify OAuth client ID
-    SPOTIFY_CLIENT_SECRET:                 z.string().optional(),                  // Spotify OAuth client secret
     CALCOM_CLIENT_ID:                      z.string().optional(),                  // Cal.com OAuth client ID
-    ATTIO_CLIENT_ID:                       z.string().optional(),                  // Attio OAuth client ID
-    ATTIO_CLIENT_SECRET:                   z.string().optional(),                  // Attio OAuth client secret
 
     // Access Control (Permission Groups) - for self-hosted deployments
     ACCESS_CONTROL_ENABLED:                z.boolean().optional(),                 // Enable access control on self-hosted (bypasses plan requirements)
@@ -701,7 +638,6 @@ export const env = createEnv({
     NEXT_PUBLIC_SSO_ENABLED:               z.boolean().optional(),                   // Enable SSO login UI components
     NEXT_PUBLIC_SCIM_ENABLED:              z.boolean().optional(),                   // Enable SCIM settings UI
     NEXT_PUBLIC_ACCESS_CONTROL_ENABLED:    z.boolean().optional(),                   // Enable access control (permission groups) on self-hosted
-    NEXT_PUBLIC_SLACK_EXTENDED_SCOPES:     z.boolean().optional(),                   // Client twin of SLACK_EXTENDED_SCOPES — set both together
     NEXT_PUBLIC_WHITELABELING_ENABLED:     z.boolean().optional(),                   // Enable whitelabeling on self-hosted (bypasses hosted requirements)
     NEXT_PUBLIC_AUDIT_LOGS_ENABLED:        z.boolean().optional(),                   // Enable audit logs on self-hosted (bypasses hosted requirements)
     NEXT_PUBLIC_CUSTOM_BLOCKS_ENABLED:     z.boolean().optional(),                   // Enable custom blocks on self-hosted (bypasses hosted requirements)
@@ -747,7 +683,6 @@ export const env = createEnv({
     NEXT_PUBLIC_SSO_ENABLED: process.env.NEXT_PUBLIC_SSO_ENABLED,
     NEXT_PUBLIC_SCIM_ENABLED: process.env.NEXT_PUBLIC_SCIM_ENABLED,
     NEXT_PUBLIC_ACCESS_CONTROL_ENABLED: process.env.NEXT_PUBLIC_ACCESS_CONTROL_ENABLED,
-    NEXT_PUBLIC_SLACK_EXTENDED_SCOPES: process.env.NEXT_PUBLIC_SLACK_EXTENDED_SCOPES,
     NEXT_PUBLIC_WHITELABELING_ENABLED: process.env.NEXT_PUBLIC_WHITELABELING_ENABLED,
     NEXT_PUBLIC_AUDIT_LOGS_ENABLED: process.env.NEXT_PUBLIC_AUDIT_LOGS_ENABLED,
     NEXT_PUBLIC_CUSTOM_BLOCKS_ENABLED: process.env.NEXT_PUBLIC_CUSTOM_BLOCKS_ENABLED,

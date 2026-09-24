@@ -5,7 +5,7 @@ import { stripe } from '@better-auth/stripe'
 import { db } from '@sim/db'
 import * as schema from '@sim/db/schema'
 import { createLogger, setRequestAuth } from '@sim/logger'
-import { getErrorMessage, toError } from '@sim/utils/errors'
+import { toError } from '@sim/utils/errors'
 import { type BetterAuthOptions, betterAuth, type User } from 'better-auth'
 import {
   APIError,
@@ -139,19 +139,6 @@ import {
   isMicrosoftProvider,
   mapMicrosoftProfileToUser,
 } from '@/lib/oauth/microsoft'
-import {
-  assertMicrosoftDataverseOAuthLinkRequest,
-  MICROSOFT_DATAVERSE_PROVIDER_ID,
-} from '@/lib/oauth/microsoft-dataverse'
-import { clearOAuthRefreshDeadFlag } from '@/lib/oauth/refresh-coordination'
-import {
-  isSalesforceLoginOrigin,
-  isSalesforceOAuthProviderId,
-  SALESFORCE_LOGIN_HOSTS,
-  withSalesforceInstanceScope,
-} from '@/lib/oauth/salesforce'
-import { extractSlackTeamId, fanOutSlackTokenChain } from '@/lib/oauth/slack'
-import { getCanonicalScopesForProvider } from '@/lib/oauth/utils'
 import { joinInstanceOrganization } from '@/lib/organizations/instance-org'
 import { capabilityRefusal } from '@/lib/permission-groups/capability-assertions'
 import { isCapabilityWithheldForUser } from '@/lib/permission-groups/user-scope.server'
@@ -203,41 +190,6 @@ if (validStripeKey) {
   stripeClient = new Stripe(env.STRIPE_SECRET_KEY || '', {
     apiVersion: '2025-08-27.basil',
   })
-}
-
-/**
- * Resolves the org's API instance URL for a freshly linked Salesforce account.
- *
- * The token response never carries `instance_url`, but `/services/oauth2/userinfo`
- * returns a `profile` URL rooted at the org's own host. A response still rooted
- * at the login host means userinfo answered for the authorization server rather
- * than an org, which is not an instance URL — hence the guard.
- *
- * @returns The instance URL origin, or undefined when it cannot be determined
- * (the caller then leaves `scope` untouched rather than storing a wrong host).
- */
-async function fetchSalesforceInstanceUrl(
-  providerId: string,
-  accessToken: string
-): Promise<string | undefined> {
-  const loginHost = SALESFORCE_LOGIN_HOSTS[providerId]
-  if (!loginHost) return undefined
-  try {
-    const response = await fetch(`https://${loginHost}/services/oauth2/userinfo`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
-    if (!response.ok) return undefined
-    const data = await response.json()
-    if (typeof data.profile !== 'string') return undefined
-    const url = new URL(data.profile)
-    // The origin becomes a tool base URL that carries the bearer token, so the
-    // scheme is pinned rather than inherited from whatever userinfo returned.
-    if (url.protocol !== 'https:' || isSalesforceLoginOrigin(url.origin)) return undefined
-    return url.origin
-  } catch (error) {
-    logger.error('Failed to fetch Salesforce instance URL', { error, providerId })
-    return undefined
-  }
 }
 
 export const auth = betterAuth({
@@ -421,28 +373,8 @@ export const auth = betterAuth({
             }
           }
 
-          if (account.accessToken && isSalesforceOAuthProviderId(account.providerId)) {
-            const instanceUrl = await fetchSalesforceInstanceUrl(
-              account.providerId,
-              account.accessToken
-            )
-            if (instanceUrl) {
-              modifiedAccount.scope = withSalesforceInstanceScope(instanceUrl, account.scope)
-            }
-          }
-
           if (isMicrosoftProvider(account.providerId)) {
             modifiedAccount.refreshTokenExpiresAt = getMicrosoftRefreshTokenExpiry()
-          }
-
-          // Box token response does not include a scope field, so Better Auth
-          // stores nothing. Populate it from the requested scopes so the
-          // credential-selector can verify permissions.
-          if (account.providerId === 'box' && !account.scope) {
-            const requestedScopes = getCanonicalScopesForProvider('box')
-            if (requestedScopes.length > 0) {
-              modifiedAccount.scope = requestedScopes.join(' ')
-            }
           }
 
           return { data: modifiedAccount }
@@ -503,41 +435,6 @@ export const auth = betterAuth({
               providerId: account.providerId,
               error,
             })
-          }
-
-          /**
-           * A fresh Slack connect re-issues the installation's rotating token
-           * chain, invalidating the copies held by sibling account rows for the
-           * same team (Slack bot tokens are per-installation, not per-grant).
-           * Propagate the new chain so every sibling is valid again, and clear
-           * the installation's dead flag.
-           */
-          if (account.providerId === 'slack' && account.accessToken) {
-            try {
-              const teamId = extractSlackTeamId(account.accountId)
-              if (teamId) {
-                // Clear the dead flag before fanning out: the connect itself
-                // proves the installation has live tokens, and a fan-out
-                // failure must not leave the hour-long flag blocking refreshes.
-                await clearOAuthRefreshDeadFlag(`slack:${teamId}`)
-                await fanOutSlackTokenChain(teamId, {
-                  accessToken: account.accessToken,
-                  refreshToken: account.refreshToken ?? null,
-                  accessTokenExpiresAt: account.accessTokenExpiresAt ?? null,
-                })
-                logger.info('[account.create.after] Propagated Slack installation token chain', {
-                  userId: account.userId,
-                  teamId,
-                  newAccountId: account.id,
-                })
-              }
-            } catch (error) {
-              logger.error('[account.create.after] Failed to propagate Slack token chain', {
-                userId: account.userId,
-                accountId: account.id,
-                error,
-              })
-            }
           }
 
           const isOAuth2Callback = context?.path.startsWith('/oauth2/callback/') === true
@@ -613,31 +510,6 @@ export const auth = betterAuth({
                 error,
               }
             )
-          }
-
-          if (isSalesforceOAuthProviderId(account.providerId)) {
-            const updates: {
-              accessTokenExpiresAt?: Date
-              scope?: string
-            } = {}
-
-            if (!account.accessTokenExpiresAt) {
-              updates.accessTokenExpiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000)
-            }
-
-            if (account.accessToken) {
-              const instanceUrl = await fetchSalesforceInstanceUrl(
-                account.providerId,
-                account.accessToken
-              )
-              if (instanceUrl) {
-                updates.scope = withSalesforceInstanceScope(instanceUrl, account.scope)
-              }
-            }
-
-            if (Object.keys(updates).length > 0) {
-              await db.update(schema.account).set(updates).where(eq(schema.account.id, account.id))
-            }
           }
 
           if (isMicrosoftProvider(account.providerId)) {
@@ -963,20 +835,6 @@ export const auth = betterAuth({
               error_description: capabilityRefusal('cli.use'),
             })
           }
-        }
-      }
-
-      if (ctx.path === '/oauth2/link' && ctx.body?.providerId === MICROSOFT_DATAVERSE_PROVIDER_ID) {
-        try {
-          assertMicrosoftDataverseOAuthLinkRequest(
-            ctx.body.callbackURL,
-            ctx.body.scopes,
-            getCanonicalScopesForProvider(MICROSOFT_DATAVERSE_PROVIDER_ID)
-          )
-        } catch (error) {
-          throw new APIError('BAD_REQUEST', {
-            message: getErrorMessage(error, 'Invalid Dataverse OAuth request'),
-          })
         }
       }
 

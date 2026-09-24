@@ -27,7 +27,6 @@ import {
 import { knowledgeKeys } from '@/hooks/queries/utils/knowledge-keys'
 import { searchSourceKeys } from '@/hooks/queries/utils/search-source-keys'
 import { selectorKeys, selectorQueryRoots } from '@/hooks/queries/utils/selector-keys'
-import { slackSearchKeys } from '@/hooks/queries/utils/slack-search-keys'
 
 describe('personal account disconnect', () => {
   it.each([true, false])(
@@ -134,89 +133,6 @@ describe('personal account disconnect', () => {
         expect(mocks.refresh).toHaveBeenCalledTimes(success ? 1 : 0)
         for (const key of [otherResults, workspaceResults])
           expect(client.getQueryData(key)).toEqual({ content: 'previously authorized content' })
-      } finally {
-        await act(async () => root.unmount())
-        client.clear()
-        vi.unstubAllGlobals()
-      }
-    }
-  )
-})
-
-describe('organization account setup updates', () => {
-  it.each([true, false])(
-    'refreshes only this organization’s setup after the caller unmounts on success=%s',
-    async (success) => {
-      vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
-      mocks.request.mockReset()
-      const response = Promise.withResolvers<object>()
-      mocks.request.mockReturnValue(response.promise)
-      const client = new QueryClient()
-      const container = document.createElement('div')
-      const root = createRoot(container)
-      let mutation: ReturnType<typeof useUpdateOrganizationAccounts>
-      function Probe() {
-        mutation = useUpdateOrganizationAccounts()
-        return null
-      }
-      const current = slackSearchKeys.manifest('org-1', 'Sim Search')
-      const renamed = slackSearchKeys.manifest('org-1', 'Custom name')
-      const other = slackSearchKeys.manifest('org-2', 'Sim Search')
-      const overview = searchSourceKeys.organizationOverview('org-1')
-      const otherOverview = searchSourceKeys.organizationOverview('org-2')
-      const providerSelectors = [
-        selectorKeys.scoped(
-          'workspace.credentialGroupProviders',
-          { kind: 'workspace', workspaceId: 'workspace-1' },
-          'block-1'
-        ),
-        selectorKeys.scoped(
-          'workspace.organizationMcpProviders',
-          { kind: 'workspace', workspaceId: 'workspace-1' },
-          'block-2'
-        ),
-        [...selectorQueryRoots.workflowSearchReplace, 'workflow-1'],
-      ]
-      for (const key of providerSelectors) client.setQueryData(key, { options: ['cached'] })
-      for (const key of [current, renamed, other]) client.setQueryData(key, { existingApp: 'A1' })
-      for (const key of [overview, otherOverview]) client.setQueryData(key, { providers: [] })
-      try {
-        await act(async () =>
-          root.render(
-            <QueryClientProvider client={client}>
-              <Probe />
-            </QueryClientProvider>
-          )
-        )
-        const input = { organizationId: 'org-1', groupId: 'group-1', update: { options: [] } }
-        let update: Promise<unknown>
-        await act(async () => {
-          update = mutation.mutateAsync(input)
-        })
-        await act(async () =>
-          root.render(<QueryClientProvider client={client}>{null}</QueryClientProvider>)
-        )
-        await act(async () => {
-          if (success) {
-            response.resolve({})
-            await update
-          } else {
-            const rejection = expect(update).rejects.toThrow('Source still uses')
-            response.reject(new Error('Source still uses Slack accounts'))
-            await rejection
-          }
-        })
-        expect(mocks.request).toHaveBeenCalledExactlyOnceWith(updateOrganizationAccountsContract, {
-          params: { id: 'org-1', groupId: 'group-1' },
-          body: { options: [] },
-        })
-        expect(client.getQueryState(current)?.isInvalidated).toBe(success)
-        expect(client.getQueryState(renamed)?.isInvalidated).toBe(success)
-        expect(client.getQueryState(other)?.isInvalidated).toBe(false)
-        expect(client.getQueryState(overview)?.isInvalidated).toBe(success)
-        expect(client.getQueryState(otherOverview)?.isInvalidated).toBe(false)
-        for (const key of providerSelectors)
-          expect(client.getQueryState(key)?.isInvalidated).toBe(success)
       } finally {
         await act(async () => root.unmount())
         client.clear()

@@ -1491,72 +1491,12 @@ export const SupabaseBlockMeta = {
   templates: [
     {
       icon: SupabaseIcon,
-      title: 'Supabase customer record sync',
-      prompt:
-        'Build a workflow that listens for Stripe new-customer events and upserts a row into a Supabase customers table with the correct plan and metadata, then emails a welcome message.',
-      modules: ['agent', 'workflows'],
-      category: 'operations',
-      tags: ['enterprise', 'automation'],
-      alsoIntegrations: ['stripe', 'gmail'],
-    },
-    {
-      icon: SupabaseIcon,
-      title: 'Supabase nightly export to S3',
-      prompt:
-        'Create a scheduled workflow that runs each night, exports key Supabase tables to compressed JSON in S3 with date partitions, and writes the manifest to an audit table.',
-      modules: ['scheduled', 'agent', 'workflows'],
-      category: 'operations',
-      tags: ['devops', 'sync'],
-      alsoIntegrations: ['s3'],
-    },
-    {
-      icon: SupabaseIcon,
-      title: 'Supabase row-level audit log',
-      prompt:
-        'Build a scheduled workflow that polls Supabase sensitive tables for recently changed rows, captures the diff against the last snapshot into an audit log table, and pings Slack on unusual write patterns.',
-      modules: ['scheduled', 'tables', 'agent', 'workflows'],
-      category: 'operations',
-      tags: ['enterprise', 'monitoring'],
-      alsoIntegrations: ['slack'],
-    },
-    {
-      icon: SupabaseIcon,
-      title: 'Supabase high-priority row alerter',
-      prompt:
-        'Create a scheduled workflow that polls Supabase frequently for high-priority rows — new orders, fraud flags — and posts a Slack alert with context for each new row it finds.',
-      modules: ['scheduled', 'agent', 'workflows'],
-      category: 'operations',
-      tags: ['monitoring', 'communication'],
-      alsoIntegrations: ['slack'],
-    },
-    {
-      icon: SupabaseIcon,
       title: 'Supabase storage cleanup',
       prompt:
         'Build a scheduled workflow that finds Supabase storage objects older than the retention policy or unreferenced in the database, deletes them, and writes a cleanup report.',
       modules: ['scheduled', 'agent', 'workflows'],
       category: 'operations',
       tags: ['devops', 'automation'],
-    },
-    {
-      icon: SupabaseIcon,
-      title: 'Supabase analytics digest',
-      prompt:
-        'Create a scheduled daily workflow that queries Supabase for new signups, active users, and key feature usage, and posts a digest to Slack with week-over-week trend.',
-      modules: ['scheduled', 'agent', 'workflows'],
-      category: 'productivity',
-      tags: ['product', 'reporting'],
-      alsoIntegrations: ['slack'],
-    },
-    {
-      icon: SupabaseIcon,
-      title: 'Supabase + Algolia search sync',
-      prompt:
-        'Build a scheduled workflow that mirrors Supabase tables into an Algolia index, propagates new and changed rows on each run, and writes sync lag to a tables-based monitor.',
-      modules: ['scheduled', 'tables', 'agent', 'workflows'],
-      category: 'engineering',
-      tags: ['engineering', 'sync'],
-      alsoIntegrations: ['algolia'],
     },
   ],
   skills: [

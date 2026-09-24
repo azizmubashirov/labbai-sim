@@ -1,19 +1,11 @@
 import {
-  BOX_SERVICE_ACCOUNT_PROVIDER_ID,
   CLIENT_CREDENTIAL_ACCOUNT_SECRET_TYPE,
   type ClientCredentialAccountProviderId,
   getClientCredentialAccountDescriptor,
   isClientCredentialAccountProviderId,
-  NETSUITE_SERVICE_ACCOUNT_PROVIDER_ID,
   partitionClientCredentialFields,
-  SALESFORCE_SERVICE_ACCOUNT_PROVIDER_ID,
-  ZOHO_DESK_SERVICE_ACCOUNT_PROVIDER_ID,
   ZOOM_SERVICE_ACCOUNT_PROVIDER_ID,
 } from '@/lib/credentials/client-credential-accounts/descriptors'
-import { mintBoxServiceAccountToken } from '@/lib/credentials/client-credential-accounts/minters/box'
-import { mintNetSuiteServiceAccountToken } from '@/lib/credentials/client-credential-accounts/minters/netsuite'
-import { mintSalesforceServiceAccountToken } from '@/lib/credentials/client-credential-accounts/minters/salesforce'
-import { mintZohoDeskServiceAccountToken } from '@/lib/credentials/client-credential-accounts/minters/zoho-desk'
 import { mintZoomServiceAccountToken } from '@/lib/credentials/client-credential-accounts/minters/zoom'
 import type { ServiceAccountPrincipal } from '@/lib/credentials/principal'
 
@@ -126,10 +118,6 @@ const CLIENT_CREDENTIAL_ACCOUNT_MINTERS: Record<
   ClientCredentialAccountMinter
 > = {
   [ZOOM_SERVICE_ACCOUNT_PROVIDER_ID]: mintZoomServiceAccountToken,
-  [BOX_SERVICE_ACCOUNT_PROVIDER_ID]: mintBoxServiceAccountToken,
-  [SALESFORCE_SERVICE_ACCOUNT_PROVIDER_ID]: mintSalesforceServiceAccountToken,
-  [ZOHO_DESK_SERVICE_ACCOUNT_PROVIDER_ID]: mintZohoDeskServiceAccountToken,
-  [NETSUITE_SERVICE_ACCOUNT_PROVIDER_ID]: mintNetSuiteServiceAccountToken,
 }
 
 export function getClientCredentialAccountMinter(

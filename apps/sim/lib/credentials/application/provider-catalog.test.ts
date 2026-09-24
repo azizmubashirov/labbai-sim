@@ -96,12 +96,12 @@ const services = [
     authType: 'oauth' as const,
   },
   {
-    serviceId: 'claude-platform',
-    providerId: 'claude-platform-service-account',
-    serviceAccountProviderId: 'claude-platform-service-account',
-    name: 'Claude Platform',
-    description: 'Run Claude Platform Managed Agents from your workflows.',
-    baseProvider: 'claude-platform',
+    serviceId: 'pipedrive',
+    providerId: 'pipedrive-service-account',
+    serviceAccountProviderId: 'pipedrive-service-account',
+    name: 'Pipedrive',
+    description: 'Connect Pipedrive.',
+    baseProvider: 'pipedrive',
     authType: 'service_account' as const,
   },
 ]
@@ -128,7 +128,7 @@ describe('listCredentialProviderCatalog', () => {
     mocks.createVisibility.mockReturnValue({
       isOAuthServiceVisible: (service: { serviceId: string }) => service.serviceId === 'salesforce',
       isCredentialVisible: ({ providerId }: { providerId: string }) =>
-        providerId === 'claude-platform-service-account',
+        providerId === 'pipedrive-service-account',
     })
     mocks.getServiceConfigByServiceId.mockImplementation((serviceId: string) => {
       if (serviceId === 'salesforce') {
@@ -176,23 +176,23 @@ describe('listCredentialProviderCatalog', () => {
       },
       {
         type: 'service_account',
-        serviceId: 'claude-platform-service-account',
-        providerId: 'claude-platform-service-account',
-        name: 'Claude Platform API key',
-        description: 'Connect Claude Platform with a API key.',
-        providerFamily: 'claude-platform',
+        serviceId: 'pipedrive-service-account',
+        providerId: 'pipedrive-service-account',
+        name: 'Pipedrive API token',
+        description: 'Connect Pipedrive with a API token.',
+        providerFamily: 'pipedrive',
         available: true,
-        docsUrl: 'https://docs.sim.ai/integrations/managed-agent',
+        docsUrl: 'https://docs.sim.ai/integrations/pipedrive-service-account',
+        helpText: expect.any(String),
         requiresClientGeneratedCredentialId: false,
         fields: [
           {
             id: 'apiToken',
-            label: 'API key',
-            placeholder: 'sk-ant-...',
+            label: 'API token',
+            placeholder: 'Paste personal API token',
             required: true,
             secret: true,
             multiline: false,
-            hint: 'Claude Platform API keys usually start with sk-ant-.',
           },
         ],
       },

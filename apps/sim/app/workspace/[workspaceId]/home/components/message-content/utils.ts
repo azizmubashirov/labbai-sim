@@ -38,7 +38,6 @@ export const TOOL_ICONS: Readonly<Record<string, IconComponent>> = {
   auth: Integration,
   call_integration_tool: Integration,
   cancel_workflow_run: Square,
-  connect_slack_bot: Integration,
   context_compaction: Asterisk,
   cp: Layout,
   create_empty_file: File,

@@ -57,13 +57,13 @@ import { buildOrganizationAccountAccessPolicy } from '@/lib/credential-groups/ap
 import { startPersonalCredentialConnection } from '@/lib/credentials/application/personal-connection'
 
 const principal: Principal = { kind: 'session', userId: 'viewer', sessionId: 'session' }
-const input = { workspaceId: 'workspace', providerId: 'confluence' }
+const input = { workspaceId: 'workspace', providerId: 'notion' }
 const group = {
   credentialGroupId: 'canonical-group',
   workspaceId: null,
   organizationId: 'organization',
   status: 'active',
-  options: [{ id: 'option', provider: 'confluence', status: 'active' }],
+  options: [{ id: 'option', provider: 'notion', status: 'active' }],
 }
 
 function execute(overrides = {}) {
@@ -91,8 +91,8 @@ describe('personal connection launch', () => {
       {
         type: 'oauth',
         available: true,
-        name: 'Confluence',
-        authorizationOptions: [{ providerId: 'confluence' }],
+        name: 'Notion',
+        authorizationOptions: [{ providerId: 'notion' }],
       },
     ])
     mocks.group.mockResolvedValue(group)
@@ -107,7 +107,7 @@ describe('personal connection launch', () => {
 
   it('enrolls a reader as themselves in the canonical group without setting up an index', async () => {
     expect(await execute()).toEqual({
-      providerId: 'confluence',
+      providerId: 'notion',
       url: 'https://accounts.example.com/authorize?state=one-use',
     })
     expect(mocks.oauthContext).toHaveBeenCalledWith(
@@ -141,34 +141,6 @@ describe('personal connection launch', () => {
       'integrations.manage'
     )
     expect(mocks.catalog).toHaveBeenCalledWith(principal, expect.any(Object), 'managed_oauth')
-  })
-
-  it('connects a configured organization Slack app through its enrollment', async () => {
-    mocks.catalog.mockResolvedValue([
-      {
-        type: 'oauth',
-        available: true,
-        name: 'Slack',
-        authorizationOptions: [{ providerId: 'slack' }],
-      },
-    ])
-    mocks.group.mockResolvedValue({
-      ...group,
-      options: [
-        {
-          id: 'slack-option',
-          provider: 'slack',
-          status: 'active',
-          authorizationAppId: 'custom-app',
-        },
-      ],
-    })
-    expect(await execute({ providerId: 'slack' })).toEqual({
-      providerId: 'slack',
-      url: 'https://accounts.example.com/authorize?state=one-use',
-    })
-    expect(mocks.oauthContext).toHaveBeenCalledWith(expect.any(Object), 'slack-option')
-    expect(mocks.ensure).not.toHaveBeenCalled()
   })
 
   it('requires current workspace membership before enrollment lookup', async () => {
@@ -210,7 +182,7 @@ describe('personal connection launch', () => {
   })
 
   it('reconnects an owned account only for the matching provider', async () => {
-    mocks.personal.mockResolvedValue([{ id: 'mine', providerId: 'confluence' }])
+    mocks.personal.mockResolvedValue([{ id: 'mine', providerId: 'notion' }])
     await execute({ credentialId: 'mine' })
     expect(mocks.personal).toHaveBeenCalledWith('workspace', 'viewer', 'mine')
     mocks.personal.mockResolvedValue([{ id: 'mine', providerId: 'gmail' }])
@@ -219,26 +191,10 @@ describe('personal connection launch', () => {
 
   it('honors provider visibility before minting an enrollment', async () => {
     mocks.catalog.mockResolvedValue([
-      { type: 'oauth', available: false, authorizationOptions: [{ providerId: 'confluence' }] },
+      { type: 'oauth', available: false, authorizationOptions: [{ providerId: 'notion' }] },
     ])
     await expect(execute()).rejects.toThrow('cannot be connected')
     expect(mocks.enroll).not.toHaveBeenCalled()
-  })
-
-  it('requires explicit Slack app setup rather than creating a bot or borrowing one', async () => {
-    mocks.permission.mockResolvedValue('admin')
-    mocks.catalog.mockResolvedValue([
-      {
-        type: 'oauth',
-        available: true,
-        name: 'Slack',
-        authorizationOptions: [{ providerId: 'slack' }],
-      },
-    ])
-    await expect(execute({ providerId: 'slack' })).rejects.toThrow(
-      'enable Slack in organization settings'
-    )
-    expect(mocks.ensure).not.toHaveBeenCalled()
   })
 
   it('propagates revoked enrollment refusal', async () => {
@@ -287,7 +243,7 @@ describe('personal connection launch', () => {
     mocks.policy.mockResolvedValue({
       document: buildOrganizationAccountAccessPolicy('canonical-group', []),
     })
-    await expect(execute()).resolves.toMatchObject({ providerId: 'confluence' })
+    await expect(execute()).resolves.toMatchObject({ providerId: 'notion' })
     expect(mocks.enroll).toHaveBeenCalledWith({
       organizationId: 'organization',
       credentialGroupId: 'canonical-group',

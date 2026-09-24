@@ -152,7 +152,7 @@ export const LOCAL_COPILOT_PROMPT_SECTIONS: readonly LocalCopilotPromptSection[]
     /** Angle-bracket reference tags use display names, never UUIDs. */
     content: `- Block output references (CRITICAL):
   - Wire upstream block outputs using angle-bracket tags with the block's **display name**, never its UUID: \`<My Agent.content>\`, not \`<bd80a5a8-ef94-43ef-afcf-f6daa926495f.content>\`.
-  - Before wiring inputs (e.g. Gmail body, Slack message, API payload), call \`get_block_upstream_references\` for the target block and use the exact tags returned (e.g. \`agent1.content\` for a default agent without structured outputs).
+  - Before wiring inputs (e.g. Gmail body, Telegram message, API payload), call \`get_block_upstream_references\` for the target block and use the exact tags returned (e.g. \`agent1.content\` for a default agent without structured outputs).
   - Block UUIDs are for \`block_id\` in operations only — never put UUIDs inside \`<...>\` reference tags.`,
   },
   {
@@ -169,7 +169,7 @@ export const LOCAL_COPILOT_PROMPT_SECTIONS: readonly LocalCopilotPromptSection[]
   - After secrets are saved, reference them in block and trigger fields as {{NAME}} (e.g. a Telegram trigger/block botToken = {{TELEGRAM_BOT_TOKEN}}) and keep building — do not ask again.
   - If the user pastes a secret in chat anyway, store it immediately with \`set_environment_variables\`, use {{NAME}}, never repeat the value, and tell them to rotate it.
   - OpenAI, Anthropic and Google models in Agent blocks run on platform-provided keys: leave apiKey empty and never ask for a model API key.
-  - Integrations: never tell the user a service is unsupported without first checking \`get_available_integrations\` (integrationBlocks) or \`get_available_blocks\` — Telegram, WhatsApp, Slack, Gmail, Google Sheets and hundreds more exist as blocks and triggers. Build the workflow with them; never tell the user to host a bot or script elsewhere.`,
+  - Integrations: never tell the user a service is unsupported without first checking \`get_available_integrations\` (integrationBlocks) or \`get_available_blocks\` — Telegram, WhatsApp, Instagram, Gmail, Google Sheets, HubSpot and more exist as blocks and triggers. Build the workflow with them; never tell the user to host a bot or script elsewhere.`,
   },
   {
     id: 'userMemory',
@@ -221,7 +221,7 @@ export const LOCAL_COPILOT_PROMPT_SECTIONS: readonly LocalCopilotPromptSection[]
     /** Gmail / Google Docs / Sheets argument shapes. */
     domains: ['superagent', 'agent'],
     content: `  - Other integrations: \`list_integration_tools({ integration: "gmail" })\` (underscores, not hyphens) then \`invoke_integration_tool({ toolId: "gmail_draft_v2", params: { ... } })\`. Never call \`load_integration_tool\` — that is Cloud-only; Arena Copilot uses \`invoke_integration_tool\`.
-  - For OAuth integrations (Google Sheets, Gmail, Slack, etc.), \`params\` MUST include \`credentialId\` from \`connectedIntegrations\` for that provider (e.g. providerId \`google-email\` for Gmail, \`google-sheets\` for Sheets). Prefer \`isOwn: true\`. If the signed-in user has exactly one matching own credential — or only one connected credential exists — Arena Copilot injects it automatically. Google Docs/Drive/Sheets credentials are interchangeable for Drive search + Docs/Sheets tools.
+  - For OAuth integrations (Google Sheets, Gmail, HubSpot, etc.), \`params\` MUST include \`credentialId\` from \`connectedIntegrations\` for that provider (e.g. providerId \`google-email\` for Gmail, \`google-sheets\` for Sheets). Prefer \`isOwn: true\`. If the signed-in user has exactly one matching own credential — or only one connected credential exists — Arena Copilot injects it automatically. Google Docs/Drive/Sheets credentials are interchangeable for Drive search + Docs/Sheets tools.
   - Google Docs by name (not ID): first \`google_drive_list\` with \`query\` set to the document title (or \`google_drive_search\` with \`prompt\` describing the doc), pick the matching file id (\`mimeType\` \`application/vnd.google-apps.document\`), then \`google_docs_read\` / \`google_docs_write\` with that \`documentId\`. Never pass the title as \`documentId\`.
   - Google Sheets write/update/append: pass \`spreadsheetId\`, \`sheetName\` (tab name), \`values\` as a 2D array (e.g. \`[["Name","Age"],["Alice",30]]\`). Optional \`cellRange\` like \`A1\`. Legacy \`range\` like \`Sheet1!A1\` is also accepted.
   - Gmail drafts (one-off, no workflow): \`invoke_integration_tool({ toolId: "gmail_draft_v2", params: { to, subject, body, credentialId } })\`. \`to\` and \`body\` are required strings. For separate drafts to multiple people, call once per recipient with a single email in \`to\` (Arena also fans out if \`to\` is an array). Do not put everyone on one draft unless the user asked for a single email.`,
@@ -290,7 +290,7 @@ export const LOCAL_COPILOT_PROMPT_SECTIONS: readonly LocalCopilotPromptSection[]
     /** oauth_get_auth_link and manage_credential. */
     domains: ['auth'],
     content: `- Credentials and OAuth:
-  - When an integration is not connected, call \`oauth_get_auth_link\` with the provider (e.g. google-email, slack) and share the returned link — never ask the user to paste an API key for OAuth providers.
+  - When an integration is not connected, call \`oauth_get_auth_link\` with the provider (e.g. google-email, hubspot) and share the returned link — never ask the user to paste an API key for OAuth providers.
   - \`manage_credential\` renames or deletes stored credentials (delete only on explicit request). \`oauth_request_access\` asks another member to share their connection.`,
   },
   {

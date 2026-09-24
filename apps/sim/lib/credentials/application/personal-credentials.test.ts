@@ -134,17 +134,6 @@ describe('personal credential application access', () => {
     expect(mocks.listTokens).toHaveBeenCalledWith('workspace-1', 'user-1')
   })
 
-  it('accepts an alternate authorization server for the same OAuth service', async () => {
-    const sandbox = { ...personalCredential, providerId: 'salesforce-sandbox' }
-    mocks.listPersonal.mockResolvedValue([sandbox])
-    await expect(
-      authorizePersonalCredential.execute({
-        principal,
-        input: { ...authorizationInput, expectedProviderId: 'salesforce' },
-      })
-    ).resolves.toEqual(sandbox)
-  })
-
   it('authorizes a managed account returned by the same personal policy', async () => {
     const managed = { ...personalCredential, providerId: 'slack', type: 'managed_oauth' as const }
     mocks.listPersonal.mockResolvedValue([managed])

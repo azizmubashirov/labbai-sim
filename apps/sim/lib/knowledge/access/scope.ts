@@ -32,10 +32,6 @@ import {
   emailDomain,
 } from '@/lib/knowledge/access/external-groups'
 import {
-  type GitHubReaderCredential,
-  resolveGitHubInstallationReadGrants,
-} from '@/lib/knowledge/access/github-installation'
-import {
   assertExternalGroupTokenCapacity,
   MAX_EXTERNAL_GROUP_TOKENS,
   parentGroupTokensQuery,
@@ -63,6 +59,15 @@ import {
 import { checkWorkspaceAccess } from '@/lib/workspaces/permissions/utils'
 
 const logger = createLogger('KnowledgeAccessScope')
+
+/**
+ * GitHub App installation sources were removed with the GitHub integration; no
+ * reader can hold a GitHub grant, so this list is always empty.
+ */
+interface GitHubReaderCredential {
+  credentialId: string
+  subjectToken: string
+}
 
 export const WORKSPACE_ACCESS_SCOPE: WorkspaceAccessScope = Object.freeze({
   kind: 'workspace',
@@ -277,8 +282,6 @@ async function loadUserAccess(
     try {
       const token = subjectToken(row)
       identityTokens.add(token)
-      if (row.providerId === 'github-repositories' && row.credentialId)
-        githubReaders.push({ credentialId: row.credentialId, subjectToken: token })
       if (row.providerId === 'confluence' && row.credentialId)
         confluenceReaders.push({ credentialId: row.credentialId, subjectToken: token })
     } catch (error) {
@@ -473,9 +476,7 @@ function createAccessProvider(
         signal: cancellation,
       }
       const [githubInstallationGrants, confluenceSiteGrants] = await Promise.all([
-        githubReaders.length
-          ? resolveGitHubInstallationReadGrants({ ...input, readers: githubReaders })
-          : Promise.resolve([]),
+        Promise.resolve([]),
         confluenceReaders.length
           ? resolveConfluenceSiteReadGrants({ ...input, readers: confluenceReaders })
           : Promise.resolve([]),

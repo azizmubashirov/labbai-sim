@@ -70,7 +70,7 @@ export const SEARCH_REPLACE_BLOCK_CONFIGS: Record<string, { subBlocks: SubBlockC
         title: 'Channel',
         type: 'channel-selector',
         serviceId: 'slack',
-        selectorKey: 'slack.channels',
+        selectorKey: 'notion.pages',
         dependsOn: ['credential'],
       },
       {

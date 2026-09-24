@@ -116,7 +116,7 @@ export async function startCredentialGroupOAuth(
     completionRedirect?: boolean
     connectionIntent?: CredentialGroupConnectionIntent
     completionId?: string
-    returnTo?: 'search' | 'accounts' | 'github-installation'
+    returnTo?: 'search' | 'accounts'
   } = {}
 ): Promise<string> {
   if (!context.credentialOwnerId) throw new CredentialGroupInvitationUnavailableError()

@@ -11,7 +11,6 @@ export interface ToolCatalogEntry {
     | 'auth'
     | 'call_integration_tool'
     | 'cancel_workflow_run'
-    | 'connect_slack_bot'
     | 'cp'
     | 'create_empty_file'
     | 'create_workflow'
@@ -114,7 +113,6 @@ export interface ToolCatalogEntry {
     | 'auth'
     | 'call_integration_tool'
     | 'cancel_workflow_run'
-    | 'connect_slack_bot'
     | 'cp'
     | 'create_empty_file'
     | 'create_workflow'
@@ -325,36 +323,6 @@ export const CancelWorkflowRun: ToolCatalogEntry = {
   },
   requiredPermission: 'write',
   requiresApproval: true,
-}
-
-export const ConnectSlackBot: ToolCatalogEntry = {
-  id: 'connect_slack_bot',
-  name: 'connect_slack_bot',
-  route: 'sim',
-  mode: 'async',
-  parameters: {
-    type: 'object',
-    properties: {
-      botTokenEnvVar: {
-        type: 'string',
-        description:
-          'NAME of the environment variable holding the bot token (xoxb-..., OAuth & Permissions → Bot User OAuth Token). Pass the variable name, never the token value.',
-      },
-      description: { type: 'string', description: 'Optional description shown on the credential.' },
-      displayName: {
-        type: 'string',
-        description:
-          'Display name for the credential, shown in the credential picker (e.g. "Elder Bot"). Must be unique in the workspace.',
-      },
-      signingSecretEnvVar: {
-        type: 'string',
-        description:
-          "NAME of the environment variable holding the Slack app's signing secret (Basic Information → App Credentials). Pass the variable name, never the secret value.",
-      },
-    },
-    required: ['displayName', 'signingSecretEnvVar', 'botTokenEnvVar'],
-  },
-  requiredPermission: 'write',
 }
 
 export const Cp: ToolCatalogEntry = {
@@ -5296,7 +5264,6 @@ export const TOOL_CATALOG: Record<string, ToolCatalogEntry> = {
   [Auth.id]: Auth,
   [CallIntegrationTool.id]: CallIntegrationTool,
   [CancelWorkflowRun.id]: CancelWorkflowRun,
-  [ConnectSlackBot.id]: ConnectSlackBot,
   [Cp.id]: Cp,
   [CreateEmptyFile.id]: CreateEmptyFile,
   [CreateWorkflow.id]: CreateWorkflow,

@@ -1,12 +1,8 @@
 import { db } from '@sim/db'
 import {
-  account,
-  credential,
   document,
   knowledgeBase,
   knowledgeConnector,
-  knowledgeConnectorMember,
-  knowledgeConnectorMemberSyncLog,
   knowledgeConnectorSyncLog,
   member,
   organization,
@@ -15,7 +11,7 @@ import {
   workspace,
 } from '@sim/db/schema'
 import { generateId } from '@sim/utils/id'
-import { eq, inArray, sql } from 'drizzle-orm'
+import { eq, inArray } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import {
   createKnowledgeAclFixtureIds,
@@ -29,12 +25,8 @@ const ids = createKnowledgeAclFixtureIds()
 const indexId = generateId()
 const driveId = generateId()
 const pausedDriveId = generateId()
-const gmailId = generateId()
-const credentialId = generateId()
-const accountId = generateId()
-const memberId = generateId()
 const documentId = generateId()
-const sourceIds = [driveId, pausedDriveId, gmailId]
+const sourceIds = [driveId, pausedDriveId]
 const principal = { kind: 'session', userId: ids.aliceId, sessionId: 'overview-admin' } as const
 const input = { organizationId: ids.organizationId }
 
@@ -66,38 +58,7 @@ beforeAll(async () => {
       accessMode: 'admin',
       sourceConfig: {},
     },
-    {
-      id: gmailId,
-      knowledgeBaseId: indexId,
-      connectorType: 'gmail',
-      accessMode: 'members',
-      sourceConfig: {},
-    },
   ])
-  await db.insert(account).values({
-    id: accountId,
-    accountId: ids.bobId,
-    userId: ids.bobId,
-    providerId: 'google-email',
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  })
-  await db.insert(credential).values({
-    id: credentialId,
-    organizationId: ids.organizationId,
-    type: 'oauth',
-    displayName: 'Fixture connection',
-    providerId: 'google-email',
-    accountId,
-    createdBy: ids.bobId,
-  })
-  await db.insert(knowledgeConnectorMember).values({
-    id: memberId,
-    organizationId: ids.organizationId,
-    connectorId: gmailId,
-    credentialId,
-    subjectToken: `s:google-email:fixture:${ids.bobId}`,
-  })
   await db.insert(document).values({
     id: documentId,
     knowledgeBaseId: indexId,
@@ -117,9 +78,6 @@ beforeEach(async () => {
   await db
     .delete(organizationSearchIntegration)
     .where(eq(organizationSearchIntegration.organizationId, ids.organizationId))
-  await db
-    .delete(knowledgeConnectorMemberSyncLog)
-    .where(inArray(knowledgeConnectorMemberSyncLog.connectorId, sourceIds))
   await db
     .delete(knowledgeConnectorSyncLog)
     .where(inArray(knowledgeConnectorSyncLog.connectorId, sourceIds))
@@ -141,17 +99,6 @@ beforeEach(async () => {
     .update(knowledgeConnector)
     .set({ status: 'paused' })
     .where(eq(knowledgeConnector.id, pausedDriveId))
-  await db
-    .update(knowledgeConnectorMember)
-    .set({
-      status: 'active',
-      lastCompleteListingAt: new Date(),
-      memberSyncedThrough: new Date(),
-      lastError: null,
-      consecutiveFailures: 0,
-      listingCheckpoint: null,
-    })
-    .where(eq(knowledgeConnectorMember.id, memberId))
   await db
     .update(document)
     .set({
@@ -229,18 +176,9 @@ describe('organization operational overview with real SQL', () => {
           isSyncing: false,
           hasPendingSync: false,
         },
-        {
-          connectorType: 'gmail',
-          sourceCount: 1,
-          approved: true,
-          status: 'active',
-          issue: null,
-          isSyncing: false,
-          hasPendingSync: false,
-        },
       ])
     )
-    expect(result.providers).toHaveLength(2)
+    expect(result.providers).toHaveLength(1)
     expect(JSON.stringify(result)).not.toMatch(/private-title|someone-else|fixture connection/i)
     const visible = await listSearchSources.execute({
       principal,
@@ -249,92 +187,17 @@ describe('organization operational overview with real SQL', () => {
     expect(visible.sources).toHaveLength(2)
     expect(visible.sources.every((source) => !source.hasViewerDocuments)).toBe(true)
   })
-  it('keeps explicit approvals and deactivations visible before source creation', async () => {
+  it('keeps an explicit deactivation visible and ignores approvals for non-search connectors', async () => {
     await db.insert(organizationSearchIntegration).values([
-      { organizationId: ids.organizationId, connectorType: 'github', approved: true },
-      { organizationId: ids.organizationId, connectorType: 'confluence', approved: false },
+      { organizationId: ids.organizationId, connectorType: 'google_drive', approved: false },
       { organizationId: ids.organizationId, connectorType: 'notion', approved: true },
     ])
-    expect(await provider('github')).toMatchObject({
-      sourceCount: 0,
-      approved: true,
-      status: 'needs_setup',
-    })
-    expect(await provider('confluence')).toMatchObject({
-      sourceCount: 0,
+    expect(await provider('google_drive')).toMatchObject({
+      sourceCount: 2,
       approved: false,
       status: 'paused',
     })
     expect(await provider('notion')).toBeUndefined()
-  })
-  it('reports waiting accounts despite an empty member run having a completion timestamp', async () => {
-    await db
-      .update(knowledgeConnectorMember)
-      .set({ status: 'disabled' })
-      .where(eq(knowledgeConnectorMember.id, memberId))
-    await db
-      .update(knowledgeConnector)
-      .set({ memberSyncStatus: 'pending' })
-      .where(eq(knowledgeConnector.id, gmailId))
-    expect(await provider('gmail')).toMatchObject({ status: 'waiting_for_connections' })
-  })
-  it('distinguishes queued member continuation from active indexing and partial failure', async () => {
-    await db
-      .update(knowledgeConnectorMember)
-      .set({ listingCheckpoint: { cursor: 'fixture' } })
-      .where(eq(knowledgeConnectorMember.id, memberId))
-    const logId = generateId()
-    await db.insert(knowledgeConnectorMemberSyncLog).values({
-      id: logId,
-      connectorId: gmailId,
-      status: 'partial',
-      membersIncomplete: 1,
-      docsFailed: 0,
-      processingDispatchFailed: 0,
-      completedAt: new Date(),
-    })
-    expect(await provider('gmail')).toMatchObject({
-      status: 'active',
-      isSyncing: false,
-      hasPendingSync: true,
-    })
-    await db
-      .update(knowledgeConnectorMemberSyncLog)
-      .set({ membersFailed: 1 })
-      .where(eq(knowledgeConnectorMemberSyncLog.id, logId))
-    expect(await provider('gmail')).toMatchObject({ status: 'needs_attention' })
-    await db
-      .update(knowledgeConnectorMemberSyncLog)
-      .set({ membersFailed: 0 })
-      .where(eq(knowledgeConnectorMemberSyncLog.id, logId))
-    await db
-      .update(knowledgeConnectorMember)
-      .set({ listingCheckpoint: null })
-      .where(eq(knowledgeConnectorMember.id, memberId))
-    expect(await provider('gmail')).toMatchObject({ status: 'needs_attention' })
-    await db
-      .update(knowledgeConnector)
-      .set({ nextMemberSyncAt: sql`statement_timestamp() - interval '1 second'` })
-      .where(eq(knowledgeConnector.id, gmailId))
-    expect(await provider('gmail')).toMatchObject({
-      status: 'active',
-      isSyncing: false,
-      hasPendingSync: true,
-    })
-    await db
-      .update(knowledgeConnector)
-      .set({ nextMemberSyncAt: null })
-      .where(eq(knowledgeConnector.id, gmailId))
-    await db.insert(knowledgeConnectorMemberSyncLog).values({
-      id: generateId(),
-      connectorId: gmailId,
-      status: 'completed',
-      docsFailed: 0,
-      processingDispatchFailed: 0,
-      startedAt: new Date(Date.now() + 1000),
-      completedAt: new Date(),
-    })
-    expect(await provider('gmail')).toMatchObject({ status: 'active' })
   })
   it('ignores intentional skips while reporting inaccessible source and indexing failures', async () => {
     await db
@@ -390,29 +253,23 @@ describe('organization operational overview with real SQL', () => {
       isSyncing: true,
     })
   })
-  it('surfaces retained source errors and stale member permissions, while pause and deactivation take precedence', async () => {
+  it('surfaces retained source errors, while pause and deactivation take precedence', async () => {
     await db
       .update(knowledgeConnector)
       .set({ lastSyncError: 'private-provider-error' })
       .where(eq(knowledgeConnector.id, driveId))
     expect(await provider('google_drive')).toMatchObject({ status: 'needs_attention' })
     await db
-      .update(knowledgeConnectorMember)
-      .set({
-        memberSyncedThrough: new Date(Date.now() - 3 * 86_400_000),
-        lastCompleteListingAt: new Date(Date.now() - 3 * 86_400_000),
-      })
-      .where(eq(knowledgeConnectorMember.id, memberId))
-    expect(await provider('gmail')).toMatchObject({ status: 'needs_attention' })
-    await db
       .update(knowledgeConnector)
       .set({ status: 'paused' })
       .where(eq(knowledgeConnector.id, driveId))
     expect(await provider('google_drive')).toMatchObject({ status: 'paused' })
-    await db
-      .insert(organizationSearchIntegration)
-      .values({ organizationId: ids.organizationId, connectorType: 'gmail', approved: false })
-    expect(await provider('gmail')).toMatchObject({
+    await db.insert(organizationSearchIntegration).values({
+      organizationId: ids.organizationId,
+      connectorType: 'google_drive',
+      approved: false,
+    })
+    expect(await provider('google_drive')).toMatchObject({
       approved: false,
       status: 'paused',
       isSyncing: false,

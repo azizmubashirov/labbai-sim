@@ -91,109 +91,13 @@ export const selectorManifest = {
     readiness: { all: ['oauthCredential', 'baseId'] },
     detail: true,
   }),
-  'asana.workspaces': providerSelector([], { detail: true }),
-  'attio.lists': providerSelector([], { detail: true }),
-  'attio.objects': providerSelector([], { detail: true }),
-  'bigquery.datasets': providerSelector(['projectId', 'impersonateUserEmail'], {
-    readiness: { all: ['oauthCredential', 'projectId'] },
-    listMode: 'paginated',
-    detail: true,
-  }),
-  'bigquery.tables': providerSelector(['projectId', 'datasetId', 'impersonateUserEmail'], {
-    readiness: { all: ['oauthCredential', 'projectId', 'datasetId'] },
-    listMode: 'paginated',
-    detail: true,
-  }),
-  'bitbucket.workspaces': providerSelector([], { listMode: 'paginated', detail: true }),
-  'bitbucket.repositories': providerSelector(['workspaceSlug'], {
-    readiness: { all: ['oauthCredential', 'workspaceSlug'] },
-    listMode: 'paginated',
-    detail: true,
-  }),
   'calcom.eventTypes': providerSelector([], { detail: true }),
   'calcom.schedules': providerSelector([], { detail: true }),
-  'clickup.workspaces': providerSelector(),
-  'clickup.spaces': providerSelector(['teamId'], {
-    readiness: { all: ['oauthCredential', 'teamId'] },
-  }),
-  'clickup.folders': providerSelector(['spaceId', 'listSpaceId'], {
-    readiness: { all: ['oauthCredential'], any: ['spaceId', 'listSpaceId'] },
-  }),
-  'clickup.lists': providerSelector(['folderId', 'spaceId', 'listSpaceId'], {
-    readiness: {
-      all: ['oauthCredential'],
-      any: ['folderId', 'spaceId', 'listSpaceId'],
-    },
-  }),
-  'coda.docs': providerSelector([], {
-    listMode: 'paginated',
-    search: true,
-    detail: true,
-    unknownDetail: true,
-    staleTime: SEARCH_SELECTOR_STALE_TIME,
-  }),
-  'coda.pages': providerSelector(['docId'], {
-    readiness: { all: ['oauthCredential', 'docId'] },
-    detail: true,
-    unknownDetail: true,
-  }),
-  'coda.tables': providerSelector(['docId'], {
-    readiness: { all: ['oauthCredential', 'docId'] },
-    detail: true,
-    unknownDetail: true,
-  }),
-  'coda.columns': providerSelector(['docId', 'tableId'], {
-    readiness: { all: ['oauthCredential', 'docId', 'tableId'] },
-    detail: true,
-    unknownDetail: true,
-  }),
-  'coda.rows': providerSelector(['docId', 'tableId'], {
-    readiness: { all: ['oauthCredential', 'docId', 'tableId'] },
-    listMode: 'paginated',
-    detail: true,
-    unknownDetail: true,
-  }),
-  'coda.formulas': providerSelector(['docId'], {
-    readiness: { all: ['oauthCredential', 'docId'] },
-    detail: true,
-    unknownDetail: true,
-  }),
-  'coda.controls': providerSelector(['docId'], {
-    readiness: { all: ['oauthCredential', 'docId'] },
-    detail: true,
-    unknownDetail: true,
-  }),
-  'coda.folders': providerSelector([], { detail: true, unknownDetail: true }),
-  'coda.permissions': providerSelector(['docId'], {
-    readiness: { all: ['oauthCredential', 'docId'] },
-    detail: true,
-  }),
-  'confluence.spaces': providerSelector(['domain'], {
-    readiness: { all: ['oauthCredential', 'domain'] },
-    listMode: 'paginated',
-    detail: true,
-    unknownDetail: true,
-  }),
-  'confluence.spacesById': providerSelector(['domain'], {
-    readiness: { all: ['oauthCredential', 'domain'] },
-    listMode: 'paginated',
-    detail: true,
-    unknownDetail: true,
-  }),
-  'confluence.pages': providerSelector(['domain'], {
-    readiness: { all: ['oauthCredential', 'domain'] },
-    search: true,
-    detail: true,
-  }),
   'google.tasks.lists': providerSelector(['impersonateUserEmail'], {
     listMode: 'paginated',
     detail: true,
   }),
   'gmail.labels': providerSelector(['impersonateUserEmail']),
-  'github.installationRepositories': {
-    ...providerSelector([], { listMode: 'paginated', detail: true, unknownDetail: true }),
-    scopeKinds: ['organization'],
-  },
   'google.calendar': providerSelector(['impersonateUserEmail'], {
     listMode: 'paginated',
     detail: true,
@@ -207,7 +111,6 @@ export const selectorManifest = {
   'google.sheets': providerSelector(['spreadsheetId', 'impersonateUserEmail'], {
     readiness: { all: ['oauthCredential', 'spreadsheetId'] },
   }),
-  'harmonic.savedSearches': providerSelector([], { detail: true, unknownDetail: true }),
   'hubspot.lists': providerSelector([], { listMode: 'paginated', search: true, detail: true }),
   'hubspot.owners': providerSelector([], { listMode: 'paginated', detail: true }),
   'hubspot.pipelines': providerSelector(['objectType', 'customObjectTypeId']),
@@ -215,186 +118,11 @@ export const selectorManifest = {
     readiness: { all: ['oauthCredential', 'pipelineId'] },
   }),
   'hubspot.properties': providerSelector(['objectType', 'customObjectTypeId']),
-  'jsm.requestTypes': providerSelector(['domain', 'serviceDeskId'], {
-    readiness: { all: ['oauthCredential', 'domain', 'serviceDeskId'] },
-    detail: true,
-  }),
-  'jsm.serviceDesks': providerSelector(['domain'], {
-    readiness: { all: ['oauthCredential', 'domain'] },
-    detail: true,
-  }),
-  'microsoft.planner.plans': providerSelector([], { listMode: 'paginated', detail: true }),
   'notion.databases': providerSelector([], { detail: true }),
   'notion.pages': providerSelector([], { detail: true }),
-  'netsuite.recordTypes': providerSelector(['jobId'], {
-    detail: true,
-    unknownDetail: true,
-  }),
-  'netsuite.asyncTasks': providerSelector(['jobId'], {
-    readiness: { all: ['oauthCredential', 'jobId'] },
-    detail: true,
-    unknownDetail: true,
-  }),
   'pipedrive.pipelines': providerSelector([], { detail: true }),
-  'sharepoint.lists': providerSelector(['siteId'], {
-    readiness: { all: ['oauthCredential', 'siteId'] },
-    listMode: 'paginated',
-    detail: true,
-  }),
   'trello.boards': providerSelector([], { detail: true }),
-  'zoho_desk.organizations': providerSelector(),
-  'zoho_desk.departments': providerSelector(['orgId'], {
-    readiness: { all: ['oauthCredential', 'orgId'] },
-  }),
-  'zoho_desk.agents': providerSelector(['orgId'], {
-    readiness: { all: ['oauthCredential', 'orgId'] },
-  }),
   'zoom.meetings': providerSelector([], { listMode: 'paginated', detail: true }),
-  'slack.channels': providerSelector([], {
-    sourceFields: { oauthCredential: ['botToken'] },
-    listMode: 'paginated',
-    detail: true,
-  }),
-  'snowflake.databases': providerSelector(['database', 'schema'], {
-    detail: true,
-    unknownDetail: true,
-  }),
-  'snowflake.schemas': providerSelector(['database', 'schema'], {
-    readiness: { all: ['oauthCredential', 'database'] },
-    detail: true,
-    unknownDetail: true,
-  }),
-  'snowflake.tables': providerSelector(['database', 'schema'], {
-    readiness: { all: ['oauthCredential', 'database', 'schema'] },
-    detail: true,
-    unknownDetail: true,
-  }),
-  'snowflake.warehouses': providerSelector(['database', 'schema'], {
-    detail: true,
-    unknownDetail: true,
-  }),
-  'snowflake.roles': providerSelector(['database', 'schema'], {
-    detail: true,
-    unknownDetail: true,
-  }),
-  'snowflake.fileFormats': providerSelector(['database', 'schema'], {
-    readiness: { all: ['oauthCredential', 'database', 'schema'] },
-    detail: true,
-    unknownDetail: true,
-  }),
-  'snowflake.procedures': providerSelector(['database', 'schema'], {
-    readiness: { all: ['oauthCredential', 'database', 'schema'] },
-    detail: true,
-    unknownDetail: true,
-  }),
-  'slack.users': providerSelector([], {
-    sourceFields: { oauthCredential: ['botToken'] },
-    listMode: 'paginated',
-    detail: true,
-  }),
-  'outlook.folders': providerSelector([], { listMode: 'paginated', detail: true }),
-  'outlook.calendars': providerSelector([], { listMode: 'paginated', detail: true }),
-  'microsoft.teams': providerSelector([], { listMode: 'paginated', detail: true }),
-  'microsoft.chats': providerSelector([], { listMode: 'paginated', detail: true }),
-  'microsoft.channels': providerSelector(['teamId'], {
-    readiness: { all: ['oauthCredential', 'teamId'] },
-    listMode: 'paginated',
-    detail: true,
-  }),
-  'microsoft.planner': providerSelector(['planId'], {
-    readiness: { all: ['oauthCredential', 'planId'] },
-    listMode: 'paginated',
-    detail: true,
-  }),
-  'onedrive.files': providerSelector(['mimeType'], { listMode: 'paginated', detail: true }),
-  'onedrive.folders': providerSelector(['driveId'], { listMode: 'paginated', detail: true }),
-  'sharepoint.sites': providerSelector([], {
-    listMode: 'paginated',
-    search: true,
-    detail: true,
-  }),
-  'microsoft.excel': providerSelector(['driveId'], {
-    listMode: 'paginated',
-    search: true,
-    detail: true,
-  }),
-  'microsoft.excel.drives': providerSelector(['siteId'], {
-    readiness: { all: ['oauthCredential', 'siteId'] },
-    listMode: 'paginated',
-    detail: true,
-  }),
-  'microsoft.excel.sheets': providerSelector(['driveId', 'spreadsheetId'], {
-    readiness: { all: ['oauthCredential', 'spreadsheetId'] },
-    listMode: 'paginated',
-  }),
-  'microsoft.word': providerSelector(['driveId'], {
-    listMode: 'paginated',
-    search: true,
-    detail: true,
-  }),
-  'wealthbox.contacts': providerSelector([], { search: true }),
-  'jira.issues': providerSelector(['domain', 'projectId'], {
-    readiness: { all: ['oauthCredential', 'domain'] },
-    search: true,
-    detail: true,
-    staleTime: SEARCH_SELECTOR_STALE_TIME,
-  }),
-  'jira.projects': providerSelector(['domain'], {
-    readiness: { all: ['oauthCredential', 'domain'] },
-    listMode: 'paginated',
-    search: true,
-    detail: true,
-  }),
-  'jira.projectKeys': providerSelector(['domain'], {
-    readiness: { all: ['oauthCredential', 'domain'] },
-    listMode: 'paginated',
-    search: true,
-    detail: true,
-  }),
-  'linear.projects': providerSelector(['teamId'], {
-    readiness: { all: ['oauthCredential', 'teamId'] },
-    listMode: 'paginated',
-    detail: true,
-  }),
-  'linear.teams': providerSelector([], { listMode: 'paginated', detail: true }),
-  'monday.boards': providerSelector([], { detail: true }),
-  'monday.groups': providerSelector(['boardId'], {
-    readiness: { all: ['oauthCredential', 'boardId'] },
-    detail: true,
-  }),
-  'webflow.sites': providerSelector(),
-  'webflow.collections': providerSelector(['siteId'], {
-    readiness: { all: ['oauthCredential', 'siteId'] },
-  }),
-  'webflow.items': providerSelector(['collectionId'], {
-    readiness: { all: ['oauthCredential', 'collectionId'] },
-    listMode: 'paginated',
-    search: true,
-    detail: true,
-    staleTime: SEARCH_SELECTOR_STALE_TIME,
-  }),
-  'cloudwatch.logGroups': rawProviderSelector(
-    ['awsAccessKeyId', 'awsSecretAccessKey', 'awsRegion'],
-    {
-      readiness: { all: ['awsAccessKeyId', 'awsSecretAccessKey', 'awsRegion'] },
-      sensitive: ['awsAccessKeyId', 'awsSecretAccessKey'],
-      listMode: 'paginated',
-      search: true,
-      detail: true,
-    }
-  ),
-  'cloudwatch.logStreams': rawProviderSelector(
-    ['awsAccessKeyId', 'awsSecretAccessKey', 'awsRegion', 'logGroupName'],
-    {
-      readiness: {
-        all: ['awsAccessKeyId', 'awsSecretAccessKey', 'awsRegion', 'logGroupName'],
-      },
-      sensitive: ['awsAccessKeyId', 'awsSecretAccessKey'],
-      listMode: 'paginated',
-      search: true,
-      detail: true,
-    }
-  ),
   'imap.mailboxes': rawProviderSelector(['host', 'port', 'secure', 'username', 'password'], {
     readiness: { all: ['host', 'username', 'password'] },
     sensitive: ['username', 'password'],
@@ -407,10 +135,6 @@ export const selectorManifest = {
     detail: true,
     staleTime: 0,
   }),
-  'managedAgent.agents': providerSelector(),
-  'managedAgent.environments': providerSelector(['environmentType']),
-  'managedAgent.vaults': providerSelector(),
-  'managedAgent.memoryStores': providerSelector(),
   'knowledge.documents': internalSelector(['knowledgeBaseId'], {
     readiness: { all: ['knowledgeBaseId'] },
     listMode: 'paginated',

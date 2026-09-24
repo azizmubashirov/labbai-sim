@@ -46,22 +46,11 @@ vi.mock('@/hooks/use-permission-config', () => ({
 vi.mock('@/app/o/[organizationId]/settings/components/integrations/search-source-setup', () => ({
   SearchSourceSetup: () => null,
 }))
-vi.mock('@/app/o/[organizationId]/settings/components/integrations/slack-account-setup', () => ({
-  OrganizationSlackAccountSetup: () => null,
-}))
 
 import { SettingsHeaderProvider, SettingsHeaderShell } from '@/components/settings/settings-header'
 import { OrganizationIntegrationsSetup } from '@/app/o/[organizationId]/settings/components/integrations/organization-integrations-setup'
 
 const providers: OrganizationSearchProviderSummary[] = [
-  {
-    connectorType: 'gmail',
-    approved: true,
-    sourceCount: 0,
-    status: 'waiting_for_connections',
-    issue: null,
-    isSyncing: false,
-  },
   {
     connectorType: 'google_drive',
     approved: false,
@@ -85,10 +74,8 @@ beforeEach(() => {
   mocks.availability.mockReturnValue({
     integrationAvailability: new Map(),
     oauthServiceAvailability: new Map([
-      ['confluence', true],
       ['google-drive', true],
       ['google-email', true],
-      ['jira', true],
     ]),
     isIntegrationAvailabilityReady: true,
     refetchIntegrationAvailability: mocks.refetch,
@@ -154,38 +141,40 @@ async function fillPicker(value: string) {
   })
 }
 
+const approvedDrive: OrganizationSearchProviderSummary = {
+  ...providers[0],
+  approved: true,
+  sourceCount: 0,
+  status: 'waiting_for_connections',
+}
+
 describe('organization integration management entry', () => {
   it('uses navigable settings rows for added sources without switches or setup buttons', async () => {
     await render()
-    expect(container.textContent).toContain('Waiting for connections')
     expect(container.textContent).toContain('Deactivated · 2 connections')
-    expect(container.querySelector('a[aria-label="Manage Gmail"]')).toHaveAttribute(
+    expect(container.querySelector('a[aria-label="Manage Google Drive"]')).toHaveAttribute(
       'href',
-      '/o/org-one/settings/integrations/providers/gmail'
+      '/o/org-one/settings/integrations/providers/google_drive'
     )
-    expect(container.querySelector('a[aria-label="Manage Google Drive"]')).not.toBeNull()
-    expect(container.textContent).not.toContain('Confluence')
     expect(container.querySelector('[role="switch"]')).toBeNull()
-    expect(container.querySelector('a[aria-label="Set up Gmail"]')).toBeNull()
+    expect(container.querySelector('a[aria-label="Set up Google Drive"]')).toBeNull()
     expect(mocks.add).not.toHaveBeenCalled()
   })
 
   it('keeps approved sources with unfinished setup visible', async () => {
     mocks.overview.mockReturnValue({
-      data: {
-        providers: [
-          {
-            ...providers[0],
-            connectorType: 'confluence',
-            status: 'needs_setup',
-          },
-        ],
-      },
+      data: { providers: [{ ...approvedDrive, status: 'needs_setup' }] },
       isPending: false,
     })
     await render()
     expect(container.textContent).toContain('Setup required')
-    expect(container.querySelector('a[aria-label="Manage Confluence"]')).not.toBeNull()
+    expect(container.querySelector('a[aria-label="Manage Google Drive"]')).not.toBeNull()
+  })
+
+  it('shows approved sources still waiting for member connections', async () => {
+    mocks.overview.mockReturnValue({ data: { providers: [approvedDrive] }, isPending: false })
+    await render()
+    expect(container.textContent).toContain('Waiting for connections')
   })
 
   it('opens the catalog from the header without changing any approvals', async () => {
@@ -194,10 +183,8 @@ describe('organization integration management entry', () => {
     expect(container.textContent).toContain('No sources yet. Add a source to get started.')
     expect(document.querySelector('[role="dialog"]')).toBeNull()
     await click('Add source')
-    expect(document.querySelector('[role="dialog"]')).toHaveTextContent('Confluence')
-    expect(document.querySelector('[role="dialog"]')).toHaveTextContent('Jira')
+    expect(document.querySelector('[role="dialog"]')).toHaveTextContent('Google Drive')
     expect(document.querySelector('[role="dialog"]')).toHaveTextContent('Connect a service account')
-    expect(document.querySelector('[role="dialog"]')).toHaveTextContent('Connect member accounts')
     expect(mocks.add).not.toHaveBeenCalled()
     await click('Cancel')
     expect(document.querySelector('[role="dialog"]')).toBeNull()
@@ -206,48 +193,34 @@ describe('organization integration management entry', () => {
   })
 
   it('approves a new source before opening its central configuration form', async () => {
+    mocks.overview.mockReturnValue({ data: { providers: [] }, isPending: false })
     await render('?addConnector=')
-    await click('Set up Confluence')
+    await click('Set up Google Drive')
     expect(mocks.add).toHaveBeenCalledExactlyOnceWith(
-      { organizationId: 'org-one', connectorType: 'confluence', approved: true },
+      { organizationId: 'org-one', connectorType: 'google_drive', approved: true },
       expect.any(Object)
     )
     expect(document.querySelector('[role="dialog"]')).not.toBeNull()
     await act(async () => mocks.add.mock.calls[0][1].onSuccess())
-    await expectSetup('confluence')
+    await expectSetup('google_drive')
     expect(document.querySelector('[role="dialog"]')).toBeNull()
   })
 
   it('opens an approved source directly without a duplicate approval', async () => {
+    mocks.overview.mockReturnValue({ data: { providers: [approvedDrive] }, isPending: false })
     await render('?addConnector=&search=retained')
-    await click('Set up Gmail')
-    await expectSetup('gmail')
+    await click('Set up Google Drive')
+    await expectSetup('google_drive')
     expect(mocks.updateUrl.mock.calls.at(-1)?.[0].searchParams.get('search')).toBe('retained')
     expect(mocks.add).not.toHaveBeenCalled()
   })
 
-  it.each(['jira', 'confluence'])(
-    'uses member setup for %s when central indexing is unavailable',
-    async (type) => {
-      mocks.mirroredAccess = false
-      mocks.add.mockImplementation((_input, options) => options.onSuccess())
-      await render('?addConnector=')
-      await click(`Set up ${type === 'jira' ? 'Jira' : 'Confluence'}`)
-      await expectSetup(type, 'members')
-    }
-  )
-
-  it('routes Slack into the existing member setup with its custom-app step', async () => {
-    mocks.availability.mockReturnValue({
-      integrationAvailability: new Map([['slack_v2', { state: 'limited' }]]),
-      oauthServiceAvailability: new Map(),
-      isIntegrationAvailabilityReady: true,
-    })
+  it('uses member setup when central indexing is unavailable', async () => {
+    mocks.mirroredAccess = false
     mocks.add.mockImplementation((_input, options) => options.onSuccess())
     await render('?addConnector=')
-    expect(document.querySelector('[role="dialog"]')).toHaveTextContent('Set up your Slack app')
-    await click('Set up Slack')
-    await expectSetup('slack', 'members')
+    await click('Set up Google Drive')
+    await expectSetup('google_drive', 'members')
   })
 
   it('reactivates a retained source before opening another configuration', async () => {
@@ -266,7 +239,7 @@ describe('organization integration management entry', () => {
       options.onError(new Error('Could not add source'))
     )
     await render('?addConnector=')
-    await click('Set up Confluence')
+    await click('Set up Google Drive')
     expect(toast.error).toHaveBeenCalledWith('Could not add source')
     expect(document.querySelector('[role="dialog"]')).not.toBeNull()
     expect(mocks.updateUrl).not.toHaveBeenCalled()
@@ -275,7 +248,7 @@ describe('organization integration management entry', () => {
   it('prevents another selection or dismissal while approval is pending', async () => {
     mocks.pending = true
     await render('?addConnector=')
-    expect(document.querySelector('button[aria-label="Set up Confluence"]')).toBeNull()
+    expect(document.querySelector('button[aria-label="Set up Google Drive"]')).toBeNull()
     expect(document.querySelector('[aria-label="Find a source"]')).toBeDisabled()
     await click('Cancel')
     expect(document.querySelector('[role="dialog"]')).not.toBeNull()
@@ -285,7 +258,7 @@ describe('organization integration management entry', () => {
 
   it('explains unavailable providers in the picker without allowing setup', async () => {
     mocks.availability.mockReturnValue({
-      integrationAvailability: new Map(),
+      integrationAvailability: new Map([['google_drive', { state: 'unavailable' }]]),
       oauthServiceAvailability: new Map(),
       isIntegrationAvailabilityReady: true,
     })
@@ -293,31 +266,29 @@ describe('organization integration management entry', () => {
     expect(document.querySelector('[role="dialog"]')).toHaveTextContent(
       'Unavailable in this deployment'
     )
-    expect(document.querySelector('button[aria-label="Set up Confluence"]')).toBeNull()
+    expect(document.querySelector('button[aria-label="Set up Google Drive"]')).toBeNull()
     expect(mocks.add).not.toHaveBeenCalled()
   })
 
   it('keeps existing unavailable sources manageable', async () => {
     mocks.availability.mockReturnValue({
-      integrationAvailability: new Map(),
+      integrationAvailability: new Map([['google_drive', { state: 'unavailable' }]]),
       oauthServiceAvailability: new Map(),
       isIntegrationAvailabilityReady: true,
     })
     await render()
-    expect(container.querySelector('a[aria-label="Manage Gmail"]')).not.toBeNull()
     expect(container.querySelector('a[aria-label="Manage Google Drive"]')).not.toBeNull()
   })
 
   it('filters the picker independently from the main source list and resets when reopened', async () => {
-    await render('?search=gmail')
+    await render('?search=drive')
     await click('Add source')
-    await fillPicker('confluence')
+    await fillPicker('google')
     const dialog = document.querySelector('[role="dialog"]')
-    expect(dialog).toHaveTextContent('Confluence')
-    expect(dialog).not.toHaveTextContent('Google Drive')
-    expect(container.querySelector('a[aria-label="Manage Gmail"]')).not.toBeNull()
+    expect(dialog).toHaveTextContent('Google Drive')
     await fillPicker('no-such-source')
     expect(dialog).toHaveTextContent('No matching sources')
+    expect(container.querySelector('a[aria-label="Manage Google Drive"]')).not.toBeNull()
     await click('Cancel')
     await click('Add source')
     expect(document.querySelector('[aria-label="Find a source"]')).toHaveValue('')
@@ -330,7 +301,7 @@ describe('organization integration management entry', () => {
       data: {
         providers: [
           {
-            ...providers[1],
+            ...providers[0],
             approved: true,
             status: 'needs_attention',
             issue: 'sync_failed',
@@ -355,7 +326,7 @@ describe('organization integration management entry', () => {
     expect(document.querySelector('[role="dialog"]')).toHaveTextContent(
       'Could not load connection availability'
     )
-    expect(document.querySelector('button[aria-label="Set up Confluence"]')).toBeNull()
+    expect(document.querySelector('button[aria-label="Set up Google Drive"]')).toBeNull()
     await click('Try again')
     expect(mocks.refetch).toHaveBeenCalledOnce()
   })
@@ -407,7 +378,7 @@ describe('organization integration management entry', () => {
 
   it('filters added sources without changing approvals', async () => {
     await render('?search=gmail')
-    expect(container.textContent).toContain('Gmail')
+    expect(container.textContent).toContain('No matching sources')
     expect(container.textContent).not.toContain('Google Drive')
     expect(mocks.add).not.toHaveBeenCalled()
   })

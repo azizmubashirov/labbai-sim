@@ -35,7 +35,6 @@ import {
 } from '@/lib/oauth/types'
 import { ClientCredentialAccountModal } from '@/app/workspace/[workspaceId]/integrations/components/connect-service-account-modal/client-credential-account-modal'
 import { TokenServiceAccountModal } from '@/app/workspace/[workspaceId]/integrations/components/connect-service-account-modal/token-service-account-modal'
-import { ConnectSlackBotModal } from '@/app/workspace/[workspaceId]/integrations/components/connect-slack-bot-modal/connect-slack-bot-modal'
 import { withBrandIcon } from '@/blocks/brand-icon'
 import {
   useCreateScopedCredential,
@@ -188,20 +187,6 @@ export function ConnectServiceAccountModal({
         descriptor={tokenDescriptor}
         serviceName={serviceName}
         serviceIcon={serviceIcon}
-        credentialId={credentialId}
-        initialDisplayName={credentialDisplayName}
-        initialDescription={credentialDescription}
-        onCreated={onCreated}
-      />
-    )
-  }
-  if (serviceAccountProviderId === SLACK_CUSTOM_BOT_PROVIDER_ID) {
-    return (
-      <ConnectSlackBotModal
-        open={open}
-        onOpenChange={onOpenChange}
-        workspaceId={workspaceId}
-        organizationId={organizationId}
         credentialId={credentialId}
         initialDisplayName={credentialDisplayName}
         initialDescription={credentialDescription}

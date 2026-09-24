@@ -33,7 +33,6 @@ export function OrganizationSourcePeople({
               type: connector.type,
               name: connector.meta.name,
               icon: connector.meta.icon,
-              needsSetup: option.provider === 'slack' && option.configurationStatus !== 'ready',
             },
           ]
         : []
@@ -47,7 +46,6 @@ export function OrganizationSourcePeople({
       searchConnection={
         selected ? { optionId: selected.optionId, providerName: selected.name } : undefined
       }
-      requestDisabled={selected?.needsSetup}
       filters={
         <div className='flex flex-col gap-2'>
           <div className='flex flex-wrap items-center justify-between gap-2'>
@@ -67,11 +65,6 @@ export function OrganizationSourcePeople({
               ]}
             />
           </div>
-          {selected?.needsSetup && (
-            <p className='text-[var(--text-muted)] text-caption'>
-              Update the Slack app from Sources before requesting connections.
-            </p>
-          )}
         </div>
       }
     />

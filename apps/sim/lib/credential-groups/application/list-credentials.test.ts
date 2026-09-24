@@ -362,7 +362,7 @@ describe('listCredentialGroupCredentials', () => {
     await expect(
       listCredentialGroupCredentials.execute({
         principal: executorPrincipal(),
-        input: { ...input, credentialProviderIds: ['slack'] },
+        input: { ...input, credentialProviderIds: ['notion'] },
       })
     ).rejects.toMatchObject({ code: 'validation' })
     expect(mocks.getWorkspaceOwnerSubscriptionAccess).not.toHaveBeenCalled()

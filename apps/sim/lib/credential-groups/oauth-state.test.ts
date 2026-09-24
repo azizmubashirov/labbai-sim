@@ -123,30 +123,30 @@ describe('credential group OAuth state', () => {
   })
 
   it.each(['search', 'accounts'] as const)(
-    'round-trips a scopeless GitHub App attempt with PKCE and one-time state',
+    'round-trips a scopeless attempt with PKCE and one-time state',
     async (returnTo) => {
       const created = await createCredentialGroupOAuthAttempt({
-        provider: 'github-repositories',
+        provider: 'notion',
         workspaceId: 'workspace-1',
         userId: 'user-1',
         email: 'person@example.com',
         enrollmentId: 'enrollment-1',
         credentialGroupId: 'group-1',
         optionId: 'option-1',
-        authorizationAppId: 'github-app:fixture',
+        authorizationAppId: 'notion:fixture',
         scopeVersion: 1,
         requiredScopes: [],
-        redirectUri: 'https://sim.example.com/api/auth/oauth2/callback/github-repositories',
-        codeVerifier: 'github-code-verifier',
+        redirectUri: 'https://sim.example.com/api/auth/oauth2/callback/notion',
+        codeVerifier: 'notion-code-verifier',
         invitationToken: 'invitation-token',
         returnTo,
       })
 
       const consumed = await consumeCredentialGroupOAuthAttempt(created.state)
       expect(consumed).toMatchObject({
-        provider: 'github-repositories',
+        provider: 'notion',
         requiredScopes: [],
-        codeVerifier: 'github-code-verifier',
+        codeVerifier: 'notion-code-verifier',
         returnTo,
       })
       expect(credentialGroupOAuthNonceMatches(created.nonce, consumed!.nonceHash)).toBe(true)
@@ -156,25 +156,25 @@ describe('credential group OAuth state', () => {
 
   it('supports providers without PKCE while preserving one-time state', async () => {
     const created = await createCredentialGroupOAuthAttempt({
-      provider: 'slack',
+      provider: 'hubspot',
       workspaceId: 'workspace-1',
       userId: 'user-1',
       email: 'person@example.com',
       enrollmentId: 'enrollment-1',
       credentialGroupId: 'group-1',
       optionId: 'option-1',
-      authorizationAppId: 'slack:A123:T123',
+      authorizationAppId: 'hubspot:app',
       scopeVersion: 1,
-      requiredScopes: ['users:read'],
-      redirectUri: 'https://sim.ai/api/credential-groups/oauth/slack/callback',
+      requiredScopes: ['crm.objects.contacts.read'],
+      redirectUri: 'https://sim.ai/api/credential-groups/oauth/hubspot/callback',
       invitationToken: 'invitation-token',
     })
 
     const consumed = await consumeCredentialGroupOAuthAttempt(created.state)
 
     expect(consumed).toMatchObject({
-      provider: 'slack',
-      authorizationAppId: 'slack:A123:T123',
+      provider: 'hubspot',
+      authorizationAppId: 'hubspot:app',
       invitationToken: 'invitation-token',
     })
     expect(consumed?.codeVerifier).toBeUndefined()

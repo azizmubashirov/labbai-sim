@@ -297,7 +297,7 @@ describe('organization Search MCP with real ingestion and current access', () =>
       .where(inArray(knowledgeExternalGroup.id, groupIds))
     const prepared = await prepareSearchSource.execute({
       principal: otherAdminPrincipal,
-      input: { organizationId: otherOrganizationId, connectorType: 'gitlab' },
+      input: { organizationId: otherOrganizationId, connectorType: 'google_drive' },
     })
     otherKnowledgeBaseId = prepared.knowledgeBaseId
     await db.insert(knowledgeBase).values({
@@ -428,7 +428,7 @@ describe('organization Search MCP with real ingestion and current access', () =>
   })
 
   it('creates an organization-only index, keeps it out of the workspace catalog, and separates actor from payer', async () => {
-    const input = { organizationId: otherOrganizationId, connectorType: 'gitlab' }
+    const input = { organizationId: otherOrganizationId, connectorType: 'google_drive' }
     const results = await Promise.all([
       prepareSearchSource.execute({ principal: otherAdminPrincipal, input }),
       prepareSearchSource.execute({ principal: otherAdminPrincipal, input }),

@@ -27,9 +27,6 @@ vi.mock('@/lib/billing/organizations/membership-reconciliation', () => ({
 }))
 vi.mock('@/lib/billing/webhooks/outbox-handlers', () => ({ billingOutboxHandlers: {} }))
 vi.mock('@/lib/invitations/direct-grant', () => ({ directGrantOutboxHandlers: {} }))
-vi.mock('@/lib/knowledge/application/slack-search/outbox', () => ({
-  slackSearchOutboxHandlers: {},
-}))
 vi.mock('@/lib/knowledge/documents/processing-outbox-handler', () => ({
   knowledgeDocumentProcessingOutboxHandlers: {},
 }))

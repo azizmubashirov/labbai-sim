@@ -11,20 +11,10 @@ const mocks = vi.hoisted(() => ({
   completeOAuth: vi.fn(),
   consumeAttempt: vi.fn(),
   logError: vi.fn(),
-  completeSetupOAuth: vi.fn(),
-  authenticateSession: vi.fn(),
 }))
 
 vi.mock('@sim/logger', () => ({
   createLogger: () => ({ error: mocks.logError }),
-}))
-vi.mock('@/lib/knowledge/application/github-setup', () => ({
-  completeGitHubSetupReaderOAuth: { execute: mocks.completeSetupOAuth },
-}))
-vi.mock('@/lib/api/server/routes', () => ({
-  internalSessionAuth: {
-    authenticate: mocks.authenticateSession,
-  },
 }))
 vi.mock('@/lib/core/utils/urls', () => ({ getBaseUrl: () => 'https://sim.test' }))
 vi.mock('@/lib/credential-groups/application/enrollment-auth', () => ({
@@ -41,7 +31,7 @@ import { handleCredentialGroupOAuthCallback } from '@/app/api/credential-groups/
 
 const completionId = '550e8400-e29b-41d4-a716-446655440000'
 const attempt = {
-  provider: 'github-repositories',
+  provider: 'google-drive',
   invitationToken: 'invitation-token',
   optionId: 'option-1',
   returnTo: 'search',
@@ -50,15 +40,15 @@ const attempt = {
 function completeCallback() {
   return handleCredentialGroupOAuthCallback({
     request: new NextRequest(
-      'https://sim.test/api/auth/oauth2/callback/github-repositories?state=cg_state&code=code-1'
+      'https://sim.test/api/auth/oauth2/callback/google-drive?state=cg_state&code=code-1'
     ),
-    provider: 'github-repositories',
+    provider: 'google-drive',
     query: { state: 'cg_state', code: 'code-1' },
     limited: null,
   })
 }
 
-describe('GitHub managed OAuth failure presentation', () => {
+describe('Managed OAuth failure presentation', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.authenticate.mockResolvedValue({ kind: 'credential_group_enrollment' })
@@ -68,11 +58,11 @@ describe('GitHub managed OAuth failure presentation', () => {
     it.each([
       {
         failure: new OAuthIdentityVerificationError('email_unverified', 'emails'),
-        status: 'github_email_unverified',
+        status: 'failed',
       },
       {
         failure: new OAuthIdentityVerificationError('email_access_denied', 'emails', 403),
-        status: 'github_email_access_denied',
+        status: 'permissions_required',
       },
       {
         failure: new OAuthIdentityVerificationError('provider_unavailable', 'profile', 503),
@@ -107,7 +97,7 @@ describe('GitHub managed OAuth failure presentation', () => {
         expect(location.searchParams.get('returnTo')).toBe('search')
       }
       expect(mocks.logError).toHaveBeenCalledExactlyOnceWith('Managed OAuth authorization failed', {
-        provider: 'github-repositories',
+        provider: 'google-drive',
         failure: status,
         errorClass: 'credential_group_oauth',
         statusCode: 502,
@@ -126,7 +116,7 @@ describe('GitHub managed OAuth failure presentation', () => {
     const response = await completeCallback()
     expect(response.headers.get('location')).toContain('oauth=failed')
     expect(mocks.logError).toHaveBeenCalledExactlyOnceWith('Managed OAuth authorization failed', {
-      provider: 'github-repositories',
+      provider: 'google-drive',
       failure: 'failed',
       errorClass: 'unexpected',
       stage: 'enrollment_completion',
@@ -148,7 +138,7 @@ describe('GitHub managed OAuth failure presentation', () => {
     const response = await completeCallback()
     expect(response.headers.get('location')).toContain('oauth=failed')
     expect(mocks.logError).toHaveBeenCalledExactlyOnceWith('Managed OAuth authorization failed', {
-      provider: 'github-repositories',
+      provider: 'google-drive',
       failure: 'failed',
       errorClass: 'unexpected',
       stage: 'enrollment_completion',
@@ -172,7 +162,7 @@ describe('GitHub managed OAuth failure presentation', () => {
     )
     await completeCallback()
     expect(mocks.logError).toHaveBeenCalledExactlyOnceWith('Managed OAuth authorization failed', {
-      provider: 'github-repositories',
+      provider: 'google-drive',
       failure: 'failed',
       errorClass: 'unexpected',
       stage: 'enrollment_completion',
@@ -188,88 +178,11 @@ describe('GitHub managed OAuth failure presentation', () => {
     )
     await completeCallback()
     expect(mocks.logError).toHaveBeenCalledExactlyOnceWith('Managed OAuth authorization failed', {
-      provider: 'github-repositories',
+      provider: 'google-drive',
       failure: 'failed',
       errorClass: 'application',
       applicationCode: 'forbidden',
       statusCode: 403,
     })
-  })
-})
-
-describe('GitHub installation setup OAuth return target', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    mocks.authenticateSession.mockResolvedValue({
-      kind: 'session',
-      userId: 'admin',
-      sessionId: 'browser',
-    })
-  })
-
-  it.each(['session_authentication', 'setup_completion'])(
-    'identifies an unexpected failure during %s without exposing its message',
-    async (stage) => {
-      mocks.consumeAttempt.mockResolvedValue({
-        ...attempt,
-        returnTo: 'github-installation',
-        organizationId: 'organization',
-        completionId,
-      })
-      const error = new TypeError('private callback data')
-      if (stage === 'session_authentication') {
-        mocks.authenticateSession.mockRejectedValueOnce(error)
-      } else {
-        mocks.completeSetupOAuth.mockRejectedValueOnce(error)
-      }
-      const response = await completeCallback()
-      expect(response.headers.get('location')).toContain('oauth=failed')
-      expect(mocks.logError).toHaveBeenCalledExactlyOnceWith('Managed OAuth authorization failed', {
-        provider: 'github-repositories',
-        failure: 'failed',
-        errorClass: 'unexpected',
-        stage,
-        errorType: 'TypeError',
-        fingerprint: sha256Hex(error.message).slice(0, 12),
-      })
-    }
-  )
-  it('resumes only the server-owned setup after the guarded OAuth completion', async () => {
-    mocks.consumeAttempt.mockResolvedValue({
-      ...attempt,
-      returnTo: 'github-installation',
-      organizationId: 'organization',
-      completionId,
-      completionRedirect: true,
-    })
-    mocks.completeSetupOAuth.mockResolvedValue({ credentialId: 'reader' })
-    const response = await completeCallback()
-    const url = new URL(response.headers.get('location')!, 'https://sim.test')
-    expect(url.pathname).toBe('/api/knowledge/github/setup/continue')
-    expect(url.searchParams.get('organizationId')).toBe('organization')
-    expect(url.searchParams.get('setupId')).toBe(completionId)
-    expect(response.headers.get('referrer-policy')).toBe('no-referrer')
-    expect(mocks.completeSetupOAuth).toHaveBeenCalled()
-    expect(mocks.completeOAuth).not.toHaveBeenCalled()
-  })
-  it('returns classified OAuth failure to setup status without accepting a client redirect URL', async () => {
-    mocks.consumeAttempt.mockResolvedValue({
-      ...attempt,
-      returnTo: 'github-installation',
-      organizationId: 'organization',
-      completionId,
-      completionRedirect: true,
-    })
-    const response = await handleCredentialGroupOAuthCallback({
-      request: new NextRequest('https://sim.test/api/auth/oauth2/callback/github-repositories'),
-      provider: 'github-repositories',
-      query: { state: 'cg_state', error: 'access_denied' },
-      limited: null,
-    })
-    const url = new URL(response.headers.get('location')!, 'https://sim.test')
-    expect(url.origin).toBe('https://sim.test')
-    expect(url.pathname).toBe('/api/knowledge/github/setup/continue')
-    expect(url.searchParams.get('oauth')).toBe('denied')
-    expect(url.searchParams.get('setupId')).toBe(completionId)
   })
 })

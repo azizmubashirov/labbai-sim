@@ -12,7 +12,6 @@ import {
   connectorMemberProvider,
   isConnectorFieldRequired,
 } from '@/app/workspace/[workspaceId]/knowledge/[id]/components/connector-access-field/connector-access'
-import { gitlabConnectorMeta } from '@/connectors/gitlab/meta'
 import {
   GOOGLE_DRIVE_ADMIN_EMAIL_FIELD_ID,
   googleDriveConnectorMeta,
@@ -46,16 +45,6 @@ describe('connectorMemberProvider', () => {
 })
 
 describe('isConnectorFieldRequired', () => {
-  it.each([
-    ['admin', true],
-    ['workspace', false],
-  ] as const)('requires GitLab Host in %s mode: %s', (accessMode, required) => {
-    const host = gitlabConnectorMeta.configFields.find((field) => field.id === 'host')
-    assert(host)
-
-    expect(isConnectorFieldRequired(host, gitlabConnectorMeta, accessMode)).toBe(required)
-  })
-
   it.each([
     ['admin', true],
     ['workspace', false],

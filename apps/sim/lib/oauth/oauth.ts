@@ -2,70 +2,22 @@ import { createLogger } from '@sim/logger'
 import { toError } from '@sim/utils/errors'
 import {
   AirtableIcon,
-  AsanaIcon,
-  AtlassianIcon,
-  AttioIcon,
-  AzureIcon,
-  BitbucketIcon,
-  BoxCompanyIcon,
   CalComIcon,
-  ClaudeIcon,
-  ClickUpIcon,
-  CodaIcon,
-  ConfluenceIcon,
-  DocuSignIcon,
-  DropboxIcon,
-  GithubIcon,
   GmailIcon,
-  GoogleAdsIcon,
-  GoogleBigQueryIcon,
   GoogleCalendarIcon,
-  GoogleChatIcon,
-  GoogleContactsIcon,
   GoogleDocsIcon,
   GoogleDriveIcon,
   GoogleFormsIcon,
-  GoogleGroupsIcon,
   GoogleIcon,
-  GoogleMeetIcon,
   GoogleSheetsIcon,
-  GoogleTasksIcon,
-  GoogleVaultIcon,
-  HarmonicIcon,
   HubspotIcon,
   InstagramIcon,
-  JiraIcon,
-  LinearIcon,
-  LinkedInIcon,
-  ManageEngineIcon,
-  MicrosoftDataverseIcon,
-  MicrosoftExcelIcon,
-  MicrosoftIcon,
-  MicrosoftOneDriveIcon,
-  MicrosoftPlannerIcon,
-  MicrosoftSharepointIcon,
-  MicrosoftTeamsIcon,
-  MicrosoftWordIcon,
-  MondayIcon,
-  NetSuiteIcon,
   NotionIcon,
-  OutlookIcon,
   PipedriveIcon,
-  QuickBooksIcon,
-  RedditIcon,
-  SalesforceIcon,
   ShopifyIcon,
-  SlackIcon,
-  SnowflakeIcon,
-  SpotifyIcon,
-  TikTokIcon,
   TrelloIcon,
   VertexIcon,
-  WealthboxIcon,
-  WebflowIcon,
   WordpressIcon,
-  xIcon,
-  ZohoDeskIcon,
   ZoomIcon,
 } from '@/components/icons'
 import { env } from '@/lib/core/config/env'
@@ -74,78 +26,17 @@ import {
   type OAuthClientCapabilityId,
   requireOAuthClientCapability,
 } from '@/lib/core/config/env-capabilities'
-import { isSlackExtendedScopesEnabled } from '@/lib/core/config/env-flags'
 import { redactExactSensitiveValues } from '@/lib/core/security/redaction'
 import {
   DEFAULT_MAX_ERROR_BODY_BYTES,
   readResponseTextWithLimit,
 } from '@/lib/core/utils/stream-limits'
-import { getDocusignOAuthUrl } from '@/lib/oauth/docusign'
-import { GITHUB_INSTALLATION_PROVIDER_ID } from '@/lib/oauth/github-installation-types'
-import {
-  GITHUB_TOKEN_URL,
-  parseGitHubRepositoriesTokenResponse,
-} from '@/lib/oauth/github-repositories'
 import { parseInstagramLongLivedToken } from '@/lib/oauth/instagram'
-import { MONDAY_OAUTH_TOKEN_URL, resolveMondayAccessTokenExpiresAt } from '@/lib/oauth/monday'
-import type { QuickBooksOAuthClientConfig } from '@/lib/oauth/quickbooks-client-config'
-import { QUICKBOOKS_TOKEN_URL } from '@/lib/oauth/quickbooks-constants'
-import {
-  SALESFORCE_ADDITIONAL_PROVIDER_IDS,
-  SALESFORCE_LOGIN_HOSTS,
-  SALESFORCE_PROVIDER_ID_LABELS,
-} from '@/lib/oauth/salesforce'
-import { REDDIT_USER_AGENT } from '@/tools/reddit/constants'
 import type { OAuthProviderConfig } from './types'
 
 const logger = createLogger('OAuth')
 
-/**
- * Slack scopes requested only where the app is approved for them, gated by
- * {@link isSlackExtendedScopesEnabled}. Slack rejects the entire authorization
- * with "unapproved permissions requested" when any requested scope is not on the
- * app's approved list, so these stay out of the default grant.
- */
-export function getSlackApprovalGatedScopes(enabled: boolean): readonly string[] {
-  return enabled ? ['assistant:write', 'app_mentions:read', 'im:history'] : []
-}
-
-const SLACK_APPROVAL_GATED_SCOPES = getSlackApprovalGatedScopes(isSlackExtendedScopesEnabled)
-
 export const OAUTH_PROVIDERS: Record<string, OAuthProviderConfig> = {
-  'github-repositories': {
-    name: 'GitHub',
-    icon: GithubIcon,
-    services: {
-      'github-repositories': {
-        name: 'GitHub',
-        description: 'Search repository files through your GitHub App access.',
-        providerId: 'github-repositories',
-        serviceAccountProviderId: GITHUB_INSTALLATION_PROVIDER_ID,
-        icon: GithubIcon,
-        baseProviderIcon: GithubIcon,
-        scopes: [],
-      },
-    },
-    defaultService: 'github-repositories',
-  },
-  'claude-platform': {
-    name: 'Claude Platform',
-    icon: ClaudeIcon,
-    services: {
-      'claude-platform': {
-        name: 'Claude Platform',
-        description: 'Run Claude Platform Managed Agents from your workflows.',
-        providerId: 'claude-platform',
-        serviceAccountProviderId: 'claude-platform-service-account',
-        icon: ClaudeIcon,
-        baseProviderIcon: ClaudeIcon,
-        scopes: [],
-        authType: 'service_account',
-      },
-    },
-    defaultService: 'claude-platform',
-  },
   google: {
     name: 'Google',
     icon: GoogleIcon,
@@ -235,125 +126,6 @@ export const OAUTH_PROVIDERS: Record<string, OAuthProviderConfig> = {
         ],
         serviceAccountProviderId: 'google-service-account',
       },
-      'google-contacts': {
-        name: 'Google Contacts',
-        description: 'Create, read, update, and search contacts with Google Contacts.',
-        providerId: 'google-contacts',
-        icon: GoogleContactsIcon,
-        baseProviderIcon: GoogleIcon,
-        scopes: [
-          'https://www.googleapis.com/auth/userinfo.email',
-          'https://www.googleapis.com/auth/userinfo.profile',
-          'https://www.googleapis.com/auth/contacts',
-        ],
-        serviceAccountProviderId: 'google-service-account',
-      },
-      'google-ads': {
-        name: 'Google Ads',
-        description: 'Query campaigns, ad groups, and performance metrics in Google Ads.',
-        providerId: 'google-ads',
-        icon: GoogleAdsIcon,
-        baseProviderIcon: GoogleIcon,
-        scopes: [
-          'https://www.googleapis.com/auth/userinfo.email',
-          'https://www.googleapis.com/auth/userinfo.profile',
-          'https://www.googleapis.com/auth/adwords',
-        ],
-      },
-      'google-bigquery': {
-        name: 'Google BigQuery',
-        description: 'Query, list, and insert data in Google BigQuery.',
-        providerId: 'google-bigquery',
-        icon: GoogleBigQueryIcon,
-        baseProviderIcon: GoogleIcon,
-        scopes: [
-          'https://www.googleapis.com/auth/userinfo.email',
-          'https://www.googleapis.com/auth/userinfo.profile',
-          'https://www.googleapis.com/auth/bigquery',
-        ],
-        serviceAccountProviderId: 'google-service-account',
-      },
-      'google-tasks': {
-        name: 'Google Tasks',
-        description: 'Create, manage, and organize tasks with Google Tasks.',
-        providerId: 'google-tasks',
-        icon: GoogleTasksIcon,
-        baseProviderIcon: GoogleIcon,
-        scopes: [
-          'https://www.googleapis.com/auth/userinfo.email',
-          'https://www.googleapis.com/auth/userinfo.profile',
-          'https://www.googleapis.com/auth/tasks',
-        ],
-        serviceAccountProviderId: 'google-service-account',
-      },
-      'google-vault': {
-        name: 'Google Vault',
-        description: 'Search, export, and manage matters/holds via Google Vault.',
-        providerId: 'google-vault',
-        icon: GoogleVaultIcon,
-        baseProviderIcon: GoogleIcon,
-        scopes: [
-          'https://www.googleapis.com/auth/userinfo.email',
-          'https://www.googleapis.com/auth/userinfo.profile',
-          'https://www.googleapis.com/auth/ediscovery',
-          // Least-privilege scope for read-only consumers. The knowledge base
-          // connector only lists matters, holds, and saved queries, all of which
-          // accept ediscovery.readonly; the block's export tools still need the
-          // read-write scope above.
-          'https://www.googleapis.com/auth/ediscovery.readonly',
-          'https://www.googleapis.com/auth/devstorage.read_only',
-        ],
-        serviceAccountProviderId: 'google-service-account',
-      },
-      'google-groups': {
-        name: 'Google Groups',
-        description: 'Manage Google Workspace Groups and their members.',
-        providerId: 'google-groups',
-        icon: GoogleGroupsIcon,
-        baseProviderIcon: GoogleIcon,
-        scopes: [
-          'https://www.googleapis.com/auth/userinfo.email',
-          'https://www.googleapis.com/auth/userinfo.profile',
-          'https://www.googleapis.com/auth/admin.directory.group',
-          'https://www.googleapis.com/auth/admin.directory.group.member',
-        ],
-        serviceAccountProviderId: 'google-service-account',
-      },
-      /**
-       * Deliberately declares no `serviceAccountProviderId`, unlike every sibling
-       * Google service. A Google service-account JWT cannot reach user-scoped Chat
-       * data without domain-wide delegation, so offering service-account auth here
-       * would surface a credential path that always fails. Enterprises that
-       * authenticate other Google connectors through a delegated service account must
-       * attach a per-user OAuth credential for Chat.
-       */
-      'google-chat': {
-        name: 'Google Chat',
-        description: 'Read Google Chat spaces and messages the signed-in user can access.',
-        providerId: 'google-chat',
-        icon: GoogleChatIcon,
-        baseProviderIcon: GoogleIcon,
-        scopes: [
-          'https://www.googleapis.com/auth/userinfo.email',
-          'https://www.googleapis.com/auth/userinfo.profile',
-          'https://www.googleapis.com/auth/chat.spaces.readonly',
-          'https://www.googleapis.com/auth/chat.messages.readonly',
-        ],
-      },
-      'google-meet': {
-        name: 'Google Meet',
-        description: 'Create and manage Google Meet meeting spaces and conferences.',
-        providerId: 'google-meet',
-        icon: GoogleMeetIcon,
-        baseProviderIcon: GoogleIcon,
-        scopes: [
-          'https://www.googleapis.com/auth/userinfo.email',
-          'https://www.googleapis.com/auth/userinfo.profile',
-          'https://www.googleapis.com/auth/meetings.space.created',
-          'https://www.googleapis.com/auth/meetings.space.readonly',
-        ],
-        serviceAccountProviderId: 'google-service-account',
-      },
       'google-service-account': {
         name: 'Google Service Account',
         description: 'Authenticate with a JSON key file from Google Cloud Console.',
@@ -378,382 +150,6 @@ export const OAUTH_PROVIDERS: Record<string, OAuthProviderConfig> = {
     },
     defaultService: 'gmail',
   },
-  microsoft: {
-    name: 'Microsoft',
-    icon: MicrosoftIcon,
-    services: {
-      'microsoft-ad': {
-        name: 'Azure AD',
-        description: 'Connect to Azure AD (Microsoft Entra ID) and manage users and groups.',
-        providerId: 'microsoft-ad',
-        icon: AzureIcon,
-        baseProviderIcon: MicrosoftIcon,
-        scopes: [
-          'openid',
-          'profile',
-          'email',
-          'User.ReadWrite.All',
-          'Group.ReadWrite.All',
-          'GroupMember.ReadWrite.All',
-          'LicenseAssignment.Read.All',
-          'LicenseAssignment.ReadWrite.All',
-          'UserAuthenticationMethod.ReadWrite.All',
-          'AuditLog.Read.All',
-          'Application.Read.All',
-          'AppRoleAssignment.ReadWrite.All',
-          'RoleManagement.ReadWrite.Directory',
-          'Device.Read.All',
-          'Policy.Read.All',
-          'offline_access',
-        ],
-      },
-      'microsoft-dataverse': {
-        name: 'Microsoft Dataverse',
-        description: 'Connect to Microsoft Dataverse and manage records.',
-        providerId: 'microsoft-dataverse',
-        icon: MicrosoftDataverseIcon,
-        baseProviderIcon: MicrosoftIcon,
-        scopes: [
-          'openid',
-          'profile',
-          'email',
-          'https://dynamics.microsoft.com/user_impersonation',
-          'offline_access',
-        ],
-      },
-      'microsoft-excel': {
-        name: 'Microsoft Excel',
-        description: 'Connect to Microsoft Excel and manage spreadsheets.',
-        providerId: 'microsoft-excel',
-        icon: MicrosoftExcelIcon,
-        baseProviderIcon: MicrosoftIcon,
-        scopes: ['openid', 'profile', 'email', 'Files.Read', 'Files.ReadWrite', 'offline_access'],
-      },
-      'microsoft-planner': {
-        name: 'Microsoft Planner',
-        description: 'Connect to Microsoft Planner and manage tasks.',
-        providerId: 'microsoft-planner',
-        icon: MicrosoftPlannerIcon,
-        baseProviderIcon: MicrosoftIcon,
-        scopes: [
-          'openid',
-          'profile',
-          'email',
-          'Group.ReadWrite.All',
-          'Group.Read.All',
-          'Tasks.ReadWrite',
-          'offline_access',
-        ],
-      },
-      'microsoft-teams': {
-        name: 'Microsoft Teams',
-        description: 'Connect to Microsoft Teams and manage messages.',
-        providerId: 'microsoft-teams',
-        icon: MicrosoftTeamsIcon,
-        baseProviderIcon: MicrosoftIcon,
-        scopes: [
-          'openid',
-          'profile',
-          'email',
-          'User.Read',
-          'Chat.Read',
-          'Chat.ReadWrite',
-          'Chat.ReadBasic',
-          'ChatMessage.Send',
-          'Channel.ReadBasic.All',
-          'ChannelMessage.Send',
-          'ChannelMessage.Read.All',
-          'ChannelMessage.ReadWrite',
-          'ChannelMember.Read.All',
-          'Group.Read.All',
-          'Group.ReadWrite.All',
-          'Team.ReadBasic.All',
-          'TeamMember.Read.All',
-          'offline_access',
-          'Files.Read',
-          'Sites.Read.All',
-        ],
-      },
-      'microsoft-word': {
-        name: 'Microsoft Word',
-        description: 'Connect to Microsoft Word and manage documents.',
-        providerId: 'microsoft-word',
-        icon: MicrosoftWordIcon,
-        baseProviderIcon: MicrosoftIcon,
-        /**
-         * Word documents are ordinary drive items, so the integration reads and
-         * writes them through the Files permissions rather than a Word-specific
-         * scope — Microsoft Graph exposes no Word API of its own.
-         *
-         * The `.All` variants are what make the SharePoint drive the block
-         * exposes actually work: `Files.ReadWrite` alone covers only the signed-in
-         * user's own OneDrive, so a document library would be rejected for
-         * insufficient privileges. Both are user-consentable, so this does not
-         * push the integration behind admin consent, and neither grants access to
-         * anything the signed-in account could not already open.
-         *
-         * @see https://learn.microsoft.com/en-us/graph/permissions-reference
-         */
-        scopes: [
-          'openid',
-          'profile',
-          'email',
-          'Files.Read',
-          'Files.ReadWrite',
-          'Files.Read.All',
-          'Files.ReadWrite.All',
-          'offline_access',
-        ],
-      },
-      outlook: {
-        name: 'Outlook',
-        description: 'Connect to Outlook and manage emails and calendar events.',
-        providerId: 'outlook',
-        icon: OutlookIcon,
-        baseProviderIcon: MicrosoftIcon,
-        /**
-         * `Calendars.ReadWrite` backs the Outlook calendar operations. Graph documents it
-         * as the sole accepted permission for creating and updating events and for
-         * accept / tentativelyAccept / decline ("Higher: Not available"), and it is
-         * supported for both work/school and personal Microsoft accounts.
-         *
-         * Do NOT add `Calendars.ReadWrite.Shared` here. This provider is shared by work
-         * and personal Outlook accounts, and the `.Shared` calendar scopes are not
-         * confirmed supported for personal Microsoft accounts — requesting one risks
-         * failing consent for personal users, which would take mail access down with it.
-         * That is the same reasoning that kept `findMeetingTimes` out of this integration.
-         * The consequence is that calendar operations target calendars the account owns;
-         * picking a calendar shared by another user may return 403 from Graph.
-         *
-         * Microsoft only grants newly-added scopes on a fresh authorization, so users who
-         * connected Outlook before `Calendars.ReadWrite` existed must reconnect
-         * (re-consent) before the calendar operations will work.
-         *
-         * @see https://learn.microsoft.com/en-us/graph/permissions-reference
-         */
-        scopes: [
-          'openid',
-          'profile',
-          'email',
-          'Mail.ReadWrite',
-          'Mail.ReadBasic',
-          'Mail.Read',
-          'Mail.Send',
-          'Calendars.ReadWrite',
-          'offline_access',
-        ],
-      },
-      onedrive: {
-        name: 'OneDrive',
-        description: 'Connect to OneDrive and manage files.',
-        providerId: 'onedrive',
-        icon: MicrosoftOneDriveIcon,
-        baseProviderIcon: MicrosoftIcon,
-        scopes: ['openid', 'profile', 'email', 'Files.Read', 'Files.ReadWrite', 'offline_access'],
-      },
-      sharepoint: {
-        name: 'SharePoint',
-        description: 'Connect to SharePoint and manage sites.',
-        providerId: 'sharepoint',
-        icon: MicrosoftSharepointIcon,
-        baseProviderIcon: MicrosoftIcon,
-        scopes: [
-          'openid',
-          'profile',
-          'email',
-          'Sites.Read.All',
-          'Sites.ReadWrite.All',
-          'Sites.Manage.All',
-          'offline_access',
-        ],
-      },
-    },
-    defaultService: 'outlook',
-  },
-  x: {
-    name: 'X',
-    icon: xIcon,
-    services: {
-      x: {
-        name: 'X',
-        description: 'Read and post tweets on X (formerly Twitter).',
-        providerId: 'x',
-        icon: xIcon,
-        baseProviderIcon: xIcon,
-        scopes: [
-          'tweet.read',
-          'tweet.write',
-          'tweet.moderate.write',
-          'users.read',
-          'follows.read',
-          'follows.write',
-          'bookmark.read',
-          'bookmark.write',
-          'like.read',
-          'like.write',
-          'block.read',
-          'block.write',
-          'mute.read',
-          'mute.write',
-          'offline.access',
-        ],
-      },
-    },
-    defaultService: 'x',
-  },
-  tiktok: {
-    name: 'TikTok',
-    icon: TikTokIcon,
-    services: {
-      tiktok: {
-        name: 'TikTok',
-        description: 'Read profile info and videos, and upload drafts to the TikTok inbox.',
-        providerId: 'tiktok',
-        icon: TikTokIcon,
-        baseProviderIcon: TikTokIcon,
-        scopes: [
-          'user.info.basic',
-          'user.info.profile',
-          'user.info.stats',
-          'video.upload',
-          'video.list',
-        ],
-      },
-    },
-    defaultService: 'tiktok',
-  },
-  atlassian: {
-    name: 'Atlassian',
-    icon: AtlassianIcon,
-    services: {
-      'atlassian-service-account': {
-        name: 'Atlassian Service Account',
-        description:
-          'Authenticate as an Atlassian service account using a scoped API token from admin.atlassian.com.',
-        providerId: 'atlassian-service-account',
-        icon: AtlassianIcon,
-        baseProviderIcon: AtlassianIcon,
-        scopes: [],
-        authType: 'service_account',
-      },
-    },
-    defaultService: 'atlassian-service-account',
-  },
-  confluence: {
-    name: 'Confluence',
-    icon: ConfluenceIcon,
-    services: {
-      confluence: {
-        name: 'Confluence',
-        description: 'Access Confluence content and documentation.',
-        providerId: 'confluence',
-        icon: ConfluenceIcon,
-        baseProviderIcon: ConfluenceIcon,
-        serviceAccountProviderId: 'atlassian-service-account',
-        scopes: [
-          'read:confluence-content.all',
-          'read:confluence-space.summary',
-          'read:space:confluence',
-          'write:confluence-content',
-          'write:confluence-space',
-          'write:confluence-file',
-          'read:page:confluence',
-          'write:page:confluence',
-          'read:comment:confluence',
-          'write:comment:confluence',
-          'delete:comment:confluence',
-          'delete:attachment:confluence',
-          'delete:page:confluence',
-          'read:label:confluence',
-          'write:label:confluence',
-          'read:attachment:confluence',
-          'write:attachment:confluence',
-          'search:confluence',
-          'read:me',
-          'offline_access',
-          'read:hierarchical-content:confluence',
-          'read:content.metadata:confluence',
-          'read:user:confluence',
-          'read:confluence-user',
-          'read:group:confluence',
-          'read:task:confluence',
-          'write:task:confluence',
-          'write:space:confluence',
-          'delete:space:confluence',
-          'read:blogpost:confluence',
-          'write:blogpost:confluence',
-          'delete:blogpost:confluence',
-          'read:content.property:confluence',
-          'write:content.property:confluence',
-          'read:space.property:confluence',
-          'write:space.property:confluence',
-          'read:space.permission:confluence',
-        ],
-      },
-    },
-    defaultService: 'confluence',
-  },
-  jira: {
-    name: 'Jira',
-    icon: JiraIcon,
-    services: {
-      jira: {
-        name: 'Jira',
-        description: 'Access Jira projects, issues, and Service Management.',
-        providerId: 'jira',
-        icon: JiraIcon,
-        baseProviderIcon: JiraIcon,
-        serviceAccountProviderId: 'atlassian-service-account',
-        scopes: [
-          'read:jira-user',
-          'read:jira-work',
-          'write:jira-work',
-          'read:me',
-          'offline_access',
-          'read:issue.vote:jira',
-          'read:user:jira',
-          'delete:issue:jira',
-          'delete:comment:jira',
-          'delete:attachment:jira',
-          'delete:issue-worklog:jira',
-          'delete:issue-link:jira',
-          // Jira Service Management scopes. The classic scopes are required: Atlassian
-          // enforces an endpoint's granular scope set as all-of, and several JSM request
-          // endpoints include scopes outside this list in their granular sets.
-          'read:servicedesk-request',
-          'write:servicedesk-request',
-          'manage:servicedesk-customer',
-          'read:servicedesk:jira-service-management',
-          'read:requesttype:jira-service-management',
-          'read:request:jira-service-management',
-          'write:request:jira-service-management',
-          'read:request.comment:jira-service-management',
-          'write:request.comment:jira-service-management',
-          'read:servicedesk.customer:jira-service-management',
-          'write:servicedesk.customer:jira-service-management',
-          'read:organization:jira-service-management',
-          'write:organization:jira-service-management',
-          'read:servicedesk.organization:jira-service-management',
-          'write:servicedesk.organization:jira-service-management',
-          'read:queue:jira-service-management',
-          'read:request.sla:jira-service-management',
-          'read:request.status:jira-service-management',
-          'write:request.status:jira-service-management',
-          'read:request.participant:jira-service-management',
-          'write:request.participant:jira-service-management',
-          'read:request.approval:jira-service-management',
-          'write:request.approval:jira-service-management',
-          'read:cmdb-object:jira',
-          'write:cmdb-object:jira',
-          'delete:cmdb-object:jira',
-          'read:cmdb-schema:jira',
-          'read:cmdb-type:jira',
-          'read:cmdb-attribute:jira',
-        ],
-      },
-    },
-    defaultService: 'jira',
-  },
   airtable: {
     name: 'Airtable',
     icon: AirtableIcon,
@@ -776,30 +172,6 @@ export const OAUTH_PROVIDERS: Record<string, OAuthProviderConfig> = {
     },
     defaultService: 'airtable',
   },
-  bitbucket: {
-    name: 'Bitbucket',
-    icon: BitbucketIcon,
-    services: {
-      bitbucket: {
-        name: 'Bitbucket',
-        description: 'Read repositories, collaborate on pull requests, and manage pipelines.',
-        providerId: 'bitbucket',
-        icon: BitbucketIcon,
-        baseProviderIcon: BitbucketIcon,
-        scopes: [
-          'account',
-          'repository',
-          'repository:write',
-          'pullrequest',
-          'pullrequest:write',
-          'pipeline',
-          'pipeline:write',
-          'webhook',
-        ],
-      },
-    },
-    defaultService: 'bitbucket',
-  },
   notion: {
     name: 'Notion',
     icon: NotionIcon,
@@ -815,150 +187,6 @@ export const OAUTH_PROVIDERS: Record<string, OAuthProviderConfig> = {
       },
     },
     defaultService: 'notion',
-  },
-  clickup: {
-    name: 'ClickUp',
-    icon: ClickUpIcon,
-    services: {
-      clickup: {
-        name: 'ClickUp',
-        description: 'Manage tasks, lists, and comments in ClickUp.',
-        providerId: 'clickup',
-        serviceAccountProviderId: 'clickup-service-account',
-        icon: ClickUpIcon,
-        baseProviderIcon: ClickUpIcon,
-        scopes: [],
-      },
-    },
-    defaultService: 'clickup',
-  },
-  linear: {
-    name: 'Linear',
-    icon: LinearIcon,
-    services: {
-      linear: {
-        name: 'Linear',
-        description: 'Manage issues and projects in Linear.',
-        providerId: 'linear',
-        serviceAccountProviderId: 'linear-service-account',
-        icon: LinearIcon,
-        baseProviderIcon: LinearIcon,
-        scopes: ['read', 'write'],
-      },
-    },
-    defaultService: 'linear',
-  },
-  'manageengine-sdp': {
-    name: 'ManageEngine ServiceDesk Plus',
-    icon: ManageEngineIcon,
-    services: {
-      'manageengine-sdp': {
-        name: 'ManageEngine ServiceDesk Plus',
-        description:
-          'Manage ServiceDesk Plus Cloud requests, notes, problems, changes, assets, and knowledge base solutions. Connecting requires a Zoho account in the US data center — the authorize and token-exchange legs are pinned to accounts.zoho.com, and a Zoho access token is only valid in the data center that issued it.',
-        providerId: 'manageengine-sdp',
-        icon: ManageEngineIcon,
-        baseProviderIcon: ManageEngineIcon,
-        // ServiceDesk Plus Cloud scopes are `SDPOnDemand.<module>.<operation>`
-        // (getting-started/oauth-2.0.html). Enumerated per operation rather
-        // than requested as the broader `.ALL` group scopes, so the consent
-        // screen names exactly what the block can do.
-        //
-        // The five modules here are the ones the tools cover. Notably absent:
-        // the standalone Tasks module (/api/v3/tasks). Its endpoints are
-        // documented but the scope table publishes no `tasks` entry, and
-        // guessing one would put an unverified scope on every user's consent
-        // screen - so those tools are deliberately not implemented.
-        scopes: [
-          'SDPOnDemand.requests.CREATE',
-          'SDPOnDemand.requests.READ',
-          'SDPOnDemand.requests.UPDATE',
-          'SDPOnDemand.requests.DELETE',
-          'SDPOnDemand.problems.CREATE',
-          'SDPOnDemand.problems.READ',
-          'SDPOnDemand.problems.UPDATE',
-          'SDPOnDemand.problems.DELETE',
-          'SDPOnDemand.changes.CREATE',
-          'SDPOnDemand.changes.READ',
-          'SDPOnDemand.changes.UPDATE',
-          'SDPOnDemand.changes.DELETE',
-          'SDPOnDemand.assets.CREATE',
-          'SDPOnDemand.assets.READ',
-          'SDPOnDemand.assets.UPDATE',
-          'SDPOnDemand.assets.DELETE',
-          'SDPOnDemand.solutions.CREATE',
-          'SDPOnDemand.solutions.READ',
-          'SDPOnDemand.solutions.UPDATE',
-          'SDPOnDemand.solutions.DELETE',
-          // Zoho account profile, used by getUserInfo to label the credential.
-          'aaaserver.profile.READ',
-        ],
-      },
-    },
-    defaultService: 'manageengine-sdp',
-  },
-  monday: {
-    name: 'Monday.com',
-    icon: MondayIcon,
-    services: {
-      monday: {
-        name: 'Monday.com',
-        description: 'Manage boards, items, and groups in Monday.com.',
-        providerId: 'monday',
-        serviceAccountProviderId: 'monday-service-account',
-        icon: MondayIcon,
-        baseProviderIcon: MondayIcon,
-        scopes: [
-          'boards:read',
-          'boards:write',
-          'updates:read',
-          'updates:write',
-          'webhooks:read',
-          'webhooks:write',
-          'me:read',
-        ],
-      },
-    },
-    defaultService: 'monday',
-  },
-  box: {
-    name: 'Box',
-    icon: BoxCompanyIcon,
-    services: {
-      box: {
-        name: 'Box',
-        description: 'Manage files, folders, and e-signatures with Box.',
-        providerId: 'box',
-        icon: BoxCompanyIcon,
-        baseProviderIcon: BoxCompanyIcon,
-        scopes: ['root_readwrite', 'sign_requests.readwrite'],
-        serviceAccountProviderId: 'box-service-account',
-      },
-    },
-    defaultService: 'box',
-  },
-  dropbox: {
-    name: 'Dropbox',
-    icon: DropboxIcon,
-    services: {
-      dropbox: {
-        name: 'Dropbox',
-        description: 'Upload, download, share, and manage files in Dropbox.',
-        providerId: 'dropbox',
-        icon: DropboxIcon,
-        baseProviderIcon: DropboxIcon,
-        scopes: [
-          'account_info.read',
-          'files.metadata.read',
-          'files.metadata.write',
-          'files.content.read',
-          'files.content.write',
-          'sharing.read',
-          'sharing.write',
-        ],
-      },
-    },
-    defaultService: 'dropbox',
   },
   shopify: {
     name: 'Shopify',
@@ -983,142 +211,6 @@ export const OAUTH_PROVIDERS: Record<string, OAuthProviderConfig> = {
     },
     defaultService: 'shopify',
   },
-  slack: {
-    name: 'Slack',
-    icon: SlackIcon,
-    services: {
-      slack: {
-        name: 'Slack',
-        description: 'Use Slack messaging, files, reactions, views, and canvases.',
-        providerId: 'slack',
-        serviceAccountProviderId: 'slack-custom-bot',
-        icon: SlackIcon,
-        baseProviderIcon: SlackIcon,
-        scopes: [
-          'channels:read',
-          'channels:history',
-          'channels:manage',
-          'groups:read',
-          'groups:history',
-          'groups:write',
-          'chat:write',
-          'chat:write.public',
-          ...SLACK_APPROVAL_GATED_SCOPES,
-          'im:write',
-          'im:read',
-          'users:read',
-          // TODO: Add 'users:read.email' once Slack app review is approved
-          'files:write',
-          'files:read',
-          'canvases:read',
-          'canvases:write',
-          'reactions:write',
-          'reactions:read',
-          // TODO: Add 'pins:read' once Slack app review is approved
-        ],
-      },
-    },
-    defaultService: 'slack',
-  },
-  snowflake: {
-    name: 'Snowflake',
-    icon: SnowflakeIcon,
-    services: {
-      snowflake: {
-        name: 'Snowflake',
-        description: 'Query data and manage warehouses and tasks in Snowflake.',
-        providerId: 'snowflake',
-        serviceAccountProviderId: 'snowflake-service-account',
-        icon: SnowflakeIcon,
-        baseProviderIcon: SnowflakeIcon,
-        scopes: [],
-        authType: 'service_account',
-      },
-    },
-    defaultService: 'snowflake',
-  },
-  netsuite: {
-    name: 'Oracle NetSuite',
-    icon: NetSuiteIcon,
-    services: {
-      netsuite: {
-        name: 'Oracle NetSuite',
-        description:
-          'Manage NetSuite records, queries, datasets, batches, metadata, and asynchronous jobs.',
-        providerId: 'netsuite',
-        serviceAccountProviderId: 'netsuite-service-account',
-        icon: NetSuiteIcon,
-        baseProviderIcon: NetSuiteIcon,
-        scopes: [],
-        authType: 'service_account',
-      },
-    },
-    defaultService: 'netsuite',
-  },
-  reddit: {
-    name: 'Reddit',
-    icon: RedditIcon,
-    services: {
-      reddit: {
-        name: 'Reddit',
-        description: 'Access Reddit data and content from subreddits.',
-        providerId: 'reddit',
-        icon: RedditIcon,
-        baseProviderIcon: RedditIcon,
-        scopes: [
-          'identity',
-          'read',
-          'submit',
-          'vote',
-          'save',
-          'edit',
-          'subscribe',
-          'history',
-          'privatemessages',
-          'account',
-          'mysubreddits',
-          'flair',
-          'report',
-          'modposts',
-          'modflair',
-          'modmail',
-        ],
-      },
-    },
-    defaultService: 'reddit',
-  },
-  wealthbox: {
-    name: 'Wealthbox',
-    icon: WealthboxIcon,
-    services: {
-      wealthbox: {
-        name: 'Wealthbox',
-        description: 'Manage contacts, notes, and tasks in your Wealthbox CRM.',
-        providerId: 'wealthbox',
-        serviceAccountProviderId: 'wealthbox-service-account',
-        icon: WealthboxIcon,
-        baseProviderIcon: WealthboxIcon,
-        scopes: ['login', 'data'],
-      },
-    },
-    defaultService: 'wealthbox',
-  },
-  webflow: {
-    name: 'Webflow',
-    icon: WebflowIcon,
-    services: {
-      webflow: {
-        name: 'Webflow',
-        description: 'Manage Webflow CMS collections, sites, and content.',
-        providerId: 'webflow',
-        serviceAccountProviderId: 'webflow-service-account',
-        icon: WebflowIcon,
-        baseProviderIcon: WebflowIcon,
-        scopes: ['cms:read', 'cms:write', 'sites:read', 'sites:write', 'forms:read'],
-      },
-    },
-    defaultService: 'webflow',
-  },
   trello: {
     name: 'Trello',
     icon: TrelloIcon,
@@ -1135,48 +227,6 @@ export const OAUTH_PROVIDERS: Record<string, OAuthProviderConfig> = {
     },
     defaultService: 'trello',
   },
-  asana: {
-    name: 'Asana',
-    icon: AsanaIcon,
-    services: {
-      asana: {
-        name: 'Asana',
-        description: 'Manage Asana projects, tasks, and workflows.',
-        providerId: 'asana',
-        serviceAccountProviderId: 'asana-service-account',
-        icon: AsanaIcon,
-        baseProviderIcon: AsanaIcon,
-        scopes: ['default'],
-      },
-    },
-    defaultService: 'asana',
-  },
-  attio: {
-    name: 'Attio',
-    icon: AttioIcon,
-    services: {
-      attio: {
-        name: 'Attio',
-        description: 'Manage records, notes, tasks, lists, comments, and more in Attio CRM.',
-        providerId: 'attio',
-        serviceAccountProviderId: 'attio-service-account',
-        icon: AttioIcon,
-        baseProviderIcon: AttioIcon,
-        scopes: [
-          'record_permission:read-write',
-          'object_configuration:read-write',
-          'list_configuration:read-write',
-          'list_entry:read-write',
-          'note:read-write',
-          'task:read-write',
-          'comment:read-write',
-          'user_management:read',
-          'webhook:read-write',
-        ],
-      },
-    },
-    defaultService: 'attio',
-  },
   calcom: {
     name: 'Cal.com',
     icon: CalComIcon,
@@ -1192,21 +242,6 @@ export const OAUTH_PROVIDERS: Record<string, OAuthProviderConfig> = {
       },
     },
     defaultService: 'calcom',
-  },
-  docusign: {
-    name: 'DocuSign',
-    icon: DocuSignIcon,
-    services: {
-      docusign: {
-        name: 'DocuSign',
-        description: 'Send documents for e-signature with DocuSign.',
-        providerId: 'docusign',
-        icon: DocuSignIcon,
-        baseProviderIcon: DocuSignIcon,
-        scopes: ['signature', 'extended'],
-      },
-    },
-    defaultService: 'docusign',
   },
   pipedrive: {
     name: 'Pipedrive',
@@ -1231,57 +266,6 @@ export const OAUTH_PROVIDERS: Record<string, OAuthProviderConfig> = {
       },
     },
     defaultService: 'pipedrive',
-  },
-  quickbooks: {
-    name: 'QuickBooks',
-    icon: QuickBooksIcon,
-    services: {
-      quickbooks: {
-        name: 'QuickBooks',
-        description:
-          'Access company data and manage customers, vendors, and items in QuickBooks Online.',
-        providerId: 'quickbooks',
-        icon: QuickBooksIcon,
-        baseProviderIcon: QuickBooksIcon,
-        scopes: ['openid', 'profile', 'email', 'com.intuit.quickbooks.accounting'],
-        clientConfiguration: {
-          redirectPath: '/api/auth/oauth2/callback/quickbooks',
-          fields: [
-            {
-              id: 'clientId',
-              label: 'Client ID',
-              placeholder: 'Enter your Intuit app client ID',
-              secret: false,
-            },
-            {
-              id: 'clientSecret',
-              label: 'Client secret',
-              placeholder: 'Enter your Intuit app client secret',
-              secret: true,
-            },
-            {
-              id: 'environment',
-              label: 'Environment',
-              placeholder: 'Select an Intuit environment',
-              secret: false,
-              options: [
-                { value: 'sandbox', label: 'Sandbox' },
-                { value: 'production', label: 'Production' },
-              ],
-              hint: 'Use the environment that matches the credentials in your Intuit app.',
-            },
-            {
-              id: 'webhookVerifierToken',
-              label: 'Webhook verifier token',
-              placeholder: 'Enter your Intuit app webhook verifier token',
-              secret: true,
-              hint: 'Used only to authenticate QuickBooks webhook triggers for this Intuit app.',
-            },
-          ],
-        },
-      },
-    },
-    defaultService: 'quickbooks',
   },
   hubspot: {
     name: 'HubSpot',
@@ -1320,55 +304,6 @@ export const OAUTH_PROVIDERS: Record<string, OAuthProviderConfig> = {
     },
     defaultService: 'hubspot',
   },
-  coda: {
-    name: 'Coda',
-    icon: CodaIcon,
-    services: {
-      coda: {
-        name: 'Coda',
-        description: 'Read and write Coda docs, pages, and tables.',
-        providerId: 'coda',
-        serviceAccountProviderId: 'coda-service-account',
-        icon: CodaIcon,
-        baseProviderIcon: CodaIcon,
-        scopes: [],
-        authType: 'service_account',
-      },
-    },
-    defaultService: 'coda',
-  },
-  harmonic: {
-    name: 'Harmonic',
-    icon: HarmonicIcon,
-    services: {
-      harmonic: {
-        name: 'Harmonic',
-        description: 'Search and enrich people with Harmonic data.',
-        providerId: 'harmonic',
-        serviceAccountProviderId: 'harmonic-service-account',
-        icon: HarmonicIcon,
-        baseProviderIcon: HarmonicIcon,
-        scopes: [],
-        authType: 'service_account',
-      },
-    },
-    defaultService: 'harmonic',
-  },
-  linkedin: {
-    name: 'LinkedIn',
-    icon: LinkedInIcon,
-    services: {
-      linkedin: {
-        name: 'LinkedIn',
-        description: 'Share posts and access profile data on LinkedIn.',
-        providerId: 'linkedin',
-        icon: LinkedInIcon,
-        baseProviderIcon: LinkedInIcon,
-        scopes: ['profile', 'openid', 'email', 'w_member_social'],
-      },
-    },
-    defaultService: 'linkedin',
-  },
   instagram: {
     name: 'Instagram',
     icon: InstagramIcon,
@@ -1389,79 +324,6 @@ export const OAUTH_PROVIDERS: Record<string, OAuthProviderConfig> = {
       },
     },
     defaultService: 'instagram',
-  },
-  salesforce: {
-    name: 'Salesforce',
-    icon: SalesforceIcon,
-    services: {
-      salesforce: {
-        name: 'Salesforce',
-        description: 'Access and manage your Salesforce CRM data.',
-        providerId: 'salesforce',
-        additionalProviderIds: SALESFORCE_ADDITIONAL_PROVIDER_IDS,
-        providerIdLabels: SALESFORCE_PROVIDER_ID_LABELS,
-        providerIdPickerHint: 'Sandbox orgs sign in at test.salesforce.com, not production.',
-        serviceAccountProviderId: 'salesforce-service-account',
-        icon: SalesforceIcon,
-        baseProviderIcon: SalesforceIcon,
-        scopes: ['api', 'refresh_token', 'openid'],
-      },
-    },
-    defaultService: 'salesforce',
-  },
-  'zoho-desk': {
-    name: 'Zoho Desk',
-    icon: ZohoDeskIcon,
-    services: {
-      'zoho-desk': {
-        name: 'Zoho Desk',
-        description:
-          'Manage Zoho Desk tickets, comments, threads, and contacts. Connecting with OAuth requires a Zoho account in the US data center; a Self Client also supports the EU, IN, and AU data centers.',
-        providerId: 'zoho-desk',
-        serviceAccountProviderId: 'zoho-desk-service-account',
-        icon: ZohoDeskIcon,
-        baseProviderIcon: ZohoDeskIcon,
-        // Kept to what the tools and the webhook trigger exercise. NOTE: Zoho
-        // lists `Desk.organization.READ , Desk.basic.READ` for GET /organizations
-        // and `Desk.departments.READ , Desk.basic.READ` for GET /departments, and
-        // does not document whether that comma means AND or OR. Both bootstrap
-        // endpoints are assumed covered by Desk.basic.READ alone - verify against
-        // a live Desk org and widen here if either returns SCOPE_MISMATCH.
-        // tickets (incl. threads/comments), contacts (get_contact), basic
-        // (list_organizations), agents (the `assigneeId` picker lists agents),
-        // webhook create/delete (the trigger provisions and tears down its own
-        // subscription), and profile (OAuth getUserInfo).
-        // Desk.search.READ, Desk.webhooks.READ and Desk.webhooks.UPDATE were
-        // requested but unused - no tool searches, and the provider never lists
-        // or edits a subscription.
-        scopes: [
-          // READ + UPDATE rather than tickets.ALL: no tool creates or deletes a
-          // ticket, and ALL additionally grants ticket DELETE. Threads, comments
-          // and attachments live under the tickets module and are covered by
-          // these two. NOTE: Zoho publishes no scope line for the attachment
-          // content sub-path - verify attachment download against a live account
-          // before merge and widen here if it returns SCOPE_MISMATCH.
-          'Desk.tickets.READ',
-          'Desk.tickets.UPDATE',
-          'Desk.contacts.READ',
-          // READ only: the knowledge base connector syncs Help Center articles
-          // via GET /articles and GET /articles/{id}; nothing authors one.
-          'Desk.articles.READ',
-          // GET /organizations documents `Desk.organization.READ , Desk.basic.READ`.
-          // Sibling endpoints spell the same construction "requires X and Y"
-          // (dependencyMappings, roles), so the comma is AND, not OR.
-          'Desk.organization.READ',
-          // READ only: the agent picker for `assigneeId` lists agents, and no
-          // tool creates, edits or deletes one.
-          'Desk.agents.READ',
-          'Desk.basic.READ',
-          'Desk.webhooks.CREATE',
-          'Desk.webhooks.DELETE',
-          'aaaserver.profile.READ',
-        ],
-      },
-    },
-    defaultService: 'zoho-desk',
   },
   zoom: {
     name: 'Zoom',
@@ -1505,39 +367,6 @@ export const OAUTH_PROVIDERS: Record<string, OAuthProviderConfig> = {
       },
     },
     defaultService: 'wordpress',
-  },
-  spotify: {
-    name: 'Spotify',
-    icon: SpotifyIcon,
-    services: {
-      spotify: {
-        name: 'Spotify',
-        description: 'Search music, manage playlists, control playback, and access your library.',
-        providerId: 'spotify',
-        icon: SpotifyIcon,
-        baseProviderIcon: SpotifyIcon,
-        scopes: [
-          'user-read-private',
-          'user-read-email',
-          'user-library-read',
-          'user-library-modify',
-          'playlist-read-private',
-          'playlist-read-collaborative',
-          'playlist-modify-public',
-          'playlist-modify-private',
-          'user-read-playback-state',
-          'user-modify-playback-state',
-          'user-read-currently-playing',
-          'user-read-recently-played',
-          'user-top-read',
-          'user-follow-read',
-          'user-follow-modify',
-          'user-read-playback-position',
-          'ugc-image-upload',
-        ],
-      },
-    },
-    defaultService: 'spotify',
   },
 }
 
@@ -1586,13 +415,7 @@ function getConfiguredClientCredentials<const TCapabilityId extends OAuthClientC
 /**
  * Get OAuth provider configuration for token refresh
  */
-function getProviderAuthConfig(
-  provider: string,
-  clientOverride?: Pick<QuickBooksOAuthClientConfig, 'clientId' | 'clientSecret'>
-): ProviderAuthConfig {
-  if (clientOverride && provider !== 'quickbooks') {
-    throw new Error(`OAuth client override is not supported for provider ${provider}`)
-  }
+function getProviderAuthConfig(provider: string): ProviderAuthConfig {
   switch (provider) {
     case 'google': {
       const { clientId, clientSecret } = getConfiguredClientCredentials(
@@ -1605,64 +428,6 @@ function getProviderAuthConfig(
         clientId,
         clientSecret,
         useBasicAuth: false,
-      }
-    }
-    case 'x': {
-      const { clientId, clientSecret } = getConfiguredClientCredentials(
-        'x',
-        'X_CLIENT_ID',
-        'X_CLIENT_SECRET'
-      )
-      return {
-        tokenEndpoint: 'https://api.x.com/2/oauth2/token',
-        clientId,
-        clientSecret,
-        useBasicAuth: true,
-        supportsRefreshTokenRotation: true,
-      }
-    }
-    case 'tiktok': {
-      const { clientId, clientSecret } = getConfiguredClientCredentials(
-        'tiktok',
-        'TIKTOK_CLIENT_ID',
-        'TIKTOK_CLIENT_SECRET'
-      )
-      return {
-        tokenEndpoint: 'https://open.tiktokapis.com/v2/oauth/token/',
-        clientId,
-        clientSecret,
-        useBasicAuth: false,
-        supportsRefreshTokenRotation: true,
-        // TikTok requires `client_key` in the token request body instead of `client_id`.
-        clientIdParamName: 'client_key',
-      }
-    }
-    case 'confluence': {
-      const { clientId, clientSecret } = getConfiguredClientCredentials(
-        'confluence',
-        'CONFLUENCE_CLIENT_ID',
-        'CONFLUENCE_CLIENT_SECRET'
-      )
-      return {
-        tokenEndpoint: 'https://auth.atlassian.com/oauth/token',
-        clientId,
-        clientSecret,
-        useBasicAuth: true,
-        supportsRefreshTokenRotation: true,
-      }
-    }
-    case 'jira': {
-      const { clientId, clientSecret } = getConfiguredClientCredentials(
-        'jira',
-        'JIRA_CLIENT_ID',
-        'JIRA_CLIENT_SECRET'
-      )
-      return {
-        tokenEndpoint: 'https://auth.atlassian.com/oauth/token',
-        clientId,
-        clientSecret,
-        useBasicAuth: true,
-        supportsRefreshTokenRotation: true,
       }
     }
     case 'calcom': {
@@ -1694,35 +459,6 @@ function getProviderAuthConfig(
         supportsRefreshTokenRotation: true,
       }
     }
-    case 'bitbucket': {
-      const { clientId, clientSecret } = getConfiguredClientCredentials(
-        'bitbucket',
-        'BITBUCKET_CLIENT_ID',
-        'BITBUCKET_CLIENT_SECRET'
-      )
-      return {
-        tokenEndpoint: 'https://bitbucket.org/site/oauth2/access_token',
-        clientId,
-        clientSecret,
-        useBasicAuth: true,
-        supportsRefreshTokenRotation: true,
-      }
-    }
-    case 'github-repositories': {
-      const { clientId, clientSecret } = getConfiguredClientCredentials(
-        'github-repositories',
-        'GITHUB_APP_CLIENT_ID',
-        'GITHUB_APP_CLIENT_SECRET'
-      )
-      return {
-        tokenEndpoint: GITHUB_TOKEN_URL,
-        clientId,
-        clientSecret,
-        useBasicAuth: false,
-        additionalHeaders: { Accept: 'application/json' },
-        supportsRefreshTokenRotation: true,
-      }
-    }
     case 'notion': {
       const { clientId, clientSecret } = getConfiguredClientCredentials(
         'notion',
@@ -1738,183 +474,6 @@ function getProviderAuthConfig(
         useJsonBody: true,
       }
     }
-    case 'microsoft':
-    case 'outlook':
-    case 'onedrive':
-    case 'sharepoint': {
-      const { clientId, clientSecret } = getConfiguredClientCredentials(
-        'microsoft',
-        'MICROSOFT_CLIENT_ID',
-        'MICROSOFT_CLIENT_SECRET'
-      )
-      return {
-        tokenEndpoint: 'https://login.microsoftonline.com/common/oauth2/v2.0/token',
-        clientId,
-        clientSecret,
-        useBasicAuth: false,
-        supportsRefreshTokenRotation: true,
-      }
-    }
-    case 'clickup': {
-      const { clientId, clientSecret } = getConfiguredClientCredentials(
-        'clickup',
-        'CLICKUP_CLIENT_ID',
-        'CLICKUP_CLIENT_SECRET'
-      )
-      return {
-        tokenEndpoint: 'https://api.clickup.com/api/v2/oauth/token',
-        clientId,
-        clientSecret,
-        useBasicAuth: false,
-        supportsRefreshTokenRotation: false,
-      }
-    }
-    case 'linear': {
-      const { clientId, clientSecret } = getConfiguredClientCredentials(
-        'linear',
-        'LINEAR_CLIENT_ID',
-        'LINEAR_CLIENT_SECRET'
-      )
-      return {
-        tokenEndpoint: 'https://api.linear.app/oauth/token',
-        clientId,
-        clientSecret,
-        useBasicAuth: true,
-        supportsRefreshTokenRotation: true,
-      }
-    }
-    case 'attio': {
-      const { clientId, clientSecret } = getConfiguredClientCredentials(
-        'attio',
-        'ATTIO_CLIENT_ID',
-        'ATTIO_CLIENT_SECRET'
-      )
-      return {
-        tokenEndpoint: 'https://app.attio.com/oauth/token',
-        clientId,
-        clientSecret,
-        useBasicAuth: false,
-      }
-    }
-    case 'box': {
-      const { clientId, clientSecret } = getConfiguredClientCredentials(
-        'box',
-        'BOX_CLIENT_ID',
-        'BOX_CLIENT_SECRET'
-      )
-      return {
-        tokenEndpoint: 'https://api.box.com/oauth2/token',
-        clientId,
-        clientSecret,
-        useBasicAuth: false,
-        // Box refresh tokens are single-use: "the Refresh Token is invalidated and a
-        // new Refresh Token is returned" and "A Refresh Token is valid for 60 days and
-        // can be used to obtain a new Access Token and Refresh Token only once."
-        // (developer.box.com/guides/authentication/tokens/refresh). Without rotation the
-        // new token is discarded and the credential dies on the second refresh.
-        supportsRefreshTokenRotation: true,
-      }
-    }
-    case 'docusign': {
-      const { clientId, clientSecret } = getConfiguredClientCredentials(
-        'docusign',
-        'DOCUSIGN_CLIENT_ID',
-        'DOCUSIGN_CLIENT_SECRET'
-      )
-      return {
-        tokenEndpoint: getDocusignOAuthUrl('/oauth/token'),
-        clientId,
-        clientSecret,
-        useBasicAuth: true,
-        supportsRefreshTokenRotation: true,
-      }
-    }
-    case 'dropbox': {
-      const { clientId, clientSecret } = getConfiguredClientCredentials(
-        'dropbox',
-        'DROPBOX_CLIENT_ID',
-        'DROPBOX_CLIENT_SECRET'
-      )
-      return {
-        tokenEndpoint: 'https://api.dropboxapi.com/oauth2/token',
-        clientId,
-        clientSecret,
-        useBasicAuth: false,
-        supportsRefreshTokenRotation: false,
-      }
-    }
-    case 'slack': {
-      const { clientId, clientSecret } = getConfiguredClientCredentials(
-        'slack',
-        'SLACK_CLIENT_ID',
-        'SLACK_CLIENT_SECRET'
-      )
-      return {
-        tokenEndpoint: 'https://slack.com/api/oauth.v2.access',
-        clientId,
-        clientSecret,
-        useBasicAuth: false,
-        supportsRefreshTokenRotation: true,
-      }
-    }
-    case 'reddit': {
-      const { clientId, clientSecret } = getConfiguredClientCredentials(
-        'reddit',
-        'REDDIT_CLIENT_ID',
-        'REDDIT_CLIENT_SECRET'
-      )
-      return {
-        tokenEndpoint: 'https://www.reddit.com/api/v1/access_token',
-        clientId,
-        clientSecret,
-        useBasicAuth: true,
-        additionalHeaders: {
-          'User-Agent': REDDIT_USER_AGENT,
-        },
-      }
-    }
-    case 'wealthbox': {
-      const { clientId, clientSecret } = getConfiguredClientCredentials(
-        'wealthbox',
-        'WEALTHBOX_CLIENT_ID',
-        'WEALTHBOX_CLIENT_SECRET'
-      )
-      return {
-        tokenEndpoint: 'https://app.crmworkspace.com/oauth/token',
-        clientId,
-        clientSecret,
-        useBasicAuth: false,
-        supportsRefreshTokenRotation: true,
-      }
-    }
-    case 'webflow': {
-      const { clientId, clientSecret } = getConfiguredClientCredentials(
-        'webflow',
-        'WEBFLOW_CLIENT_ID',
-        'WEBFLOW_CLIENT_SECRET'
-      )
-      return {
-        tokenEndpoint: 'https://api.webflow.com/oauth/access_token',
-        clientId,
-        clientSecret,
-        useBasicAuth: false,
-        supportsRefreshTokenRotation: false,
-      }
-    }
-    case 'asana': {
-      const { clientId, clientSecret } = getConfiguredClientCredentials(
-        'asana',
-        'ASANA_CLIENT_ID',
-        'ASANA_CLIENT_SECRET'
-      )
-      return {
-        tokenEndpoint: 'https://app.asana.com/-/oauth_token',
-        clientId,
-        clientSecret,
-        useBasicAuth: true,
-        supportsRefreshTokenRotation: true,
-      }
-    }
     case 'pipedrive': {
       const { clientId, clientSecret } = getConfiguredClientCredentials(
         'pipedrive',
@@ -1926,18 +485,6 @@ function getProviderAuthConfig(
         clientId,
         clientSecret,
         useBasicAuth: false,
-        supportsRefreshTokenRotation: true,
-      }
-    }
-    case 'quickbooks': {
-      if (!clientOverride) {
-        throw new Error('QuickBooks OAuth client configuration is missing')
-      }
-      return {
-        tokenEndpoint: QUICKBOOKS_TOKEN_URL,
-        clientId: clientOverride.clientId,
-        clientSecret: clientOverride.clientSecret,
-        useBasicAuth: true,
         supportsRefreshTokenRotation: true,
       }
     }
@@ -1955,20 +502,6 @@ function getProviderAuthConfig(
         supportsRefreshTokenRotation: true,
       }
     }
-    case 'linkedin': {
-      const { clientId, clientSecret } = getConfiguredClientCredentials(
-        'linkedin',
-        'LINKEDIN_CLIENT_ID',
-        'LINKEDIN_CLIENT_SECRET'
-      )
-      return {
-        tokenEndpoint: 'https://www.linkedin.com/oauth/v2/accessToken',
-        clientId,
-        clientSecret,
-        useBasicAuth: false,
-        supportsRefreshTokenRotation: false,
-      }
-    }
     case 'instagram': {
       const { clientId, clientSecret } = getConfiguredClientCredentials(
         'instagram',
@@ -1982,25 +515,6 @@ function getProviderAuthConfig(
         useBasicAuth: false,
         supportsRefreshTokenRotation: true,
         refreshStrategy: 'instagram_long_lived',
-      }
-    }
-    case 'salesforce':
-    case 'salesforce-sandbox': {
-      const { clientId, clientSecret } = getConfiguredClientCredentials(
-        'salesforce',
-        'SALESFORCE_CLIENT_ID',
-        'SALESFORCE_CLIENT_SECRET'
-      )
-      // A refresh token is only redeemable at the authorization server that
-      // issued it: a sandbox token posted to login.salesforce.com fails with
-      // `invalid_grant`. One Connected App's consumer key is valid at both
-      // hosts, so only the endpoint differs.
-      return {
-        tokenEndpoint: `https://${SALESFORCE_LOGIN_HOSTS[provider]}/services/oauth2/token`,
-        clientId,
-        clientSecret,
-        useBasicAuth: false,
-        supportsRefreshTokenRotation: true,
       }
     }
     case 'shopify': {
@@ -2043,90 +557,6 @@ function getProviderAuthConfig(
       )
       return {
         tokenEndpoint: 'https://public-api.wordpress.com/oauth2/token',
-        clientId,
-        clientSecret,
-        useBasicAuth: false,
-        supportsRefreshTokenRotation: false,
-      }
-    }
-    case 'spotify': {
-      const { clientId, clientSecret } = getConfiguredClientCredentials(
-        'spotify',
-        'SPOTIFY_CLIENT_ID',
-        'SPOTIFY_CLIENT_SECRET'
-      )
-      return {
-        tokenEndpoint: 'https://accounts.spotify.com/api/token',
-        clientId,
-        clientSecret,
-        useBasicAuth: true,
-        supportsRefreshTokenRotation: false,
-      }
-    }
-    case 'monday': {
-      const { clientId, clientSecret } = getConfiguredClientCredentials(
-        'monday',
-        'MONDAY_CLIENT_ID',
-        'MONDAY_CLIENT_SECRET'
-      )
-      return {
-        tokenEndpoint: MONDAY_OAUTH_TOKEN_URL,
-        clientId,
-        clientSecret,
-        useBasicAuth: false,
-        useJsonBody: true,
-        supportsRefreshTokenRotation: true,
-      }
-    }
-    case 'manageengine-sdp': {
-      // ServiceDesk Plus Cloud authenticates through Zoho, so the grant is the
-      // same one Zoho Desk uses and shares its client credentials: scopes are
-      // chosen per authorization request, not per API-console client, so one
-      // registered client serves both products.
-      //
-      // Rotation stays off for the same reason as zoho-desk below - Zoho's
-      // refresh_token grant returns a new access token but no new refresh token.
-      // accounts.zoho.com is correct because the authorize and code-exchange
-      // legs in lib/auth/connectors/providers.ts are pinned to the US accounts
-      // server, so every refresh token in the system is US-issued. Data
-      // residency for API calls is honored separately, via the block's data
-      // center selector.
-      // Keyed on the `zoho-desk` capability, which is what
-      // `resolveOAuthClientCapabilityId('manageengine-sdp')` aliases to — the
-      // capability names the env pair, not the product.
-      const { clientId, clientSecret } = getConfiguredClientCredentials(
-        'zoho-desk',
-        'ZOHO_CLIENT_ID',
-        'ZOHO_CLIENT_SECRET'
-      )
-      return {
-        tokenEndpoint: 'https://accounts.zoho.com/oauth/v2/token',
-        clientId,
-        clientSecret,
-        useBasicAuth: false,
-        supportsRefreshTokenRotation: false,
-      }
-    }
-    case 'zoho-desk': {
-      // Zoho's refresh_token grant returns a new access token but no new refresh
-      // token, so rotation stays off (the existing refresh token is preserved).
-      // The refresh must target the accounts server of the data center that issued
-      // the token - "if location=eu, you will need to make access token request to
-      // https://accounts.zoho.eu" (zoho.com/accounts/protocol/oauth/multi-dc.html).
-      // accounts.zoho.com is correct here because the authorize and code-exchange
-      // legs in lib/auth/connectors/providers.ts are also pinned to the US accounts
-      // server, so every refresh token in the system is US-issued. Making refresh
-      // DC-aware requires making the grant DC-aware first (read the `accounts-server`
-      // callback param) and threading the credential's persisted `__zoho_domain__`
-      // marker into refreshOAuthToken, which today only receives the token string.
-      // Data residency for API calls is already honored via that persisted Desk base.
-      const { clientId, clientSecret } = getConfiguredClientCredentials(
-        'zoho-desk',
-        'ZOHO_CLIENT_ID',
-        'ZOHO_CLIENT_SECRET'
-      )
-      return {
-        tokenEndpoint: 'https://accounts.zoho.com/oauth/v2/token',
         clientId,
         clientSecret,
         useBasicAuth: false,
@@ -2328,14 +758,13 @@ async function refreshInstagramLongLivedToken(
 
 export async function refreshOAuthToken(
   providerId: string,
-  refreshToken: string,
-  clientOverride?: Pick<QuickBooksOAuthClientConfig, 'clientId' | 'clientSecret'>
+  refreshToken: string
 ): Promise<RefreshTokenResult> {
   const exactSecrets = [refreshToken]
   try {
     const provider = getBaseProviderForService(providerId)
 
-    const config = getProviderAuthConfig(provider, clientOverride)
+    const config = getProviderAuthConfig(provider)
     if (config.clientSecret) exactSecrets.push(config.clientSecret)
 
     if (config.refreshStrategy === 'instagram_long_lived') {
@@ -2384,10 +813,7 @@ export async function refreshOAuthToken(
       return { ok: false, message: 'Invalid OAuth token refresh response' }
     }
 
-    if (
-      data.ok === false ||
-      (provider === 'github-repositories' && typeof data.error === 'string')
-    ) {
+    if (data.ok === false) {
       const errorCode = safeOAuthErrorCode(data, exactSecrets)
       logger.error('Token refresh failed:', {
         status: response.status,
@@ -2406,17 +832,6 @@ export async function refreshOAuthToken(
       }
     }
 
-    if (provider === 'github-repositories') {
-      const tokens = parseGitHubRepositoriesTokenResponse(data)
-      return {
-        ok: true,
-        accessToken: tokens.access_token,
-        refreshToken: tokens.refresh_token,
-        expiresIn: tokens.expires_in,
-        refreshTokenExpiresIn: tokens.refresh_token_expires_in,
-      }
-    }
-
     const accessToken =
       typeof data.access_token === 'string' && data.access_token.length > 0
         ? data.access_token
@@ -2431,14 +846,6 @@ export async function refreshOAuthToken(
       newRefreshToken = data.refresh_token
       logger.info(`Received new refresh token from ${provider}`)
     }
-    if (provider === 'monday' && !newRefreshToken) {
-      logger.warn('Monday token refresh response omitted its rotating refresh token')
-      return { ok: false, message: 'Invalid Monday token refresh response' }
-    }
-    if (provider === 'quickbooks' && !newRefreshToken) {
-      logger.warn('QuickBooks token refresh response omitted its rotating refresh token')
-      return { ok: false, message: 'Invalid QuickBooks token refresh response' }
-    }
 
     const rawExpiresIn = data.expires_in ?? data.expiresIn
     const parsedExpiresIn =
@@ -2447,29 +854,7 @@ export async function refreshOAuthToken(
         : Number.NaN
     const responseExpiresIn =
       Number.isFinite(parsedExpiresIn) && parsedExpiresIn > 0 ? parsedExpiresIn : undefined
-    const expiresIn =
-      provider === 'monday' && accessToken
-        ? Math.max(
-            1,
-            Math.ceil(
-              (resolveMondayAccessTokenExpiresAt(accessToken, responseExpiresIn).getTime() -
-                Date.now()) /
-                1000
-            )
-          )
-        : (responseExpiresIn ?? 3600)
-
-    const rawRefreshTokenExpiresIn = data.x_refresh_token_expires_in
-    const parsedRefreshTokenExpiresIn =
-      typeof rawRefreshTokenExpiresIn === 'number' || typeof rawRefreshTokenExpiresIn === 'string'
-        ? Number(rawRefreshTokenExpiresIn)
-        : Number.NaN
-    const refreshTokenExpiresIn =
-      provider === 'quickbooks' &&
-      Number.isSafeInteger(parsedRefreshTokenExpiresIn) &&
-      parsedRefreshTokenExpiresIn > 0
-        ? parsedRefreshTokenExpiresIn
-        : undefined
+    const expiresIn = responseExpiresIn ?? 3600
 
     if (!accessToken) {
       // Log only the shape, never `data` itself - on a partial success it can
@@ -2492,7 +877,6 @@ export async function refreshOAuthToken(
       accessToken,
       expiresIn,
       refreshToken: newRefreshToken ?? refreshToken,
-      ...(refreshTokenExpiresIn ? { refreshTokenExpiresIn } : {}),
     }
   } catch (error) {
     const normalized = toError(error)

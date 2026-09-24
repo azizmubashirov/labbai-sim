@@ -767,16 +767,6 @@ export const ExaBlockMeta = {
       category: 'operations',
       tags: ['finance', 'research'],
     },
-    {
-      icon: ExaAIIcon,
-      title: 'Exa competitor news monitor',
-      prompt:
-        'Build a scheduled daily workflow that runs Exa search for fresh news about my competitors, gets the page contents and finds similar coverage, summarizes the notable moves with citations, and posts a digest to the team Slack channel.',
-      modules: ['scheduled', 'agent', 'workflows'],
-      category: 'marketing',
-      tags: ['marketing', 'research', 'monitoring'],
-      alsoIntegrations: ['slack'],
-    },
   ],
   skills: [
     {

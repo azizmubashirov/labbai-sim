@@ -41,11 +41,11 @@ describe('isBlockTypeAccessControlExempt', () => {
    */
   it('does not exempt a superseded block, which is judged as its successor', () => {
     registry({
-      slack: { hideFromToolbar: true, sunset: { status: 'legacy', replacedBy: 'slack_v2' } },
-      slack_v2: {},
+      gmail: { hideFromToolbar: true, sunset: { status: 'legacy', replacedBy: 'gmail_v2' } },
+      gmail_v2: {},
     })
 
-    expect(isBlockTypeAccessControlExempt('slack')).toBe(false)
+    expect(isBlockTypeAccessControlExempt('gmail')).toBe(false)
   })
 
   /**
@@ -60,9 +60,9 @@ describe('isBlockTypeAccessControlExempt', () => {
   })
 
   it('does not exempt a current block', () => {
-    registry({ slack_v2: {} })
+    registry({ gmail_v2: {} })
 
-    expect(isBlockTypeAccessControlExempt('slack_v2')).toBe(false)
+    expect(isBlockTypeAccessControlExempt('gmail_v2')).toBe(false)
   })
 
   /**
@@ -92,25 +92,25 @@ describe('isAccessControlAllowlistRow', () => {
 
   /**
    * The bug this closes: the editor renders only visible blocks but used to
-   * materialize an allowlist from every non-exempt one. Unchecking `slack_v2`
-   * on a previously-unrestricted group therefore wrote `slack` into the stored
-   * list, and the runtime resolves `slack` to `slack_v2` — re-allowing exactly
+   * materialize an allowlist from every non-exempt one. Unchecking `gmail_v2`
+   * on a previously-unrestricted group therefore wrote `gmail` into the stored
+   * list, and the runtime resolves `gmail` to `gmail_v2` — re-allowing exactly
    * the integration the admin had just denied.
    */
   it('is not a row for a superseded block, which has no row of its own', () => {
     registry({
-      slack: { hideFromToolbar: true, sunset: { status: 'legacy', replacedBy: 'slack_v2' } },
-      slack_v2: {},
+      gmail: { hideFromToolbar: true, sunset: { status: 'legacy', replacedBy: 'gmail_v2' } },
+      gmail_v2: {},
     })
 
-    expect(isAccessControlAllowlistRow('slack')).toBe(false)
-    expect(isBlockTypeAccessControlExempt('slack')).toBe(false)
+    expect(isAccessControlAllowlistRow('gmail')).toBe(false)
+    expect(isBlockTypeAccessControlExempt('gmail')).toBe(false)
   })
 
   it('is a row for a current block', () => {
-    registry({ slack_v2: {} })
+    registry({ gmail_v2: {} })
 
-    expect(isAccessControlAllowlistRow('slack_v2')).toBe(true)
+    expect(isAccessControlAllowlistRow('gmail_v2')).toBe(true)
   })
 
   /** Exempt block types are decided by no row at all. */

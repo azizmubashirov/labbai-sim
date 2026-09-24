@@ -73,7 +73,7 @@ describe('buildWorkflowExportPayload', () => {
               value: [
                 {
                   type: 'slack',
-                  toolId: 'slack_message',
+                  toolId: 'trello_add_comment',
                   params: {
                     credential: 'nested-credential-id',
                     botToken: 'nested-xoxb-secret',
@@ -117,7 +117,7 @@ describe('buildWorkflowExportPayload', () => {
     const tools = [
       {
         type: 'slack',
-        toolId: 'slack_message',
+        toolId: 'trello_add_comment',
         params: {
           credential: 'nested-credential-id',
           botToken: 'nested-secret-prefix-{{NESTED_PREFIX_ONLY}}',

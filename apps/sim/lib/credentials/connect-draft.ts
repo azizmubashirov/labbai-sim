@@ -7,10 +7,6 @@ import { resourceScopeColumns, resourceScopeFromOwner } from '@/lib/core/resourc
 import { resourceScopeCondition } from '@/lib/core/resource-scope.server'
 import { defaultCredentialDisplayName } from '@/lib/credentials/display-name'
 import { CREDENTIAL_DRAFT_TTL_MS } from '@/lib/credentials/draft-constants'
-import {
-  encryptQuickBooksOAuthClientConfig,
-  type QuickBooksOAuthClientConfig,
-} from '@/lib/oauth/quickbooks-client-config'
 import { credentialProviderMatchesService, getAllOAuthServices } from '@/lib/oauth/utils'
 
 const logger = createLogger('OAuthConnectDraft')
@@ -37,22 +33,11 @@ export async function createConnectDraft(params: {
   /** Reconnect only: the credential's actual name, so audit records stay accurate. */
   displayName?: string
   description?: string
-  oauthClientConfig?: QuickBooksOAuthClientConfig
 }): Promise<CreatedConnectDraft> {
   const { userId, workspaceId, providerId, credentialId } = params
   const scope = resourceScopeFromOwner(params)
 
-  if (providerId === 'quickbooks' && !params.oauthClientConfig) {
-    throw new Error(
-      'QuickBooks requires an OAuth client ID, client secret, environment, and webhook verifier token'
-    )
-  }
-  if (providerId !== 'quickbooks' && params.oauthClientConfig) {
-    throw new Error(`OAuth client configuration is not supported for provider ${providerId}`)
-  }
-  const oauthConfig = params.oauthClientConfig
-    ? await encryptQuickBooksOAuthClientConfig(params.oauthClientConfig)
-    : null
+  const oauthConfig: string | null = null
 
   let displayName = params.displayName
   if (!displayName) {

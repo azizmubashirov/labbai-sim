@@ -44,19 +44,19 @@ vi.mock('@/lib/auth/connectors/managed-oauth', () => ({
         },
       }
     }
-    if (providerId === 'jira') {
+    if (providerId === 'hubspot') {
       return {
         providerId,
-        clientId: 'jira-client-1',
-        clientSecret: 'jira-secret-1',
-        authorizationUrl: 'https://auth.atlassian.com/authorize',
-        tokenUrl: 'https://auth.atlassian.com/oauth/token',
-        redirectURI: 'https://sim.example.com/api/auth/oauth2/callback/jira',
-        scopes: ['read:me', 'read:jira-work', 'offline_access'],
+        clientId: 'hubspot-client-1',
+        clientSecret: 'hubspot-secret-1',
+        authorizationUrl: 'https://app.hubspot.com/oauth/authorize',
+        tokenUrl: 'https://api.hubapi.com/oauth/v1/token',
+        redirectURI: 'https://sim.example.com/api/auth/oauth2/callback/hubspot',
+        scopes: ['crm.objects.contacts.read', 'oauth'],
         responseType: 'code',
         authentication: 'basic',
         prompt: 'consent',
-        authorizationUrlParams: { audience: 'api.atlassian.com' },
+        authorizationUrlParams: { optional_scope: 'tickets' },
         getToken: mockGetToken,
         managedOAuth: {
           additionalScopes: [],
@@ -64,8 +64,8 @@ vi.mock('@/lib/auth/connectors/managed-oauth', () => ({
           pkce: false,
           nonceVerification: 'state_only',
           prompt: 'consent',
-          authorizationUrlParams: { audience: 'api.atlassian.com' },
-          getAuthorizationAppId: (clientId: string) => `jira:${clientId}`,
+          authorizationUrlParams: { optional_scope: 'tickets' },
+          getAuthorizationAppId: (clientId: string) => `hubspot:${clientId}`,
           verifyIdentity: mockVerifyIdentity,
           hasRequiredScopes: (granted: string[], required: string[]) =>
             required.every((scope) => granted.includes(scope)),
@@ -80,7 +80,7 @@ vi.mock('@/lib/auth/connectors/managed-oauth', () => ({
 import { createStandardOAuthCredentialGroupProviderAdapter } from '@/lib/credential-groups/standard-oauth-provider'
 
 const adapter = createStandardOAuthCredentialGroupProviderAdapter('google-calendar')
-const jiraAdapter = createStandardOAuthCredentialGroupProviderAdapter('jira')
+const stateBoundAdapter = createStandardOAuthCredentialGroupProviderAdapter('hubspot')
 
 function buildContext(): CredentialGroupOAuthContext {
   return {
@@ -307,46 +307,46 @@ describe('standard OAuth Credential Group provider', () => {
     })
   })
 
-  it('uses the existing Atlassian callback and state-bound identity verification', async () => {
-    const requiredScopes = ['read:me', 'read:jira-work', 'offline_access']
+  it('uses the existing callback and state-bound identity verification without PKCE', async () => {
+    const requiredScopes = ['crm.objects.contacts.read', 'oauth']
     const context: CredentialGroupOAuthContext = {
       ...buildContext(),
       option: {
         ...buildContext().option,
-        provider: 'jira',
-        label: 'Jira',
-        authorizationAppId: 'jira:jira-client-1',
+        provider: 'hubspot',
+        label: 'HubSpot',
+        authorizationAppId: 'hubspot:hubspot-client-1',
         requiredScopes,
       },
     }
-    const policy = await jiraAdapter.getPolicy(context.option, {
+    const policy = await stateBoundAdapter.getPolicy(context.option, {
       workspaceId: context.workspaceId,
       credentialGroupId: context.credentialGroupId,
     })
-    const prepared = await jiraAdapter.prepareAuthorization(context, policy)
+    const prepared = await stateBoundAdapter.prepareAuthorization(context, policy)
     const authorizationUrl = new URL(
       await prepared.buildAuthorizationUrl({ state: 'cg_state-1', nonce: 'nonce-ignored' })
     )
 
-    expect(prepared.redirectUri).toBe('https://sim.example.com/api/auth/oauth2/callback/jira')
+    expect(prepared.redirectUri).toBe('https://sim.example.com/api/auth/oauth2/callback/hubspot')
     expect(prepared.codeVerifier).toBeUndefined()
-    expect(authorizationUrl.searchParams.get('audience')).toBe('api.atlassian.com')
+    expect(authorizationUrl.searchParams.get('optional_scope')).toBe('tickets')
     expect(authorizationUrl.searchParams.has('nonce')).toBe(false)
     expect(authorizationUrl.searchParams.has('login_hint')).toBe(false)
     expect(authorizationUrl.searchParams.has('code_challenge')).toBe(false)
 
     mockVerifyIdentity.mockResolvedValueOnce({
-      providerSubjectId: 'atlassian-account-1',
+      providerSubjectId: 'hubspot-user-1',
       providerTenantId: null,
       email: 'person@example.com',
       emailVerified: true,
       grantedScopes: requiredScopes,
     })
-    const grant = await jiraAdapter.exchangeAndVerify({
+    const grant = await stateBoundAdapter.exchangeAndVerify({
       context,
       attempt: {
         state: 'cg_state-1',
-        provider: 'jira',
+        provider: 'hubspot',
         nonceHash: 'unused-for-state-bound-provider',
         enrollmentId: context.enrollmentId,
         credentialGroupId: context.credentialGroupId,
@@ -362,10 +362,10 @@ describe('standard OAuth Credential Group provider', () => {
       policy,
     })
 
-    expect(grant.providerSubjectId).toBe('atlassian-account-1')
+    expect(grant.providerSubjectId).toBe('hubspot-user-1')
     expect(mockGetToken).toHaveBeenLastCalledWith({
       code: 'code-1',
-      redirectURI: 'https://sim.example.com/api/auth/oauth2/callback/jira',
+      redirectURI: 'https://sim.example.com/api/auth/oauth2/callback/hubspot',
       codeVerifier: undefined,
     })
   })

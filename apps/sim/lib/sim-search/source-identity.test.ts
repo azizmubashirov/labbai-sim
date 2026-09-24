@@ -8,93 +8,9 @@ import {
   SOURCE_LABELS_KEY,
   searchSourceIdentity,
 } from '@/lib/sim-search/source-identity'
-import { confluenceConnectorMeta } from '@/connectors/confluence/meta'
-import { gitlabConnectorMeta } from '@/connectors/gitlab/meta'
-import { googleCalendarConnectorMeta } from '@/connectors/google-calendar/meta'
 import { googleDriveConnectorMeta } from '@/connectors/google-drive/meta'
 
 describe('Search source identity', () => {
-  it('describes dynamic All without exposing the persisted marker', () => {
-    expect(
-      describeSearchSource(confluenceConnectorMeta, {
-        domain: 'example.atlassian.net',
-        spaceKey: ['*'],
-      })
-    ).toBe('example.atlassian.net · All')
-    expect(searchSourceIdentity(confluenceConnectorMeta, { spaceKey: ['*'] })).not.toBe(
-      searchSourceIdentity(confluenceConnectorMeta, { spaceKey: ['ENG', 'HR'] })
-    )
-  })
-
-  it('normalizes multi-value settings and ignores runtime mappings and cleared caps', () => {
-    expect(
-      searchSourceIdentity(confluenceConnectorMeta, {
-        domain: ' acme.atlassian.net ',
-        spaceKey: 'ENG, OPS,ENG',
-        maxPages: '10',
-      })
-    ).toBe(
-      searchSourceIdentity(confluenceConnectorMeta, {
-        spaceKey: ['OPS', 'ENG'],
-        domain: 'acme.atlassian.net',
-        maxPages: 0,
-        tagSlotMapping: { title: 'tag1' },
-      })
-    )
-  })
-
-  it('keeps separate sites, source filters, GitLab hosts and repositories distinct', () => {
-    const confluence = { domain: 'one.atlassian.net', spaceKey: 'ENG' }
-    for (const change of [
-      { domain: 'two.atlassian.net' },
-      { spaceKey: 'OPS' },
-      { labelFilter: 'public' },
-    ]) {
-      expect(searchSourceIdentity(confluenceConnectorMeta, confluence)).not.toBe(
-        searchSourceIdentity(confluenceConnectorMeta, { ...confluence, ...change })
-      )
-    }
-    const gitlab = { host: 'gitlab.one.example', project: 'group/repo', ref: 'main' }
-    for (const change of [
-      { host: 'gitlab.two.example' },
-      { project: 'group/other' },
-      { ref: 'release' },
-    ]) {
-      expect(searchSourceIdentity(gitlabConnectorMeta, gitlab)).not.toBe(
-        searchSourceIdentity(gitlabConnectorMeta, { ...gitlab, ...change })
-      )
-    }
-  })
-
-  it('describes declared source addresses without exposing credentials or arbitrary config', () => {
-    expect(
-      describeSearchSource(gitlabConnectorMeta, {
-        host: 'gitlab.one.example',
-        project: 'group/repo',
-        apiKey: 'secret',
-        encryptedApiKey: 'ciphertext',
-        arbitrary: 'private value',
-        issueLabels: 'confidential filter',
-      })
-    ).toBe('gitlab.one.example · group/repo')
-    expect(
-      describeSearchSource(confluenceConnectorMeta, { domain: 'x'.repeat(500) }).length
-    ).toBeLessThanOrEqual(240)
-  })
-
-  it('uses readable counts for opaque legacy IDs and leaves unconfigured defaults unchanged', () => {
-    expect(describeSearchSource(googleDriveConnectorMeta, { folderId: 'opaque-folder-id' })).toBe(
-      '1 folder selected'
-    )
-    expect(
-      describeSearchSource(googleDriveConnectorMeta, { folderId: ['folder-a', 'folder-b'] })
-    ).toBe('2 folders selected')
-    expect(describeSearchSource(googleDriveConnectorMeta, {})).toBe('')
-    expect(describeSearchSource(gitlabConnectorMeta, { project: '12345' })).toBe(
-      '1 project selected'
-    )
-  })
-
   it('uses selected folder names without changing deduplication identity', () => {
     const config = { folderId: ['folder-b', 'folder-a'] }
     const sourceLabels = createSourceLabelMetadata(googleDriveConnectorMeta, config, {
@@ -110,45 +26,6 @@ describe('Search source identity', () => {
     expect(searchSourceIdentity(googleDriveConnectorMeta, labeledConfig)).toBe(
       searchSourceIdentity(googleDriveConnectorMeta, config)
     )
-  })
-
-  it.each([
-    ['primary', '1 calendar selected'],
-    ['team@group.calendar.google.com', '1 calendar selected'],
-    ['primary, team@group.calendar.google.com, primary', '2 calendars selected'],
-    [
-      ['first@group.calendar.google.com', 'second@group.calendar.google.com'],
-      '2 calendars selected',
-    ],
-    ['', ''],
-    [[], ''],
-  ])('describes manual Calendar selections without displaying raw IDs: %j', (calendarId, title) => {
-    expect(describeSearchSource(googleCalendarConnectorMeta, { calendarId })).toBe(title)
-  })
-
-  it('uses saved calendar names without changing identity and drops them after a selection change', () => {
-    const config = { calendarId: ['primary', 'team@group.calendar.google.com'] }
-    const labeledConfig = {
-      ...config,
-      [SOURCE_LABELS_KEY]: createSourceLabelMetadata(googleCalendarConnectorMeta, config, {
-        calendarId: [
-          { id: 'primary', label: 'My calendar' },
-          { id: 'team@group.calendar.google.com', label: 'Engineering' },
-        ],
-      }),
-    }
-    expect(describeSearchSource(googleCalendarConnectorMeta, labeledConfig)).toBe(
-      'My calendar · Engineering'
-    )
-    expect(searchSourceIdentity(googleCalendarConnectorMeta, labeledConfig)).toBe(
-      searchSourceIdentity(googleCalendarConnectorMeta, config)
-    )
-    expect(
-      describeSearchSource(googleCalendarConnectorMeta, {
-        ...labeledConfig,
-        calendarId: ['other@group.calendar.google.com'],
-      })
-    ).toBe('1 calendar selected')
   })
 
   it('drops saved labels when selections or source settings change', () => {

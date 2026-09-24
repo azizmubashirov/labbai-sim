@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { Chip, ChipConfirmModal, ChipTag, toast } from '@sim/emcn'
 import { getErrorMessage } from '@sim/utils/errors'
-import type { WorkspaceCredential } from '@/lib/api/contracts'
 import type {
   CredentialGroup,
   CredentialGroupOption,
@@ -23,8 +22,6 @@ import {
   getCredentialGroupProviderSupport,
   isCredentialGroupStandardOAuthProvider,
 } from '@/lib/credential-groups/providers'
-import { SLACK_MANAGED_USER_SCOPES } from '@/lib/credential-groups/slack-managed-user-scopes'
-import { SLACK_CUSTOM_BOT_PROVIDER_ID } from '@/lib/oauth/types'
 import { RowActionsMenu } from '@/app/workspace/[workspaceId]/settings/components/row-actions-menu'
 import { SettingsEmptyState } from '@/app/workspace/[workspaceId]/settings/components/settings-empty-state'
 import {
@@ -32,17 +29,12 @@ import {
   SettingsResourceRow,
 } from '@/app/workspace/[workspaceId]/settings/components/settings-resource-row'
 import { SettingsSection } from '@/app/workspace/[workspaceId]/settings/components/settings-section/settings-section'
-import { SlackManagedUsersModal } from '@/ee/credential-groups/components/slack-managed-users-modal'
 import {
   useCreateCredentialGroupMcpConnector,
   useDeleteCredentialGroupMcpConnector,
   useUpdateCredentialGroup,
   useWorkspaceAccounts,
 } from '@/hooks/queries/credential-groups'
-import { useWorkspaceCredentials } from '@/hooks/queries/credentials'
-
-/** Stable identity so a pending/errored credentials query cannot churn the modal's `bots` prop. */
-const EMPTY_SLACK_BOTS: WorkspaceCredential[] = []
 
 interface CredentialGroupDetailsProps {
   credentialGroup: CredentialGroup
@@ -59,12 +51,7 @@ function toOptionUpdateInput(
     label: getCredentialGroupProviderService(option.provider).name,
     required: false,
   }
-  if (option.provider !== 'slack') return { ...common, provider: option.provider }
-  return {
-    ...common,
-    provider: 'slack',
-    slackBotCredentialId: option.slackBotCredentialId,
-  }
+  return { ...common, provider: option.provider }
 }
 
 export function CredentialGroupDetails({
@@ -81,12 +68,6 @@ export function CredentialGroupDetails({
    */
   const accounts = useWorkspaceAccounts(workspaceId)
   const availableProviders = accounts.data?.availableProviders
-  const slackBots = useWorkspaceCredentials({
-    workspaceId,
-    type: 'service_account',
-    providerId: SLACK_CUSTOM_BOT_PROVIDER_ID,
-  })
-  const [slackSetup, setSlackSetup] = useState<{ credentialId?: string } | null>(null)
   const [removingProvider, setRemovingProvider] = useState<CredentialGroupProvider | null>(null)
   const [removingMcpConnector, setRemovingMcpConnector] = useState<ManagedMcpConnectorId | null>(
     null
@@ -124,18 +105,10 @@ export function CredentialGroupDetails({
     return updateOptions([...existing, nextOption], `${service.name} added`)
   }
 
-  const openSlackSetup = (credentialId?: string) => {
-    setSlackSetup({ credentialId })
-  }
-
   const handleProviderAction = (provider: CredentialGroupProvider) => {
     const support = getCredentialGroupProviderSupport(provider)
     if (isCredentialGroupStandardOAuthProvider(provider)) {
       void addProvider(provider)
-      return
-    }
-    if (support.configuration === 'slack_custom_bot') {
-      openSlackSetup()
       return
     }
     throw new Error(`Unsupported Credential Group configuration: ${support.configuration}`)
@@ -225,22 +198,7 @@ export function CredentialGroupDetails({
               (candidate) => candidate.provider === provider
             )
             const ProviderIcon = service.icon
-            const slackBot =
-              provider === 'slack' && option?.provider === 'slack'
-                ? slackBots.data?.find((bot) => bot.id === option.slackBotCredentialId)
-                : undefined
-            const slackNeedsSetup =
-              provider === 'slack' &&
-              option?.provider === 'slack' &&
-              (!slackBot || option.configurationStatus !== 'ready')
-            const descriptionText =
-              provider === 'slack' && option
-                ? slackBot
-                  ? `${slackBot.displayName}${slackNeedsSetup ? ' · Finish member sign-in setup' : ''}`
-                  : slackBots.isPending
-                    ? 'Loading custom Slack app...'
-                    : 'Custom Slack app unavailable'
-                : support.description
+            const descriptionText = support.description
 
             return (
               <SettingsResourceRow
@@ -248,34 +206,13 @@ export function CredentialGroupDetails({
                 icon={<ProviderIcon aria-hidden />}
                 title={service.name}
                 description={descriptionText}
-                badge={
-                  option && !slackNeedsSetup ? <ChipTag variant='gray'>Added</ChipTag> : undefined
-                }
+                badge={option ? <ChipTag variant='gray'>Added</ChipTag> : undefined}
                 trailing={
                   option ? (
                     <div className='flex items-center gap-1'>
-                      {slackNeedsSetup && option.provider === 'slack' && slackBot ? (
-                        <Chip onClick={() => openSlackSetup(slackBot.id)} disabled={isUpdating}>
-                          Continue setup
-                        </Chip>
-                      ) : null}
                       <RowActionsMenu
                         label={`${service.name} actions`}
                         actions={[
-                          ...(provider === 'slack'
-                            ? [
-                                {
-                                  label: 'Change Slack app',
-                                  onSelect: () =>
-                                    openSlackSetup(
-                                      option?.provider === 'slack'
-                                        ? option.slackBotCredentialId
-                                        : undefined
-                                    ),
-                                  disabled: isUpdating,
-                                },
-                              ]
-                            : []),
                           {
                             label: 'Remove',
                             destructive: true,
@@ -288,7 +225,7 @@ export function CredentialGroupDetails({
                   ) : (
                     <Chip
                       onClick={() => handleProviderAction(provider)}
-                      disabled={isUpdating || (provider === 'slack' && slackBots.isPending)}
+                      disabled={isUpdating}
                     >
                       {support.configuration === 'oauth' ? 'Add' : 'Set up'}
                     </Chip>
@@ -350,25 +287,6 @@ export function CredentialGroupDetails({
           })}
         </div>
       </SettingsSection>
-
-      <SlackManagedUsersModal
-        open={slackSetup !== null}
-        workspaceId={workspaceId}
-        credentialGroupId={credentialGroup.id}
-        onOpenChange={(nextOpen) => {
-          if (!nextOpen) setSlackSetup(null)
-        }}
-        bots={slackBots.data ?? EMPTY_SLACK_BOTS}
-        isLoading={slackBots.isPending}
-        error={slackBots.error}
-        initialCredentialId={slackSetup?.credentialId}
-        initialRequiredScopes={
-          credentialGroup.options.find((option) => option.provider === 'slack')?.requiredScopes ??
-          (credentialGroup.options.some((option) => option.provider === 'slack')
-            ? SLACK_MANAGED_USER_SCOPES
-            : undefined)
-        }
-      />
 
       <ChipConfirmModal
         open={Boolean(removingProvider)}

@@ -13,7 +13,7 @@ import { loadAllSelectorOptions } from '@/lib/selectors/client/execute-selector'
 import { MAX_SELECTOR_OPTIONS, MAX_SELECTOR_PAGES } from '@/lib/selectors/limits'
 
 const input = {
-  selectorKey: 'bitbucket.workspaces' as const,
+  selectorKey: 'hubspot.owners' as const,
   scope: { kind: 'workspace' as const, workspaceId: 'workspace-1' },
   context: { oauthCredential: 'credential-1' },
 }

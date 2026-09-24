@@ -5,21 +5,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const {
   mockEncryptSecret,
-  mockFetchSlackTeamId,
   mockValidateAtlassian,
   mockNormalizeDomain,
   mockClientCredentialMinter,
 } = vi.hoisted(() => ({
   // Identity encryption so tests can read back the JSON blob.
   mockEncryptSecret: vi.fn(async (value: string) => ({ encrypted: value })),
-  mockFetchSlackTeamId: vi.fn(),
   mockValidateAtlassian: vi.fn(),
   mockNormalizeDomain: vi.fn((raw: string) => raw.trim().toLowerCase()),
   mockClientCredentialMinter: vi.fn(),
 }))
 
 vi.mock('@/lib/core/security/encryption', () => ({ encryptSecret: mockEncryptSecret }))
-vi.mock('@/lib/webhooks/providers/slack', () => ({ fetchSlackTeamId: mockFetchSlackTeamId }))
 vi.mock('@/lib/credentials/atlassian-service-account', () => ({
   validateAtlassianServiceAccount: mockValidateAtlassian,
   normalizeAtlassianDomain: mockNormalizeDomain,
@@ -41,64 +38,20 @@ vi.mock('@/lib/api/server', () => ({
 }))
 vi.mock('@/lib/credentials/client-credential-accounts/server', () => ({
   getClientCredentialAccountMinter: (providerId: string) =>
-    providerId === 'zoom-service-account' ||
-    providerId === 'box-service-account' ||
-    providerId === 'netsuite-service-account'
-      ? mockClientCredentialMinter
-      : undefined,
+    providerId === 'zoom-service-account' ? mockClientCredentialMinter : undefined,
 }))
 
 import {
   ServiceAccountSecretError,
   verifyAndBuildServiceAccountSecret,
 } from '@/lib/credentials/service-account-secret'
-import {
-  ATLASSIAN_SERVICE_ACCOUNT_PROVIDER_ID,
-  SLACK_CUSTOM_BOT_PROVIDER_ID,
-} from '@/lib/oauth/types'
+import { ATLASSIAN_SERVICE_ACCOUNT_PROVIDER_ID } from '@/lib/oauth/types'
 
 describe('verifyAndBuildServiceAccountSecret', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockEncryptSecret.mockImplementation(async (value: string) => ({ encrypted: value }))
     mockNormalizeDomain.mockImplementation((raw: string) => raw.trim().toLowerCase())
-  })
-
-  it('verifies a Slack bot token and encrypts the derived blob', async () => {
-    mockFetchSlackTeamId.mockResolvedValue({ teamId: 'T1', userId: 'U_BOT', teamName: 'Acme' })
-    const result = await verifyAndBuildServiceAccountSecret(SLACK_CUSTOM_BOT_PROVIDER_ID, {
-      signingSecret: 'sec',
-      botToken: 'xoxb-1',
-    })
-    expect(result.providerId).toBe(SLACK_CUSTOM_BOT_PROVIDER_ID)
-    expect(result.displayName).toBe('Acme')
-    expect(result.auditMetadata.slackTeamId).toBe('T1')
-    expect(result.botUserId).toBe('U_BOT')
-    const blob = JSON.parse(result.encryptedServiceAccountKey)
-    expect(blob).toMatchObject({
-      signingSecret: 'sec',
-      botToken: 'xoxb-1',
-      teamId: 'T1',
-      botUserId: 'U_BOT',
-      teamName: 'Acme',
-    })
-  })
-
-  it('throws when Slack required fields are missing', async () => {
-    await expect(
-      verifyAndBuildServiceAccountSecret(SLACK_CUSTOM_BOT_PROVIDER_ID, { signingSecret: 'sec' })
-    ).rejects.toBeInstanceOf(ServiceAccountSecretError)
-    expect(mockFetchSlackTeamId).not.toHaveBeenCalled()
-  })
-
-  it('wraps a failed Slack token verification as a ServiceAccountSecretError', async () => {
-    mockFetchSlackTeamId.mockRejectedValue(new Error('invalid_auth'))
-    await expect(
-      verifyAndBuildServiceAccountSecret(SLACK_CUSTOM_BOT_PROVIDER_ID, {
-        signingSecret: 'sec',
-        botToken: 'xoxb-bad',
-      })
-    ).rejects.toThrow(/Could not verify the Slack bot token/)
   })
 
   it('verifies an Atlassian token and encrypts the blob', async () => {
@@ -220,48 +173,16 @@ describe('verifyAndBuildServiceAccountSecret', () => {
 
   it('falls back to a label-derived display name when the mint has no identity', async () => {
     mockClientCredentialMinter.mockResolvedValue({ accessToken: 'minted', expiresInSeconds: 3600 })
-    const result = await verifyAndBuildServiceAccountSecret('box-service-account', {
+    const result = await verifyAndBuildServiceAccountSecret('zoom-service-account', {
       clientId: 'cid',
       clientSecret: 'csec',
       orgId: '999',
     })
-    expect(result.displayName).toBe('Box 999')
+    expect(result.displayName).toBe('Zoom 999')
     expect(result.principal).toBeNull()
     expect(result.auditMetadata).toEqual({ principalKind: 'none' })
     const blob = JSON.parse(result.encryptedServiceAccountKey)
     expect(blob.metadata).toEqual({ principalKind: 'none' })
-  })
-
-  it('threads NetSuite certificate material into the minter and encrypted blob', async () => {
-    mockClientCredentialMinter.mockResolvedValue({
-      accessToken: 'minted',
-      expiresInSeconds: 3600,
-      instanceUrl: 'https://1234567.suitetalk.api.netsuite.com',
-      identity: {
-        displayName: 'Oracle NetSuite 1234567',
-        principal: { kind: 'tenant', id: '1234567' },
-        auditMetadata: { netSuiteAccountId: '1234567' },
-      },
-    })
-
-    const result = await verifyAndBuildServiceAccountSecret('netsuite-service-account', {
-      orgId: ' https://1234567.suitetalk.api.netsuite.com/ ',
-      clientId: ' client-id ',
-      certificateId: ' certificate-id ',
-      privateKey: ' -----BEGIN PRIVATE KEY-----key ',
-    })
-
-    expect(mockClientCredentialMinter).toHaveBeenCalledWith({
-      orgId: 'https://1234567.suitetalk.api.netsuite.com/',
-      clientId: 'client-id',
-      certificateId: 'certificate-id',
-      privateKey: '-----BEGIN PRIVATE KEY-----key',
-    })
-    expect(JSON.parse(result.encryptedServiceAccountKey)).toMatchObject({
-      providerId: 'netsuite-service-account',
-      certificateId: 'certificate-id',
-      privateKey: '-----BEGIN PRIVATE KEY-----key',
-    })
   })
 
   it('throws when client-credential required fields are missing, without minting', async () => {
@@ -277,7 +198,7 @@ describe('verifyAndBuildServiceAccountSecret', () => {
   it('propagates a failed client-credential mint', async () => {
     mockClientCredentialMinter.mockRejectedValue(new Error('invalid_credentials'))
     await expect(
-      verifyAndBuildServiceAccountSecret('box-service-account', {
+      verifyAndBuildServiceAccountSecret('zoom-service-account', {
         clientId: 'cid',
         clientSecret: 'bad',
         orgId: '999',

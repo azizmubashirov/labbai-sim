@@ -30,7 +30,6 @@ import {
   serializeWorkspaceForks,
 } from '@/lib/copilot/vfs/serializers'
 import type { BlockConfig } from '@/blocks/types'
-import { gitlabConnectorMeta } from '@/connectors/gitlab/meta'
 import { hostedKeyEnabledWhen } from '@/tools/hosting'
 import type { ToolConfig } from '@/tools/types'
 
@@ -567,23 +566,6 @@ describe('serializeCredentials — type distinguishes reconnect flow', () => {
     )
     expect(json[0].description).toBe('Stripe live key for billing')
     expect(json[1]).not.toHaveProperty('description')
-  })
-})
-
-describe('connector setup guidance', () => {
-  it('describes GitLab PAT setup without requiring an OAuth credential or administrator fields', () => {
-    const schema = JSON.parse(serializeConnectorSchema(gitlabConnectorMeta))
-    expect(schema.auth.mode).toBe('apiKey')
-    expect(schema.configFields.filter((field: { required?: boolean }) => field.required)).toEqual([
-      expect.objectContaining({ id: 'project' }),
-    ])
-
-    const overview = serializeConnectorOverview([gitlabConnectorMeta])
-    expect(overview).toContain(
-      'For API-key connectors, pass apiKey as a `{{SECRET_NAME}}` reference'
-    )
-    expect(overview).toContain('For OAuth connectors, pass a credentialId')
-    expect(overview).not.toContain('the user must have an OAuth credential')
   })
 })
 

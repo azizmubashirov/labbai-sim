@@ -4,22 +4,13 @@
 import { describe, expect, it } from 'vitest'
 import { elevenLabsAudioIsolationTool } from '@/tools/elevenlabs/audio-isolation'
 import { elevenLabsSpeechToSpeechTool } from '@/tools/elevenlabs/speech-to-speech'
-import { extendParserTool, extendParserV2Tool } from '@/tools/extend/parser'
 import { parseTool as firecrawlParseTool } from '@/tools/firecrawl/parse'
-import { firefliesUploadAudioTool } from '@/tools/fireflies/upload_audio'
 import { mistralParserTool, mistralParserV3Tool } from '@/tools/mistral/parser'
-import { pulseParserTool, pulseParserV2Tool } from '@/tools/pulse/parser'
-import { quiverImageToSvgTool } from '@/tools/quiver/image_to_svg'
-import { quiverTextToSvgTool } from '@/tools/quiver/text_to_svg'
-import { reductoParserTool, reductoParserV2Tool } from '@/tools/reducto/parser'
 import { assemblyaiSttTool, assemblyaiSttV2Tool } from '@/tools/stt/assemblyai'
 import { deepgramSttTool, deepgramSttV2Tool } from '@/tools/stt/deepgram'
 import { elevenLabsSttTool, elevenLabsSttV2Tool } from '@/tools/stt/elevenlabs'
 import { geminiSttTool, geminiSttV2Tool } from '@/tools/stt/gemini'
 import { whisperSttTool, whisperSttV2Tool } from '@/tools/stt/whisper'
-import { textractAnalyzeExpenseTool } from '@/tools/textract/analyze-expense'
-import { textractAnalyzeIdTool } from '@/tools/textract/analyze-id'
-import { textractParserTool, textractParserV2Tool } from '@/tools/textract/parser'
 import type { ExecutableToolConfig } from '@/tools/types'
 import { visionTool } from '@/tools/vision/tool'
 
@@ -58,17 +49,6 @@ function getProjectingModelInput(tool: ExecutableToolConfig) {
 
 describe('file model-input selectors', () => {
   it.each([
-    extendParserTool,
-    extendParserV2Tool,
-    pulseParserTool,
-    pulseParserV2Tool,
-    reductoParserTool,
-    reductoParserV2Tool,
-    textractParserTool,
-    textractParserV2Tool,
-    textractAnalyzeExpenseTool,
-    textractAnalyzeIdTool,
-    firefliesUploadAudioTool,
     deepgramSttTool,
     deepgramSttV2Tool,
     assemblyaiSttTool,
@@ -120,21 +100,6 @@ describe('file model-input selectors', () => {
         imageFile: { ...FILE, base64: 'effective-inline-bytes' },
       })
     ).toEqual([['imageFile', 'base64']])
-  })
-
-  it('treats Quiver URLs as locators and data URLs as inline media', () => {
-    const serializedFile = JSON.stringify(FILE)
-    expect(selectPrivateInputPaths(quiverImageToSvgTool, { image: serializedFile })).toEqual([])
-    expect(
-      selectPrivateInputPaths(quiverTextToSvgTool, {
-        references: [serializedFile, 'https://example.com/reference.png'],
-      })
-    ).toEqual([])
-    expect(
-      selectPrivateInputPaths(quiverImageToSvgTool, {
-        image: 'data:image/png;base64,c2VjcmV0',
-      })
-    ).toEqual([['image']])
   })
 
   it('projects the Firecrawl multipart filename without rewriting the stored file', () => {

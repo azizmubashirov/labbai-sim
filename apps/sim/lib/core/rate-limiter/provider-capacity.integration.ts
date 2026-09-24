@@ -23,7 +23,6 @@ import {
   updateProviderCapacity,
 } from '@/lib/core/rate-limiter/provider-capacity-state'
 import { mutateProviderCapacity } from '@/lib/core/rate-limiter/provider-capacity-store'
-import { fetchGitHubWithRetry } from '@/connectors/github/request'
 
 const redisUrl = process.env.KNOWLEDGE_ACL_TEST_REDIS_URL
 if (redisUrl) {
@@ -383,71 +382,6 @@ describe.each(['database', 'redis'] as const)('%s weighted provider capacity', (
         await mutate({ kind: 'settle', leaseId: 'limited', outcome: 'rate_limit' }, config)
       ).toMatchObject({ scale: 0.5, retryAfterMs: 120_000 })
     })
-
-    it.each(['secondary-throttle', 'successful-exhaustion'] as const)(
-      'honors %s through HTTP, shared admission, and a second worker without retrying upstream',
-      async (scenario) => {
-        const authorization = `Bearer ${generateId()}`
-        const scope = createHash('sha256').update(authorization).digest('hex')
-        key = `provider:ocr:github-rest:${scope}:capacity:v1`
-        let requests = 0
-        const server = createServer((_request, response) => {
-          requests++
-          if (scenario === 'secondary-throttle') {
-            response.writeHead(403, { 'content-type': 'application/json' })
-            response.end(JSON.stringify({ message: 'You have exceeded a secondary rate limit.' }))
-          } else {
-            response.writeHead(200, {
-              'x-ratelimit-remaining': '0',
-              'x-ratelimit-reset': String(Math.ceil(Date.now() / 1000) + 3600),
-            })
-            response.end('complete source content')
-          }
-        })
-        await new Promise<void>((resolve, reject) => {
-          server.once('error', reject)
-          server.listen(0, '127.0.0.1', resolve)
-        })
-        const address = server.address()
-        if (!address || typeof address === 'string') throw new Error('Missing local fixture port')
-        const actualFetch = globalThis.fetch
-        vi.stubGlobal('fetch', (_input: Parameters<typeof fetch>[0], init?: RequestInit) =>
-          actualFetch(`http://127.0.0.1:${address.port}`, init)
-        )
-        try {
-          const request = () =>
-            fetchGitHubWithRetry('https://api.github.com/repos/example/repo/git/blobs/blob', {
-              headers: { Authorization: authorization },
-            })
-          if (scenario === 'secondary-throttle') {
-            await expect(request()).rejects.toMatchObject({
-              rateLimited: true,
-              retryAfterMs: 120_000,
-            })
-          } else {
-            expect(await (await request()).text()).toBe('complete source content')
-          }
-          await expect(request()).rejects.toMatchObject({
-            rateLimited: scenario === 'secondary-throttle',
-            reason: scenario === 'secondary-throttle' ? 'rate_limit' : 'admission_timeout',
-          })
-          expect(requests).toBe(1)
-          const saved = await read()
-          expect(saved.leases).toHaveLength(0)
-          if (scenario === 'successful-exhaustion') {
-            expect(saved.requestQuota?.remaining).toBe(0)
-            expect(saved.scale).toBe(1)
-          } else {
-            expect(saved.scale).toBe(0.5)
-          }
-        } finally {
-          server.closeAllConnections()
-          await new Promise<void>((resolve, reject) =>
-            server.close((error) => (error ? reject(error) : resolve()))
-          )
-        }
-      }
-    )
 
     it.runIf(backend === 'redis')(
       'rejects a stale queued Redis command before creating any reservation',

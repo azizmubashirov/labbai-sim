@@ -88,18 +88,18 @@ describe('getCopilotToolDescription', () => {
     )
   })
 
-  it.concurrent('appends the email tagline instruction for Outlook tools when enabled', () => {
+  it.concurrent('appends the email tagline instruction for Gmail v2 tools when enabled', () => {
     expect(
       getCopilotToolDescription(
         {
-          id: 'outlook_send',
-          name: 'Outlook Send',
-          description: 'Send emails using Outlook',
+          id: 'gmail_send_v2',
+          name: 'Gmail Send',
+          description: 'Send emails using Gmail',
         },
         { appendEmailTagline: true }
       )
     ).toBe(
-      'Send emails using Outlook <important>Always add the footer "sent with sim ai" to the end of the email body. Add 3 line breaks before the footer.</important>'
+      'Send emails using Gmail <important>Always add the footer "sent with sim ai" to the end of the email body. Add 3 line breaks before the footer.</important>'
     )
   })
 

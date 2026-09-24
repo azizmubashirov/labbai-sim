@@ -451,16 +451,6 @@ export const PostgreSQLBlockMeta = {
     },
     {
       icon: PostgresIcon,
-      title: 'Postgres metrics digest to Slack',
-      prompt:
-        'Create a scheduled workflow that queries key business metrics from PostgreSQL each morning, has an agent summarize the numbers and notable changes, and posts the digest to a Slack channel.',
-      modules: ['scheduled', 'agent', 'workflows'],
-      category: 'operations',
-      tags: ['reporting', 'automation'],
-      alsoIntegrations: ['slack'],
-    },
-    {
-      icon: PostgresIcon,
       title: 'Document your Postgres schema',
       prompt:
         'Build a workflow that introspects a PostgreSQL schema to list its tables, columns, keys, and indexes, then has an agent write plain-English documentation describing what each table holds.',
@@ -494,16 +484,6 @@ export const PostgreSQLBlockMeta = {
       modules: ['scheduled', 'tables', 'agent', 'workflows'],
       category: 'operations',
       tags: ['database', 'sync'],
-    },
-    {
-      icon: PostgresIcon,
-      title: 'Postgres threshold breach alert',
-      prompt:
-        'Build a scheduled workflow that queries a PostgreSQL count or aggregate, compares it to a threshold, and posts a Slack alert only when the value crosses the limit so the team hears about problems early.',
-      modules: ['scheduled', 'agent', 'workflows'],
-      category: 'operations',
-      tags: ['monitoring', 'automation'],
-      alsoIntegrations: ['slack'],
     },
     {
       icon: PostgresIcon,

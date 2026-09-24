@@ -9,7 +9,6 @@ import type { OperationUseCase } from '@/lib/core/application/operation'
 import { requireOrganizationMembership } from '@/lib/core/application/organization-authorization'
 import { withResourceOutboundScope } from '@/lib/core/network/resource-scope.server'
 import { OrchestrationError } from '@/lib/core/orchestration/types'
-import { authorizePersonalSearchSetup } from '@/lib/knowledge/application/personal-search-account'
 import { type CredentialAuditRequest, recordCredentialAccess } from '@/lib/oauth/token-resolution'
 import { selectorOperations } from '@/lib/selectors/application/operations'
 import {
@@ -352,21 +351,14 @@ export const executeSelector: OperationUseCase<
       return executeWorkspaceSelector.execute(args)
     }
     if (args.principal.kind !== 'session') throw new SelectorContextUnavailableError()
-    if (args.input.personalSearchSetup) {
-      const selectorKey =
-        args.input.personalSearchSetup === 'jira' ? 'jira.projectKeys' : 'confluence.spaces'
-      if (args.input.selectorKey !== selectorKey) throw new SelectorContextUnavailableError()
-      await authorizePersonalSearchSetup(args.principal, {
-        organizationId: args.input.scope.organizationId,
-        connectorType: args.input.personalSearchSetup,
-      })
-    } else
-      await requireOrganizationMembership(
-        args.principal,
-        args.input.scope.organizationId,
-        'admin',
-        'knowledge.use'
-      )
+    // Personal Atlassian source setup was removed with the Jira and Confluence connectors.
+    if (args.input.personalSearchSetup) throw new SelectorContextUnavailableError()
+    await requireOrganizationMembership(
+      args.principal,
+      args.input.scope.organizationId,
+      'admin',
+      'knowledge.use'
+    )
     const context = await resolveSelectorApplicationContext({
       selectorKey: args.input.selectorKey as ServerSelectorKey,
       scope: args.input.scope,

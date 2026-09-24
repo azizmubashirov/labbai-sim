@@ -23,7 +23,7 @@ import {
   Wrench,
 } from '@sim/emcn/icons'
 import { type PermissionType, permissionSatisfies } from '@sim/platform-authz/workspace'
-import { McpIcon, SlackIcon } from '@/components/icons'
+import { McpIcon } from '@/components/icons'
 import type { SettingsHeaderMeta } from '@/components/settings/settings-header'
 import type { DeploymentFeatures, DeploymentShape } from '@/lib/api/contracts/workspaces'
 import { organizationRoutes } from '@/lib/navigation/paths'
@@ -37,7 +37,6 @@ export type OrganizationSettingsSection =
   | 'integrations'
   | 'connected-accounts'
   | 'search-mcp'
-  | 'search-slack'
   | 'members'
   | 'billing'
   | 'usage'
@@ -732,7 +731,6 @@ const ORGANIZATION_SECTION_GROUPS: Record<OrganizationSettingsSection, Organizat
     'data-drains': 'governance',
     integrations: 'sim-search',
     'search-mcp': 'sim-search',
-    'search-slack': 'sim-search',
   }
 
 export const ORGANIZATION_SETTINGS_ITEMS: SettingsNavigationItem<OrganizationSettingsSection>[] = (
@@ -773,15 +771,6 @@ export const ORGANIZATION_SETTINGS_ITEMS: SettingsNavigationItem<OrganizationSet
       description: 'Search your sources from other apps.',
       docsLink: 'https://docs.sim.ai/search/mcp',
       icon: Server,
-      group,
-    }
-  }
-  if (id === 'search-slack') {
-    return {
-      id,
-      label: 'Sim Search in Slack',
-      description: 'Let members search their sources by messaging a Slack bot.',
-      icon: SlackIcon,
       group,
     }
   }
@@ -906,7 +895,7 @@ export function isOrganizationSettingsSectionAvailable(
     return true
   if (section === 'billing') return features.billingEnabled
   /* Sim Search itself is enterprise on the hosted product; self-hosted gates it by flag, not by section. */
-  if (section === 'integrations' || section === 'search-slack')
+  if (section === 'integrations')
     return !features.hosted || features.hasEnterprisePlan
   /**
    * Access Control follows governance rather than the plan gate: its restrictions keep applying

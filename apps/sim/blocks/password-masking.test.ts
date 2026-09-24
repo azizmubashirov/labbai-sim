@@ -16,15 +16,13 @@ import { getAllBlocks } from '@/blocks/registry'
  * failure — masking a secret is the point, not passing the check.
  */
 const FIELDS_REQUIRING_MASKING: ReadonlyArray<{ block: string; subBlock: string }> = [
-  { block: 'pi', subBlock: 'privateKey' },
-  { block: 'sftp', subBlock: 'privateKey' },
-  { block: 'ssh', subBlock: 'privateKey' },
-  { block: 'secrets_manager', subBlock: 'secretValue' },
-  { block: 'ssm', subBlock: 'parameterValue' },
-  { block: 'kalshi', subBlock: 'privateKey' },
-  { block: 'sts', subBlock: 'webIdentityToken' },
-  { block: 'sts', subBlock: 'samlAssertion' },
-  { block: 'browser_use', subBlock: 'variables' },
+  { block: 'mysql', subBlock: 'password' },
+  { block: 'postgresql', subBlock: 'password' },
+  { block: 'smtp', subBlock: 'smtpPassword' },
+  { block: 'telegram', subBlock: 'botToken' },
+  { block: 'twilio_sms', subBlock: 'authToken' },
+  { block: 'webhook_request', subBlock: 'secret' },
+  { block: 'whatsapp', subBlock: 'accessToken' },
 ]
 
 const maskedTypes = new Set<string>(PASSWORD_MASKED_SUBBLOCK_TYPES)

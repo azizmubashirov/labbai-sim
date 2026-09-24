@@ -61,12 +61,7 @@ describe('credential group contracts', () => {
       options: [
         { provider: 'gmail', label: 'Gmail', required: true },
         { provider: 'google-calendar', label: 'Google Calendar', required: true },
-        {
-          provider: 'slack',
-          label: 'Slack',
-          required: true,
-          slackBotCredentialId: '11111111-1111-4111-8111-111111111111',
-        },
+        { provider: 'notion', label: 'Notion', required: true },
       ],
     })
 
@@ -116,31 +111,6 @@ describe('credential group contracts', () => {
     })
 
     expect(result.success).toBe(false)
-  })
-
-  it('allows Slack options without a workspace bot for organization personal authorization', () => {
-    const missingApp = updateCredentialGroupBodySchema.safeParse({
-      options: [
-        {
-          provider: 'slack',
-          label: 'Slack',
-          required: true,
-        },
-      ],
-    })
-    const withApp = updateCredentialGroupBodySchema.safeParse({
-      options: [
-        {
-          provider: 'slack',
-          label: 'Slack',
-          required: true,
-          slackBotCredentialId: '11111111-1111-4111-8111-111111111111',
-        },
-      ],
-    })
-
-    expect(missingApp.success).toBe(true)
-    expect(withApp.success).toBe(true)
   })
 
   it('rejects duplicate option IDs on update', () => {

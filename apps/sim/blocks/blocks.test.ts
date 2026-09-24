@@ -69,9 +69,9 @@ describe.concurrent('Blocks Module', () => {
     })
 
     it('should normalize hyphens to underscores', () => {
-      const block = getBlock('microsoft-teams')
+      const block = getBlock('google-sheets')
       expect(block).toBeDefined()
-      expect(block?.type).toBe('microsoft_teams')
+      expect(block?.type).toBe('google_sheets')
     })
   })
 
@@ -337,7 +337,7 @@ describe.concurrent('Blocks Module', () => {
     })
 
     it('should handle hyphenated versions of underscored types', () => {
-      expect(isValidBlockType('microsoft-teams')).toBe(true)
+      expect(isValidBlockType('google-sheets')).toBe(true)
       expect(isValidBlockType('google-calendar')).toBe(true)
     })
   })

@@ -190,12 +190,8 @@ import {
   resolveOAuthAccountId,
   ServiceAccountTokenError,
 } from '@/lib/oauth/credential-service'
-import * as githubInstallation from '@/lib/oauth/github-installation'
 import { capabilityRefusal } from '@/lib/permission-groups/capability-assertions'
 import { DEFAULT_PERMISSION_GROUP_CONFIG } from '@/lib/permission-groups/fields'
-import { confluenceConnectorMeta } from '@/connectors/confluence/meta'
-import { gmailConnectorMeta } from '@/connectors/gmail/meta'
-import { googleCalendarConnectorMeta } from '@/connectors/google-calendar/meta'
 import { googleDriveConnectorMeta } from '@/connectors/google-drive/meta'
 
 const crossWorkspaceContext = {
@@ -243,33 +239,6 @@ describe('knowledge connector application use cases', () => {
   }
   const patPrincipal = { kind: 'session' as const, userId: 'writer', sessionId: 'session' }
 
-  it('resolves an API-key reference using the caller and canonical workspace before persistence', async () => {
-    mocks.resolveEnvironment.mockResolvedValue({ GITLAB_PAT: { value: 'resolved-pat' } })
-    mocks.createConnector.mockResolvedValueOnce({
-      success: true,
-      connector: { id: 'new-connector', connectorType: 'gitlab', accessMode: 'workspace' },
-    })
-    await createKnowledgeConnector.execute({ principal: patPrincipal, input: patInput })
-    expect(mocks.resolveEnvironment).toHaveBeenCalledWith('writer', 'workspace-b', ['GITLAB_PAT'])
-    expect(mocks.createConnector).toHaveBeenCalledWith(
-      expect.objectContaining({ apiKey: 'resolved-pat' })
-    )
-  })
-
-  it.each([{}, { GITLAB_PAT: { value: '' } }])(
-    'rejects missing or empty secrets before contacting the provider',
-    async (variables) => {
-      mocks.resolveEnvironment.mockResolvedValue(variables)
-      await expect(
-        createKnowledgeConnector.execute({ principal: patPrincipal, input: patInput })
-      ).rejects.toMatchObject({
-        code: 'validation',
-        message: 'Secret "GITLAB_PAT" is unavailable or empty',
-      })
-      expect(mocks.createConnector).not.toHaveBeenCalled()
-    }
-  )
-
   it('checks workspace write permission before resolving a secret', async () => {
     mocks.resolvePermission.mockResolvedValue('read')
     await expect(
@@ -279,21 +248,6 @@ describe('knowledge connector application use cases', () => {
     expect(mocks.createConnector).not.toHaveBeenCalled()
   })
 
-  it('passes literal PATs through without reading secrets', async () => {
-    mocks.createConnector.mockResolvedValueOnce({
-      success: true,
-      connector: { id: 'new-connector', connectorType: 'gitlab', accessMode: 'workspace' },
-    })
-    await createKnowledgeConnector.execute({
-      principal: patPrincipal,
-      input: { ...patInput, apiKey: 'literal-pat' },
-    })
-    expect(mocks.resolveEnvironment).not.toHaveBeenCalled()
-    expect(mocks.createConnector).toHaveBeenCalledWith(
-      expect.objectContaining({ apiKey: 'literal-pat' })
-    )
-  })
-
   it('refuses workspace-wide or unreviewed source ingestion into the canonical search index', async () => {
     mocks.resolveKnowledgeBase.mockResolvedValue({
       ...crossWorkspaceContext,
@@ -301,8 +255,8 @@ describe('knowledge connector application use cases', () => {
     })
     mocks.resolvePermission.mockResolvedValue('admin')
     for (const [connectorType, accessMode] of [
-      ['confluence', 'workspace'],
-      ['gitlab', 'workspace'],
+      ['google_drive', 'workspace'],
+      ['google_docs', 'members'],
       ['notion', 'members'],
     ] as const) {
       await expect(
@@ -450,48 +404,6 @@ describe('knowledge connector application use cases', () => {
     }
   )
 
-  it('rejects a personal Confluence OAuth credential before central token use', async () => {
-    await expect(
-      resolveConnectorCredentialAccessToken({
-        principal: { kind: 'session', userId: 'admin', sessionId: 'session' },
-        credentialId: 'credential-1',
-        workspaceId: 'workspace-a',
-        actingUserId: 'admin',
-        requestId: 'request',
-        auth: confluenceConnectorMeta.auth,
-        accessMode: 'admin',
-        sourceConfig: { domain: 'team.atlassian.net', spaceKey: ['ENG'] },
-      })
-    ).rejects.toMatchObject({
-      code: 'validation',
-      message: expect.stringContaining('requires a service account'),
-    })
-    expect(mocks.resolveTokenBundle).not.toHaveBeenCalled()
-  })
-
-  it('resolves a Confluence service account with content and permission scopes', async () => {
-    mocks.resolveTokenIdentity.mockResolvedValueOnce({ kind: 'service_account' })
-    await expect(
-      resolveConnectorCredentialAccessToken({
-        principal: { kind: 'session', userId: 'admin', sessionId: 'session' },
-        credentialId: 'credential-1',
-        workspaceId: 'workspace-a',
-        actingUserId: 'admin',
-        requestId: 'request',
-        auth: confluenceConnectorMeta.auth,
-        accessMode: 'admin',
-        sourceConfig: { domain: 'team.atlassian.net', spaceKey: ['ENG'] },
-      })
-    ).resolves.toEqual({ accessToken: 'access-token' })
-    expect(mocks.resolveTokenBundle).toHaveBeenCalledWith(
-      'credential-1',
-      'admin',
-      'request',
-      expect.arrayContaining(['read:confluence-content.all', 'read:space.permission:confluence']),
-      undefined
-    )
-  })
-
   it.each(['workspace', 'members', 'admin'] as const)(
     'mints only the Drive scopes needed by an eligible service account in %s mode',
     async (accessMode) => {
@@ -550,21 +462,15 @@ describe('knowledge connector application use cases', () => {
   })
 
   it.each([
-    { connectorType: 'confluence', apiKey: 'token', error: 'requires an OAuth account' },
+    { connectorType: 'google_drive', apiKey: 'token', error: 'requires an OAuth account' },
     {
-      connectorType: 'github',
-      apiKey: 'token',
-      credentialId: 'credential-1',
-      error: 'Choose either an OAuth account or an API key',
-    },
-    {
-      connectorType: 'github',
+      connectorType: 'notion',
       apiKey: 'token',
       accessMode: 'members' as const,
       error: 'requires an OAuth account',
     },
   ])(
-    'rejects unsupported, mixed, or member API keys before credential use: $connectorType $accessMode',
+    'rejects unsupported or member API keys before credential use: $connectorType $accessMode',
     async ({ error, ...input }) => {
       mocks.resolvePermission.mockResolvedValue('admin')
       await expect(
@@ -897,7 +803,7 @@ describe('knowledge connector application use cases', () => {
         input: {
           knowledgeBaseId: 'knowledge-a',
           assertedWorkspaceId: 'workspace-a',
-          connectorType: 'confluence',
+          connectorType: 'google_drive',
           credentialId: 'credential-1',
           sourceConfig: {},
           syncIntervalMinutes: 1440,
@@ -988,7 +894,7 @@ describe('knowledge connector application use cases', () => {
       {
         knowledgeBaseId: 'knowledge-a',
         assertedWorkspaceId: 'workspace-a',
-        connectorType: 'confluence',
+        connectorType: 'google_drive',
         credentialId: 'credential-1',
         sourceConfig: {},
         syncIntervalMinutes: 1440,
@@ -1225,7 +1131,7 @@ describe('knowledge connector application use cases', () => {
     const createInput = {
       knowledgeBaseId: 'knowledge-a',
       assertedWorkspaceId: 'workspace-a',
-      connectorType: 'confluence',
+      connectorType: 'notion',
       credentialId: 'credential-1',
       sourceConfig: {},
       syncIntervalMinutes: 1440,
@@ -1258,13 +1164,13 @@ describe('knowledge connector application use cases', () => {
     })
 
     it.each([
-      ['the group names it', ['confluence', 'google_drive']],
+      ['the group names it', ['notion', 'google_drive']],
       ['the group restricts nothing', null],
     ])('permits a connector when %s', async (_case, allowed) => {
       allowOnly(allowed as string[] | null)
       mocks.createConnector.mockResolvedValueOnce({
         success: true,
-        connector: { id: 'connector-a', connectorType: 'confluence', syncIntervalMinutes: 1440 },
+        connector: { id: 'connector-a', connectorType: 'notion', syncIntervalMinutes: 1440 },
       })
 
       const result = await createKnowledgeConnector.execute({
@@ -1280,7 +1186,7 @@ describe('knowledge connector application use cases', () => {
       mocks.getUserPermissionConfig.mockResolvedValue(null)
       mocks.createConnector.mockResolvedValueOnce({
         success: true,
-        connector: { id: 'connector-a', connectorType: 'confluence', syncIntervalMinutes: 1440 },
+        connector: { id: 'connector-a', connectorType: 'notion', syncIntervalMinutes: 1440 },
       })
 
       await createKnowledgeConnector.execute({
@@ -1456,23 +1362,6 @@ describe('members-mode connector creation', () => {
       })
     )
   })
-
-  it('prepares Confluence sign-in during admin setup without granting member crawler access', async () => {
-    mocks.resolvePermission.mockResolvedValue('admin')
-    await createKnowledgeConnector.execute({
-      principal: sessionPrincipal,
-      input: { ...membersInput, connectorType: 'confluence', accessMode: 'admin' },
-    })
-    expect(mocks.provision).toHaveBeenCalledExactlyOnceWith({
-      workspaceId: 'workspace-b',
-      userId: 'user-1',
-      connectorMeta: expect.objectContaining({ requiresMemberIdentity: true }),
-    })
-    expect(mocks.resolveMembersBinding).not.toHaveBeenCalled()
-    expect(mocks.createConnector).toHaveBeenCalledWith(
-      expect.objectContaining({ membersBinding: undefined, accessMode: 'admin' })
-    )
-  })
 })
 
 describe('approved organization member source creation', () => {
@@ -1534,33 +1423,6 @@ describe('approved organization member source creation', () => {
     )
     expect(mocks.resolveMembersBinding).not.toHaveBeenCalled()
     expect(mocks.createConnector).not.toHaveBeenCalled()
-  })
-
-  it('starts a personal source from the connector Search defaults and accepts their fields', async () => {
-    mocks.createConnector.mockResolvedValue({
-      success: true,
-      connector: { id: 'connector', connectorType: 'gmail', accessMode: 'members' },
-    })
-    await createApprovedSearchSource.execute({
-      principal,
-      input: { ...input, connectorType: 'gmail', sourceConfig: {} },
-    })
-    expect(mocks.createConnector).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        sourceConfig: expect.objectContaining({ dateRange: '6m' }),
-      })
-    )
-
-    queueTableRows(member, [{ role: 'member' }])
-    await createApprovedSearchSource.execute({
-      principal,
-      input: { ...input, connectorType: 'gmail', sourceConfig: { dateRange: 'all' } },
-    })
-    expect(mocks.createConnector).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        sourceConfig: expect.objectContaining({ dateRange: 'all' }),
-      })
-    )
   })
 
   it('refuses custom configuration outside the personal setup fields', async () => {
@@ -1748,7 +1610,7 @@ describe('organization connector credential authorization', () => {
     expect(mocks.resolveTokenBundle).not.toHaveBeenCalled()
   })
 
-  it.each([googleDriveConnectorMeta, gmailConnectorMeta, googleCalendarConnectorMeta])(
+  it.each([googleDriveConnectorMeta])(
     'projects $name token rejections as safe setup errors',
     async ({ auth }) => {
       mocks.resolveTokenBundle.mockRejectedValueOnce(
@@ -1790,7 +1652,7 @@ describe('organization connector credential authorization', () => {
     expect((error as Error).message).not.toContain('private provider payload')
   })
 
-  it.each([googleDriveConnectorMeta, gmailConnectorMeta, googleCalendarConnectorMeta])(
+  it.each([googleDriveConnectorMeta])(
     'maps $name delegated token failures after directory authorization succeeds',
     async ({ auth }) => {
       vi.mocked(resolveOAuthAccountId).mockResolvedValueOnce({
@@ -2013,189 +1875,3 @@ describe('organization connector credential authorization', () => {
   })
 })
 
-describe('GitHub installation source rejection at the application boundary', () => {
-  const principal = { kind: 'session', userId: 'org-admin', sessionId: 'session' } as const
-  const sourceConfig = { repository: 'example/private', githubRepositoryId: '123' }
-  const credential = {
-    id: 'installation-credential',
-    organizationId: 'org',
-    workspaceId: null,
-    providerId: 'github-app-installation',
-    type: 'service_account',
-    encryptedServiceAccountKey: 'encrypted-binding',
-    providerSubjectId: '42',
-    providerTenantId: '7',
-    revokedAt: null,
-  }
-  const connector = {
-    id: 'source',
-    connectorType: 'github',
-    credentialId: credential.id,
-    accessMode: 'members' as const,
-    sourceConfig,
-    encryptedApiKey: null,
-  }
-  const createInput = {
-    knowledgeBaseId: 'org-index',
-    assertedOrganizationId: 'org',
-    connectorType: 'github',
-    credentialId: credential.id,
-    accessMode: 'members' as const,
-    sourceConfig,
-    syncIntervalMinutes: 60,
-  }
-  const validationMessage =
-    'Check that the repository is included in the selected GitHub App installation, then retry.'
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    resetDbChainMock()
-    queueTableRows(member, [{ role: 'admin' }])
-    queueTableRows(member, [{ role: 'admin' }])
-    const context = {
-      organizationId: 'org',
-      knowledgeBaseId: 'org-index',
-      knowledgeBase: { id: 'org-index', name: 'Search', isSearchIndex: true },
-    }
-    mocks.resolveKnowledgeBase.mockResolvedValue(context)
-    mocks.resolveConnector.mockResolvedValue({ ...context, connectorId: connector.id, connector })
-    mocks.getUserPermissionConfig.mockResolvedValue(null)
-    mocks.authorizeOrganizationCredentialUse.mockResolvedValue({ credential })
-    mocks.resolveTokenIdentity.mockResolvedValue({ kind: 'service_account' })
-    mocks.resolveTokenBundle.mockResolvedValue({ accessToken: 'repository-token' })
-    mocks.resolveMembersBinding.mockResolvedValue({
-      credentialGroupId: 'group',
-      credentialGroupOptionId: 'option',
-      organizationId: 'org',
-      sourceConfig,
-    })
-    vi.spyOn(encryption, 'decryptSecret').mockResolvedValue({
-      decrypted: JSON.stringify({
-        type: 'github_app_installation',
-        version: 1,
-        appId: '1',
-        appClientId: 'app-client',
-        installationId: '42',
-        accountId: '7',
-        accountType: 'Organization',
-        accountLogin: 'example',
-        repositorySelection: 'selected',
-      }),
-    })
-    vi.spyOn(githubInstallation, 'resolveGitHubInstallationRepository').mockResolvedValue({
-      id: '123',
-      fullName: sourceConfig.repository,
-      defaultBranch: 'main',
-    })
-    mocks.createConnector.mockImplementation(
-      async (input: { resolveAccessToken(id: string): Promise<unknown> }) => {
-        await input.resolveAccessToken(credential.id)
-        throw new Error('Unexpected connector persistence')
-      }
-    )
-    mocks.updateConnector.mockImplementation(
-      async (input: {
-        prepareSourceConfig(
-          currentConnector: typeof connector,
-          config: typeof sourceConfig
-        ): Promise<typeof sourceConfig>
-        validateSourceConfig(
-          currentConnector: typeof connector,
-          config: typeof sourceConfig
-        ): Promise<unknown>
-      }) => {
-        const prepared = await input.prepareSourceConfig(connector, sourceConfig)
-        await input.validateSourceConfig(connector, prepared)
-        throw new Error('Unexpected connector persistence')
-      }
-    )
-  })
-
-  afterEach(() => {
-    vi.restoreAllMocks()
-    resetDbChainMock()
-  })
-
-  it.each([
-    [422, 'repository-token'],
-    [404, 'repository'],
-  ] as const)(
-    'returns a safe validation response for GitHub %s during %s',
-    async (status, operation) => {
-      vi.mocked(githubInstallation.resolveGitHubInstallationRepository).mockRejectedValueOnce(
-        new githubInstallation.GitHubInstallationError(
-          'private provider payload',
-          status,
-          operation
-        )
-      )
-      const error = await createKnowledgeConnector
-        .execute({ principal, input: createInput })
-        .catch((error: unknown) => error)
-      expect(error).toBeInstanceOf(OrchestrationError)
-      expect(internalOrchestrationErrorPolicy.project(error)).toMatchObject({
-        status: 400,
-        body: { error: validationMessage },
-      })
-      expect(mocks.authorizeOrganizationCredentialUse).toHaveBeenCalledWith(
-        expect.objectContaining({ principal, organizationId: 'org', credentialId: credential.id })
-      )
-      expect(mocks.createConnector).not.toHaveBeenCalled()
-      expect(mocks.recordAudit).not.toHaveBeenCalled()
-    }
-  )
-
-  it.each(['create', 'update'] as const)(
-    'classifies a repository token rejected during authorized %s validation',
-    async (operation) => {
-      mocks.resolveTokenBundle.mockRejectedValueOnce(
-        new githubInstallation.GitHubInstallationError(
-          'private token response',
-          422,
-          'repository-token'
-        )
-      )
-      const result =
-        operation === 'create'
-          ? createKnowledgeConnector.execute({ principal, input: createInput })
-          : updateKnowledgeConnector.execute({
-              principal,
-              input: {
-                knowledgeBaseId: 'org-index',
-                connectorId: connector.id,
-                updates: { sourceConfig },
-              },
-            })
-      await expect(result).rejects.toMatchObject({ code: 'validation', message: validationMessage })
-      expect(mocks.resolveTokenBundle).toHaveBeenCalledOnce()
-      expect(mocks.recordAudit).not.toHaveBeenCalled()
-    }
-  )
-
-  it.each([403, 429, 503])(
-    'preserves GitHub %s and its operation for retry classification',
-    async (status) => {
-      const failure = new githubInstallation.GitHubInstallationError(
-        'GitHub provider request failed',
-        status,
-        'repository-token'
-      )
-      mocks.resolveTokenBundle.mockRejectedValueOnce(failure)
-      await expect(
-        createKnowledgeConnector.execute({ principal, input: createInput })
-      ).rejects.toBe(failure)
-      expect(internalOrchestrationErrorPolicy.project(failure)).toBeNull()
-      expect(mocks.recordAudit).not.toHaveBeenCalled()
-    }
-  )
-
-  it('preserves network failures during authorized source creation', async () => {
-    const failure = new TypeError('Network request failed')
-    mocks.resolveTokenBundle.mockRejectedValueOnce(failure)
-    await expect(createKnowledgeConnector.execute({ principal, input: createInput })).rejects.toBe(
-      failure
-    )
-    expect(internalOrchestrationErrorPolicy.project(failure)).toBeNull()
-    expect(mocks.recordAudit).not.toHaveBeenCalled()
-  })
-})

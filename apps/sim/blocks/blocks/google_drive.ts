@@ -1776,16 +1776,6 @@ export const GoogleDriveBlockMeta = {
   url: 'https://workspace.google.com/products/drive',
   templates: [
     {
-      icon: BookOpen,
-      title: 'Google Drive personal notes assistant',
-      prompt:
-        'Create a knowledge base and connect it to my Google Drive, Notion, or Obsidian so all my notes, docs, and articles are automatically synced and embedded. Then build an agent that I can ask anything — it should answer with citations and deploy as a chat endpoint.',
-      modules: ['knowledge-base', 'agent'],
-      category: 'productivity',
-      tags: ['individual', 'research', 'team'],
-      alsoIntegrations: ['notion', 'obsidian'],
-    },
-    {
       icon: GoogleDriveIcon,
       title: 'Google Drive knowledge search',
       prompt:
@@ -1793,36 +1783,6 @@ export const GoogleDriveBlockMeta = {
       modules: ['knowledge-base', 'agent'],
       category: 'productivity',
       tags: ['individual', 'team', 'research'],
-    },
-    {
-      icon: GoogleDriveIcon,
-      title: 'Google Drive contract intake',
-      prompt:
-        'Create a workflow that watches a Google Drive intake folder for new contract PDFs, extracts clauses with Reducto, writes structured terms to a table, and pings legal in Slack.',
-      modules: ['files', 'tables', 'agent', 'workflows'],
-      category: 'operations',
-      tags: ['legal', 'automation'],
-      alsoIntegrations: ['reducto', 'slack'],
-    },
-    {
-      icon: GoogleDriveIcon,
-      title: 'Google Drive new-hire kit deployer',
-      prompt:
-        'Build a workflow triggered by a new hire in Greenhouse that copies the standard Google Drive onboarding folder, shares it with the new hire, and writes the link into the onboarding tracker.',
-      modules: ['files', 'agent', 'workflows'],
-      category: 'operations',
-      tags: ['hr', 'automation'],
-      alsoIntegrations: ['greenhouse'],
-    },
-    {
-      icon: GoogleDriveIcon,
-      title: 'Google Drive retention enforcer',
-      prompt:
-        'Create a scheduled monthly workflow that finds Google Drive files past the retention horizon, requires owner approval over Slack, and archives or deletes per the policy.',
-      modules: ['scheduled', 'agent', 'workflows'],
-      category: 'operations',
-      tags: ['legal', 'enterprise'],
-      alsoIntegrations: ['slack'],
     },
     {
       icon: GoogleDriveIcon,

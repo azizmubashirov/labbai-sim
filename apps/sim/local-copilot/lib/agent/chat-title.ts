@@ -21,7 +21,7 @@ const TITLE_MAX_LENGTH = 60
 const SYSTEM_PROMPT = `You name chat conversations in a workflow-automation product.
 Rules:
 - Return ONLY the title text — no quotes, no trailing punctuation, no explanation.
-- 3 to 6 words, written like a short label (e.g. "Slack weekly digest workflow").
+- 3 to 6 words, written like a short label (e.g. "Telegram weekly digest workflow").
 - Capture the user's specific intent; never generic titles like "New chat" or "Question".`
 
 /**

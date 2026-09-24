@@ -10,16 +10,12 @@ import {
 } from '@sim/testing'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { mockGetPolicy, mockConfiguration } = vi.hoisted(() => ({
+const { mockGetPolicy } = vi.hoisted(() => ({
   mockGetPolicy: vi.fn(),
-  mockConfiguration: vi.fn(),
 }))
 
 vi.mock('@/lib/credential-groups/provider-registry', () => ({
   getCredentialGroupProviderAdapter: () => ({ getPolicy: mockGetPolicy }),
-}))
-vi.mock('@/lib/credential-groups/provider-configuration', () => ({
-  decryptCredentialGroupProviderConfiguration: mockConfiguration,
 }))
 
 import { credentialGroupScopePolicyVersion } from '@/lib/credential-groups/provider-adapter'
@@ -28,91 +24,54 @@ import {
   getCredentialGroup,
   updateCredentialGroup,
 } from '@/lib/credential-groups/service'
-import {
-  SLACK_MANAGED_USER_SCOPES,
-  SLACK_SEARCH_USER_SCOPES,
-} from '@/lib/credential-groups/slack-managed-user-scopes'
 
 describe('Credential Group service', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     resetDbChainMock()
-    mockConfiguration.mockResolvedValue({})
   })
 
-  it.each([
-    {
-      name: 'minimal search ready',
-      required: SLACK_SEARCH_USER_SCOPES,
-      granted: SLACK_SEARCH_USER_SCOPES,
-      expected: 'ready',
-    },
-    {
-      name: 'workflow ready',
-      required: SLACK_MANAGED_USER_SCOPES,
-      granted: SLACK_MANAGED_USER_SCOPES,
-      expected: 'ready',
-    },
-    {
-      name: 'workflow needs additional consent',
-      required: SLACK_MANAGED_USER_SCOPES,
-      granted: SLACK_SEARCH_USER_SCOPES,
-      expected: 'needs_update',
-    },
-    {
-      name: 'search missing history',
-      required: SLACK_SEARCH_USER_SCOPES,
-      granted: SLACK_SEARCH_USER_SCOPES.filter((scope) => scope !== 'groups:history'),
-      expected: 'needs_update',
-    },
-  ])(
-    'projects configuration status from the canonical option policy: $name',
-    async ({ required, granted, expected }) => {
-      const now = new Date('2026-09-04T00:00:00Z')
-      queueTableRows(schemaMock.credentialGroup, [
-        {
-          id: 'group-1',
-          workspaceId: 'workspace-1',
-          name: 'Members',
-          description: null,
-          options: [
-            {
-              id: 'option-1',
-              label: 'Slack',
-              provider: 'slack',
-              slackBotCredentialId: 'bot-1',
-              required: false,
-              status: 'active',
-              requiredScopes: [...required],
-              scopeVersion: credentialGroupScopePolicyVersion([...required]),
-            },
-          ],
-          encryptedProviderConfiguration: 'encrypted',
-          status: 'active',
-          createdAt: now,
-          updatedAt: now,
-        },
-      ])
-      queueTableRows(schemaMock.mcpServers, [])
-      mockConfiguration.mockResolvedValue({
-        slack: { slackBotCredentialId: 'bot-1', scopes: [...granted] },
-      })
-      const result = await getCredentialGroup('workspace-1', 'group-1')
-      expect(result?.options[0]).toMatchObject({
-        configurationStatus: expected,
-        requiredScopes: [...required],
-      })
-    }
-  )
+  it('projects a ready configuration status for a standard OAuth option', async () => {
+    const now = new Date('2026-09-04T00:00:00Z')
+    const requiredScopes = ['https://www.googleapis.com/auth/gmail.readonly']
+    queueTableRows(schemaMock.credentialGroup, [
+      {
+        id: 'group-1',
+        workspaceId: 'workspace-1',
+        name: 'Members',
+        description: null,
+        options: [
+          {
+            id: 'option-1',
+            label: 'Gmail',
+            provider: 'gmail',
+            required: false,
+            status: 'active',
+            requiredScopes,
+            scopeVersion: credentialGroupScopePolicyVersion(requiredScopes),
+          },
+        ],
+        encryptedProviderConfiguration: null,
+        status: 'active',
+        createdAt: now,
+        updatedAt: now,
+      },
+    ])
+    queueTableRows(schemaMock.mcpServers, [])
+    const result = await getCredentialGroup('workspace-1', 'group-1')
+    expect(result?.options[0]).toMatchObject({
+      provider: 'gmail',
+      configurationStatus: 'ready',
+    })
+  })
 
   it('preserves stored scopes while validating provider policy in the update transaction', async () => {
     const option = {
       id: 'option-1',
-      provider: 'slack' as const,
-      label: 'Slack',
-      slackBotCredentialId: 'bot-1',
-      authorizationAppId: 'slack:A123:T123',
-      requiredScopes: ['chat:write'],
+      provider: 'gmail' as const,
+      label: 'Gmail',
+      authorizationAppId: 'google:client-1',
+      requiredScopes: ['https://www.googleapis.com/auth/gmail.readonly'],
       scopeVersion: 1,
       required: true,
       status: 'active' as const,
@@ -135,8 +94,8 @@ describe('Credential Group service', () => {
       { ...existing, updatedAt: new Date('2026-08-13T01:00:00Z') },
     ])
     mockGetPolicy.mockResolvedValue({
-      provider: 'slack',
-      providerId: 'slack',
+      provider: 'gmail',
+      providerId: 'google-email',
       authorizationAppId: option.authorizationAppId,
       requiredScopes: option.requiredScopes,
       scopeVersion: option.scopeVersion,
@@ -149,7 +108,6 @@ describe('Credential Group service', () => {
             id: option.id,
             provider: option.provider,
             label: option.label,
-            slackBotCredentialId: option.slackBotCredentialId,
             required: option.required,
           },
         ],
@@ -158,10 +116,7 @@ describe('Credential Group service', () => {
 
     expect(dbChainMockFns.set).toHaveBeenCalledWith(expect.objectContaining({ options: [option] }))
     expect(mockGetPolicy).toHaveBeenCalledWith(
-      expect.objectContaining({
-        slackBotCredentialId: 'bot-1',
-        requiredScopes: option.requiredScopes,
-      }),
+      expect.objectContaining({ requiredScopes: option.requiredScopes }),
       {
         workspaceId: 'workspace-1',
         credentialGroupId: 'group-1',

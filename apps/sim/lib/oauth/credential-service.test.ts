@@ -9,7 +9,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   coalesceLocally: vi.fn(),
   decryptSecret: vi.fn(),
-  getFreshestSlackChain: vi.fn(),
   getRecentTerminalError: vi.fn(),
   logger: {
     info: vi.fn(),
@@ -20,7 +19,6 @@ const mocks = vi.hoisted(() => ({
     fatal: vi.fn(),
   },
   refreshOAuthToken: vi.fn(),
-  decryptQuickBooksOAuthClientConfig: vi.fn(),
   withLeaderLock: vi.fn(),
 }))
 
@@ -57,19 +55,6 @@ vi.mock('@/lib/oauth/oauth', () => ({
   TOKEN_REFRESH_TIMEOUT_MS: 15_000,
 }))
 
-vi.mock('@/lib/oauth/quickbooks-client-config', () => ({
-  decryptQuickBooksOAuthClientConfig: mocks.decryptQuickBooksOAuthClientConfig,
-}))
-
-vi.mock('@/lib/oauth/slack', () => ({
-  extractSlackTeamId: (value: string | null | undefined) =>
-    value?.match(/^([TE][A-Z0-9]+)-/)?.[1] ?? null,
-  fanOutSlackTokenChain: vi.fn(),
-  getFreshestSlackChain: mocks.getFreshestSlackChain,
-  hasSlackChainMoved: vi.fn(() => false),
-  isSlackProvider: (providerId: string) => providerId === 'slack',
-}))
-
 vi.mock('@/lib/oauth/terminal-errors', () => ({
   getRecentTerminalError: mocks.getRecentTerminalError,
   isTerminalRefreshError: vi.fn(() => false),
@@ -88,14 +73,12 @@ import {
 import { isInstagramProvider, shouldProactivelyRefreshInstagramToken } from '@/lib/oauth/instagram'
 import { isMicrosoftProvider } from '@/lib/oauth/microsoft'
 import { getOAuthRefreshCoordinationIdentity } from '@/lib/oauth/refresh-coordination'
-import { fanOutSlackTokenChain } from '@/lib/oauth/slack'
 import { isTerminalRefreshError, markCredentialDead } from '@/lib/oauth/terminal-errors'
 import { GOOGLE_SERVICE_ACCOUNT_PROVIDER_ID } from '@/lib/oauth/types'
 
 const RAW_CREDENTIAL_ID = 'credential-raw-secret-id'
 const RAW_ACCOUNT_ID = 'account-raw-secret-id'
 const RAW_USER_ID = 'user-raw-secret-id'
-const RAW_SLACK_TEAM_ID = 'TSECRET123'
 const RAW_PROVIDER_ERROR = 'provider returned raw private failure text'
 
 interface RefreshObservation {
@@ -105,10 +88,7 @@ interface RefreshObservation {
   logs: string
 }
 
-async function observeRefresh(
-  providerId: 'google' | 'slack',
-  privacyMode?: 'selector'
-): Promise<RefreshObservation> {
+async function observeRefresh(privacyMode?: 'selector'): Promise<RefreshObservation> {
   resetDbChainMock()
   vi.clearAllMocks()
   mocks.getRecentTerminalError.mockResolvedValue(null)
@@ -118,12 +98,6 @@ async function observeRefresh(
   mocks.withLeaderLock.mockImplementation(async (options: { onLeader: () => Promise<unknown> }) =>
     options.onLeader()
   )
-  mocks.getFreshestSlackChain.mockResolvedValue({
-    accessToken: null,
-    refreshToken: 'refresh-token',
-    accessTokenExpiresAt: new Date(0),
-    chainVersion: new Date(0),
-  })
   mocks.refreshOAuthToken.mockRejectedValue(new Error(RAW_PROVIDER_ERROR))
 
   queueTableRows(credential, [
@@ -138,11 +112,8 @@ async function observeRefresh(
   queueTableRows(account, [
     {
       id: RAW_ACCOUNT_ID,
-      accountId:
-        providerId === 'slack'
-          ? `${RAW_SLACK_TEAM_ID}-usr_USECRET-connection`
-          : 'provider-account-id',
-      providerId,
+      accountId: 'provider-account-id',
+      providerId: 'google',
       userId: RAW_USER_ID,
       accessToken: null,
       refreshToken: 'refresh-token',
@@ -185,33 +156,30 @@ describe('resolveCredentialTokenBundle selector privacy', () => {
     vi.useRealTimers()
   })
 
-  it('HMACs OAuth and Slack refresh identities and suppresses raw identifiers and provider errors', async () => {
-    for (const providerId of ['google', 'slack'] as const) {
-      const observed = await observeRefresh(providerId, 'selector')
-      const serializedKeys = JSON.stringify([
-        observed.cacheKey,
-        observed.coalescingKey,
-        observed.lockKey,
-      ])
+  it('HMACs OAuth refresh identities and suppresses raw identifiers and provider errors', async () => {
+    const observed = await observeRefresh('selector')
+    const serializedKeys = JSON.stringify([
+      observed.cacheKey,
+      observed.coalescingKey,
+      observed.lockKey,
+    ])
 
-      expect(observed.coalescingKey).toBe(observed.lockKey)
-      expect(observed.coalescingKey).toMatch(/^oauth:refresh:[A-Za-z0-9_-]{40,}$/)
-      for (const privateValue of [
-        RAW_CREDENTIAL_ID,
-        RAW_ACCOUNT_ID,
-        RAW_USER_ID,
-        RAW_SLACK_TEAM_ID,
-        RAW_PROVIDER_ERROR,
-      ]) {
-        expect(serializedKeys).not.toContain(privateValue)
-        expect(observed.logs).not.toContain(privateValue)
-      }
+    expect(observed.coalescingKey).toBe(observed.lockKey)
+    expect(observed.coalescingKey).toMatch(/^oauth:refresh:[A-Za-z0-9_-]{40,}$/)
+    for (const privateValue of [
+      RAW_CREDENTIAL_ID,
+      RAW_ACCOUNT_ID,
+      RAW_USER_ID,
+      RAW_PROVIDER_ERROR,
+    ]) {
+      expect(serializedKeys).not.toContain(privateValue)
+      expect(observed.logs).not.toContain(privateValue)
     }
   })
 
   it('shares private refresh coordination across privacy modes without changing ordinary diagnostics', async () => {
-    const privateGoogle = await observeRefresh('google', 'selector')
-    const google = await observeRefresh('google')
+    const privateGoogle = await observeRefresh('selector')
+    const google = await observeRefresh()
     expect(google.cacheKey).toBe(privateGoogle.cacheKey)
     expect(google.coalescingKey).toBe(privateGoogle.coalescingKey)
     expect(google.lockKey).toBe(google.coalescingKey)
@@ -219,85 +187,6 @@ describe('resolveCredentialTokenBundle selector privacy', () => {
     expect(google.logs).toContain(RAW_ACCOUNT_ID)
     expect(google.logs).toContain(RAW_USER_ID)
     expect(google.logs).toContain(RAW_PROVIDER_ERROR)
-
-    const privateSlack = await observeRefresh('slack', 'selector')
-    const slack = await observeRefresh('slack')
-    expect(slack.cacheKey).toBe(privateSlack.cacheKey)
-    expect(slack.coalescingKey).toBe(privateSlack.coalescingKey)
-    expect(slack.lockKey).toBe(slack.coalescingKey)
-    expect(slack.coalescingKey).not.toContain(RAW_SLACK_TEAM_ID)
-    expect(slack.logs).toContain(RAW_SLACK_TEAM_ID)
-    expect(slack.logs).toContain(RAW_PROVIDER_ERROR)
-  })
-
-  it('refreshes QuickBooks with its own encrypted app config and rotates both expirations', async () => {
-    const now = new Date('2026-09-04T18:00:00.000Z')
-    vi.useFakeTimers()
-    vi.setSystemTime(now)
-    mocks.getRecentTerminalError.mockResolvedValue(null)
-    mocks.coalesceLocally.mockImplementation(
-      async (_key: string, producer: () => Promise<unknown>) => producer()
-    )
-    mocks.withLeaderLock.mockImplementation(async (options: { onLeader: () => Promise<unknown> }) =>
-      options.onLeader()
-    )
-    mocks.decryptQuickBooksOAuthClientConfig.mockResolvedValue({
-      clientId: 'client-id',
-      clientSecret: 'client-secret',
-      environment: 'sandbox',
-      webhookVerifierToken: 'verifier-token',
-    })
-    dbChainMockFns.returning.mockResolvedValue([{ id: RAW_ACCOUNT_ID }])
-    mocks.refreshOAuthToken.mockResolvedValue({
-      ok: true,
-      accessToken: 'new-access-token',
-      expiresIn: 3600,
-      refreshToken: 'new-refresh-token',
-      refreshTokenExpiresIn: 8_726_400,
-    })
-    queueTableRows(credential, [
-      {
-        id: 'credential-1',
-        type: 'oauth',
-        accountId: 'account-1',
-        workspaceId: 'workspace-1',
-        providerId: null,
-      },
-    ])
-    queueTableRows(account, [
-      {
-        id: 'account-1',
-        accountId:
-          'quickbooks:v2:NkYPLLqX2cM-QABxg0vbv71mQS9s_aRP3v7ZKLvnJyo:sandbox:1234567890:dXNlci0x',
-        providerId: 'quickbooks',
-        userId: 'user-1',
-        accessToken: 'expired-access-token',
-        refreshToken: 'old-refresh-token',
-        accessTokenExpiresAt: new Date(now.getTime() - 1),
-        refreshTokenExpiresAt: new Date(now.getTime() + 1000),
-        oauthConfig: 'encrypted-client-config',
-        updatedAt: new Date(0),
-      },
-    ])
-
-    await expect(
-      resolveCredentialTokenBundle('credential-1', 'user-1', 'request-1')
-    ).resolves.toEqual({ accessToken: 'new-access-token' })
-
-    expect(mocks.refreshOAuthToken).toHaveBeenCalledWith('quickbooks', 'old-refresh-token', {
-      clientId: 'client-id',
-      clientSecret: 'client-secret',
-      environment: 'sandbox',
-      webhookVerifierToken: 'verifier-token',
-    })
-    expect(dbChainMockFns.set).toHaveBeenCalledWith(
-      expect.objectContaining({
-        accessToken: 'new-access-token',
-        refreshToken: 'new-refresh-token',
-        accessTokenExpiresAt: new Date(now.getTime() + 3_600_000),
-        refreshTokenExpiresAt: new Date(now.getTime() + 8_726_400_000),
-      })
-    )
   })
 })
 
@@ -609,40 +498,6 @@ describe('OAuth access-token refresh headroom', () => {
     )
   })
 
-  it.each([
-    { remainingMs: 6_000, refresh: true },
-    { remainingMs: 300_000, refresh: true },
-    { remainingMs: 300_001, refresh: false },
-  ])(
-    'applies headroom to the shared Slack token with $remainingMs left',
-    async ({ remainingMs, refresh }) => {
-      const row = { ...createOAuthAccount(-1), providerId: 'slack', accountId: 'TEXAMPLE-usr_U1' }
-      const chainVersion = new Date(0)
-      mocks.getFreshestSlackChain.mockResolvedValue({
-        accessToken: 'installation-access-token',
-        refreshToken: 'installation-refresh-token',
-        accessTokenExpiresAt: new Date(now.getTime() + remainingMs),
-        chainVersion,
-      })
-      queueCredentialAccount(row)
-      await expect(
-        resolveCredentialTokenBundle(RAW_CREDENTIAL_ID, RAW_USER_ID, 'test')
-      ).resolves.toEqual({
-        accessToken: refresh ? 'refreshed-access-token' : 'installation-access-token',
-      })
-      expect(mocks.refreshOAuthToken).toHaveBeenCalledTimes(refresh ? 1 : 0)
-      if (refresh)
-        expect(mocks.refreshOAuthToken).toHaveBeenCalledWith('slack', 'installation-refresh-token')
-      expect(fanOutSlackTokenChain).toHaveBeenCalledWith(
-        'TEXAMPLE',
-        expect.objectContaining({
-          accessToken: refresh ? 'refreshed-access-token' : 'installation-access-token',
-        }),
-        { ifChainUnchangedSince: chainVersion }
-      )
-    }
-  )
-
   it('preserves Microsoft refresh-token aging without rejecting a healthy access token', async () => {
     vi.mocked(isMicrosoftProvider).mockReturnValue(true)
     mocks.refreshOAuthToken.mockResolvedValue({ ok: false, errorCode: 'temporarily_unavailable' })
@@ -938,17 +793,6 @@ describe('getCredentialTerminalRefreshError', () => {
     })
     expect(mocks.getRecentTerminalError).toHaveBeenCalledWith(
       getOAuthRefreshCoordinationIdentity(RAW_ACCOUNT_ID)
-    )
-  })
-
-  it('reads a Slack credential on its installation, the scope its refresh is flagged under', async () => {
-    queueTableRows(credential, [
-      { id: RAW_CREDENTIAL_ID, type: 'oauth', accountId: RAW_ACCOUNT_ID },
-    ])
-    queueTableRows(account, [{ providerId: 'slack', providerAccountId: 'TEXAMPLE-usr_U1' }])
-    await getCredentialTerminalRefreshError(RAW_CREDENTIAL_ID)
-    expect(mocks.getRecentTerminalError).toHaveBeenCalledWith(
-      getOAuthRefreshCoordinationIdentity('slack:TEXAMPLE')
     )
   })
 

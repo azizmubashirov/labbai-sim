@@ -99,13 +99,13 @@ let popup: {
   opener: unknown
   location: { href: string }
 }
-const slack: CredentialItemData = {
+const notion: CredentialItemData = {
   type: 'link',
-  provider: 'slack',
+  provider: 'notion',
   value: 'https://untrusted.example/authorize?credentialId=someone-else',
 }
 
-async function render(data: CredentialItemData[] = [slack]) {
+async function render(data: CredentialItemData[] = [notion]) {
   await act(async () =>
     root.render(
       <SpecialTags
@@ -139,8 +139,8 @@ beforeEach(() => {
   mocks.refetch.mockImplementation(async () => ({ isSuccess: true, data: mocks.rows }))
   mocks.start.mockImplementation((_body, callbacks) =>
     callbacks.onSuccess({
-      providerId: 'slack',
-      url: 'https://slack.com/oauth/v2/authorize?state=trusted-state',
+      providerId: 'notion',
+      url: 'https://api.notion.com/v1/oauth/authorize?state=trusted-state',
     })
   )
   popup = {
@@ -167,12 +167,14 @@ afterEach(() => {
 describe('Assistant credential card', () => {
   it('lets readers connect through the canonical endpoint without following the model URL', async () => {
     await render()
-    await click('Connect Slack')
+    await click('Connect Notion')
     expect(mocks.start).toHaveBeenCalledWith(
-      { workspaceId: 'workspace-1', providerId: 'slack' },
+      { workspaceId: 'workspace-1', providerId: 'notion' },
       expect.any(Object)
     )
-    expect(popup.location.href).toBe('https://slack.com/oauth/v2/authorize?state=trusted-state')
+    expect(popup.location.href).toBe(
+      'https://api.notion.com/v1/oauth/authorize?state=trusted-state'
+    )
     expect(popup.opener).toBeNull()
     expect(container.querySelector('a')).toBeNull()
     expect(mocks.workspaceCredentials).not.toHaveBeenCalledWith(
@@ -182,19 +184,19 @@ describe('Assistant credential card', () => {
 
   it('marks a connection complete from the personal list, closes its popup, and resumes through Submit', async () => {
     await render()
-    await click('Connect Slack')
+    await click('Connect Notion')
     mocks.rows = [
       {
         id: 'owned',
-        providerId: 'slack',
+        providerId: 'notion',
         type: 'managed_oauth',
-        displayName: 'My Slack',
+        displayName: 'My Notion',
         updatedAt: new Date().toISOString(),
         connectedAt: new Date().toISOString(),
       },
     ]
     await render()
-    expect(container.textContent).toContain('Connected Slack')
+    expect(container.textContent).toContain('Connected Notion')
     expect(popup.close).toHaveBeenCalled()
     await click('Submit')
     expect(mocks.continue).toHaveBeenCalledOnce()
@@ -205,36 +207,36 @@ describe('Assistant credential card', () => {
     mocks.rows = [
       {
         id: 'owned',
-        providerId: 'slack',
+        providerId: 'notion',
         type: 'managed_oauth',
-        displayName: 'My Slack',
+        displayName: 'My Notion',
         updatedAt: '2026-01-01T00:00:00.000Z',
         connectedAt: '2026-01-01T00:00:00.000Z',
       },
     ]
     await render()
-    await click('Connect Slack')
+    await click('Connect Notion')
     await render()
-    expect(container.textContent).toContain('Waiting for Slack connection')
+    expect(container.textContent).toContain('Waiting for Notion connection')
     expect(popup.close).not.toHaveBeenCalled()
   })
 
   it('refreshes the baseline so a previously connected account missing from cache cannot complete the attempt', async () => {
     const existing: PersonalCredential = {
       id: 'owned',
-      providerId: 'slack',
+      providerId: 'notion',
       type: 'managed_oauth',
-      displayName: 'My Slack',
+      displayName: 'My Notion',
       updatedAt: '2026-01-01T00:00:00.000Z',
       connectedAt: '2026-01-01T00:00:00.000Z',
     }
     mocks.refetch.mockResolvedValue({ isSuccess: true, data: [existing] })
     await render()
-    await click('Connect Slack')
+    await click('Connect Notion')
     mocks.rows = [existing]
     await render()
     expect(mocks.refetch).toHaveBeenCalledOnce()
-    expect(container.textContent).toContain('Waiting for Slack connection')
+    expect(container.textContent).toContain('Waiting for Notion connection')
     expect(popup.close).not.toHaveBeenCalled()
   })
 
@@ -244,12 +246,12 @@ describe('Assistant credential card', () => {
       return { isSuccess: false }
     })
     await render()
-    await click('Connect Slack')
+    await click('Connect Notion')
     await render()
     expect(mocks.start).not.toHaveBeenCalled()
     expect(popup.close).toHaveBeenCalledOnce()
-    expect(container.textContent).toContain('Retry checking Slack connections')
-    await click('Retry checking Slack connections')
+    expect(container.textContent).toContain('Retry checking Notion connections')
+    await click('Retry checking Notion connections')
     expect(mocks.refetch).toHaveBeenCalledTimes(2)
   })
 
@@ -262,8 +264,8 @@ describe('Assistant credential card', () => {
         })
     )
     await render()
-    await click('Connect Slack')
-    await click('Connect Slack')
+    await click('Connect Notion')
+    await click('Connect Notion')
     expect(mocks.refetch).toHaveBeenCalledOnce()
     expect(window.open).toHaveBeenCalledOnce()
     expect(mocks.start).not.toHaveBeenCalled()
@@ -274,29 +276,29 @@ describe('Assistant credential card', () => {
   it('does not complete on background refresh, but does complete on a new verified grant', async () => {
     const original = {
       id: 'owned',
-      providerId: 'slack',
+      providerId: 'notion',
       type: 'managed_oauth' as const,
-      displayName: 'My Slack',
+      displayName: 'My Notion',
       updatedAt: '2026-01-01T00:00:00.000Z',
       connectedAt: '2026-01-01T00:00:00.000Z',
     }
     mocks.rows = [original]
     await render()
-    await click('Connect Slack')
+    await click('Connect Notion')
     mocks.rows = [{ ...original, updatedAt: new Date().toISOString() }]
     await render()
-    expect(container.textContent).toContain('Waiting for Slack connection')
+    expect(container.textContent).toContain('Waiting for Notion connection')
     mocks.rows = [
       { ...original, updatedAt: new Date().toISOString(), connectedAt: new Date().toISOString() },
     ]
     await render()
-    expect(container.textContent).toContain('Connected Slack')
+    expect(container.textContent).toContain('Connected Notion')
   })
 
   it('requires successful metadata before starting and offers retry when the read fails', async () => {
     mocks.metadataError = new Error('Could not load your connections')
     await render()
-    await click('Retry checking Slack connections')
+    await click('Retry checking Notion connections')
     expect(mocks.refetch).toHaveBeenCalledOnce()
     expect(mocks.start).not.toHaveBeenCalled()
     expect(window.open).not.toHaveBeenCalled()
@@ -307,36 +309,36 @@ describe('Assistant credential card', () => {
 
   it('rejects an insecure external OAuth URL and leaves the popup closed', async () => {
     mocks.start.mockImplementation((_body, callbacks) =>
-      callbacks.onSuccess({ providerId: 'slack', url: 'http://untrusted.example/authorize' })
+      callbacks.onSuccess({ providerId: 'notion', url: 'http://untrusted.example/authorize' })
     )
     await render()
-    await click('Connect Slack')
+    await click('Connect Notion')
     expect(popup.location.href).toBe('about:blank')
     expect(popup.close).toHaveBeenCalledOnce()
-    expect(container.textContent).toContain('Not connected — connect Slack')
+    expect(container.textContent).toContain('Not connected — connect Notion')
   })
 
   it('keeps a failed start retryable and surfaces the server setup message', async () => {
     mocks.start.mockImplementation((_body, callbacks) => {
-      mocks.error = new Error('Ask an admin to enable Slack')
+      mocks.error = new Error('Ask an admin to enable Notion')
       callbacks.onError(mocks.error)
     })
     await render()
-    await click('Connect Slack')
+    await click('Connect Notion')
     expect(popup.close).toHaveBeenCalledOnce()
     expect(container.querySelector('[role="alert"]')?.textContent).toBe(
-      'Ask an admin to enable Slack'
+      'Ask an admin to enable Notion'
     )
-    expect(container.textContent).toContain('Not connected — connect Slack')
+    expect(container.textContent).toContain('Not connected — connect Notion')
   })
 
   it('ends polling when a connection never completes', async () => {
     await render()
-    await click('Connect Slack')
+    await click('Connect Notion')
     await act(async () => {
       await vi.advanceTimersByTimeAsync(OAUTH_CHAT_ATTEMPT_MAX_AGE_MS)
     })
-    expect(container.textContent).toContain('Not connected — connect Slack')
+    expect(container.textContent).toContain('Not connected — connect Notion')
     expect(mocks.list).toHaveBeenLastCalledWith('workspace-1', {
       enabled: true,
       refetchInterval: false,
@@ -346,12 +348,12 @@ describe('Assistant credential card', () => {
 
   it('focuses the live web popup and starts a fresh attempt once its handle is closed', async () => {
     await render()
-    await click('Connect Slack')
-    await click('Waiting for Slack connection…')
+    await click('Connect Notion')
+    await click('Waiting for Notion connection…')
     expect(popup.focus).toHaveBeenCalledOnce()
     expect(mocks.start).toHaveBeenCalledOnce()
     popup.closed = true
-    await click('Waiting for Slack connection…')
+    await click('Waiting for Notion connection…')
     expect(mocks.start).toHaveBeenCalledTimes(2)
     expect(window.open).toHaveBeenCalledTimes(2)
   })
@@ -375,7 +377,7 @@ describe('Assistant credential card', () => {
   it('hides workspace secrets, service accounts and API key reveals even for editors', async () => {
     mocks.canEdit = true
     await render([
-      slack,
+      notion,
       { type: 'secret_input', name: 'HIDDEN_SECRET' },
       { type: 'service_account', provider: 'google-drive' },
       { type: 'sim_key', value: 'must-never-render' },

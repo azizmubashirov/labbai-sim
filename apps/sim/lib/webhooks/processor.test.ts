@@ -99,7 +99,6 @@ vi.mock('@/lib/webhooks/utils', () => ({
 }))
 
 vi.mock('@/lib/webhooks/utils.server', () => ({
-  handleSlackChallenge: vi.fn().mockReturnValue(null),
   handleWhatsAppVerification: vi.fn().mockResolvedValue(null),
 }))
 
@@ -115,20 +114,8 @@ vi.mock('@/executor/utils/reference-validation', () => ({
   resolveEnvVarReferences: vi.fn((value: string) => value),
 }))
 
-vi.mock('@/triggers/confluence/utils', () => ({
-  isConfluencePayloadMatch: vi.fn().mockReturnValue(true),
-}))
-
 vi.mock('@/triggers/constants', () => ({
   isPollingWebhookProvider: vi.fn((provider: string) => provider === 'gmail'),
-}))
-
-vi.mock('@/triggers/github/utils', () => ({
-  isGitHubEventMatch: vi.fn().mockReturnValue(true),
-}))
-
-vi.mock('@/triggers/jira/utils', () => ({
-  isJiraEventMatch: vi.fn().mockReturnValue(true),
 }))
 
 import {

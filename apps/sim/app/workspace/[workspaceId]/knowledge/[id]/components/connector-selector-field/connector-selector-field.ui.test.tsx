@@ -51,7 +51,7 @@ function ControlledSelector({ dynamicAll = false }: ControlledSelectorProps) {
         id: 'spaces',
         title: 'Spaces',
         type: 'selector',
-        selectorKey: 'confluence.spaces',
+        selectorKey: 'google.drive',
         multi: true,
         allowSelectAll: true,
         selectAllValue: dynamicAll ? '*' : undefined,

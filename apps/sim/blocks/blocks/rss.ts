@@ -52,16 +52,6 @@ export const RssBlockMeta = {
   tags: ['automation', 'content-management'],
   templates: [
     {
-      icon: RssIcon,
-      title: 'RSS post to Slack',
-      prompt:
-        'Build a workflow that triggers when a new item is published in an RSS feed, writes a one-line summary of the item with an agent, and posts the title, summary, and link to a Slack channel.',
-      modules: ['agent', 'workflows'],
-      category: 'marketing',
-      tags: ['content', 'automation'],
-      alsoIntegrations: ['slack'],
-    },
-    {
       icon: Table,
       title: 'RSS feed to content table',
       prompt:

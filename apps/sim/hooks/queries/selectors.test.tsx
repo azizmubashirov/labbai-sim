@@ -107,115 +107,15 @@ afterEach(() => {
 })
 
 describe('generic selector queries', () => {
-  it('uses the dedicated personal setup contract and isolates it from ordinary browsing', async () => {
-    const personalItems = [{ id: 'PERSONAL', label: 'Personal project' }]
-    mockRequestJson.mockResolvedValue({
-      success: true,
-      data: { kind: 'list', items: personalItems },
-    })
-    mockExecuteSelectorRequest.mockResolvedValue({
-      kind: 'list',
-      items: [{ id: 'ADMIN', label: 'Admin project' }],
-    })
-    const hook = renderHookWithClient(() =>
-      useSelectorOptions('jira.projectKeys', {
-        context: { oauthCredential: 'credential-1', domain: 'example.atlassian.net' },
-        scope: { kind: 'organization', organizationId: 'org-1' },
-        surface: { kind: 'personal-search-setup', organizationId: 'org-1', connectorType: 'jira' },
-        surfaceId: 'projects',
-      })
-    )
-    await waitFor(() => expect(hook.getResult().data).toEqual(personalItems))
-    expect(mockExecuteSelectorRequest).not.toHaveBeenCalled()
-    expect(mockRequestJson).toHaveBeenCalledWith(
-      expect.objectContaining({ path: '/api/knowledge/sim-search/personal-source-setup' }),
-      expect.objectContaining({
-        body: {
-          action: 'options',
-          organizationId: 'org-1',
-          connectorType: 'jira',
-          credentialId: 'credential-1',
-          domain: 'example.atlassian.net',
-          request: { kind: 'list' },
-        },
-        signal: expect.any(AbortSignal),
-      })
-    )
-    hook.rerender(() =>
-      useSelectorOptions('jira.projectKeys', {
-        context: { oauthCredential: 'credential-1', domain: 'example.atlassian.net' },
-        scope: { kind: 'organization', organizationId: 'org-1' },
-        surfaceId: 'projects',
-      })
-    )
-    await waitFor(() =>
-      expect(hook.getResult().data).toEqual([{ id: 'ADMIN', label: 'Admin project' }])
-    )
-    expect(mockExecuteSelectorRequest).toHaveBeenCalledTimes(1)
-  })
-
-  it('hydrates personal setup labels through the same dedicated contract', async () => {
-    mockRequestJson.mockResolvedValue({
-      success: true,
-      data: { kind: 'detail', item: { id: 'ENG', label: 'Engineering' } },
-    })
-    const hook = renderHookWithClient(() =>
-      useSelectorOptionDetail('confluence.spaces', {
-        context: { oauthCredential: 'credential-1', domain: 'example.atlassian.net' },
-        scope: { kind: 'organization', organizationId: 'org-1' },
-        surface: {
-          kind: 'personal-search-setup',
-          organizationId: 'org-1',
-          connectorType: 'confluence',
-        },
-        detailId: 'ENG',
-      })
-    )
-    await waitFor(() => expect(hook.getResult().data?.id).toBe('ENG'))
-    expect(mockRequestJson).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        body: expect.objectContaining({
-          connectorType: 'confluence',
-          request: { kind: 'detail', id: 'ENG' },
-        }),
-      })
-    )
-    expect(mockExecuteSelectorRequest).not.toHaveBeenCalled()
-  })
-
-  it.each(['selector', 'organization'] as const)(
-    'rejects a mismatched personal setup %s before sending a request',
-    async (mismatch) => {
-      const hook = renderHookWithClient(() =>
-        useSelectorOptions(mismatch === 'selector' ? 'confluence.spaces' : 'jira.projectKeys', {
-          context: { oauthCredential: 'credential-1', domain: 'example.atlassian.net' },
-          scope: {
-            kind: 'organization',
-            organizationId: mismatch === 'organization' ? 'org-2' : 'org-1',
-          },
-          surface: {
-            kind: 'personal-search-setup',
-            organizationId: 'org-1',
-            connectorType: 'jira',
-          },
-        })
-      )
-      await waitFor(() => expect(hook.getResult().error).not.toBeNull())
-      expect(mockRequestJson).not.toHaveBeenCalled()
-      expect(mockExecuteSelectorRequest).not.toHaveBeenCalled()
-    }
-  )
-
   it.each(['flat', 'paged'] as const)('returns a complete already-loaded %s list', async (mode) => {
     const items = [{ id: 'ENG', label: 'Engineering' }]
     mockExecuteSelectorRequest.mockResolvedValue({ kind: 'list', items })
     const hook = renderHookWithClient(() =>
-      useSelectorOptions(mode === 'paged' ? 'jira.projectKeys' : 'jira.issues', {
+      useSelectorOptions(mode === 'paged' ? 'google.drive' : 'gmail.labels', {
         context: {
           workspaceId: 'workspace-1',
           oauthCredential: 'credential-1',
-          domain: 'example.atlassian.net',
+          impersonateUserEmail: 'admin@example.com',
         },
       })
     )
@@ -246,11 +146,11 @@ describe('generic selector queries', () => {
         })
       )
       const hook = renderHookWithClient(() =>
-        useSelectorOptions('jira.projectKeys', {
+        useSelectorOptions('google.drive', {
           context: {
             workspaceId: 'workspace-1',
             oauthCredential: 'credential-1',
-            domain: 'example.atlassian.net',
+            impersonateUserEmail: 'admin@example.com',
           },
         })
       )
@@ -275,11 +175,11 @@ describe('generic selector queries', () => {
       }
     )
     const hook = renderHookWithClient(() =>
-      useSelectorOptions('jira.projectKeys', {
+      useSelectorOptions('google.drive', {
         context: {
           workspaceId: 'workspace-1',
           oauthCredential: 'credential-1',
-          domain: 'example.atlassian.net',
+          impersonateUserEmail: 'admin@example.com',
         },
       })
     )
@@ -337,12 +237,12 @@ describe('generic selector queries', () => {
       let workspaceId = 'workspace-1'
       let surfaceId = 'field-1'
       let credentialId = 'credential-1'
-      let domain = 'example.atlassian.net'
+      let impersonateUserEmail = 'admin@example.com'
       let search = ''
       let enabled = true
       const useHook = () =>
-        useSelectorOptions('jira.projectKeys', {
-          context: { workspaceId, oauthCredential: credentialId, domain },
+        useSelectorOptions('google.drive', {
+          context: { workspaceId, oauthCredential: credentialId, impersonateUserEmail },
           surfaceId,
           search,
           enabled,
@@ -357,7 +257,7 @@ describe('generic selector queries', () => {
       if (change === 'scope') workspaceId = 'workspace-2'
       if (change === 'surface') surfaceId = 'field-2'
       if (change === 'credential') credentialId = 'credential-2'
-      if (change === 'site') domain = 'another.atlassian.net'
+      if (change === 'site') impersonateUserEmail = 'other-admin@example.com'
       if (change === 'search') search = 'Operations'
       if (change === 'disabled') enabled = false
       if (change === 'unmount') hook.unmount()
@@ -492,7 +392,7 @@ describe('generic selector queries', () => {
     second.unmount()
   })
 
-  it.each(['gmail.labels', 'bitbucket.workspaces'] as const)(
+  it.each(['gmail.labels', 'zoom.meetings'] as const)(
     'does not manually refetch the unready %s selector',
     async (selectorKey) => {
       mockExecuteSelectorRequest.mockResolvedValue({ kind: 'list', items: [] })
@@ -557,7 +457,7 @@ describe('generic selector queries', () => {
             }
     )
     const hook = renderHookWithClient(() =>
-      useSelectorOptions('bitbucket.workspaces', {
+      useSelectorOptions('zoom.meetings', {
         context: { workspaceId: 'workspace-1', oauthCredential: 'credential-1' },
         surfaceId: 'canvas:block-1:workspace',
       })
@@ -589,8 +489,8 @@ describe('generic selector queries', () => {
     )
 
     const hook = renderHookWithClient(() =>
-      useSelectorOptions('bitbucket.workspaces', {
-        context: { workspaceId: 'workspace-1', oauthCredential: '{{BITBUCKET_CREDENTIAL}}' },
+      useSelectorOptions('zoom.meetings', {
+        context: { workspaceId: 'workspace-1', oauthCredential: '{{ZOOM_CREDENTIAL}}' },
         surfaceId: 'canvas:block-1:workspace',
       })
     )
@@ -633,7 +533,7 @@ describe('generic selector queries', () => {
     )
 
     const hook = renderHookWithClient(() =>
-      useSelectorOptions('bitbucket.workspaces', {
+      useSelectorOptions('zoom.meetings', {
         context: { workspaceId: 'workspace-1', oauthCredential: 'credential-1' },
         surfaceId: 'canvas:block-1:workspace',
       })
@@ -676,7 +576,7 @@ describe('generic selector queries', () => {
     )
 
     const hook = renderHookWithClient(() =>
-      useSelectorOptions('bitbucket.workspaces', {
+      useSelectorOptions('zoom.meetings', {
         context: { workspaceId: 'workspace-1', oauthCredential: 'credential-1' },
         surfaceId: 'canvas:block-1:workspace',
       })
@@ -711,7 +611,7 @@ describe('generic selector queries', () => {
     })
 
     const hook = renderHookWithClient(() =>
-      useSelectorOptions('bitbucket.workspaces', {
+      useSelectorOptions('zoom.meetings', {
         context: { workspaceId: 'workspace-1', oauthCredential: 'credential-1' },
         surfaceId: 'canvas:block-1:workspace',
       })
@@ -731,11 +631,11 @@ describe('generic selector queries', () => {
     })
 
     const hook = renderHookWithClient(() =>
-      useSelectorOptionDetail('jira.issues', {
+      useSelectorOptionDetail('google.drive', {
         context: {
           workflowId: 'workflow-1',
-          oauthCredential: '{{JIRA_CREDENTIAL}}',
-          domain: '{{JIRA_DOMAIN}}',
+          oauthCredential: '{{GOOGLE_DRIVE_CREDENTIAL}}',
+          impersonateUserEmail: '{{GOOGLE_IMPERSONATE_EMAIL}}',
         },
         detailId,
         surfaceId: 'canvas:block-1:issue',
@@ -752,8 +652,8 @@ describe('generic selector queries', () => {
     })
     const keys = serializedKeys(hook.queryClient)
     expect(keys).not.toContain(detailId)
-    expect(keys).not.toContain('JIRA_CREDENTIAL')
-    expect(keys).not.toContain('JIRA_DOMAIN')
+    expect(keys).not.toContain('GOOGLE_DRIVE_CREDENTIAL')
+    expect(keys).not.toContain('GOOGLE_IMPERSONATE_EMAIL')
   })
 
   it('forwards React Query cancellation to selector execution', async () => {

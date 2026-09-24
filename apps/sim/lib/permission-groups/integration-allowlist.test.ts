@@ -3,7 +3,7 @@
  *
  * These helpers read the generated successor map rather than the block
  * registry, so every id below is a real one and the assertions are about the
- * repository's actual lifecycle facts: `slack` was replaced by `slack_v2`,
+ * repository's actual lifecycle facts: `router` was replaced by `router_v2`,
  * `notion` by `notion_v2`, `file` by `file_v5`.
  */
 import { describe, expect, it } from 'vitest'
@@ -16,7 +16,7 @@ import {
 
 describe('resolveAccessControlBlockType', () => {
   it('judges a superseded block as its successor', () => {
-    expect(resolveAccessControlBlockType('slack')).toBe('slack_v2')
+    expect(resolveAccessControlBlockType('router')).toBe('router_v2')
   })
 
   /** The map is flattened, so a chain costs one lookup and never a partial hop. */
@@ -26,7 +26,7 @@ describe('resolveAccessControlBlockType', () => {
   })
 
   it('leaves a current block alone', () => {
-    expect(resolveAccessControlBlockType('slack_v2')).toBe('slack_v2')
+    expect(resolveAccessControlBlockType('router_v2')).toBe('router_v2')
   })
 
   /**
@@ -61,13 +61,13 @@ describe('toAccessControlAllowlist', () => {
 
   /**
    * `ALLOWED_INTEGRATIONS` is written by hand against whatever ids its author
-   * knows, so a deployment that permitted `slack` must not refuse `slack_v2`.
+   * knows, so a deployment that permitted `router` must not refuse `router_v2`.
    */
   it('judges a policy entry naming a retired id as its successor', () => {
-    const allowlist = toAccessControlAllowlist(['Slack'])
+    const allowlist = toAccessControlAllowlist(['Router'])
 
-    expect(allowlist?.has('slack_v2')).toBe(true)
-    expect(allowlist?.has('slack')).toBe(false)
+    expect(allowlist?.has('router_v2')).toBe(true)
+    expect(allowlist?.has('router')).toBe(false)
   })
 
   it('denies everything for an empty allowlist', () => {
@@ -80,10 +80,10 @@ describe('toAccessControlAllowlist', () => {
    * enforcement path that read the group.
    */
   it('indexes an object-prototype entry as an ordinary block type', () => {
-    const allowlist = toAccessControlAllowlist(['constructor', 'slack'])
+    const allowlist = toAccessControlAllowlist(['constructor', 'router'])
 
     expect(allowlist?.has('constructor')).toBe(true)
-    expect(allowlist?.has('slack_v2')).toBe(true)
+    expect(allowlist?.has('router_v2')).toBe(true)
   })
 })
 
@@ -96,11 +96,11 @@ describe('intersectAccessControlAllowlists', () => {
    * which refuses an integration both policies allow.
    */
   it('intersects a retired id against its successor', () => {
-    expect([...(intersectAccessControlAllowlists(['slack'], ['slack_v2']) ?? [])]).toEqual([
-      'slack_v2',
+    expect([...(intersectAccessControlAllowlists(['router'], ['router_v2']) ?? [])]).toEqual([
+      'router_v2',
     ])
-    expect([...(intersectAccessControlAllowlists(['slack_v2'], ['slack']) ?? [])]).toEqual([
-      'slack_v2',
+    expect([...(intersectAccessControlAllowlists(['router_v2'], ['router']) ?? [])]).toEqual([
+      'router_v2',
     ])
   })
 
@@ -123,7 +123,7 @@ describe('intersectAccessControlAllowlists', () => {
 
 describe('intersectIntegrationAllowlists', () => {
   it('uses the configured list when the other policy is unrestricted', () => {
-    expect(intersectIntegrationAllowlists(null, ['Slack'])).toEqual(['slack_v2'])
+    expect(intersectIntegrationAllowlists(null, ['Router'])).toEqual(['router_v2'])
     expect(intersectIntegrationAllowlists(['Notion'], null)).toEqual(['notion_v2'])
     expect(intersectIntegrationAllowlists(null, null)).toBeNull()
   })
@@ -134,17 +134,17 @@ describe('intersectIntegrationAllowlists', () => {
    * the same two policies.
    */
   it('keeps a mixed-vintage integration both policies allow', () => {
-    expect(intersectIntegrationAllowlists(['slack'], ['slack_v2'])).toEqual(['slack_v2'])
+    expect(intersectIntegrationAllowlists(['router'], ['router_v2'])).toEqual(['router_v2'])
   })
 
   it('keeps only integrations allowed by both policies', () => {
-    expect(intersectIntegrationAllowlists(['Slack', 'Notion'], ['notion', 'gmail'])).toEqual([
+    expect(intersectIntegrationAllowlists(['Router', 'Notion'], ['notion', 'gmail'])).toEqual([
       'notion_v2',
     ])
   })
 
   it('preserves an explicit deny-all list', () => {
     expect(intersectIntegrationAllowlists([], null)).toEqual([])
-    expect(intersectIntegrationAllowlists(['slack'], [])).toEqual([])
+    expect(intersectIntegrationAllowlists(['router'], [])).toEqual([])
   })
 })

@@ -673,46 +673,6 @@ export const GoogleDocsBlockMeta = {
   templates: [
     {
       icon: GoogleDocsIcon,
-      title: 'Google Docs review request',
-      prompt:
-        'Build a workflow that reads a Google Doc when its title is marked ready for review, summarizes the key points with an agent, and posts a review request with the doc link to the named reviewers in Slack.',
-      modules: ['agent', 'workflows'],
-      category: 'productivity',
-      tags: ['team', 'automation'],
-      alsoIntegrations: ['slack'],
-    },
-    {
-      icon: GoogleDocsIcon,
-      title: 'Google Docs change digester',
-      prompt:
-        'Create a scheduled weekly workflow that reads each tracked Google Doc, compares its content against the snapshot stored in a table, summarizes what changed with an agent, and posts a digest to the team in Slack.',
-      modules: ['scheduled', 'tables', 'agent', 'workflows'],
-      category: 'productivity',
-      tags: ['team', 'reporting'],
-      alsoIntegrations: ['slack'],
-    },
-    {
-      icon: GoogleDocsIcon,
-      title: 'Google Docs translation copy',
-      prompt:
-        'Build a workflow that takes a Google Docs document and creates translated copies into target languages with Google Translate, links them in the source, and notifies the localization team.',
-      modules: ['agent', 'workflows'],
-      category: 'marketing',
-      tags: ['content', 'enterprise'],
-      alsoIntegrations: ['google_translate'],
-    },
-    {
-      icon: GoogleDocsIcon,
-      title: 'Meeting notes to Google Docs',
-      prompt:
-        'Create a workflow that after a meeting pulls the transcript, summarizes decisions, action items, and owners with an agent, and creates a formatted Google Docs document in the shared team folder with a link posted to Slack.',
-      modules: ['agent', 'workflows'],
-      category: 'productivity',
-      tags: ['team', 'meeting', 'reporting'],
-      alsoIntegrations: ['slack'],
-    },
-    {
-      icon: GoogleDocsIcon,
       title: 'Google Docs proposal generator',
       prompt:
         'Build a workflow that on a closed-won deal reads the account details, creates a Google Docs document from the proposal template, fills in customer name, scope, and pricing, and shares the draft with the account owner for review.',

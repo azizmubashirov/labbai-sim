@@ -46,8 +46,6 @@ import {
   resolveActiveKnowledgeResourceContext,
   resolveKnowledgeWorkspaceContext,
 } from '@/lib/knowledge/application/contexts'
-import { rethrowGitHubInstallationSourceError } from '@/lib/knowledge/application/github-installation-error'
-import { prepareGitHubInstallationSource } from '@/lib/knowledge/application/github-installation-source'
 import { knowledgeOperations } from '@/lib/knowledge/application/operations'
 import {
   type ConnectorAccessMode,
@@ -363,7 +361,7 @@ function rethrowConnectorCredentialError(error: unknown): never {
     }
     throw new OrchestrationError('validation', message)
   }
-  rethrowGitHubInstallationSourceError(error)
+  throw error
 }
 
 /** Applies setup error handling to initial tokens and later delegated user probes. */
@@ -899,18 +897,7 @@ async function executeCreateKnowledgeConnector(
       })
     }
   }
-  const sourceConfig = await prepareGitHubInstallationSource({
-    principal,
-    requestId,
-    workspaceId: context.workspaceId,
-    connectorType: input.connectorType,
-    credentialId: input.credentialId,
-    organizationId: context.organizationId,
-    isSearchIndex: context.knowledgeBase.isSearchIndex === true,
-    accessMode: input.accessMode ?? 'workspace',
-    actingUserId,
-    sourceConfig: membersBinding?.sourceConfig ?? input.sourceConfig,
-  })
+  const sourceConfig = membersBinding?.sourceConfig ?? input.sourceConfig
   if (membersBinding) membersBinding = { ...membersBinding, sourceConfig }
   const apiKey = await resolveConnectorApiKey(input.apiKey, principal, workspaceId)
   const permissionChange = input.permissionConfig
@@ -1146,20 +1133,6 @@ export const updateKnowledgeConnector = defineAuthorizedKnowledgeUseCase({
       updates,
       permissionChange,
       expectedUpdatedAt,
-      prepareSourceConfig: (connector, sourceConfig) =>
-        prepareGitHubInstallationSource({
-          principal,
-          requestId,
-          workspaceId: context.workspaceId,
-          connectorType: connector.connectorType,
-          credentialId: connector.credentialId,
-          organizationId: context.organizationId,
-          isSearchIndex: context.knowledgeBase.isSearchIndex === true,
-          accessMode: connector.accessMode,
-          actingUserId,
-          sourceConfig,
-          previousConfig: connector.sourceConfig as Record<string, unknown>,
-        }),
       resolveBillingAttribution: () => {
         const workspaceId = context.workspaceId
         return (

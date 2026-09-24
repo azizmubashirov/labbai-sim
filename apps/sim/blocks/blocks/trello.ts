@@ -1448,26 +1448,6 @@ export const TrelloBlockMeta = {
     },
     {
       icon: TrelloIcon,
-      title: 'Trello + Linear bridge',
-      prompt:
-        'Create a workflow that mirrors Trello cards in a chosen list into Linear issues, keeps status and comments in sync, and writes the link back to the Trello card.',
-      modules: ['agent', 'workflows'],
-      category: 'productivity',
-      tags: ['engineering', 'sync'],
-      alsoIntegrations: ['linear'],
-    },
-    {
-      icon: TrelloIcon,
-      title: 'Trello SLA monitor',
-      prompt:
-        'Build a workflow that watches Trello cards for due-date breaches, sends reminders, and escalates to managers via Slack when items slip more than 2 days.',
-      modules: ['scheduled', 'agent', 'workflows'],
-      category: 'productivity',
-      tags: ['team', 'monitoring'],
-      alsoIntegrations: ['slack'],
-    },
-    {
-      icon: TrelloIcon,
       title: 'Trello content pipeline',
       prompt:
         'Create a workflow that reads a Trello editorial board, publishes the cards in the "ready" list to WordPress on schedule, and moves the card to "live" with the URL attached.',
@@ -1485,16 +1465,6 @@ export const TrelloBlockMeta = {
       category: 'productivity',
       tags: ['team', 'reporting'],
       alsoIntegrations: ['gmail'],
-    },
-    {
-      icon: TrelloIcon,
-      title: 'Trello stale-card sweeper',
-      prompt:
-        'Create a scheduled workflow that scans a Trello board for cards with no activity in 30 days, comments a nudge on each, and posts a stale-card list to Slack for the project owner.',
-      modules: ['scheduled', 'agent', 'workflows'],
-      category: 'productivity',
-      tags: ['team', 'monitoring'],
-      alsoIntegrations: ['slack'],
     },
     {
       icon: TrelloIcon,

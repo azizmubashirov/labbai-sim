@@ -162,18 +162,17 @@ describe('organization integration invitations', () => {
           id: 'group-a',
           options: [
             {
-              id: 'github-option',
-              provider: 'github-repositories',
+              id: 'drive-option',
+              provider: 'google-drive',
               label: 'Engineering',
               required: true,
             },
             {
-              id: 'slack-option',
-              provider: 'slack',
-              label: 'Slack',
+              id: 'notion-option',
+              provider: 'notion',
+              label: 'Notion',
               required: false,
-              slackBotCredentialId: 'slack-bot',
-              requiredScopes: ['search:read'],
+              requiredScopes: ['notion:read'],
             },
           ],
         },
@@ -191,17 +190,16 @@ describe('organization integration invitations', () => {
         update: {
           options: [
             {
-              id: 'github-option',
-              provider: 'github-repositories',
+              id: 'drive-option',
+              provider: 'google-drive',
               label: 'Engineering',
               required: true,
             },
             {
-              id: 'slack-option',
-              provider: 'slack',
-              label: 'Slack',
+              id: 'notion-option',
+              provider: 'notion',
+              label: 'Notion',
               required: false,
-              slackBotCredentialId: 'slack-bot',
             },
           ],
         },
@@ -251,7 +249,7 @@ describe('organization integration invitations', () => {
       error: null,
       isPending: true,
     })
-    await render('?tab=people&integration=jira')
+    await render('?tab=people&integration=google_drive')
     expect(mocks.accounts).toHaveBeenLastCalledWith('org-a')
     expect(mocks.people).toHaveBeenLastCalledWith('org-a', '', { enabled: false })
     expect(container.textContent).toContain('Loading connected accounts')
@@ -265,7 +263,7 @@ describe('organization integration invitations', () => {
       data: { credentialGroup: { id: 'group-a', options: [] } },
       error: null,
     })
-    await render('?tab=people&integration=jira')
+    await render('?tab=people&integration=google_drive')
     expect(container.textContent).not.toContain('Loading connected accounts')
     expect(findButton('Request connections')).not.toBeDisabled()
     await click('Request connections')
@@ -281,7 +279,7 @@ describe('organization integration invitations', () => {
       isPending: true,
     })
     mocks.people.mockReturnValue({ error: new Error('Organization accounts not configured') })
-    await render('?tab=people&integration=jira')
+    await render('?tab=people&integration=google_drive')
     expect(mocks.people).toHaveBeenLastCalledWith('org-a', '', { enabled: false })
     expect(container.textContent).not.toContain('Organization accounts not configured')
 
@@ -290,7 +288,7 @@ describe('organization integration invitations', () => {
       data: { credentialGroup: null },
       error: null,
     })
-    await render('?tab=people&integration=jira')
+    await render('?tab=people&integration=google_drive')
     expect(mocks.people).toHaveBeenLastCalledWith('org-a', '', { enabled: false })
     expect(container.textContent).toContain('before requesting connections')
     expect(container.textContent).not.toContain('Organization accounts not configured')
@@ -349,22 +347,27 @@ describe('organization integration invitations', () => {
         credentialGroup: {
           id: 'group-a',
           options: [
-            { id: 'jira-option', provider: 'jira', status: 'active' },
+            {
+              id: 'drive-option',
+              provider: 'google-drive',
+              status: 'active',
+              configurationStatus: 'ready',
+            },
             { id: 'gmail-option', provider: 'gmail', status: 'active' },
-            { id: 'old-option', provider: 'confluence', status: 'revoked' },
+            { id: 'old-option', provider: 'google-drive', status: 'revoked' },
           ],
         },
       },
     })
-    await render('?tab=people&integration=jira&credential-group-people=alex')
+    await render('?tab=people&integration=google_drive&credential-group-people=alex')
     expect(mocks.people).toHaveBeenLastCalledWith('org-a', 'alex', {
       enabled: true,
-      optionId: 'jira-option',
+      optionId: 'drive-option',
     })
-    expect(findButton('Filter people by integration').textContent).toContain('Jira')
+    expect(findButton('Filter people by integration').textContent).toContain('Google Drive')
     await click('Request connections')
     expect(document.querySelector('[role="dialog"]')?.textContent).toContain(
-      'Request Jira connections'
+      'Request Google Drive connections'
     )
     await click('Cancel')
     await act(async () =>
@@ -376,7 +379,8 @@ describe('organization integration invitations', () => {
       (item) => item.textContent === 'All integrations'
     )
     expect(all).toBeDefined()
-    expect(document.querySelector('[role="menu"]')?.textContent).not.toContain('Confluence')
+    // The revoked option and the non-indexing Gmail option offer no filter of their own.
+    expect(document.querySelectorAll('[role="menuitem"]')).toHaveLength(2)
     await act(async () => all?.click())
     await vi.waitFor(() =>
       expect(mocks.people).toHaveBeenLastCalledWith('org-a', 'alex', { enabled: true })
@@ -384,7 +388,7 @@ describe('organization integration invitations', () => {
     expect(container.querySelector('input[placeholder="Search people..."]')).toHaveValue('alex')
   })
 
-  it.each(['', '&integration=gmail'])(
+  it.each(['', '&integration=google_drive'])(
     'defaults to All on navigation with one integration and initial filter %s',
     async (filter) => {
       mocks.accounts.mockReturnValue({
@@ -392,17 +396,24 @@ describe('organization integration invitations', () => {
         data: {
           credentialGroup: {
             id: 'group-a',
-            options: [{ id: 'gmail-option', provider: 'gmail', status: 'active' }],
+            options: [
+              {
+                id: 'drive-option',
+                provider: 'google-drive',
+                status: 'active',
+                configurationStatus: 'ready',
+              },
+            ],
           },
         },
       })
       await render(`?tab=people${filter}`)
       expect(findButton('Filter people by integration').textContent).toContain(
-        filter ? 'Gmail' : 'All integrations'
+        filter ? 'Google Drive' : 'All integrations'
       )
       expect(mocks.people).toHaveBeenLastCalledWith('org-a', '', {
         enabled: true,
-        ...(filter ? { optionId: 'gmail-option' } : {}),
+        ...(filter ? { optionId: 'drive-option' } : {}),
       })
       await click('Sources')
       await click('People')
@@ -411,7 +422,7 @@ describe('organization integration invitations', () => {
     }
   )
 
-  it('preserves Slack setup recovery in People without hiding existing connections', async () => {
+  it('preserves setup recovery in People without hiding existing connections', async () => {
     mocks.accounts.mockReturnValue({
       isSuccess: true,
       data: {
@@ -419,8 +430,8 @@ describe('organization integration invitations', () => {
           id: 'group-a',
           options: [
             {
-              id: 'slack-option',
-              provider: 'slack',
+              id: 'drive-option',
+              provider: 'google-drive',
               status: 'active',
               configurationStatus: 'needs_update',
             },
@@ -428,12 +439,12 @@ describe('organization integration invitations', () => {
         },
       },
     })
-    await render('?tab=people&integration=slack')
+    await render('?tab=people&integration=google_drive')
     expect(mocks.people).toHaveBeenLastCalledWith('org-a', '', {
       enabled: true,
-      optionId: 'slack-option',
+      optionId: 'drive-option',
     })
     expect(findButton('Request connections')).toBeDisabled()
-    expect(container.textContent).toContain('Update the Slack app from Sources')
+    expect(container.textContent).toContain('before requesting connections')
   })
 })

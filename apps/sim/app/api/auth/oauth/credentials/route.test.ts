@@ -93,7 +93,7 @@ describe('OAuth Credentials API Route', () => {
       authType: 'session',
     })
 
-    const req = createMockRequestWithQuery('GET', '?provider=github')
+    const req = createMockRequestWithQuery('GET', '?provider=notion')
 
     const response = await GET(req)
     const data = await response.json()
@@ -197,42 +197,30 @@ describe('OAuth Credentials API Route', () => {
       return data.credentials[0]
     }
 
-    it.each([null, '', ' \t\n '])(
-      'does not synthesize a Confluence grant from missing scope metadata %j',
-      async (scope) => {
-        const credential = await requestCredential('confluence', scope)
-
-        expect(credential.scopes).toEqual([])
-        expect(
-          getMissingRequiredScopes(credential, getCanonicalScopesForProvider('confluence'))
-        ).toContain('read:group:confluence')
-      }
-    )
-
-    it('preserves the actual older Confluence grant and identifies missing group access', async () => {
-      const requiredScopes = getCanonicalScopesForProvider('confluence')
-      const previousGrant = requiredScopes.filter((scope) => scope !== 'read:group:confluence')
-      const credential = await requestCredential('confluence', previousGrant.join(','))
+    it('preserves the actual older grant and identifies the missing scope', async () => {
+      const requiredScopes = getCanonicalScopesForProvider('google-drive')
+      const missingScope = 'https://www.googleapis.com/auth/drive'
+      expect(requiredScopes).toContain(missingScope)
+      const previousGrant = requiredScopes.filter((scope) => scope !== missingScope)
+      const credential = await requestCredential('google-drive', previousGrant.join(','))
 
       expect(credential.scopes).toEqual(previousGrant)
-      expect(getMissingRequiredScopes(credential, requiredScopes)).toEqual([
-        'read:group:confluence',
-      ])
+      expect(getMissingRequiredScopes(credential, requiredScopes)).toEqual([missingScope])
     })
 
-    it('preserves a complete Confluence grant without requesting another update', async () => {
-      const grantedScopes = getCanonicalScopesForProvider('confluence')
-      const credential = await requestCredential('confluence', grantedScopes.join(' '))
+    it('preserves a complete grant without requesting another update', async () => {
+      const grantedScopes = getCanonicalScopesForProvider('google-drive')
+      const credential = await requestCredential('google-drive', grantedScopes.join(' '))
 
       expect(credential.scopes).toEqual(grantedScopes)
       expect(getMissingRequiredScopes(credential, grantedScopes)).toEqual([])
     })
 
     it.each([null, '', ' \t\n '])(
-      'preserves the Box omitted-scope fallback for %j',
+      'preserves the omitted-scope fallback for %j',
       async (scope) => {
-        const credential = await requestCredential('box', scope)
-        const requiredScopes = getCanonicalScopesForProvider('box')
+        const credential = await requestCredential('google-drive', scope)
+        const requiredScopes = getCanonicalScopesForProvider('google-drive')
 
         expect(requiredScopes.length).toBeGreaterThan(0)
         expect(credential.scopes).toEqual(requiredScopes)

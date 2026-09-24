@@ -26,7 +26,7 @@ describe('useConnectOAuthService', () => {
 
   afterEach(() => unmount())
 
-  it('supplies the canonical legacy scopes explicitly for web Dataverse links', async () => {
+  it('links a standard provider with the draft id on the callback and no per-request scopes', async () => {
     oauthLink.mockResolvedValue({ data: {}, error: null })
     const queryClient = new QueryClient({
       defaultOptions: { mutations: { retry: false }, queries: { retry: false } },
@@ -52,22 +52,15 @@ describe('useConnectOAuthService', () => {
 
     await act(async () => {
       await connect?.mutateAsync({
-        providerId: 'microsoft-dataverse',
+        providerId: 'google-drive',
         callbackURL: 'https://sim.test/oauth/credential-connected',
         draftId: 'draft-1',
       })
     })
 
     expect(oauthLink).toHaveBeenCalledWith({
-      providerId: 'microsoft-dataverse',
+      providerId: 'google-drive',
       callbackURL: 'https://sim.test/oauth/credential-connected?credentialDraftId=draft-1',
-      scopes: [
-        'openid',
-        'profile',
-        'email',
-        'https://dynamics.microsoft.com/user_impersonation',
-        'offline_access',
-      ],
     })
   })
 })

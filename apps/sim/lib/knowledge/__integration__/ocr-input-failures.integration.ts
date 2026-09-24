@@ -109,7 +109,7 @@ describe('OCR input failures stop without partial indexing or futile retries', (
       const file = await addDocument(
         ids.knowledgeBaseId,
         ids.connectorId,
-        'confluence',
+        'notion',
         {
           externalId: 'synthetic-input',
           title: filename,

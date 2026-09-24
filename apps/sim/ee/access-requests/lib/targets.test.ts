@@ -17,8 +17,8 @@ import {
 
 const catalog = createAccessRequestCatalog({
   integrations: [
-    { id: 'slack_v2', label: 'Slack' },
-    { id: 'github', label: 'GitHub' },
+    { id: 'notion_v2', label: 'Notion' },
+    { id: 'gmail', label: 'Gmail' },
   ],
   providers: [
     { id: 'openai', label: 'OpenAI' },
@@ -28,7 +28,7 @@ const catalog = createAccessRequestCatalog({
     { id: 'gpt-example', label: 'Example GPT', providerId: 'openai' },
     { id: 'other-gpt', label: 'Other GPT', providerId: 'openai' },
   ],
-  tools: [{ id: 'slack_send_message_v2', label: 'Send message', integrationId: 'slack_v2' }],
+  tools: [{ id: 'notion_write_v2', label: 'Send message', integrationId: 'notion_v2' }],
   knowledgeConnectors: [{ id: 'google_drive', label: 'Google Drive' }],
 })
 
@@ -43,12 +43,12 @@ describe('access request targets', () => {
   })
 
   it('canonicalizes integration successors before testing or keying a request', () => {
-    const target = validateAccessRequestTarget({ kind: 'integration', id: 'Slack' }, catalog)
-    expect(target).toEqual({ kind: 'integration', id: 'slack_v2' })
-    expect(target && getAccessRequestTargetKey(target)).toBe('integration:slack_v2')
+    const target = validateAccessRequestTarget({ kind: 'integration', id: 'Notion' }, catalog)
+    expect(target).toEqual({ kind: 'integration', id: 'notion_v2' })
+    expect(target && getAccessRequestTargetKey(target)).toBe('integration:notion_v2')
     const delta = buildAccessRequestPolicyDelta(
-      { kind: 'integration', id: 'slack_v2' },
-      { ...DEFAULT_PERMISSION_GROUP_CONFIG, allowedIntegrations: ['SLACK'] },
+      { kind: 'integration', id: 'notion_v2' },
+      { ...DEFAULT_PERMISSION_GROUP_CONFIG, allowedIntegrations: ['NOTION'] },
       catalog
     )
     expect(delta.changes).toEqual([])
@@ -56,22 +56,22 @@ describe('access request targets', () => {
 
   it('allows a single member of an empty allowlist without lifting the whole allowlist', () => {
     const delta = buildAccessRequestPolicyDelta(
-      { kind: 'integration', id: 'slack_v2' },
+      { kind: 'integration', id: 'notion_v2' },
       { ...DEFAULT_PERMISSION_GROUP_CONFIG, allowedIntegrations: [] },
       catalog
     )
-    expect(delta.config.allowedIntegrations).toEqual(['slack_v2'])
+    expect(delta.config.allowedIntegrations).toEqual(['notion_v2'])
     expect(delta.changes).toEqual([
       {
         configKey: 'allowedIntegrations',
         label: 'Allowed integrations and blocks',
         before: [],
-        after: ['slack_v2'],
+        after: ['notion_v2'],
       },
     ])
     expect(
       buildAccessRequestPolicyDelta(
-        { kind: 'integration', id: 'slack_v2' },
+        { kind: 'integration', id: 'notion_v2' },
         DEFAULT_PERMISSION_GROUP_CONFIG,
         catalog
       ).changes
@@ -116,22 +116,22 @@ describe('access request targets', () => {
   it('shows the tool and parent integration changes using exact tool IDs', () => {
     const config = {
       ...DEFAULT_PERMISSION_GROUP_CONFIG,
-      allowedIntegrations: ['github'],
-      deniedTools: ['slack_send_message_v2', 'other_tool'],
+      allowedIntegrations: ['gmail'],
+      deniedTools: ['notion_write_v2', 'other_tool'],
     }
     const delta = buildAccessRequestPolicyDelta(
-      { kind: 'tool', id: 'slack_send_message_v2' },
+      { kind: 'tool', id: 'notion_write_v2' },
       config,
       catalog
     )
-    expect(delta.config.allowedIntegrations).toEqual(['github_v2', 'slack_v2'])
+    expect(delta.config.allowedIntegrations).toEqual(['gmail_v2', 'notion_v2'])
     expect(delta.config.deniedTools).toEqual(['other_tool'])
     expect(delta.changes.map((change) => change.configKey)).toEqual([
       'allowedIntegrations',
       'deniedTools',
     ])
     expect(
-      validateAccessRequestTarget({ kind: 'tool', id: 'SLACK_SEND_MESSAGE_V2' }, catalog)
+      validateAccessRequestTarget({ kind: 'tool', id: 'NOTION_WRITE_V2' }, catalog)
     ).toBeNull()
   })
 
@@ -278,10 +278,10 @@ describe('access request targets', () => {
   it('keeps cheap discovery denial in parity with full policy deltas', () => {
     const targets: AccessRequestTarget[] = [
       { kind: 'feature', configKey: 'disableKnowledgeBaseCreation' },
-      { kind: 'integration', id: 'slack' },
+      { kind: 'integration', id: 'notion' },
       { kind: 'provider', id: 'openai' },
       { kind: 'model', id: 'GPT-EXAMPLE' },
-      { kind: 'tool', id: 'slack_send_message_v2' },
+      { kind: 'tool', id: 'notion_write_v2' },
       { kind: 'knowledge_connector', id: 'google_drive' },
       { kind: 'file_share_auth', id: 'public' },
       { kind: 'chat_deploy_auth', id: 'sso' },
@@ -290,7 +290,7 @@ describe('access request targets', () => {
       DEFAULT_PERMISSION_GROUP_CONFIG,
       {
         ...DEFAULT_PERMISSION_GROUP_CONFIG,
-        allowedIntegrations: ['SLACK'],
+        allowedIntegrations: ['NOTION'],
         allowedModelProviders: ['openai'],
         deniedModels: ['OTHER-GPT'],
       },
@@ -305,7 +305,7 @@ describe('access request targets', () => {
         allowedIntegrations: [],
         allowedModelProviders: [],
         deniedModels: ['GPT-EXAMPLE'],
-        deniedTools: ['slack_send_message_v2'],
+        deniedTools: ['notion_write_v2'],
         allowedKnowledgeConnectors: [],
         allowedFileShareAuthTypes: [],
         allowedChatDeployAuthTypes: [],

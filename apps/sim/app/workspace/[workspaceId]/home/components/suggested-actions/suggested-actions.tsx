@@ -8,7 +8,7 @@ import { stripVersionSuffix } from '@sim/utils/string'
 import { useParams } from 'next/navigation'
 import { usePostHog } from 'posthog-js/react'
 import { HomeSection } from '@/components/home/home-section'
-import { GmailIcon, SlackIcon } from '@/components/icons'
+import { GmailIcon, GoogleSheetsIcon } from '@/components/icons'
 import {
   resolveOAuthServiceForIntegration,
   resolveOAuthServiceForSlug,
@@ -214,10 +214,10 @@ function computeActions(services: readonly ServiceInfo[], signals: Signals): Act
 const INITIAL_ACTIONS: Action[] = [
   {
     kind: 'integration',
-    id: 'integrate-slack',
-    label: 'Integrate with Slack',
-    icon: SlackIcon,
-    slug: 'slack',
+    id: 'integrate-google-sheets',
+    label: 'Integrate with Google Sheets',
+    icon: GoogleSheetsIcon,
+    slug: 'google-sheets',
   },
   {
     kind: 'integration',
@@ -227,7 +227,7 @@ const INITIAL_ACTIONS: Action[] = [
     slug: 'gmail',
   },
   toPromptAction(TABLE_STARTERS[0]),
-  ...CANDIDATES.filter((c) => c.blockType === 'github' && c.featured)
+  ...CANDIDATES.filter((c) => c.blockType === 'hubspot' && c.featured)
     .slice(0, 1)
     .map(toPromptAction),
 ]

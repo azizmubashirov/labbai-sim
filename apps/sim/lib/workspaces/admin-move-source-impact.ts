@@ -57,7 +57,6 @@ const ENTERPRISE_GATED_SECTION_LABELS: Record<OrganizationSettingsSection, strin
   'recently-deleted': null,
   integrations: 'Sim Search source setup',
   'search-mcp': null,
-  'search-slack': 'Sim Search in Slack',
   'connected-accounts': 'organization connected accounts',
   members: null,
   billing: null,

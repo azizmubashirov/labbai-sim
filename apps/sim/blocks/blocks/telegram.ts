@@ -929,32 +929,12 @@ export const TelegramBlockMeta = {
   templates: [
     {
       icon: TelegramIcon,
-      title: 'Telegram alert relay',
-      prompt:
-        'Build a workflow that listens for critical alerts from Sentry or PagerDuty and forwards a concise summary with severity, link, and the on-call person to a Telegram group.',
-      modules: ['agent', 'workflows'],
-      category: 'engineering',
-      tags: ['devops', 'monitoring'],
-      alsoIntegrations: ['sentry', 'pagerduty'],
-    },
-    {
-      icon: TelegramIcon,
       title: 'Telegram price-action notifier',
       prompt:
         'Create a scheduled workflow that watches tracked assets in a table for price thresholds and pushes a Telegram message with the trigger, price, and a link to the chart.',
       modules: ['scheduled', 'tables', 'agent', 'workflows'],
       category: 'operations',
       tags: ['finance', 'monitoring'],
-    },
-    {
-      icon: TelegramIcon,
-      title: 'Telegram support bot',
-      prompt:
-        'Build a Telegram bot that answers product questions using a knowledge base with citations, escalates to a human via Intercom when it cannot answer, and logs every conversation to a table.',
-      modules: ['knowledge-base', 'tables', 'agent', 'workflows'],
-      category: 'support',
-      tags: ['support', 'communication'],
-      alsoIntegrations: ['intercom'],
     },
     {
       icon: TelegramIcon,

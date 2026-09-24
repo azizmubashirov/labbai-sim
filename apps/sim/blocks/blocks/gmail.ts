@@ -762,26 +762,6 @@ export const GmailBlockMeta = {
     },
     {
       icon: GmailIcon,
-      title: 'Gmail triage assistant',
-      prompt:
-        'Build a workflow that scans my Gmail inbox every hour, categorizes emails by urgency and type (action needed, FYI, follow-up), drafts replies for routine messages, and sends me a prioritized summary in Slack so I only open what matters. Schedule it to run hourly.',
-      modules: ['agent', 'scheduled', 'workflows'],
-      category: 'productivity',
-      tags: ['individual', 'communication', 'automation'],
-      alsoIntegrations: ['slack'],
-    },
-    {
-      icon: ClipboardList,
-      title: 'Gmail invoice processor',
-      prompt:
-        'Build a workflow that processes invoice PDFs from Gmail, extracts vendor name, amount, due date, and line items, then logs everything to a tracking table and sends a Slack alert for invoices due within 7 days.',
-      modules: ['files', 'tables', 'agent', 'workflows'],
-      category: 'operations',
-      tags: ['finance', 'automation'],
-      alsoIntegrations: ['slack'],
-    },
-    {
-      icon: GmailIcon,
       title: 'Gmail to CRM activity logger',
       prompt:
         'Build a workflow that reads new Gmail threads with customers, extracts the contact, deal context, and key points discussed, and logs a timestamped activity to the matching HubSpot contact or deal so every conversation stays attached to the record.',

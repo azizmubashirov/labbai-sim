@@ -11,7 +11,6 @@ import { useOrganizationContext } from '@/app/o/[organizationId]/providers/organ
 import { AddOrganizationSourceModal } from '@/app/o/[organizationId]/settings/components/integrations/add-organization-source-modal'
 import { organizationSearchStatusLabel } from '@/app/o/[organizationId]/settings/components/integrations/organization-search-status'
 import { SearchSourceSetup } from '@/app/o/[organizationId]/settings/components/integrations/search-source-setup'
-import { OrganizationSlackAccountSetup } from '@/app/o/[organizationId]/settings/components/integrations/slack-account-setup'
 import { IntegrationTile } from '@/app/workspace/[workspaceId]/integrations/components/integrations-showcase'
 import {
   SettingsEmptyState,
@@ -182,7 +181,6 @@ export function OrganizationIntegrationsSetup() {
           mirroredAccessAvailable={searchAccess.sourceMirrored}
         />
       )}
-      <OrganizationSlackAccountSetup />
     </>
   )
 }

@@ -7,7 +7,6 @@ import { getErrorMessage } from '@sim/utils/errors'
 import { useQueryState } from 'nuqs'
 import { saveDiscardActions } from '@/components/settings/save-discard-actions'
 import type { CredentialGroupEnrollment } from '@/lib/api/contracts/credential-groups'
-import { SLACK_CUSTOM_BOT_PROVIDER_ID } from '@/lib/oauth/types'
 import { UnsavedChangesModal } from '@/app/workspace/[workspaceId]/components/credential-detail'
 import {
   credentialGroupPeopleSearchParam,
@@ -41,7 +40,6 @@ import {
   useResendCredentialGroupEnrollment,
   useUpdateCredentialGroup,
 } from '@/hooks/queries/credential-groups'
-import { useWorkspaceCredentials } from '@/hooks/queries/credentials'
 import { useDebouncedSearchSetter } from '@/hooks/use-debounced-search-setter'
 
 interface CredentialGroupDetailProps {
@@ -59,11 +57,6 @@ const CREDENTIAL_GROUP_TABS = [
 
 export function CredentialGroupDetail({ workspaceId, groupId }: CredentialGroupDetailProps) {
   const detail = useCredentialGroupDetail(workspaceId, groupId)
-  const slackBots = useWorkspaceCredentials({
-    workspaceId,
-    type: 'service_account',
-    providerId: SLACK_CUSTOM_BOT_PROVIDER_ID,
-  })
   const resend = useResendCredentialGroupEnrollment()
   const deleteEnrollment = useDeleteCredentialGroupEnrollment()
   const updateGroup = useUpdateCredentialGroup()
@@ -118,12 +111,7 @@ export function CredentialGroupDetail({ workspaceId, groupId }: CredentialGroupD
             (server) => server.enabled && server.authType === 'oauth'
           ))
     ) &&
-    credentialGroup?.options.every(
-      (option) =>
-        option.provider !== 'slack' ||
-        (option.configurationStatus === 'ready' &&
-          slackBots.data?.some((bot) => bot.id === option.slackBotCredentialId))
-    )
+    credentialGroup?.options.every((option) => option.configurationStatus === 'ready')
 
   const guard = useSettingsUnsavedGuard({
     isDirty: accessEditor.dirty,

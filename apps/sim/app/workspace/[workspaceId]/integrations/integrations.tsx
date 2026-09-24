@@ -40,7 +40,7 @@ import { useDebouncedSearchSetter } from '@/hooks/use-debounced-search-setter'
 import { usePermissionConfig } from '@/hooks/use-permission-config'
 
 /** Slugs surfaced in the pinned Featured section, in display order. */
-const FEATURED_SLUGS = ['slack', 'gmail', 'jira', 'github', 'google-sheets', 'hubspot'] as const
+const FEATURED_SLUGS = ['telegram', 'whatsapp', 'gmail', 'google-sheets', 'hubspot', 'notion'] as const
 
 const FEATURED_INTEGRATIONS: readonly Integration[] = (() => {
   const bySlug = new Map(INTEGRATIONS.map((i) => [i.slug, i]))

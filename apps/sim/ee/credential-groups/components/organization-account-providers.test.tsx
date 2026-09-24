@@ -18,7 +18,6 @@ const mocks = vi.hoisted(() => ({
   update: vi.fn(),
   remove: vi.fn(),
   reset: vi.fn(),
-  slack: vi.fn<(props: unknown) => null>(() => null),
   addError: null as Error | null,
   updatePending: false,
 }))
@@ -44,9 +43,6 @@ vi.mock('@/hooks/queries/organization-accounts', () => ({
   }),
   useConfigureOrganizationMcp: () => ({ isPending: false, mutateAsync: mocks.configure }),
   useOrganizationDatabricksSetup: mocks.setup,
-}))
-vi.mock('@/ee/credential-groups/components/slack-managed-users-modal', () => ({
-  SlackManagedUsersModal: mocks.slack,
 }))
 vi.mock('@/ee/credential-groups/components/organization-account-people', () => ({
   OrganizationAccountPeople: () => null,
@@ -94,11 +90,11 @@ const gmail: NonNullable<OrganizationAccountsSettings['credentialGroup']>['optio
   status: 'active',
   configurationStatus: 'ready',
 }
-const github: NonNullable<OrganizationAccountsSettings['credentialGroup']>['options'][number] = {
+const notion: NonNullable<OrganizationAccountsSettings['credentialGroup']>['options'][number] = {
   ...gmail,
-  id: 'github-option',
-  provider: 'github-repositories',
-  label: 'Engineering GitHub',
+  id: 'notion-option',
+  provider: 'notion',
+  label: 'Engineering Notion',
   required: true,
 }
 
@@ -158,15 +154,15 @@ describe('organization provider configuration UI', () => {
   }
 
   it('filters integrations without dropping hidden providers from configuration updates', async () => {
-    await render([], [gmail, github], '?credential-group-provider=+GMAIL+')
+    await render([], [gmail, notion], '?credential-group-provider=+GMAIL+')
     expect(container.textContent).toContain('Gmail')
-    expect(container.textContent).not.toContain('GitHub')
+    expect(container.textContent).not.toContain('Notion')
     await clickButton('Update configurations')
     expect(
       mocks.update.mock.calls[0][0].update.options.map(
         (option: { provider: string }) => option.provider
       )
-    ).toEqual(['gmail', 'github-repositories'])
+    ).toEqual(['gmail', 'notion'])
   })
 
   it('distinguishes an integration search miss from an unconfigured group', async () => {
@@ -271,15 +267,7 @@ describe('organization provider configuration UI', () => {
   })
 
   it('updates current provider configurations while preserving their IDs and saved settings', async () => {
-    const slack = {
-      ...gmail,
-      id: 'slack-option',
-      provider: 'slack' as const,
-      label: 'Company Slack',
-      slackBotCredentialId: 'bot-1',
-      requiredScopes: ['search:read'],
-    }
-    await render([], [github, gmail, slack])
+    await render([], [notion, gmail])
     await clickButton('Update configurations')
     expect(mocks.update).toHaveBeenCalledExactlyOnceWith(
       {
@@ -288,23 +276,16 @@ describe('organization provider configuration UI', () => {
         update: {
           options: [
             {
-              id: github.id,
-              provider: github.provider,
-              label: github.label,
-              required: github.required,
+              id: notion.id,
+              provider: notion.provider,
+              label: notion.label,
+              required: notion.required,
             },
             {
               id: gmail.id,
               provider: gmail.provider,
               label: gmail.label,
               required: gmail.required,
-            },
-            {
-              id: slack.id,
-              provider: slack.provider,
-              label: slack.label,
-              required: slack.required,
-              slackBotCredentialId: slack.slackBotCredentialId,
             },
           ],
         },
@@ -318,7 +299,7 @@ describe('organization provider configuration UI', () => {
 
   it('disables configuration updates while a provider mutation is pending', async () => {
     mocks.updatePending = true
-    await render([], [github])
+    await render([], [notion])
     const button = Array.from(document.querySelectorAll('button')).find(
       (node) => node.textContent === 'Update configurations'
     )
@@ -329,13 +310,13 @@ describe('organization provider configuration UI', () => {
 
   it('surfaces a configuration update failure without removing the provider', async () => {
     mocks.update.mockImplementation((_input, { onError }) =>
-      onError(new Error('GitHub App configuration is unavailable'))
+      onError(new Error('Notion configuration is unavailable'))
     )
-    await render([], [github])
+    await render([], [notion])
     await clickButton('Update configurations')
-    expect(toast.error).toHaveBeenCalledWith('GitHub App configuration is unavailable')
+    expect(toast.error).toHaveBeenCalledWith('Notion configuration is unavailable')
     expect(toast.success).not.toHaveBeenCalled()
-    expect(container.textContent).toContain('GitHub')
+    expect(container.textContent).toContain('Notion')
     expect(mocks.remove).not.toHaveBeenCalled()
   })
 
@@ -345,8 +326,8 @@ describe('organization provider configuration UI', () => {
       mocks.accounts.mockReturnValue({
         data: {
           canManage,
-          credentialGroup: { ...group, options: [github] },
-          availableProviders: ['github-repositories'],
+          credentialGroup: { ...group, options: [notion] },
+          availableProviders: ['notion'],
         },
       })
       await act(async () =>
@@ -360,29 +341,6 @@ describe('organization provider configuration UI', () => {
       expect(mocks.update).not.toHaveBeenCalled()
     }
   )
-
-  it('opens Slack app configuration directly with the existing scopes', async () => {
-    await render(
-      [],
-      [
-        {
-          ...gmail,
-          id: 'slack-option',
-          provider: 'slack',
-          label: 'Slack',
-          requiredScopes: ['search:read'],
-        },
-      ]
-    )
-    expect(mocks.slack).not.toHaveBeenCalled()
-    await clickButton('Configure')
-    expect(mocks.slack.mock.lastCall?.[0]).toMatchObject({
-      open: true,
-      organizationId: 'org-1',
-      credentialGroupId: 'group-1',
-      initialRequiredScopes: ['search:read'],
-    })
-  })
 
   it('surfaces an add failure in the catalog and does not open configuration', async () => {
     mocks.add.mockImplementation(() => {})

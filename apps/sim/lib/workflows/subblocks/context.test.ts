@@ -5,7 +5,6 @@ import { afterAll, describe, expect, it, vi } from 'vitest'
 
 vi.unmock('@/blocks/registry')
 
-import { isSelectorReady } from '@/lib/selectors/manifest'
 import * as blocksBarrel from '@/blocks'
 import { getAllBlocks, getBlock as getRealBlock } from '@/blocks/registry'
 import {
@@ -132,44 +131,6 @@ describe('buildSelectorContextFromBlock', () => {
     expect(ctx.workspaceId).toBe('ws-123')
   })
 
-  it('exposes the NetSuite async job ID to dependent task selectors', () => {
-    const ctx = buildSelectorContextFromBlock('netsuite', {
-      operation: { id: 'operation', type: 'dropdown', value: 'netsuite_get_async_status' },
-      jobId: { id: 'jobId', type: 'short-input', value: 'job-7' },
-    })
-
-    expect(ctx.jobId).toBe('job-7')
-  })
-
-  it('exposes the active Bitbucket workspace slug to repository selectors', () => {
-    const subBlocks = {
-      operation: {
-        id: 'operation',
-        type: 'dropdown',
-        value: 'bitbucket_get_repository',
-      },
-      workspacePicker: {
-        id: 'workspacePicker',
-        type: 'project-selector',
-        value: 'acme-platform',
-      },
-      workspaceSlugInput: {
-        id: 'workspaceSlugInput',
-        type: 'short-input',
-        value: 'advanced-team',
-      },
-    }
-
-    expect(buildSelectorContextFromBlock('bitbucket', subBlocks).workspaceSlug).toBe(
-      'acme-platform'
-    )
-    expect(
-      buildSelectorContextFromBlock('bitbucket', subBlocks, {
-        canonicalModes: { workspaceSlug: 'advanced' },
-      }).workspaceSlug
-    ).toBe('advanced-team')
-  })
-
   it('preserves Gmail action credential resolution in basic and advanced modes', () => {
     const subBlocks = subBlocksFromValues({
       credential: 'action-basic',
@@ -230,73 +191,14 @@ describe('buildSelectorContextFromBlock', () => {
     })
   })
 
-  it('projects only the active Slack auth source plus trigger credentials', () => {
-    const oauthAction = buildSelectorContextFromBlock(
-      'slack',
-      subBlocksFromValues({
-        authMethod: 'oauth',
-        credential: 'active-oauth',
-        botToken: 'xoxb-dormant',
-      }),
-      {
-        selectorKey: 'slack.channels',
-        dependsOn: ['authMethod', 'credential', 'botToken'],
-      }
-    )
-    expect(oauthAction.oauthCredential).toBe('active-oauth')
-
-    const botAction = buildSelectorContextFromBlock(
-      'slack',
-      subBlocksFromValues({
-        authMethod: 'bot_token',
-        credential: 'dormant-oauth',
-        botToken: '{{SLACK_BOT_TOKEN}}',
-      }),
-      {
-        selectorKey: 'slack.channels',
-        dependsOn: ['authMethod', 'credential', 'botToken'],
-      }
-    )
-    expect(botAction.oauthCredential).toBe('{{SLACK_BOT_TOKEN}}')
-
-    const trigger = buildSelectorContextFromBlock(
-      'slack_v2',
-      subBlocksFromValues({
-        eventType: 'message',
-        customBotCredential: '{{SLACK_TRIGGER_CREDENTIAL}}',
-      }),
-      {
-        selectorKey: 'slack.channels',
-        dependsOn: ['customBotCredential'],
-        triggerMode: true,
-      }
-    )
-    expect(trigger.oauthCredential).toBe('{{SLACK_TRIGGER_CREDENTIAL}}')
-  })
-
-  it('projects the optional Microsoft Excel drive cascade input', () => {
-    const excel = buildSelectorContextFromBlock(
-      'microsoft_excel',
-      subBlocksFromValues({
-        credential: 'excel-credential',
-        driveId: '{{SHAREPOINT_DRIVE_ID}}',
-      }),
-      {
-        selectorKey: 'microsoft.excel',
-        dependsOn: ['credential', 'driveId'],
-      }
-    )
-    expect(excel.driveId).toBe('{{SHAREPOINT_DRIVE_ID}}')
-  })
-
   it('uses trigger credentials with and without canonical metadata after action conversion', () => {
-    const clickupValues = {
-      selectedTriggerId: 'clickup_task_created',
+    const hubspotValues = {
+      selectedTriggerId: 'hubspot_poller',
       credential: 'dormant-action',
       triggerCredentials: 'active-trigger',
     }
     const cases = [
-      { blockType: 'clickup', values: clickupValues },
+      { blockType: 'hubspot', values: hubspotValues },
       {
         blockType: 'airtable',
         values: { credential: 'dormant-action', triggerCredentials: 'active-trigger' },
@@ -311,32 +213,13 @@ describe('buildSelectorContextFromBlock', () => {
       ).toBe('active-trigger')
     }
 
-    const clickupConfig = getRealBlock('clickup')
+    const hubspotConfig = getRealBlock('hubspot')
     const triggerCanonicalIndex = buildCanonicalIndex(
-      getSelectorContextSubBlocks(clickupConfig?.subBlocks ?? [], clickupValues, true)
+      getSelectorContextSubBlocks(hubspotConfig?.subBlocks ?? [], hubspotValues, true)
     )
-    expect(resolveDependencyValue('triggerCredentials', clickupValues, triggerCanonicalIndex)).toBe(
+    expect(resolveDependencyValue('triggerCredentials', hubspotValues, triggerCanonicalIndex)).toBe(
       'active-trigger'
     )
-  })
-
-  it('uses only active trigger dependencies in the strict selector context path', () => {
-    const context = buildSelectorContextFromBlock(
-      'clickup',
-      subBlocksFromValues({
-        selectedTriggerId: 'clickup_task_created',
-        credential: 'dormant-action',
-        triggerCredentials: '{{CLICKUP_SHARED_CREDENTIAL}}',
-        teamId: '<previous.output>',
-      }),
-      {
-        selectorKey: 'clickup.spaces',
-        dependsOn: ['triggerCredentials', 'teamId'],
-        triggerMode: true,
-      }
-    )
-
-    expect(context).toEqual({ oauthCredential: '{{CLICKUP_SHARED_CREDENTIAL}}' })
   })
 
   it('does not leak a dormant action credential when an unmapped trigger credential is blank', () => {
@@ -347,36 +230,6 @@ describe('buildSelectorContextFromBlock', () => {
     )
 
     expect(ctx.oauthCredential).toBeUndefined()
-  })
-
-  it('exposes a trigger workspace slug to the Bitbucket repository selector', () => {
-    const context = buildSelectorContextFromBlock(
-      'bitbucket',
-      {
-        selectedTriggerId: {
-          id: 'selectedTriggerId',
-          type: 'dropdown',
-          value: 'bitbucket_push',
-        },
-        triggerCredentials: {
-          id: 'triggerCredentials',
-          type: 'oauth-input',
-          value: 'credential-1',
-        },
-        workspacePicker: {
-          id: 'workspacePicker',
-          type: 'project-selector',
-          value: 'acme-platform',
-        },
-      },
-      { triggerMode: true }
-    )
-
-    expect(context).toMatchObject({
-      oauthCredential: 'credential-1',
-      workspaceSlug: 'acme-platform',
-    })
-    expect(isSelectorReady('bitbucket.repositories', context)).toBe(true)
   })
 
   it('should ignore subblock keys not in SELECTOR_CONTEXT_FIELDS', () => {

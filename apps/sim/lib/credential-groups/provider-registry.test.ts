@@ -3,7 +3,6 @@
  */
 import { describe, expect, it } from 'vitest'
 import {
-  createAtlassianManagedOAuthConnector,
   createGoogleManagedOAuthConnector,
   getManagedOAuthConnectorPolicy,
 } from '@/lib/auth/connectors/managed-oauth'
@@ -14,7 +13,6 @@ import {
   getCredentialGroupProviderService,
   getCredentialGroupStandardOAuthProviderFromProviderId,
 } from '@/lib/credential-groups/providers'
-import { SLACK_MANAGED_USER_SCOPES } from '@/lib/credential-groups/slack-managed-user-scopes'
 
 const GMAIL_MODIFY_SCOPE = 'https://www.googleapis.com/auth/gmail.modify'
 const GMAIL_SEND_SCOPE = 'https://www.googleapis.com/auth/gmail.send'
@@ -49,7 +47,7 @@ describe('Credential Group provider registry', () => {
     )
   })
 
-  it.each(['confluence', 'jira'] as const)(
+  it.each(['notion', 'hubspot'] as const)(
     'maps %s to its existing OAuth provider and adapter',
     (provider) => {
       const service = getCredentialGroupProviderService(provider)
@@ -95,28 +93,6 @@ describe('Credential Group provider registry', () => {
 
     expect(managedOAuth.hasRequiredScopes(requiredScopes, requiredScopes)).toBe(true)
     expect(managedOAuth.hasRequiredScopes(requiredScopes.slice(1), requiredScopes)).toBe(false)
-  })
-
-  it.each(['confluence', 'jira'] as const)('requires the complete %s scope policy', (provider) => {
-    const managedOAuth = createAtlassianManagedOAuthConnector(provider)
-    const requiredScopes = getCredentialGroupProviderService(provider).scopes
-
-    expect(managedOAuth.hasRequiredScopes(requiredScopes, requiredScopes)).toBe(true)
-    expect(managedOAuth.hasRequiredScopes(requiredScopes.slice(1), requiredScopes)).toBe(false)
-  })
-
-  it('maps the legacy Slack tool scope bundle to the managed-user policy', () => {
-    const adapter = getCredentialGroupProviderAdapter('slack')
-    const canonicalScopes = getCredentialGroupProviderService('slack').scopes
-
-    expect(adapter.hasRequiredScopes([...SLACK_MANAGED_USER_SCOPES], canonicalScopes)).toBe(true)
-    expect(
-      adapter.hasRequiredScopes(
-        SLACK_MANAGED_USER_SCOPES.filter((scope) => scope !== 'chat:write'),
-        canonicalScopes
-      )
-    ).toBe(false)
-    expect(adapter.hasRequiredScopes(['chat:write'], ['chat:write'])).toBe(true)
   })
 
   it('fails fast for an unregistered managed provider ID', () => {

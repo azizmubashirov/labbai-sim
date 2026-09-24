@@ -13,11 +13,53 @@ import * as subblockVisibility from '@/lib/workflows/subblocks/visibility'
 import { Serializer } from '@/serializer/index'
 
 /**
- * Asserts real tool params and outputs, which the global `@/tools/metadata`
- * and `@/tools/metadata-outputs` mocks in vitest.setup.ts empty.
+ * Tool definitions shared by the serializer's metadata lookup and the executor's
+ * `getTool`. The global `@/tools/metadata` mock in vitest.setup.ts returns no
+ * params, so this file supplies the params the validation layers read.
  */
-vi.unmock('@/tools/metadata')
-vi.unmock('@/tools/metadata-outputs')
+const { mockTools } = vi.hoisted(() => ({
+  mockTools: {
+    jina_read_url: {
+      name: 'Jina Reader',
+      params: {
+        url: {
+          type: 'string',
+          visibility: 'user-or-llm',
+          required: true,
+          description: 'URL to extract content from',
+        },
+        apiKey: {
+          type: 'string',
+          visibility: 'user-only',
+          required: true,
+          description: 'Your Jina API key',
+        },
+      },
+    },
+    reddit_get_posts: {
+      name: 'Reddit Posts',
+      params: {
+        subreddit: {
+          type: 'string',
+          visibility: 'user-or-llm',
+          required: true,
+          description: 'Subreddit name',
+        },
+        credential: {
+          type: 'string',
+          visibility: 'user-only',
+          required: true,
+          description: 'Reddit credentials',
+        },
+      },
+    },
+  } as Record<string, any>,
+}))
+
+vi.mock('@/tools/metadata', () => ({
+  getToolMetadata: (toolId: string) => mockTools[toolId],
+  getToolParams: (toolId: string) => mockTools[toolId]?.params,
+}))
 
 vi.mock('@/blocks', () => blocksMock)
 
@@ -66,45 +108,7 @@ function validateRequiredParametersAfterMerge(
 }
 
 vi.mock('@/tools/utils', () => ({
-  getTool: (toolId: string) => {
-    const mockTools: Record<string, any> = {
-      jina_read_url: {
-        name: 'Jina Reader',
-        params: {
-          url: {
-            type: 'string',
-            visibility: 'user-or-llm',
-            required: true,
-            description: 'URL to extract content from',
-          },
-          apiKey: {
-            type: 'string',
-            visibility: 'user-only',
-            required: true,
-            description: 'Your Jina API key',
-          },
-        },
-      },
-      reddit_get_posts: {
-        name: 'Reddit Posts',
-        params: {
-          subreddit: {
-            type: 'string',
-            visibility: 'user-or-llm',
-            required: true,
-            description: 'Subreddit name',
-          },
-          credential: {
-            type: 'string',
-            visibility: 'user-only',
-            required: true,
-            description: 'Reddit credentials',
-          },
-        },
-      },
-    }
-    return mockTools[toolId] || null
-  },
+  getTool: (toolId: string) => mockTools[toolId] || null,
   validateRequiredParametersAfterMerge,
 }))
 

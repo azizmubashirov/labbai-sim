@@ -24,9 +24,6 @@ const mocks = vi.hoisted(() => ({
   createConnection: vi.fn(),
   getPerRequestScopes: vi.fn(),
   launchConnection: vi.fn(),
-  decryptQuickBooksClientConfig: vi.fn(),
-  createQuickBooksState: vi.fn(),
-  getCanonicalScopes: vi.fn(),
   isPubliclyRegistered: vi.fn(),
 }))
 
@@ -65,13 +62,6 @@ vi.mock('@/lib/credentials/application/launch-scoped-credential-connection', () 
 }))
 vi.mock('@/lib/oauth/utils', () => ({
   getPerRequestOAuthLinkScopes: mocks.getPerRequestScopes,
-  getCanonicalScopesForProvider: mocks.getCanonicalScopes,
-}))
-vi.mock('@/lib/oauth/quickbooks-client-config', () => ({
-  decryptQuickBooksOAuthClientConfig: mocks.decryptQuickBooksClientConfig,
-}))
-vi.mock('@/lib/oauth/quickbooks-state', () => ({
-  createQuickBooksOAuthState: mocks.createQuickBooksState,
 }))
 
 import { GET } from '@/app/api/auth/oauth2/authorize/route'
@@ -123,19 +113,6 @@ describe('OAuth2 authorize route', () => {
     mocks.linkAccount.mockResolvedValue(linkResponse())
     mocks.getPerRequestScopes.mockReturnValue(undefined)
     mocks.betterAuthGET.mockResolvedValue(new Response(null, { status: 302 }))
-    mocks.getCanonicalScopes.mockReturnValue([
-      'openid',
-      'profile',
-      'email',
-      'com.intuit.quickbooks.accounting',
-    ])
-    mocks.decryptQuickBooksClientConfig.mockResolvedValue({
-      clientId: 'intuit-client-id',
-      clientSecret: 'intuit-client-secret',
-      environment: 'sandbox',
-      webhookVerifierToken: 'verifier-token',
-    })
-    mocks.createQuickBooksState.mockReturnValue('signed-state')
   })
 
   it('forwards a resource-bound Search authorization to the existing provider', async () => {
@@ -570,22 +547,22 @@ describe('OAuth2 authorize route', () => {
   })
 
   it('passes per-request scopes to providers that cannot inherit static connector scopes', async () => {
-    const scopes = ['openid', 'https://dynamics.microsoft.com/user_impersonation']
+    const scopes = ['openid', 'https://www.googleapis.com/auth/drive.file']
     mocks.getPerRequestScopes.mockReturnValue(scopes)
     mocks.createConnection.mockResolvedValue({
-      providerId: 'microsoft-dataverse',
+      providerId: 'google-drive',
       workspaceId: WORKSPACE_ID,
       draftId: 'draft-1',
       expiresAt: new Date(),
       authorizationUrl: '',
     })
 
-    await GET(request({ providerId: 'microsoft-dataverse', workspaceId: WORKSPACE_ID }))
+    await GET(request({ providerId: 'google-drive', workspaceId: WORKSPACE_ID }))
 
     expect(mocks.linkAccount).toHaveBeenCalledWith(
       expect.objectContaining({
         body: expect.objectContaining({
-          providerId: 'microsoft-dataverse',
+          providerId: 'google-drive',
           scopes,
         }),
       })
@@ -710,38 +687,5 @@ describe('OAuth2 authorize route', () => {
 
     expect(location.pathname).toBe('/api/auth/trello/authorize')
     expect(location.searchParams.get('draftId')).toBe('draft-1')
-  })
-
-  it('starts QuickBooks with the write-only app configuration bound to its draft', async () => {
-    mocks.launchConnection.mockResolvedValue({
-      draft: {
-        id: 'draft-1',
-        providerId: 'quickbooks',
-        workspaceId: WORKSPACE_ID,
-        credentialId: null,
-        oauthConfig: 'encrypted-config',
-      },
-    })
-    const callbackURL = `${BASE_URL}/workspace/${WORKSPACE_ID}/integrations`
-
-    const response = await GET(request({ draftId: 'draft-1', callbackURL }))
-    const location = new URL(response.headers.get('location') ?? '')
-
-    expect(mocks.requireClient).not.toHaveBeenCalled()
-    expect(mocks.decryptQuickBooksClientConfig).toHaveBeenCalledWith('encrypted-config')
-    expect(mocks.createQuickBooksState).toHaveBeenCalledWith({
-      userId: 'user-1',
-      draftId: 'draft-1',
-      returnUrl: callbackURL,
-    })
-    expect(location.origin + location.pathname).toBe('https://appcenter.intuit.com/connect/oauth2')
-    expect(Object.fromEntries(location.searchParams)).toEqual({
-      client_id: 'intuit-client-id',
-      response_type: 'code',
-      scope: 'openid profile email com.intuit.quickbooks.accounting',
-      redirect_uri: `${BASE_URL}/api/auth/oauth2/callback/quickbooks`,
-      state: 'signed-state',
-    })
-    expect(mocks.linkAccount).not.toHaveBeenCalled()
   })
 })

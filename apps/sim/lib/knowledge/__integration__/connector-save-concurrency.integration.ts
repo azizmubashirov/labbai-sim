@@ -146,7 +146,7 @@ describe('independent connector saves in one knowledge base', () => {
     const args = [
       ids.knowledgeBaseId,
       ids.connectorId,
-      'confluence',
+      'notion',
       item.extDoc,
       { workspaceId: ids.workspaceId, userId: ids.aliceId },
       undefined,
@@ -162,7 +162,7 @@ describe('independent connector saves in one knowledge base', () => {
         return persistSkippedDocuments(
           ids.knowledgeBaseId,
           ids.connectorId,
-          'confluence',
+          'notion',
           [{ type: 'skip', existingId: item.documentId, extDoc: item.extDoc }],
           undefined,
           'workspace',
@@ -179,7 +179,7 @@ describe('independent connector saves in one knowledge base', () => {
         return persistSourceDocumentFailures({
           knowledgeBaseId: ids.knowledgeBaseId,
           connectorId: ids.connectorId,
-          connectorType: 'confluence',
+          connectorType: 'notion',
           documents: [item.extDoc],
           failedExternalIds: new Set([item.extDoc.externalId]),
           priorByExternalId: new Map([[item.extDoc.externalId, { id: item.documentId }]]),

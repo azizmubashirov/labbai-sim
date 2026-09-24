@@ -29,7 +29,6 @@ import {
   validateConnectorSourceConfig,
 } from '@/lib/knowledge/application/connectors'
 import { resolveActiveKnowledgeConnectorContext } from '@/lib/knowledge/application/contexts'
-import { prepareGitHubInstallationSource } from '@/lib/knowledge/application/github-installation-source'
 import { knowledgeOperations } from '@/lib/knowledge/application/operations'
 import {
   type ConnectorAccessMode,
@@ -254,22 +253,7 @@ export const updateKnowledgeConnectorAccess = defineAuthorizedKnowledgeUseCase({
         'Save source settings separately when changing the connection method.'
       )
     }
-    const sourceConfig = await prepareGitHubInstallationSource({
-      principal,
-      requestId,
-      workspaceId: context.workspaceId,
-      connectorType: connector.connectorType,
-      credentialId:
-        input.credentialId === undefined && input.accessMode === connector.accessMode
-          ? connector.credentialId
-          : input.credentialId,
-      organizationId: context.organizationId,
-      isSearchIndex: context.knowledgeBase.isSearchIndex === true,
-      accessMode: input.accessMode,
-      actingUserId,
-      sourceConfig: input.sourceConfig ?? previousConfig,
-      previousConfig,
-    })
+    const sourceConfig = input.sourceConfig ?? previousConfig
 
     let target: ConnectorAccessTarget
     if (input.accessMode === 'members') {

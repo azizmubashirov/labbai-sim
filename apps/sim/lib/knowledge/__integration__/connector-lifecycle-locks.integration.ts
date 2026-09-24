@@ -33,7 +33,7 @@ import { completeSuccessfulSync } from '@/lib/knowledge/connectors/sync-engine'
 import { createContentSyncLease } from '@/lib/knowledge/connectors/sync-lock'
 import { sweepStuckDocuments } from '@/lib/knowledge/connectors/sync-primitives'
 import { deleteKnowledgeBase } from '@/lib/knowledge/service'
-import { GitHubRequestDeferredError } from '@/connectors/github/request'
+import { ProviderCapacityDeferredError } from '@/lib/core/rate-limiter/provider-capacity-error'
 import type { SyncResult } from '@/connectors/types'
 
 const WAIT_OPTIONS = { interval: 5, timeout: 5000 }
@@ -126,7 +126,7 @@ describe('source lifecycle KB guards', () => {
         lease,
         kind: 'content',
         result,
-        error: new GitHubRequestDeferredError(60_000),
+        error: new ProviderCapacityDeferredError('rate_limit', { providerId: 'github-rest', retryAfterMs: 60_000 }),
       })
     }
     return sweepStuckDocuments({

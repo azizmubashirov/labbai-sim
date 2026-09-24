@@ -1905,17 +1905,6 @@ export const HubSpotBlockMeta = {
 
     {
       icon: HubspotIcon,
-      title: 'Get HubSpot deal alerts in Slack',
-      prompt:
-        'Build a workflow that watches HubSpot for deal stage changes, new contacts, and revenue milestones, then posts instant Slack notifications to your sales team.',
-      modules: ['agent', 'workflows'],
-      category: 'productivity',
-      tags: ['automation', 'communication'],
-      featured: true,
-      alsoIntegrations: ['slack'],
-    },
-    {
-      icon: HubspotIcon,
       title: 'Send personalised emails from HubSpot events',
       prompt:
         'Build a workflow that triggers whenever a HubSpot contact enters a new lifecycle stage and sends a personalised Gmail message tailored to that stage.',
@@ -1943,16 +1932,6 @@ export const HubSpotBlockMeta = {
       category: 'sales',
       tags: ['sales', 'reporting', 'crm'],
       alsoIntegrations: ['gmail'],
-    },
-    {
-      icon: HubspotIcon,
-      title: 'HubSpot ticket triage',
-      prompt:
-        'Build a workflow that on a new HubSpot support ticket classifies priority and topic, adds a triage note, associates it with the right company, and posts an alert to the support Slack channel for high-priority cases.',
-      modules: ['agent', 'workflows'],
-      category: 'support',
-      tags: ['support', 'automation', 'crm'],
-      alsoIntegrations: ['slack'],
     },
     {
       icon: HubspotIcon,

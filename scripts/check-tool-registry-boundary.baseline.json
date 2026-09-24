@@ -76,9 +76,7 @@
     },
     "app/workspace/[workspaceId]/access-requests/page.tsx": {
       "modules": 45,
-      "gateways": {
-        "apps/sim/ee/access-requests/components/my-access-requests.tsx": 43
-      }
+      "gateways": {}
     },
     "app/workspace/[workspaceId]/chat/[chatId]/error.tsx": {
       "modules": 152,
@@ -204,8 +202,7 @@
         "apps/sim/blocks/registry.ts": 367,
         "apps/sim/app/workspace/[workspaceId]/integrations/[block]/integration-skills-section.tsx": 62,
         "apps/sim/app/workspace/[workspaceId]/components/index.ts": 58,
-        "apps/sim/lib/api/contracts/index.ts": 33,
-        "apps/sim/triggers/clickup/index.ts": 32
+        "apps/sim/lib/api/contracts/index.ts": 33
       }
     },
     "app/workspace/[workspaceId]/integrations/connected/[credentialId]/page.tsx": {
@@ -237,8 +234,7 @@
         "apps/sim/triggers/index.ts": 524,
         "apps/sim/triggers/registry.ts": 522,
         "apps/sim/app/workspace/[workspaceId]/components/index.ts": 59,
-        "apps/sim/lib/api/contracts/index.ts": 33,
-        "apps/sim/triggers/clickup/index.ts": 32
+        "apps/sim/lib/api/contracts/index.ts": 33
       }
     },
     "app/workspace/[workspaceId]/knowledge/[id]/[documentId]/loading.tsx": {
@@ -287,8 +283,7 @@
         "apps/sim/app/workspace/[workspaceId]/knowledge/[id]/components/index.ts": 114,
         "apps/sim/connectors/registry.ts": 67,
         "apps/sim/app/workspace/[workspaceId]/providers/workspace-permissions-provider.tsx": 64,
-        "apps/sim/app/workspace/[workspaceId]/components/index.ts": 35,
-        "apps/sim/triggers/clickup/index.ts": 32
+        "apps/sim/app/workspace/[workspaceId]/components/index.ts": 35
       }
     },
     "app/workspace/[workspaceId]/knowledge/error.tsx": {
@@ -670,8 +665,7 @@
         "apps/sim/triggers/index.ts": 524,
         "apps/sim/triggers/registry.ts": 522,
         "apps/sim/lib/catalog/projection/block-summary.ts": 405,
-        "apps/sim/blocks/registry-maps.ts": 401,
-        "apps/sim/triggers/clickup/index.ts": 32
+        "apps/sim/blocks/registry-maps.ts": 401
       }
     },
     "lib/catalog/projection/block-summary.ts": {
@@ -680,8 +674,7 @@
         "apps/sim/blocks/registry.ts": 956,
         "apps/sim/blocks/registry-maps.ts": 953,
         "apps/sim/triggers/index.ts": 524,
-        "apps/sim/triggers/registry.ts": 522,
-        "apps/sim/triggers/clickup/index.ts": 32
+        "apps/sim/triggers/registry.ts": 522
       }
     },
     "lib/catalog/projection/connector-type.ts": {

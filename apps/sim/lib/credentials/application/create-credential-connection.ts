@@ -6,12 +6,10 @@ import { credentialDelegationPolicy } from '@/lib/credentials/application/author
 import { resolveCredentialConnectionTarget } from '@/lib/credentials/application/connection-target'
 import { credentialOperations } from '@/lib/credentials/application/operations'
 import { createConnectDraft } from '@/lib/credentials/connect-draft'
-import type { QuickBooksOAuthClientConfig } from '@/lib/oauth/quickbooks-client-config'
 import { loadActiveWorkspaceApplicationContext } from '@/lib/workspaces/application/workspace-context'
 
 export type CreateCredentialConnectionInput = {
   workspaceId: string
-  oauthClientConfig?: QuickBooksOAuthClientConfig
 } & (
   | { providerId: string; displayName?: string; credentialId?: never }
   | {
@@ -47,18 +45,6 @@ export const createCredentialConnection = defineAuthorizedWorkspaceUseCase({
       credentialId: input.credentialId,
       assertedProviderId: 'assertedProviderId' in input ? input.assertedProviderId : undefined,
     })
-    if (target.providerId === 'quickbooks' && !input.oauthClientConfig) {
-      throw new OrchestrationError(
-        'validation',
-        'QuickBooks OAuth client configuration is required'
-      )
-    }
-    if (target.providerId !== 'quickbooks' && input.oauthClientConfig) {
-      throw new OrchestrationError(
-        'validation',
-        'OAuth client configuration is only supported for QuickBooks'
-      )
-    }
     const displayName = input.providerId ? input.displayName : target.displayName
 
     const draft = await createConnectDraft({
@@ -67,7 +53,6 @@ export const createCredentialConnection = defineAuthorizedWorkspaceUseCase({
       providerId: target.providerId,
       credentialId: target.credentialId,
       displayName,
-      oauthClientConfig: input.oauthClientConfig,
     })
     const authorizationUrl = new URL('/api/auth/oauth2/authorize', getBaseUrl())
     authorizationUrl.searchParams.set('draftId', draft.id)

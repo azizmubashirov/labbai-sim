@@ -3,7 +3,7 @@
  */
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
-import { DropboxIcon } from '@/components/icons'
+import { NotionIcon } from '@/components/icons'
 import { OAUTH_PROVIDERS } from '@/lib/oauth'
 import { BrandIcon, withBrandIcon } from '@/blocks/brand-icon'
 import { getAllBlocks } from '@/blocks/registry'
@@ -12,7 +12,7 @@ import { getAllBlocks } from '@/blocks/registry'
 vi.unmock('@/components/icons')
 
 vi.mocked(getAllBlocks).mockReturnValue([
-  { icon: DropboxIcon, iconColor: '#0061FF' },
+  { icon: NotionIcon, iconColor: '#0061FF' },
 ] as unknown as ReturnType<typeof getAllBlocks>)
 
 interface PlainIconProps {
@@ -25,7 +25,7 @@ function PlainIcon({ className }: PlainIconProps) {
 
 describe('BrandIcon', () => {
   it('tints a registered brand glyph with its block color', () => {
-    const markup = renderToStaticMarkup(<BrandIcon icon={DropboxIcon} className='size-[16px]' />)
+    const markup = renderToStaticMarkup(<BrandIcon icon={NotionIcon} className='size-[16px]' />)
 
     expect(markup).toContain('color:#0061FF')
     expect(markup).toContain('size-[16px]')
@@ -39,7 +39,7 @@ describe('BrandIcon', () => {
   })
 
   it('gives an OAuth connect surface the color the chat surfaces already use', () => {
-    const serviceIcon = OAUTH_PROVIDERS.dropbox.services.dropbox.icon
+    const serviceIcon = OAUTH_PROVIDERS.notion.services.notion.icon
     const markup = renderToStaticMarkup(<BrandIcon icon={serviceIcon} />)
 
     expect(markup).toContain('color:#0061FF')
@@ -48,7 +48,7 @@ describe('BrandIcon', () => {
 
 describe('withBrandIcon', () => {
   it('returns a stable component per icon so an icon slot never remounts', () => {
-    expect(withBrandIcon(DropboxIcon)).toBe(withBrandIcon(DropboxIcon))
-    expect(withBrandIcon(PlainIcon)).not.toBe(withBrandIcon(DropboxIcon))
+    expect(withBrandIcon(NotionIcon)).toBe(withBrandIcon(NotionIcon))
+    expect(withBrandIcon(PlainIcon)).not.toBe(withBrandIcon(NotionIcon))
   })
 })

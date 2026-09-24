@@ -25,7 +25,7 @@ import {
 } from '@/lib/credentials/gitlab-personal-token'
 import type { CredentialRow } from '@/lib/credentials/queries'
 import type { DbOrTx } from '@/lib/db/types'
-import { normalizeGitLabHost } from '@/tools/gitlab/utils'
+import { normalizeGitLabHost } from '@/lib/credentials/gitlab-host'
 
 export interface PersonalTokenCredential {
   id: string

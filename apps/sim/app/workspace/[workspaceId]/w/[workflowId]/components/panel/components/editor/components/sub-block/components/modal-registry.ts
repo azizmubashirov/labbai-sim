@@ -1,5 +1,4 @@
 import type { ComponentType } from 'react'
-import { SlackSetupWizard } from '@/app/workspace/[workspaceId]/w/[workflowId]/components/panel/components/editor/components/sub-block/components/slack-setup-wizard/slack-setup-wizard'
 
 /**
  * Props every `type: 'modal'` sub-block component must accept. The sub-block
@@ -23,7 +22,6 @@ interface ModalSubBlockProps {
  * pulled into trigger / block config modules.
  */
 export const MODAL_REGISTRY: Readonly<Record<string, ComponentType<ModalSubBlockProps>>> = {
-  'slack-setup-wizard': SlackSetupWizard,
 }
 
 export type ModalId = keyof typeof MODAL_REGISTRY

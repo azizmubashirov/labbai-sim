@@ -15,7 +15,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const {
   mockAvailability,
   mockCheckWorkspaceAccess,
-  mockGitHubReadGrants,
   mockConfluenceReadGrants,
   mockCsvGrants,
   mockLiveSources,
@@ -27,7 +26,6 @@ const {
   },
   mockAvailability: vi.fn(async () => ({ memberScoped: true, sourceMirrored: true })),
   mockCheckWorkspaceAccess: vi.fn(async () => ({ hasAccess: true })),
-  mockGitHubReadGrants: vi.fn(async () => []),
   mockConfluenceReadGrants: vi.fn(async () => []),
   mockCsvGrants: vi.fn(async () => [] as string[]),
 }))
@@ -40,9 +38,6 @@ vi.mock('@/lib/workspaces/permissions/utils', () => ({
 }))
 vi.mock('@/lib/knowledge/access/confluence-site', () => ({
   resolveConfluenceSiteReadGrants: mockConfluenceReadGrants,
-}))
-vi.mock('@/lib/knowledge/access/github-installation', () => ({
-  resolveGitHubInstallationReadGrants: mockGitHubReadGrants,
 }))
 vi.mock('@/lib/knowledge/access/live-sources', () => ({
   githubInstallationSourceCondition: mockLiveSources.github,
@@ -570,33 +565,6 @@ describe('organization document ACL scope', () => {
     vi.clearAllMocks()
     resetDbChainMock()
   })
-  it('live-checks only the current member’s GitHub credentials within the canonical selected index', async () => {
-    queueTableRows(schemaMock.member, [{ id: 'membership-1' }])
-    queueSubjects([
-      {
-        email: 'viewer@example.com',
-        credentialId: 'personal-github',
-        providerId: 'github-repositories',
-        providerSubjectId: '42',
-        providerTenantId: null,
-      },
-    ])
-    const provider = createKnowledgeAccessProvider(SESSION, {
-      ...organization,
-      knowledgeBaseIds: ['index-1'],
-    })
-    expect(await provider.get()).not.toHaveProperty('githubInstallationGrants')
-    expect(mockGitHubReadGrants).not.toHaveBeenCalled()
-    const scope = await provider.getForConnectors(['source-after-100'])
-    expect(mockGitHubReadGrants).toHaveBeenCalledWith({
-      scope: { kind: 'organization', organizationId: 'org-1' },
-      readers: [{ credentialId: 'personal-github', subjectToken: 's:github-repositories:-:42' }],
-      knowledgeBaseIds: ['index-1'],
-      connectorIds: ['source-after-100'],
-      signal: undefined,
-    })
-    expect(scope).toMatchObject({ githubInstallationGrants: [] })
-  })
   it('checks only the enrolled Confluence reader after ranking canonical document candidates', async () => {
     queueTableRows(schemaMock.member, [{ id: 'membership-1' }])
     queueSubjects([
@@ -625,7 +593,6 @@ describe('organization document ACL scope', () => {
       connectorIds: ['confluence-source'],
       signal: undefined,
     })
-    expect(mockGitHubReadGrants).not.toHaveBeenCalled()
   })
   it('preserves candidate admission for an already-authenticated personal-key or session user', async () => {
     queueTableRows(schemaMock.member, [{ id: 'membership-1' }])
@@ -673,7 +640,7 @@ describe('organization document ACL scope', () => {
       },
     ])
     expect(await resolveKnowledgeAccessScope(SESSION, organization)).toMatchObject({ tokens: [] })
-    expect(mockGitHubReadGrants).not.toHaveBeenCalled()
+    expect(mockConfluenceReadGrants).not.toHaveBeenCalled()
   })
   it('uses current organization membership and org baseline without any workspace membership', async () => {
     queueTableRows(schemaMock.member, [{ id: 'membership-1' }])

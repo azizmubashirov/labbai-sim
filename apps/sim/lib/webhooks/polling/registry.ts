@@ -4,7 +4,6 @@ import { googleDrivePollingHandler } from '@/lib/webhooks/polling/google-drive'
 import { googleSheetsPollingHandler } from '@/lib/webhooks/polling/google-sheets'
 import { hubspotPollingHandler } from '@/lib/webhooks/polling/hubspot'
 import { imapPollingHandler } from '@/lib/webhooks/polling/imap'
-import { outlookPollingHandler } from '@/lib/webhooks/polling/outlook'
 import { rssPollingHandler } from '@/lib/webhooks/polling/rss'
 import type { PollingProviderHandler } from '@/lib/webhooks/polling/types'
 
@@ -15,7 +14,6 @@ const POLLING_HANDLERS: Record<string, PollingProviderHandler> = {
   'google-sheets': googleSheetsPollingHandler,
   hubspot: hubspotPollingHandler,
   imap: imapPollingHandler,
-  outlook: outlookPollingHandler,
   rss: rssPollingHandler,
 }
 

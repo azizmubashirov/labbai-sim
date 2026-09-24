@@ -14,7 +14,6 @@ SHELL=/bin/sh
 
 # Polling triggers
 */1 * * * * curl -fsS -m 60 -o /dev/null -H "Authorization: Bearer $CRON_SECRET" "$SIM_URL/api/webhooks/poll/gmail"
-*/1 * * * * curl -fsS -m 60 -o /dev/null -H "Authorization: Bearer $CRON_SECRET" "$SIM_URL/api/webhooks/poll/outlook"
 */1 * * * * curl -fsS -m 60 -o /dev/null -H "Authorization: Bearer $CRON_SECRET" "$SIM_URL/api/webhooks/poll/imap"
 */1 * * * * curl -fsS -m 60 -o /dev/null -H "Authorization: Bearer $CRON_SECRET" "$SIM_URL/api/webhooks/poll/rss"
 */1 * * * * curl -fsS -m 60 -o /dev/null -H "Authorization: Bearer $CRON_SECRET" "$SIM_URL/api/webhooks/poll/google-sheets"
@@ -51,9 +50,6 @@ SHELL=/bin/sh
 
 # Deletes OAuth token rows after the retention tail
 0 * * * * curl -fsS -m 120 -o /dev/null -H "Authorization: Bearer $CRON_SECRET" "$SIM_URL/api/cron/cleanup-oauth-tokens"
-
-# Microsoft Graph subscription renewal (Teams chat triggers expire after ~3 days)
-0 */12 * * * curl -fsS -m 120 -o /dev/null -H "Authorization: Bearer $CRON_SECRET" "$SIM_URL/api/cron/renew-subscriptions"
 
 # Billing cycle close: final overage collection + per-period tracker reset for elapsed periods
 0 */6 * * * curl -fsS -m 120 -o /dev/null -H "Authorization: Bearer $CRON_SECRET" "$SIM_URL/api/cron/billing-cycle-close"

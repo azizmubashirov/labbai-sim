@@ -35,14 +35,9 @@ vi.mock('@/lib/oauth/credential-service', () => ({ resolveCredentialTokenBundle:
 vi.mock('@/lib/core/security/encryption', () => ({
   decryptSecret: async () => ({ decrypted: '{}' }),
 }))
-vi.mock('@/lib/oauth/github-installation', () => ({
-  parseGitHubInstallationBinding: () => ({ installationId: '42', accountId: '7' }),
-  resolveGitHubInstallationRepository: mocks.repository,
-}))
 
 import { OrchestrationError } from '@/lib/core/orchestration/types'
 import { requireConnectorCredential } from '@/lib/knowledge/application/connector-credential'
-import { prepareGitHubInstallationSource } from '@/lib/knowledge/application/github-installation-source'
 import { DEFAULT_PERMISSION_GROUP_CONFIG } from '@/lib/permission-groups/fields'
 
 const principal: Principal = { kind: 'session', userId: 'admin-1', sessionId: 'session-1' }
@@ -75,35 +70,6 @@ beforeEach(() => {
 })
 
 describe('organization source credential authorization', () => {
-  it.each(['owner', 'admin'])('pins an installation repository for a current %s', async (role) => {
-    queueTableRows(member, [{ role }])
-    queueTableRows(credential, [installed])
-
-    await expect(
-      prepareGitHubInstallationSource({
-        principal,
-        requestId: input.requestId,
-        connectorType: 'github',
-        credentialId: installed.id,
-        organizationId: 'org-1',
-        isSearchIndex: true,
-        accessMode: 'members',
-        actingUserId: 'admin-1',
-        sourceConfig: { repository: 'example/private' },
-      })
-    ).resolves.toEqual({ repository: 'example/private', githubRepositoryId: '123' })
-    expect(dbChainMockFns.where).toHaveBeenCalledWith(
-      and(eq(member.organizationId, 'org-1'), eq(member.userId, 'admin-1'))
-    )
-    expect(dbChainMockFns.where).toHaveBeenCalledWith(
-      and(
-        eq(credential.id, installed.id),
-        and(eq(credential.organizationId, 'org-1'), isNull(credential.workspaceId))
-      )
-    )
-    expect(mocks.requireService).toHaveBeenCalledWith([], 'github-app-installation')
-  })
-
   it.each([{ rows: [] }, { rows: [{ role: 'member' }] }])(
     'refuses missing or insufficient membership: %j',
     async ({ rows }) => {

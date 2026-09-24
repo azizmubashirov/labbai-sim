@@ -67,7 +67,6 @@ export const TOOL_ACTIVITIES: Readonly<Record<string, ActivityPhrase | Operation
   apply_file_edit: 'edited files',
   call_integration_tool: 'used integrations',
   cancel_workflow_run: 'stopped workflow runs',
-  connect_slack_bot: 'connected integrations',
   cp: 'copied resources',
   create_empty_file: 'created files',
   create_workflow: 'created workflows',

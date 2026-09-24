@@ -46,7 +46,7 @@ beforeAll(async () => {
     sourceIds.map((id) => ({
       id,
       knowledgeBaseId: ids.knowledgeBaseId,
-      connectorType: 'confluence',
+      connectorType: 'notion',
       sourceConfig: { domain: 'fixture.atlassian.net', spaceKey: 'ENG' },
       accessMode: 'admin',
       status: 'active',
@@ -143,7 +143,7 @@ describe('bounded source pagination and provider overview', () => {
   })
   it('includes providers beyond the loaded page and requires viewer-readable indexed content', async () => {
     const first = await listSearchSources.execute({ principal: alice, input })
-    expect(first.sources.every((source) => source.connectorType === 'confluence')).toBe(true)
+    expect(first.sources.every((source) => source.connectorType === 'notion')).toBe(true)
     const [aliceOverview, bobOverview] = await Promise.all(
       [alice, bob].map((principal) => readSearchSourceOverview.execute({ principal, input }))
     )
@@ -173,7 +173,7 @@ describe('bounded source pagination and provider overview', () => {
     await db.insert(knowledgeConnector).values({
       id: newSourceId,
       knowledgeBaseId: ids.knowledgeBaseId,
-      connectorType: 'confluence',
+      connectorType: 'notion',
       sourceConfig: { domain: 'fixture.atlassian.net', spaceKey: 'NEW' },
       accessMode: 'admin',
       status: 'pending',

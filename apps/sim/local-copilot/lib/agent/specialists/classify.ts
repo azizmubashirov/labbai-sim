@@ -74,7 +74,7 @@ const DOMAIN_PATTERNS: DomainPattern[] = [
   {
     domain: 'auth',
     weight: 3,
-    patterns: [/\b(oauth|credential|api\s*key|connect\s+(gmail|slack|google)|authorize|auth)\b/i],
+    patterns: [/\b(oauth|credential|api\s*key|connect\s+(gmail|hubspot|google)|authorize|auth)\b/i],
   },
   {
     domain: 'media',
@@ -100,7 +100,7 @@ const DOMAIN_PATTERNS: DomainPattern[] = [
     domain: 'superagent',
     weight: 3,
     patterns: [
-      /\b(send\s+(an?\s+)?email|draft\s+(an?\s+)?email|check\s+my\s+calendar|google\s+docs?|slack\s+message)\b/i,
+      /\b(send\s+(an?\s+)?email|draft\s+(an?\s+)?email|check\s+my\s+calendar|google\s+docs?|telegram\s+message)\b/i,
       /\b(gmail|outlook|calendar|notion|hubspot)\b/i,
     ],
   },

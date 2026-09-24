@@ -825,26 +825,6 @@ export const FirecrawlBlockMeta = {
     },
     {
       icon: FirecrawlIcon,
-      title: 'Firecrawl competitor change tracker',
-      prompt:
-        'Build a scheduled workflow that scrapes competitor websites, pricing pages, and changelog pages weekly using Firecrawl, compares against previous snapshots, summarizes any changes, logs them to a tracking table, and sends a Slack alert for major updates.',
-      modules: ['scheduled', 'tables', 'agent', 'workflows'],
-      category: 'operations',
-      tags: ['founder', 'product', 'monitoring', 'research'],
-      alsoIntegrations: ['slack'],
-    },
-    {
-      icon: FirecrawlIcon,
-      title: 'Firecrawl competitor site monitor',
-      prompt:
-        'Build a scheduled workflow that uses Firecrawl to scrape competitor pricing, product, and changelog pages weekly, diffs against the prior snapshot, and posts changes to Slack.',
-      modules: ['scheduled', 'agent', 'workflows'],
-      category: 'marketing',
-      tags: ['marketing', 'monitoring'],
-      alsoIntegrations: ['slack'],
-    },
-    {
-      icon: FirecrawlIcon,
       title: 'Firecrawl SEO content brief',
       prompt:
         'Create a workflow that takes a target keyword, scrapes the top-10 ranking pages with Firecrawl, analyzes structure and subtopics, and writes a content brief file.',
@@ -870,16 +850,6 @@ export const FirecrawlBlockMeta = {
       category: 'productivity',
       tags: ['research'],
       alsoIntegrations: ['exa'],
-    },
-    {
-      icon: FirecrawlIcon,
-      title: 'Firecrawl product-launch detector',
-      prompt:
-        'Build a scheduled workflow that crawls competitor blogs and product pages with Firecrawl daily, classifies posts as product launches, and posts notable launches to Slack.',
-      modules: ['scheduled', 'agent', 'workflows'],
-      category: 'marketing',
-      tags: ['marketing', 'monitoring'],
-      alsoIntegrations: ['slack'],
     },
   ],
   skills: [

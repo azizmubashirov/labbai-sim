@@ -123,7 +123,7 @@ const SPECIALIST_SPECS: SpecialistToolSpec[] = [
   },
   {
     domain: 'superagent',
-    description: 'Superagent — live integration actions (Gmail, Sheets, Slack, Drive, etc.).',
+    description: 'Superagent — live integration actions (Gmail, Sheets, Telegram, Drive, etc.).',
     properties: {
       task: {
         type: 'string',

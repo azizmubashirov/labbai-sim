@@ -58,7 +58,6 @@ vi.mock('@/lib/credentials/managed-oauth', () => ({
 
 import { compileCredentialGroupWorkflowAccessPolicy } from '@/lib/credential-groups/application/workflow-access-policy'
 import { CREDENTIAL_GROUP_KNOWLEDGE_CONNECTOR_ACCESS_LIMIT } from '@/lib/credential-groups/limits'
-import { SLACK_MANAGED_USER_SCOPES } from '@/lib/credential-groups/slack-managed-user-scopes'
 import {
   assertKnowledgeConnectorCredentialAccess,
   findListingCapViolation,
@@ -74,7 +73,6 @@ import {
   ResourcePolicyNotFoundError,
   ResourcePolicyRevisionConflictError,
 } from '@/lib/resource-policies/repository'
-import { confluenceConnectorMeta } from '@/connectors/confluence/meta'
 
 const GROUP_ID = 'group-1'
 const BINDING = {
@@ -533,92 +531,6 @@ describe('knowledge connector member access', () => {
           sourceConfig: { folderId: ['folder-1'], maxFiles: '' },
         })
       ).toEqual({ ok: true, option: driveOption })
-    })
-
-    it('keeps existing Confluence page credentials eligible without attachment access', () => {
-      const confluenceOption = {
-        ...driveOption,
-        id: 'option-confluence',
-        provider: 'confluence',
-        label: 'Confluence',
-        authorizationAppId: 'atlassian:app',
-        requiredScopes: [
-          'read:confluence-content.all',
-          'read:page:confluence',
-          'read:blogpost:confluence',
-          'read:space:confluence',
-          'read:label:confluence',
-          'search:confluence',
-          'offline_access',
-        ],
-      }
-
-      expect(
-        validateKnowledgeConnectorMembersBinding({
-          connectorMeta: confluenceConnectorMeta,
-          group: { status: 'active', options: [confluenceOption] },
-          credentialGroupOptionId: confluenceOption.id,
-          sourceConfig: { domain: 'example.atlassian.net', spaceKey: ['ENG'], maxPages: '' },
-        })
-      ).toEqual({ ok: true, option: confluenceOption })
-    })
-
-    describe('a Slack option, whose members authorize through the workspace custom app', () => {
-      const slackMeta = {
-        name: 'Slack',
-        auth: {
-          mode: 'oauth' as const,
-          provider: 'slack' as const,
-          requiredScopes: ['channels:read', 'channels:history', 'groups:read', 'groups:history'],
-        },
-        permissionScopedListing: { capFieldIds: ['channel'] },
-        configFields: [{ id: 'channel', title: 'Channels', type: 'short-input' as const }],
-      }
-      const slackOption = {
-        ...driveOption,
-        id: 'option-slack',
-        provider: 'slack',
-        label: 'Slack',
-        authorizationAppId: 'slack:app',
-        requiredScopes: [...SLACK_MANAGED_USER_SCOPES],
-      }
-      const slackGroup = { status: 'active' as const, options: [slackOption] }
-
-      it('accepts the binding through the Slack scope policy', () => {
-        expect(
-          validateKnowledgeConnectorMembersBinding({
-            connectorMeta: slackMeta,
-            group: slackGroup,
-            credentialGroupOptionId: 'option-slack',
-            sourceConfig: { maxMessages: '500' },
-          })
-        ).toEqual({ ok: true, option: slackOption })
-      })
-
-      it('rejects a channel selection as a listing cap', () => {
-        const result = validateKnowledgeConnectorMembersBinding({
-          connectorMeta: slackMeta,
-          group: slackGroup,
-          credentialGroupOptionId: 'option-slack',
-          sourceConfig: { channel: ['general'] },
-        })
-        expect(result.ok).toBe(false)
-        if (!result.ok) expect(result.message).toContain('Channels cannot be set')
-      })
-
-      it('rejects an option missing a history scope', () => {
-        const result = validateKnowledgeConnectorMembersBinding({
-          connectorMeta: slackMeta,
-          group: {
-            ...slackGroup,
-            options: [{ ...slackOption, requiredScopes: ['channels:read', 'groups:read'] }],
-          },
-          credentialGroupOptionId: 'option-slack',
-          sourceConfig: {},
-        })
-        expect(result.ok).toBe(false)
-        if (!result.ok) expect(result.message).toContain('every permission')
-      })
     })
 
     it.each([

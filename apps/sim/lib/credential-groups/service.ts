@@ -21,12 +21,9 @@ import { resourceScopeCondition } from '@/lib/core/resource-scope.server'
 import { decodeCredentialGroupWorkflowAccessPolicy } from '@/lib/credential-groups/application/workflow-access-policy'
 import { getManagedMcpConnector } from '@/lib/credential-groups/managed-mcp-connectors'
 import { requireOrganizationAccountsSetup } from '@/lib/credential-groups/organization-setup'
-import { credentialGroupScopePolicyVersion } from '@/lib/credential-groups/provider-adapter'
-import { decryptCredentialGroupProviderConfiguration } from '@/lib/credential-groups/provider-configuration'
 import { getCredentialGroupProviderAdapter } from '@/lib/credential-groups/provider-registry'
 import { isCredentialGroupProvider } from '@/lib/credential-groups/providers'
 import { credentialGroupScope } from '@/lib/credential-groups/scope'
-import { resolveSlackManagedUserScopes } from '@/lib/credential-groups/slack-managed-user-scopes'
 import type {
   CredentialGroupMcpServer,
   CredentialGroupOptionInput,
@@ -95,7 +92,6 @@ async function buildOption(
     id: generateId(),
     provider: option.provider,
     label: option.label,
-    ...(option.provider === 'slack' ? { slackBotCredentialId: option.slackBotCredentialId } : {}),
     authorizationAppId: providerConfig.authorizationAppId,
     requiredScopes: providerConfig.requiredScopes,
     scopeVersion: providerConfig.scopeVersion,
@@ -129,7 +125,6 @@ async function updateOptions(
         id: existing.id,
         provider: existing.provider,
         label: input.label,
-        ...(input.provider === 'slack' ? { slackBotCredentialId: input.slackBotCredentialId } : {}),
         authorizationAppId: providerConfig.authorizationAppId,
         requiredScopes: providerConfig.requiredScopes,
         scopeVersion: providerConfig.scopeVersion,
@@ -144,9 +139,6 @@ async function toCredentialGroup(
   row: typeof credentialGroup.$inferSelect,
   linkedMcpServers: CredentialGroupMcpServer[]
 ): Promise<CredentialGroupRecord> {
-  const providerConfiguration = await decryptCredentialGroupProviderConfiguration(
-    row.encryptedProviderConfiguration
-  )
   return {
     id: row.id,
     workspaceId: row.workspaceId,
@@ -163,32 +155,7 @@ async function toCredentialGroup(
         required: option.required,
         status: option.status,
       }
-      if (option.provider !== 'slack') {
-        return { ...common, provider: option.provider, configurationStatus: 'ready' as const }
-      }
-      if (row.workspaceId && !option.slackBotCredentialId) {
-        throw new Error(`Slack credential option ${option.id} has no custom bot`)
-      }
-      return {
-        ...common,
-        provider: 'slack' as const,
-        slackBotCredentialId: option.slackBotCredentialId,
-        requiredScopes: resolveSlackManagedUserScopes(option.requiredScopes),
-        configurationStatus:
-          !providerConfiguration.slack ||
-          (row.workspaceId &&
-            providerConfiguration.slack.slackBotCredentialId !== option.slackBotCredentialId)
-            ? ('not_configured' as const)
-            : option.scopeVersion !==
-                  credentialGroupScopePolicyVersion(
-                    resolveSlackManagedUserScopes(option.requiredScopes)
-                  ) ||
-                !resolveSlackManagedUserScopes(option.requiredScopes).every((scope) =>
-                  providerConfiguration.slack?.scopes.includes(scope)
-                )
-              ? ('needs_update' as const)
-              : ('ready' as const),
-      }
+      return { ...common, provider: option.provider, configurationStatus: 'ready' as const }
     }),
     mcpServers: linkedMcpServers,
     status: row.status,
@@ -266,9 +233,6 @@ export async function ensureWorkspaceAccountsGroup(
   executor?: DbOrTx
 ): Promise<CredentialGroupRecord & { created: boolean }> {
   const scope = credentialGroupScope(scopeInput)
-  if (option?.provider === 'slack') {
-    throw new OrchestrationError('validation', 'Configure Slack sign-in in Connected accounts')
-  }
   const preparedOption = option ? await buildOption(scope, { ...option, required: false }) : null
   let wasCreated = false
   const provision = async (tx: DbOrTx) => {
@@ -479,10 +443,7 @@ export async function updateCredentialGroup(
       body.options !== undefined
         ? await updateOptions(scope, groupId, body.options, existing.options, tx)
         : existing.options
-    const keepsSlack = nextOptions.some((option) => option.provider === 'slack')
-    const encryptedProviderConfiguration = keepsSlack
-      ? existing.encryptedProviderConfiguration
-      : null
+    const encryptedProviderConfiguration = null
     const nextOptionById = new Map(nextOptions.map((option) => [option.id, option]))
     const invalidatedOptionIds = existing.options
       .filter((option) => {

@@ -51,13 +51,6 @@ const FEATURE_FLAGS = {
       'Capture durable Workflow Agent tool history and continue existing retries. Supports workspace rollout targeting; version-aware memory storage remains active when capture is disabled.',
     fallback: 'AGENT_MEMORY_HISTORY',
   },
-  'slack-search-shared-app': {
-    description:
-      'Enable the official shared Slack app for existing Search customers. Supports orgId ' +
-      'targeting for setup, personal connections, and bot execution. Off-AppConfig falls back ' +
-      'to SLACK_SEARCH_SHARED_APP.',
-    fallback: 'SLACK_SEARCH_SHARED_APP',
-  },
   'trigger-eu-region': {
     description:
       'Route Trigger.dev runs to eu-central-1 instead of the default us-east-1. Global on/off ' +

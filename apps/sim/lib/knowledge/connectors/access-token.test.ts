@@ -29,9 +29,6 @@ import {
   resolveConnectorAccessToken,
   syncContextForToken,
 } from '@/lib/knowledge/connectors/access-token'
-import { isConnectorCredentialTypeAllowed } from '@/connectors/auth'
-import { gmailConnectorMeta } from '@/connectors/gmail/meta'
-import { googleCalendarConnectorMeta } from '@/connectors/google-calendar/meta'
 import type { ConnectorAuthConfig } from '@/connectors/types'
 
 const OAUTH_AUTH: ConnectorAuthConfig = {
@@ -447,113 +444,6 @@ describe('delegated connector access', () => {
       'Service account is unavailable'
     )
     expect(mockResolveTokenBundle).toHaveBeenCalledTimes(1)
-  })
-})
-
-describe.each([
-  {
-    name: 'Gmail',
-    auth: gmailConnectorMeta.auth,
-    contentScope: 'https://www.googleapis.com/auth/gmail.readonly',
-  },
-  {
-    name: 'Google Calendar',
-    auth: googleCalendarConnectorMeta.auth,
-    contentScope: 'https://www.googleapis.com/auth/calendar.events.readonly',
-  },
-])('$name declared company authentication', ({ auth, contentScope }) => {
-  const directoryScope = 'https://www.googleapis.com/auth/admin.directory.user.readonly'
-  const resolve = (accessMode: ConnectorAccessMode) =>
-    resolveConnectorAccessToken({
-      auth,
-      accessMode,
-      connector: credentialConnector('google-service'),
-      userId: 'actor',
-      requestId: 'request',
-      sourceConfig: {
-        adminEmail: ' Directory.Admin@Example.com ',
-        scopes: ['untrusted.write'],
-        userEmail: 'unverified@example.com',
-      },
-    })
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    mockResolveTokenBundle.mockResolvedValue({ accessToken: 'directory-token' })
-    mockResolveOAuthAccountId.mockResolvedValue({
-      credentialType: 'service_account',
-      providerId: 'google-service-account',
-      credentialId: 'google-service',
-    })
-    mockGetServiceAccountToken.mockResolvedValue('delegated-read-token')
-  })
-
-  it('mints Directory and per-user tokens from actual connector metadata with separate fixed scope sets', async () => {
-    const token = await resolve('admin')
-    expect(mockResolveTokenBundle).toHaveBeenCalledExactlyOnceWith(
-      'google-service',
-      'actor',
-      'request',
-      [directoryScope],
-      'directory.admin@example.com'
-    )
-    expect(token?.getDelegatedAccessToken).toBeTypeOf('function')
-    await expect(token?.getDelegatedAccessToken?.(' Employee@Example.com ')).resolves.toBe(
-      'delegated-read-token'
-    )
-    expect(mockGetServiceAccountToken).toHaveBeenCalledExactlyOnceWith(
-      'google-service',
-      [contentScope],
-      'employee@example.com'
-    )
-    expect(syncContextForToken(token!)).toEqual({
-      getDelegatedAccessToken: token?.getDelegatedAccessToken,
-    })
-    expect(JSON.stringify(syncContextForToken(token!))).toBe('{}')
-    expect(isConnectorCredentialTypeAllowed(auth, 'admin', 'oauth')).toBe(false)
-    expect(isConnectorCredentialTypeAllowed(auth, 'admin', 'service_account')).toBe(true)
-  })
-
-  it.each(['members', 'workspace'] as const)(
-    'keeps %s OAuth available without a company delegation capability',
-    async (accessMode) => {
-      const token = await resolve(accessMode)
-      expect(token).toEqual({ accessToken: 'directory-token' })
-      expect(mockResolveTokenBundle).toHaveBeenCalledExactlyOnceWith(
-        'google-service',
-        'actor',
-        'request',
-        [contentScope],
-        'directory.admin@example.com'
-      )
-      expect(isConnectorCredentialTypeAllowed(auth, accessMode, 'oauth')).toBe(true)
-      expect(mockResolveOAuthAccountId).not.toHaveBeenCalled()
-      expect(mockGetServiceAccountToken).not.toHaveBeenCalled()
-    }
-  )
-
-  it('does not expose delegation when a selected credential resolves to ordinary OAuth', async () => {
-    mockResolveOAuthAccountId.mockResolvedValue({
-      credentialType: 'oauth',
-      providerId: auth.mode === 'oauth' ? auth.provider : '',
-      credentialId: 'google-service',
-    })
-    expect(await resolve('admin')).toEqual({ accessToken: 'directory-token' })
-    expect(mockGetServiceAccountToken).not.toHaveBeenCalled()
-  })
-
-  it('propagates service-account revocation without using an OAuth or Directory token fallback', async () => {
-    const token = await resolve('admin')
-    mockGetServiceAccountToken.mockRejectedValueOnce(new Error('Service account is unavailable'))
-    await expect(token?.getDelegatedAccessToken?.('employee@example.com')).rejects.toThrow(
-      'Service account is unavailable'
-    )
-    expect(mockResolveTokenBundle).toHaveBeenCalledOnce()
-    expect(mockGetServiceAccountToken).toHaveBeenCalledExactlyOnceWith(
-      'google-service',
-      [contentScope],
-      'employee@example.com'
-    )
   })
 })
 

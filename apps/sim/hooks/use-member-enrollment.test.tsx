@@ -519,11 +519,15 @@ describe('useMemberEnrollment', () => {
     'retains source setup until enrollment navigation succeeds: %s',
     (outcome) => {
       mount()
-      const connector = SEARCH_CONNECTORS.find((item) => item.type === 'github')!
+      const drive = SEARCH_CONNECTORS.find((item) => item.type === 'google_drive')!
+      const connector = {
+        ...drive,
+        setupFields: drive.meta.configFields.filter((field) => field.id === 'folderId'),
+      }
       act(() => enrollment().connectSearchSource('workspace-1', connector, undefined))
       expect(enrollment().setupConnector).toBe(connector)
       if (outcome === 'blocked') vi.mocked(window.open).mockReturnValueOnce(null)
-      act(() => enrollment().connectSource('workspace-1', 'github', { repository: 'acme/docs' }))
+      act(() => enrollment().connectSource('workspace-1', 'google_drive', { folderId: 'folder-1' }))
       if (outcome === 'blocked') {
         expect(mocks.sourceConnectionMutate).not.toHaveBeenCalled()
         expect(enrollment().error).toContain('Allow pop-ups')

@@ -104,7 +104,13 @@ describe('focused public enrollment projection', () => {
   const options = [
     { id: 'first', provider: 'gmail', label: 'First account', status: 'active', required: false },
     { id: 'second', provider: 'gmail', label: 'Second account', status: 'active', required: false },
-    { id: 'broken-slack', provider: 'slack', label: 'Slack', status: 'active', required: false },
+    {
+      id: 'broken-hubspot',
+      provider: 'hubspot',
+      label: 'HubSpot',
+      status: 'active',
+      required: false,
+    },
     {
       id: 'disabled',
       provider: 'gmail',
@@ -130,8 +136,8 @@ describe('focused public enrollment projection', () => {
       },
     ])
     adapter.getPolicy.mockImplementation(async (option) => {
-      if (option.provider === 'slack')
-        throw new CredentialGroupProviderConfigurationError('Unconfigured Slack')
+      if (option.provider === 'hubspot')
+        throw new CredentialGroupProviderConfigurationError('Unconfigured HubSpot')
       return {
         provider: 'gmail',
         providerId: 'google-email',

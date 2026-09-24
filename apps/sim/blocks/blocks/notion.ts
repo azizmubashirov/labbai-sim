@@ -1245,27 +1245,6 @@ export const NotionBlockMeta = {
 
     {
       icon: NotionIcon,
-      title: 'Notify your team from Notion',
-      prompt:
-        'Build a workflow that watches Notion for new or updated pages and automatically posts a Slack message so your team stays aligned without manual check-ins.',
-      modules: ['agent', 'workflows'],
-      category: 'productivity',
-      tags: ['automation', 'communication'],
-      featured: true,
-      alsoIntegrations: ['slack'],
-    },
-    {
-      icon: NotionIcon,
-      title: 'Notion meeting-notes capture',
-      prompt:
-        'Build a workflow that runs after a Google Meet call, fetches the transcript, and creates a structured Notion page under the right project with attendees, decisions, and action items.',
-      modules: ['agent', 'workflows'],
-      category: 'productivity',
-      tags: ['team', 'note-taking', 'automation'],
-      alsoIntegrations: ['google_meet'],
-    },
-    {
-      icon: NotionIcon,
       title: 'Notion CRM enrichment',
       prompt:
         'Create a workflow that watches a Notion database of companies, researches each new entry for funding, headcount, and industry, and appends the enriched fields back to the Notion page so the pipeline stays current.',
@@ -1282,16 +1261,6 @@ export const NotionBlockMeta = {
       category: 'marketing',
       tags: ['marketing', 'content-management', 'automation'],
       alsoIntegrations: ['wordpress'],
-    },
-    {
-      icon: NotionIcon,
-      title: 'Notion weekly digest builder',
-      prompt:
-        'Create a scheduled weekly workflow that queries a Notion project database for items completed this week, appends a summary section to a Notion review page, and posts the highlights to Slack for the team.',
-      modules: ['scheduled', 'agent', 'workflows'],
-      category: 'productivity',
-      tags: ['team', 'reporting', 'automation'],
-      alsoIntegrations: ['slack'],
     },
   ],
   skills: [

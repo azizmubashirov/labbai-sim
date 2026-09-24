@@ -414,12 +414,8 @@ const SubBlockRow = memo(function SubBlockRow({
   )
 
   const domainValue = resolveContextValue('domain')
-  const teamIdValue = resolveContextValue('teamId')
   const projectIdValue = resolveContextValue('projectId')
-  const planIdValue = resolveContextValue('planId')
   const baseIdValue = resolveContextValue('baseId')
-  const datasetIdValue = resolveContextValue('datasetId')
-  const serviceDeskIdValue = resolveContextValue('serviceDeskId')
   const siteIdValue = resolveContextValue('siteId')
   const collectionIdValue = resolveContextValue('collectionId')
   const spreadsheetIdValue = resolveContextValue('spreadsheetId')
@@ -433,12 +429,8 @@ const SubBlockRow = memo(function SubBlockRow({
     oauthCredential: typeof credentialId === 'string' ? credentialId : undefined,
     knowledgeBaseId: typeof knowledgeBaseId === 'string' ? knowledgeBaseId : undefined,
     domain: domainValue,
-    teamId: teamIdValue,
     projectId: projectIdValue,
-    planId: planIdValue,
     baseId: baseIdValue,
-    datasetId: datasetIdValue,
-    serviceDeskId: serviceDeskIdValue,
     siteId: siteIdValue,
     collectionId: collectionIdValue,
     spreadsheetId: spreadsheetIdValue,

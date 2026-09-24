@@ -1394,39 +1394,17 @@ export const KNOWLEDGE_EMBEDDINGS_CAPABILITY = defineCapability({
 
 export const OAUTH_CLIENT_CAPABILITIES = {
   google: ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET'],
-  x: ['X_CLIENT_ID', 'X_CLIENT_SECRET'],
-  tiktok: ['TIKTOK_CLIENT_ID', 'TIKTOK_CLIENT_SECRET'],
-  confluence: ['CONFLUENCE_CLIENT_ID', 'CONFLUENCE_CLIENT_SECRET'],
-  jira: ['JIRA_CLIENT_ID', 'JIRA_CLIENT_SECRET'],
   calcom: ['CALCOM_CLIENT_ID'],
   airtable: ['AIRTABLE_CLIENT_ID', 'AIRTABLE_CLIENT_SECRET'],
-  bitbucket: ['BITBUCKET_CLIENT_ID', 'BITBUCKET_CLIENT_SECRET'],
-  'github-repositories': ['GITHUB_APP_CLIENT_ID', 'GITHUB_APP_CLIENT_SECRET'],
   notion: ['NOTION_CLIENT_ID', 'NOTION_CLIENT_SECRET'],
   microsoft: ['MICROSOFT_CLIENT_ID', 'MICROSOFT_CLIENT_SECRET'],
-  clickup: ['CLICKUP_CLIENT_ID', 'CLICKUP_CLIENT_SECRET'],
-  linear: ['LINEAR_CLIENT_ID', 'LINEAR_CLIENT_SECRET'],
-  attio: ['ATTIO_CLIENT_ID', 'ATTIO_CLIENT_SECRET'],
-  box: ['BOX_CLIENT_ID', 'BOX_CLIENT_SECRET'],
-  docusign: ['DOCUSIGN_CLIENT_ID', 'DOCUSIGN_CLIENT_SECRET'],
-  dropbox: ['DROPBOX_CLIENT_ID', 'DROPBOX_CLIENT_SECRET'],
-  slack: ['SLACK_CLIENT_ID', 'SLACK_CLIENT_SECRET'],
-  reddit: ['REDDIT_CLIENT_ID', 'REDDIT_CLIENT_SECRET'],
-  wealthbox: ['WEALTHBOX_CLIENT_ID', 'WEALTHBOX_CLIENT_SECRET'],
-  webflow: ['WEBFLOW_CLIENT_ID', 'WEBFLOW_CLIENT_SECRET'],
-  asana: ['ASANA_CLIENT_ID', 'ASANA_CLIENT_SECRET'],
   pipedrive: ['PIPEDRIVE_CLIENT_ID', 'PIPEDRIVE_CLIENT_SECRET'],
   hubspot: ['HUBSPOT_CLIENT_ID', 'HUBSPOT_CLIENT_SECRET'],
-  linkedin: ['LINKEDIN_CLIENT_ID', 'LINKEDIN_CLIENT_SECRET'],
   instagram: ['INSTAGRAM_CLIENT_ID', 'INSTAGRAM_CLIENT_SECRET'],
-  salesforce: ['SALESFORCE_CLIENT_ID', 'SALESFORCE_CLIENT_SECRET'],
   shopify: ['SHOPIFY_CLIENT_ID', 'SHOPIFY_CLIENT_SECRET'],
   zoom: ['ZOOM_CLIENT_ID', 'ZOOM_CLIENT_SECRET'],
   wordpress: ['WORDPRESS_CLIENT_ID', 'WORDPRESS_CLIENT_SECRET'],
-  spotify: ['SPOTIFY_CLIENT_ID', 'SPOTIFY_CLIENT_SECRET'],
-  monday: ['MONDAY_CLIENT_ID', 'MONDAY_CLIENT_SECRET'],
   trello: ['TRELLO_API_KEY'],
-  'zoho-desk': ['ZOHO_CLIENT_ID', 'ZOHO_CLIENT_SECRET'],
 } as const
 
 /** Single registry consumed by runtime status and environment-source detection. */
@@ -1504,44 +1482,16 @@ const GOOGLE_OAUTH_SERVICES = new Set([
   'google-docs',
   'google-sheets',
   'google-calendar',
-  'google-contacts',
-  'google-ads',
-  'google-bigquery',
-  'google-tasks',
-  'google-vault',
   'google-forms',
-  'google-groups',
-  'google-meet',
-  'google-chat',
   'vertex-ai',
 ])
 
-const MICROSOFT_OAUTH_SERVICES = new Set([
-  'microsoft',
-  'outlook',
-  'onedrive',
-  'sharepoint',
-  'microsoft-ad',
-  'microsoft-dataverse',
-  'microsoft-excel',
-  'microsoft-teams',
-  'microsoft-planner',
-  'microsoft-word',
-])
+const MICROSOFT_OAUTH_SERVICES = new Set(['microsoft'])
 
 export function resolveOAuthClientCapabilityId(serviceId: string): OAuthClientCapabilityId | null {
   const normalized = serviceId.toLowerCase().replace(/_/g, '-')
   if (GOOGLE_OAUTH_SERVICES.has(normalized)) return 'google'
   if (MICROSOFT_OAUTH_SERVICES.has(normalized)) return 'microsoft'
-  if (normalized === 'zoho') return 'zoho-desk'
-  // ServiceDesk Plus Cloud authenticates through Zoho. Scopes are chosen per
-  // authorization request rather than per API-console client, so the same
-  // registered Zoho client serves both products and is configured by the same
-  // env pair — without this alias the integration is silently dropped.
-  if (normalized === 'manageengine-sdp') return 'zoho-desk'
-  // One consumer key serves both Salesforce login hosts, so the sandbox provider
-  // is configured by the same env pair — without this alias it is silently dropped.
-  if (normalized === 'salesforce-sandbox') return 'salesforce'
   return normalized in OAUTH_CLIENT_CAPABILITIES ? (normalized as OAuthClientCapabilityId) : null
 }
 

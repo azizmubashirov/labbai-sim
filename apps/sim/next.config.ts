@@ -86,7 +86,6 @@ const nextConfig: NextConfig = {
   },
   output: isTruthy(env.DOCKER_BUILD) ? 'standalone' : undefined,
   serverExternalPackages: [
-    '@1password/sdk',
     'ws',
     'isolated-vm',
     /**

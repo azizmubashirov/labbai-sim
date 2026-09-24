@@ -10,8 +10,6 @@ import {
   inviteCredentialGroupEnrollmentsBodySchema,
   inviteCredentialGroupEnrollmentsContract,
   managedMcpConnectorIdSchema,
-  startSlackCredentialGroupConfigurationBodySchema,
-  startSlackCredentialGroupConfigurationContract,
   updateCredentialGroupBodySchema,
 } from '@/lib/api/contracts/credential-groups'
 import { organizationIdSchema, workspaceIdSchema } from '@/lib/api/contracts/primitives'
@@ -93,15 +91,6 @@ export const startOrganizationAccountConnectionContract = defineRouteContract({
   response: { mode: 'json', schema: organizationAccountConnectionResponseSchema },
 })
 
-export const startOrganizationSlackConfigurationContract = defineRouteContract({
-  method: 'POST',
-  path: '/api/organizations/[id]/connected-accounts/[groupId]/slack-managed-users',
-  params: organizationAccountsParamsSchema.extend({ groupId: z.string().min(1).max(128) }),
-  body: startSlackCredentialGroupConfigurationBodySchema
-    .omit({ slackBotCredentialId: true, clientId: true, clientSecret: true })
-    .required({ appId: true, teamId: true }),
-  response: startSlackCredentialGroupConfigurationContract.response,
-})
 export type OrganizationAccountsSettings = z.output<
   typeof getOrganizationAccountsContract.response.schema
 >

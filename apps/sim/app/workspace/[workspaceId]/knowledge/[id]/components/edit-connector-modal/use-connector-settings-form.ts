@@ -20,7 +20,6 @@ import {
 } from '@/app/workspace/[workspaceId]/knowledge/[id]/hooks/use-connector-config-fields'
 import { useConnectorScope } from '@/app/workspace/[workspaceId]/knowledge/[id]/hooks/use-connector-scope'
 import { isConnectorCredentialTypeAllowed } from '@/connectors/auth'
-import { useGitLabPermissionForm } from '@/connectors/gitlab/permission-config/use-permission-form'
 import { CONNECTOR_META_REGISTRY } from '@/connectors/registry'
 import {
   type ConnectorData,
@@ -144,17 +143,6 @@ export function useConnectorSettingsForm({
     connector.accessMode === 'members' ? connector.credentialId : null
   )
   const [error, setError] = useState<string | null>(null)
-  const gitlabPermissions = useGitLabPermissionForm(
-    connector.permissionConfig ?? {
-      provider: 'gitlab',
-      mode: 'administrator',
-      revision: 0,
-      userMapping: null,
-      projectPermissions: null,
-    }
-  )
-  const showGitLabPermissions =
-    connector.connectorType === 'gitlab' && connector.accessMode === 'admin'
 
   /**
    * Seeds from the stored canonical config. For canonical-pair fields (selector +
@@ -314,21 +302,12 @@ export function useConnectorSettingsForm({
   )
 
   const hasChanges =
-    (showGitLabPermissions && gitlabPermissions.dirty) ||
     syncInterval !== connector.syncIntervalMinutes ||
     didCanonicalModesChange(canonicalModes, persistedCanonicalModes) ||
     Object.entries(resolveSourceConfig()).some(
       ([key, value]) =>
         !hiddenCapFieldIds.has(key) && !valuesEqual(connector.sourceConfig[key], value)
     )
-
-  const {
-    apiKey: permissionApiKey,
-    complete: permissionsComplete,
-    dirty: permissionsDirty,
-    input: permissionInput,
-    reset: resetPermissions,
-  } = gitlabPermissions
 
   const handleSave = useCallback(() => {
     if (
@@ -337,18 +316,12 @@ export function useConnectorSettingsForm({
       (accessDirty && !accountChanged) ||
       (accountChanged && !accessComplete) ||
       syncing ||
-      isSaving ||
-      (showGitLabPermissions && !permissionsComplete)
+      isSaving
     )
       return
     setError(null)
 
     const updates: UpdateConnectorBody = {}
-    if (showGitLabPermissions && permissionsDirty) {
-      updates.permissionConfig = permissionInput
-      if (permissionApiKey.trim()) updates.apiKey = permissionApiKey
-    }
-
     if (syncInterval !== connector.syncIntervalMinutes) {
       updates.syncIntervalMinutes = syncInterval
     }
@@ -403,7 +376,6 @@ export function useConnectorSettingsForm({
       { knowledgeBaseId, connectorId: connector.id, updates },
       {
         onSuccess: (updated) => {
-          resetPermissions(updated.permissionConfig)
           onSaved(updated)
         },
         onError: (err) => {
@@ -426,16 +398,10 @@ export function useConnectorSettingsForm({
     connectorConfig,
     knowledgeBaseId,
     onSaved,
-    permissionApiKey,
-    permissionInput,
-    permissionsComplete,
-    permissionsDirty,
     persistedCanonicalModes,
-    resetPermissions,
     resolveSourceConfig,
     searchSettingsAllowed,
     settingsComplete,
-    showGitLabPermissions,
     syncInterval,
     updateConnector,
   ])
@@ -494,7 +460,6 @@ export function useConnectorSettingsForm({
       : undefined
 
   const fieldsProps: ConnectorSettingsFieldsProps = {
-    gitlabPermissions: showGitLabPermissions ? gitlabPermissions : undefined,
     availability: {
       error: integrationAvailabilityError,
       isFetching: isIntegrationAvailabilityFetching,
@@ -502,9 +467,6 @@ export function useConnectorSettingsForm({
       refetch: refetchIntegrationAvailability,
     },
     isSearchIndex,
-    usesGitHubInstallation:
-      connector.connectorType === 'github' &&
-      typeof connector.sourceConfig.githubRepositoryId === 'string',
     connectorConfig,
     sourceConfig,
     selectionLabels,
@@ -556,8 +518,7 @@ export function useConnectorSettingsForm({
       !syncing &&
       !isSaving &&
       searchSettingsAllowed &&
-      Boolean(settingsComplete) &&
-      (!showGitLabPermissions || gitlabPermissions.complete),
+      Boolean(settingsComplete),
     save: handleSave,
     fieldsProps,
   }

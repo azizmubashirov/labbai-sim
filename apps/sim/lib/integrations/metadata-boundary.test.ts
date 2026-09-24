@@ -14,7 +14,7 @@ import { resolveOAuthServiceForSlug } from '@/lib/integrations/oauth-service'
 describe('integration metadata boundary', () => {
   it('resolves deployment availability without marketing or operation data', () => {
     expect(resolveIntegrationAvailability({})).toEqual(
-      expect.arrayContaining([expect.objectContaining({ type: 'github_v2', state: 'ready' })])
+      expect.arrayContaining([expect.objectContaining({ type: 'telegram', state: 'ready' })])
     )
   })
 

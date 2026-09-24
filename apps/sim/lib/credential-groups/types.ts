@@ -6,14 +6,9 @@ interface CredentialGroupOptionInputBase {
   required: boolean
 }
 
-export type CredentialGroupOptionInput =
-  | (CredentialGroupOptionInputBase & {
-      provider: Exclude<CredentialGroupProvider, 'slack'>
-    })
-  | (CredentialGroupOptionInputBase & {
-      provider: 'slack'
-      slackBotCredentialId?: string
-    })
+export type CredentialGroupOptionInput = CredentialGroupOptionInputBase & {
+  provider: CredentialGroupProvider
+}
 
 export type CredentialGroupOptionUpdateInput = CredentialGroupOptionInput & { id?: string }
 
@@ -38,16 +33,10 @@ interface CredentialGroupOptionBase {
   status: 'active' | 'disabled'
 }
 
-export type CredentialGroupOption =
-  | (CredentialGroupOptionBase & {
-      provider: Exclude<CredentialGroupProvider, 'slack'>
-      configurationStatus: 'ready'
-    })
-  | (CredentialGroupOptionBase & {
-      provider: 'slack'
-      slackBotCredentialId?: string
-      configurationStatus: 'not_configured' | 'ready' | 'needs_update'
-    })
+export type CredentialGroupOption = CredentialGroupOptionBase & {
+  provider: CredentialGroupProvider
+  configurationStatus: 'ready'
+}
 
 export interface CredentialGroupRecord {
   id: string

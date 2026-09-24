@@ -33,13 +33,13 @@ describe('getBlock prototype safety', () => {
 /**
  * The list and the detail read must agree about a type.
  *
- * `slack_v2` is `preview`-gated while `slack` v1 deliberately stays in the
- * toolbar so a workspace has a Slack block during the gate. Resolving the
- * detail to the newest version and then hiding it answered `404` for a type
- * `GET /api/v2/blocks` was publishing in the same breath.
+ * A versioned block may gate its newest version while an older one stays in the
+ * toolbar. Resolving the detail to the newest version and then hiding it
+ * answered `404` for a type `GET /api/v2/blocks` was publishing in the same
+ * breath.
  */
 describe('version resolution for a viewer', () => {
-  it.each(['slack', 'table'])(
+  it.each(['gmail', 'table'])(
     'resolves %s to a version the unrevealed viewer can actually see',
     async (type) => {
       const { getLatestBlockForViewer, getAllBlocks } = await import('@/blocks/registry')

@@ -997,26 +997,6 @@ export const CalComBlockMeta = {
   templates: [
     {
       icon: CalComIcon,
-      title: 'Cal.com booking prep brief',
-      prompt:
-        'Build a workflow that runs 30 minutes before a Cal.com booking, researches the attendee with Apollo, and emails the host a structured prep brief.',
-      modules: ['scheduled', 'agent', 'workflows'],
-      category: 'sales',
-      tags: ['sales', 'research'],
-      alsoIntegrations: ['apollo', 'gmail'],
-    },
-    {
-      icon: CalComIcon,
-      title: 'Cal.com post-meeting recap',
-      prompt:
-        'Create a workflow that runs after a Cal.com meeting ends, summarizes the meeting notes, and updates the linked Salesforce or HubSpot opportunity.',
-      modules: ['agent', 'workflows'],
-      category: 'sales',
-      tags: ['sales', 'crm'],
-      alsoIntegrations: ['salesforce', 'hubspot'],
-    },
-    {
-      icon: CalComIcon,
       title: 'Cal.com no-show recovery',
       prompt:
         'Build a workflow that detects Cal.com no-shows, sends a polite reschedule email with a one-tap link, and updates the deal record with the no-show event.',
@@ -1024,16 +1004,6 @@ export const CalComBlockMeta = {
       category: 'sales',
       tags: ['sales', 'communication'],
       alsoIntegrations: ['gmail'],
-    },
-    {
-      icon: CalComIcon,
-      title: 'Cal.com + Loops nurture',
-      prompt:
-        'Create a workflow that on a Cal.com booking enrolls the attendee into a Loops nurture campaign tailored to the meeting topic.',
-      modules: ['agent', 'workflows'],
-      category: 'marketing',
-      tags: ['marketing', 'communication'],
-      alsoIntegrations: ['loops'],
     },
     {
       icon: CalComIcon,
@@ -1053,16 +1023,6 @@ export const CalComBlockMeta = {
       category: 'sales',
       tags: ['sales', 'crm'],
       alsoIntegrations: ['hubspot'],
-    },
-    {
-      icon: CalComIcon,
-      title: 'Cal.com reschedule chaser',
-      prompt:
-        'Build a scheduled workflow that finds Cal.com bookings that have been rescheduled more than twice, posts a Slack alert to the host, and proposes a fixed time.',
-      modules: ['scheduled', 'agent', 'workflows'],
-      category: 'sales',
-      tags: ['sales', 'monitoring'],
-      alsoIntegrations: ['slack'],
     },
   ],
   skills: [

@@ -61,7 +61,7 @@ describe('useFetchedOptions label hydration', () => {
         blockId: 'block-1',
         subBlockId: 'label',
         dependsOnFields: ['credential'],
-        selectorKey: 'jira.issues',
+        selectorKey: 'google.drive',
         isPreview: false,
         disabled: true,
         valueToHydrate: 'issue-1',
@@ -72,11 +72,11 @@ describe('useFetchedOptions label hydration', () => {
 
     expect(renderToStaticMarkup(<Probe />)).toContain('Hydrated issue')
     expect(mockUseSelectorOptions).toHaveBeenCalledWith(
-      'jira.issues',
+      'google.drive',
       expect.objectContaining({ enabled: false })
     )
     expect(mockUseSelectorOptionDetail).toHaveBeenCalledWith(
-      'jira.issues',
+      'google.drive',
       expect.objectContaining({ detailId: 'issue-1', enabled: true })
     )
   })
@@ -87,7 +87,7 @@ describe('useFetchedOptions label hydration', () => {
         blockId: 'block-1',
         subBlockId: 'labels',
         dependsOnFields: ['credential'],
-        selectorKey: 'jira.issues',
+        selectorKey: 'google.drive',
         isPreview: true,
         disabled: false,
         valueToHydrate: undefined,
@@ -101,11 +101,11 @@ describe('useFetchedOptions label hydration', () => {
     expect(html).toContain('Hydrated label-1')
     expect(html).toContain('Hydrated {{SHARED_LABEL}}')
     expect(mockUseSelectorOptions).toHaveBeenCalledWith(
-      'jira.issues',
+      'google.drive',
       expect.objectContaining({ enabled: false })
     )
     expect(mockUseSelectorOptionDetails).toHaveBeenCalledWith(
-      'jira.issues',
+      'google.drive',
       expect.objectContaining({
         detailIds: ['label-1', '{{SHARED_LABEL}}'],
         enabled: true,

@@ -86,52 +86,12 @@ export const OpenAIBlockMeta = {
   templates: [
     {
       icon: OpenAIIcon,
-      title: 'Document embedding pipeline',
-      prompt:
-        'Build a workflow that watches a files folder, chunks each new document, generates embeddings with OpenAI, and upserts vectors into Pinecone with rich metadata for retrieval.',
-      modules: ['files', 'knowledge-base', 'agent', 'workflows'],
-      category: 'engineering',
-      tags: ['automation', 'sync'],
-      alsoIntegrations: ['pinecone'],
-    },
-    {
-      icon: OpenAIIcon,
-      title: 'Knowledge base re-embedder',
-      prompt:
-        'Create a scheduled workflow that finds documents whose embeddings are stale, regenerates them with OpenAI, and re-upserts the vectors into Pinecone so retrieval stays current.',
-      modules: ['scheduled', 'knowledge-base', 'agent', 'workflows'],
-      category: 'engineering',
-      tags: ['automation', 'sync', 'vector-search'],
-      alsoIntegrations: ['pinecone'],
-    },
-    {
-      icon: OpenAIIcon,
       title: 'Semantic duplicate detector',
       prompt:
         'Build a workflow that reads new rows from a table, generates OpenAI embeddings for each, compares them against existing rows by cosine similarity, and flags near-duplicates in an evaluation table.',
       modules: ['tables', 'agent', 'workflows'],
       category: 'engineering',
       tags: ['engineering', 'analysis', 'vector-search'],
-    },
-    {
-      icon: OpenAIIcon,
-      title: 'Product catalog semantic search',
-      prompt:
-        'Create a workflow that embeds each product description from a table with OpenAI, upserts the vectors into Pinecone, and lets an incoming query return the closest matching products by similarity.',
-      modules: ['tables', 'agent', 'workflows'],
-      category: 'marketing',
-      tags: ['marketing', 'vector-search'],
-      alsoIntegrations: ['pinecone'],
-    },
-    {
-      icon: OpenAIIcon,
-      title: 'Semantic ticket deduplication',
-      prompt:
-        'Build a workflow that embeds each new support ticket with OpenAI, searches a Pinecone index of past tickets for near-duplicates, and links the new ticket to the matching thread instead of opening a fresh one.',
-      modules: ['agent', 'workflows'],
-      category: 'support',
-      tags: ['support', 'automation', 'vector-search'],
-      alsoIntegrations: ['pinecone'],
     },
     {
       icon: OpenAIIcon,

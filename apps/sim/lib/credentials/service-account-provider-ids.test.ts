@@ -14,8 +14,8 @@ describe('isServiceAccountProviderId', () => {
     expect(isServiceAccountProviderId('atlassian-service-account')).toBe(true)
     expect(isServiceAccountProviderId('slack-custom-bot')).toBe(true)
     expect(isServiceAccountProviderId('notion-service-account')).toBe(true)
-    expect(isServiceAccountProviderId('salesforce-service-account')).toBe(true)
-    expect(isServiceAccountProviderId('netsuite-service-account')).toBe(true)
+    expect(isServiceAccountProviderId('hubspot-service-account')).toBe(true)
+    expect(isServiceAccountProviderId('zoom-service-account')).toBe(true)
   })
 
   it('is case- and whitespace-insensitive', () => {
@@ -38,7 +38,7 @@ describe('getServiceAccountGatingBlockType', () => {
     expect(getServiceAccountGatingBlockType('slack-custom-bot')).toBe('slack_v2')
     expect(getServiceAccountGatingBlockType('notion-service-account')).toBeNull()
     expect(getServiceAccountGatingBlockType('google-service-account')).toBeNull()
-    expect(getServiceAccountGatingBlockType('salesforce-service-account')).toBeNull()
+    expect(getServiceAccountGatingBlockType('hubspot-service-account')).toBeNull()
   })
 })
 
@@ -46,12 +46,11 @@ describe('getServiceAccountConnectNoun', () => {
   it('names the token-paste secret each provider actually collects', () => {
     expect(getServiceAccountConnectNoun('notion-service-account')).toBe('integration secret')
     expect(getServiceAccountConnectNoun('hubspot-service-account')).toBe('private app token')
-    expect(getServiceAccountConnectNoun('linear-service-account')).toBe('API key')
+    expect(getServiceAccountConnectNoun('calcom-service-account')).toBe('API key')
   })
 
   it('names the client-credential secret', () => {
     expect(getServiceAccountConnectNoun('zoom-service-account')).toBe('server-to-server app')
-    expect(getServiceAccountConnectNoun('netsuite-service-account')).toBe('OAuth certificate')
   })
 
   it('calls a custom Slack bot a custom bot', () => {

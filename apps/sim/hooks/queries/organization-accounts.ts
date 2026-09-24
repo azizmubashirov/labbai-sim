@@ -43,7 +43,6 @@ import { mcpKeys } from '@/hooks/queries/utils/mcp-keys'
 import { resetOrganizationSearchAccess } from '@/hooks/queries/utils/reset-organization-search-access'
 import { searchSourceKeys } from '@/hooks/queries/utils/search-source-keys'
 import { invalidateSelectorQueries } from '@/hooks/queries/utils/selector-keys'
-import { slackSearchKeys } from '@/hooks/queries/utils/slack-search-keys'
 
 export const ORGANIZATION_ACCOUNTS_STALE_TIME = 30_000
 
@@ -183,9 +182,6 @@ export function useUpdateOrganizationAccounts() {
         queryClient.invalidateQueries({ queryKey: personalCredentialKeys.lists() }),
         queryClient.invalidateQueries({ queryKey: mcpKeys.managedCatalog() }),
         invalidateSelectorQueries(queryClient),
-        queryClient.invalidateQueries({
-          queryKey: slackSearchKeys.organizationManifests(organizationId),
-        }),
         queryClient.invalidateQueries({
           queryKey: searchSourceKeys.organizationOverview(organizationId),
         }),

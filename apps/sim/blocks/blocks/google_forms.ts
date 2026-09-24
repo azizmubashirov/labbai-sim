@@ -572,16 +572,6 @@ export const GoogleFormsBlockMeta = {
     },
     {
       icon: GoogleFormsIcon,
-      title: 'Google Forms support intake',
-      prompt:
-        'Create a workflow that turns Google Forms support submissions into Zendesk tickets, prioritizes them with an agent, and posts the new ticket to the support Slack channel.',
-      modules: ['agent', 'workflows'],
-      category: 'support',
-      tags: ['support', 'automation'],
-      alsoIntegrations: ['zendesk', 'slack'],
-    },
-    {
-      icon: GoogleFormsIcon,
       title: 'Google Forms event RSVP tracker',
       prompt:
         'Build a workflow that captures Google Forms event RSVPs into a table, sends confirmation emails, and provides a daily attendee dashboard to the organizer.',
@@ -589,36 +579,6 @@ export const GoogleFormsBlockMeta = {
       category: 'marketing',
       tags: ['marketing', 'communication'],
       alsoIntegrations: ['gmail'],
-    },
-    {
-      icon: GoogleFormsIcon,
-      title: 'Google Forms survey analyzer',
-      prompt:
-        'Create a workflow that processes Google Forms survey responses, classifies sentiment and themes with an agent, and writes a weekly insight digest to Slack.',
-      modules: ['scheduled', 'agent', 'workflows'],
-      category: 'productivity',
-      tags: ['product', 'analysis'],
-      alsoIntegrations: ['slack'],
-    },
-    {
-      icon: GoogleFormsIcon,
-      title: 'Google Forms approvals router',
-      prompt:
-        'Build a workflow that turns Google Forms approval requests into Slack messages with quick-action buttons, captures the decision, and emails the requester the outcome.',
-      modules: ['agent', 'workflows'],
-      category: 'operations',
-      tags: ['team', 'automation'],
-      alsoIntegrations: ['slack'],
-    },
-    {
-      icon: GoogleFormsIcon,
-      title: 'Google Forms PTO collector',
-      prompt:
-        'Create a workflow that processes PTO requests from Google Forms, captures manager approval over Slack, and updates the HR table with approved time off.',
-      modules: ['tables', 'agent', 'workflows'],
-      category: 'operations',
-      tags: ['hr', 'automation'],
-      alsoIntegrations: ['slack'],
     },
     {
       icon: GoogleFormsIcon,

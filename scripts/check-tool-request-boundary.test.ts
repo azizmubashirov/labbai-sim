@@ -908,13 +908,13 @@ describe('tool self-hop audit', () => {
   it('allows a provider request returned by an imported helper', () => {
     const audit = auditToolSelfHops(
       `
-        import { snowflakeStatementRequest } from '@/tools/snowflake/utils'
+        import { providerStatementRequest } from './fixtures/check-tool-request-boundary/provider-request'
         const tool = {
           id: 'test_tool',
-          request: snowflakeStatementRequest(() => ({ statement: 'select 1' })),
+          request: providerStatementRequest(() => ({ statement: 'select 1' })),
         }
       `,
-      'apps/sim/tools/snowflake/audit-fixture.ts'
+      'scripts/audit-fixture.ts'
     )
 
     expect(audit.violations).toEqual([])

@@ -428,16 +428,6 @@ export const MySQLBlockMeta = {
       tags: ['engineering', 'database'],
     },
     {
-      icon: ClipboardList,
-      title: 'Daily MySQL metrics report to Slack',
-      prompt:
-        'Create a scheduled workflow that runs a MySQL query for yesterday’s key metrics, has an agent summarize the rows into a short update, and posts the digest to a Slack channel every morning.',
-      modules: ['scheduled', 'agent', 'workflows'],
-      category: 'operations',
-      tags: ['reporting', 'analytics'],
-      alsoIntegrations: ['slack'],
-    },
-    {
       icon: Table,
       title: 'Document a MySQL schema',
       prompt:
@@ -454,16 +444,6 @@ export const MySQLBlockMeta = {
       modules: ['tables', 'agent', 'workflows'],
       category: 'operations',
       tags: ['automation', 'database'],
-    },
-    {
-      icon: Search,
-      title: 'Nightly MySQL data-quality audit',
-      prompt:
-        'Build a scheduled workflow that runs MySQL queries checking for nulls, duplicates, and orphaned foreign keys, has an agent describe any issues found, and alerts the team in Slack when the counts are non-zero.',
-      modules: ['scheduled', 'agent', 'workflows'],
-      category: 'operations',
-      tags: ['data-quality', 'monitoring'],
-      alsoIntegrations: ['slack'],
     },
     {
       icon: Wrench,

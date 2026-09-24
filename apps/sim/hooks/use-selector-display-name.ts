@@ -17,12 +17,8 @@ interface SelectorDisplayNameArgs {
   oauthCredential?: string
   domain?: string
   projectId?: string
-  planId?: string
-  teamId?: string
   knowledgeBaseId?: string
   baseId?: string
-  datasetId?: string
-  serviceDeskId?: string
   siteId?: string
   collectionId?: string
   spreadsheetId?: string
@@ -36,12 +32,8 @@ export function useSelectorDisplayName({
   oauthCredential,
   domain,
   projectId,
-  planId,
-  teamId,
   knowledgeBaseId,
   baseId,
-  datasetId,
-  serviceDeskId,
   siteId,
   collectionId,
   spreadsheetId,
@@ -73,12 +65,8 @@ export function useSelectorDisplayName({
       oauthCredential,
       domain,
       projectId,
-      planId,
-      teamId,
       knowledgeBaseId,
       baseId,
-      datasetId,
-      serviceDeskId,
       siteId,
       collectionId,
       spreadsheetId,
@@ -93,12 +81,8 @@ export function useSelectorDisplayName({
     oauthCredential,
     domain,
     projectId,
-    planId,
-    teamId,
     knowledgeBaseId,
     baseId,
-    datasetId,
-    serviceDeskId,
     siteId,
     collectionId,
     spreadsheetId,
@@ -108,7 +92,7 @@ export function useSelectorDisplayName({
   const key = resolution?.key
   const context = resolution?.context ?? {}
   const enabled = Boolean(key && hasSelection)
-  const resolvedKey: SelectorKey = (key ?? 'slack.channels') as SelectorKey
+  const resolvedKey: SelectorKey = key ?? 'google.drive'
   const resolvedContext = enabled ? context : {}
   const supportsDetail = getSelectorManifestEntry(resolvedKey).supportsDetail
 

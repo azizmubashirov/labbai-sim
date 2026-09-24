@@ -4,7 +4,6 @@
 import { describe, expect, it } from 'vitest'
 import {
   createCredentialBodySchema,
-  createCredentialDraftBodySchema,
   updateCredentialByIdBodySchema,
   workspaceCredentialSchema,
 } from '@/lib/api/contracts/credentials'
@@ -92,46 +91,6 @@ describe('Atlassian service-account target', () => {
   it('rejects unrecognized products instead of choosing another API', () => {
     expect(
       updateCredentialByIdBodySchema.safeParse({ atlassianProduct: 'bitbucket' }).success
-    ).toBe(false)
-  })
-})
-
-describe('createCredentialDraftBodySchema OAuth client configuration', () => {
-  const base = {
-    workspaceId: 'workspace-1',
-    displayName: 'Accounting',
-  }
-  const oauthClientConfig = {
-    clientId: 'client-id',
-    clientSecret: 'client-secret',
-    environment: 'sandbox' as const,
-    webhookVerifierToken: 'verifier-token',
-  }
-
-  it('requires caller-managed app credentials for QuickBooks', () => {
-    const result = createCredentialDraftBodySchema.safeParse({
-      ...base,
-      providerId: 'quickbooks',
-    })
-
-    expect(result.success).toBe(false)
-    if (!result.success) expect(result.error.issues[0]?.path).toEqual(['oauthClientConfig'])
-  })
-
-  it('accepts QuickBooks app credentials and rejects them for other providers', () => {
-    expect(
-      createCredentialDraftBodySchema.safeParse({
-        ...base,
-        providerId: 'quickbooks',
-        oauthClientConfig,
-      }).success
-    ).toBe(true)
-    expect(
-      createCredentialDraftBodySchema.safeParse({
-        ...base,
-        providerId: 'google-email',
-        oauthClientConfig,
-      }).success
     ).toBe(false)
   })
 })

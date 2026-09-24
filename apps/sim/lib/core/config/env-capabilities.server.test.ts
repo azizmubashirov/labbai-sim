@@ -13,20 +13,20 @@ describe('server environment capabilities', () => {
     setEnv({
       SHOPIFY_CLIENT_ID: undefined,
       SHOPIFY_CLIENT_SECRET: undefined,
-      SLACK_CLIENT_ID: undefined,
-      SLACK_CLIENT_SECRET: undefined,
+      HUBSPOT_CLIENT_ID: undefined,
+      HUBSPOT_CLIENT_SECRET: undefined,
     })
   })
 
   afterAll(resetEnvMock)
 
   it('inspects partial OAuth configuration without throwing', () => {
-    setEnv({ SLACK_CLIENT_ID: 'slack-client' })
+    setEnv({ HUBSPOT_CLIENT_ID: 'hubspot-client' })
 
-    expect(inspectConfiguredOAuthClient('slack')).toEqual({
+    expect(inspectConfiguredOAuthClient('hubspot')).toEqual({
       state: 'partial',
-      missingFields: ['SLACK_CLIENT_SECRET'],
-      setupCommand: 'npx sim-setup add integration slack',
+      missingFields: ['HUBSPOT_CLIENT_SECRET'],
+      setupCommand: 'npx sim-setup add integration hubspot',
     })
   })
 
@@ -37,10 +37,10 @@ describe('server environment capabilities', () => {
   })
 
   it('fails fast when an OAuth client is partially configured', () => {
-    setEnv({ SLACK_CLIENT_ID: 'slack-client' })
+    setEnv({ HUBSPOT_CLIENT_ID: 'hubspot-client' })
 
-    expect(() => requireConfiguredOAuthClient('slack')).toThrow(
-      'OAuth client slack is partially configured — missing SLACK_CLIENT_SECRET. Run npx sim-setup add integration slack.'
+    expect(() => requireConfiguredOAuthClient('hubspot')).toThrow(
+      'OAuth client hubspot is partially configured — missing HUBSPOT_CLIENT_SECRET. Run npx sim-setup add integration hubspot.'
     )
   })
 

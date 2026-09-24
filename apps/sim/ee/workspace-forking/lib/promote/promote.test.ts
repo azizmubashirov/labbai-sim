@@ -741,10 +741,10 @@ describe('promoteFork trigger URLs', () => {
     blocks: {
       'blk-new': {
         id: 'blk-new',
-        // The REAL slack_webhook trigger id, so the provider check resolves against the actual
+        // The REAL telegram_webhook trigger id, so the provider check resolves against the actual
         // registry - adoption only pairs a URL with a trigger of the SAME provider.
-        type: 'slack_webhook',
-        name: 'Slack messages',
+        type: 'telegram_webhook',
+        name: 'Telegram messages',
         triggerMode: true,
         subBlocks: {},
         outputs: {},
@@ -773,7 +773,9 @@ describe('promoteFork trigger URLs', () => {
     // The old trigger block ('blk-old') serves the live URL and is NOT in the source any more:
     // the user deleted and re-added the trigger, so the sync writes 'blk-new' instead.
     mockLoadTargetWebhookPaths.mockResolvedValue(
-      new Map([['blk-old', { path: 'live-slack-path', workflowId: 'wf-tgt', provider: 'slack' }]])
+      new Map([
+        ['blk-old', { path: 'live-telegram-path', workflowId: 'wf-tgt', provider: 'telegram' }],
+      ])
     )
     vi.mocked(copyWorkflowStateIntoTarget).mockResolvedValue({
       targetWorkflowId: 'wf-tgt',
@@ -788,8 +790,9 @@ describe('promoteFork trigger URLs', () => {
   }
 
   /**
-   * The reported bug, at the promote level: pushing a workflow whose Slack trigger was re-created
-   * used to hand the parent a brand-new webhook URL, forcing a re-paste into Slack every sync.
+   * The reported bug, at the promote level: pushing a workflow whose Telegram trigger was
+   * re-created used to hand the parent a brand-new webhook URL, forcing a re-registration every
+   * sync.
    */
   it('hands the retiring URL to the arriving trigger instead of minting a new one', async () => {
     arrangeReCreatedTrigger()
@@ -798,7 +801,7 @@ describe('promoteFork trigger URLs', () => {
 
     expect(result.blocked).toBeNull()
     const writeParams = vi.mocked(copyWorkflowStateIntoTarget).mock.calls[0][0]
-    expect(writeParams.triggerPathByBlockId?.get('blk-new')).toBe('live-slack-path')
+    expect(writeParams.triggerPathByBlockId?.get('blk-new')).toBe('live-telegram-path')
     // Adopted, so nothing needs re-registering externally.
     expect(result.triggerUrlChanges).toEqual([])
   })
@@ -813,7 +816,9 @@ describe('promoteFork trigger URLs', () => {
 
     const writeParams = vi.mocked(copyWorkflowStateIntoTarget).mock.calls[0][0]
     expect(writeParams.triggerPathByBlockId?.size).toBe(0)
-    expect(result.triggerUrlChanges).toEqual([{ workflowName: 'Flow', path: 'live-slack-path' }])
+    expect(result.triggerUrlChanges).toEqual([
+      { workflowName: 'Flow', path: 'live-telegram-path' },
+    ])
   })
 
   /**
@@ -886,13 +891,13 @@ describe('promoteFork trigger URLs', () => {
     const result = await promoteFork({
       ...promoteParams(),
       triggerMappings: [
-        { sourceWorkflowId: 'wf-src', sourceBlockId: 'blk-new', adoptPath: 'live-slack-path' },
+        { sourceWorkflowId: 'wf-src', sourceBlockId: 'blk-new', adoptPath: 'live-telegram-path' },
       ],
     })
     expect(result.blocked).toBeNull()
     expect(
       vi.mocked(copyWorkflowStateIntoTarget).mock.calls[0][0].triggerPathByBlockId?.get('blk-new')
-    ).toBe('live-slack-path')
+    ).toBe('live-telegram-path')
     expect(result.triggerUrlChanges).toEqual([])
   })
 })

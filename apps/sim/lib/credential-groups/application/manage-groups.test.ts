@@ -223,10 +223,9 @@ describe('Credential Group Settings application operations', () => {
       options: [
         {
           id: 'internal-option-id',
-          provider: 'slack',
+          provider: 'gmail',
           status: 'active',
           configurationStatus: 'ready',
-          slackBotCredentialId: 'internal-credential-id',
         },
       ],
     })
@@ -237,7 +236,7 @@ describe('Credential Group Settings application operations', () => {
     const result = await vfs.read('organization/connected-accounts.json')
     expect(JSON.parse(result!.content)).toMatchObject({
       status: 'active',
-      options: [{ provider: 'slack', status: 'active', configurationStatus: 'ready' }],
+      options: [{ provider: 'gmail', status: 'active', configurationStatus: 'ready' }],
     })
     expect(result!.content).not.toContain('internal-')
     expect(mocks.list).toHaveBeenCalledExactlyOnceWith('workspace-1')

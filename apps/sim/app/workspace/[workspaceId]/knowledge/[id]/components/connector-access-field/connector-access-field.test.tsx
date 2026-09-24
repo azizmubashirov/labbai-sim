@@ -22,7 +22,7 @@ vi.mock('@/hooks/queries/source-accounts', () => ({
         credentialGroup: mocks.configured
           ? {
               status: 'active',
-              options: [{ provider: 'slack', status: 'active', configurationStatus: 'ready' }],
+              options: [{ provider: 'google-drive', status: 'active', configurationStatus: 'ready' }],
             }
           : null,
       },
@@ -38,9 +38,7 @@ vi.mock('@/hooks/queries/source-accounts', () => ({
 }))
 
 import { ConnectorAccessField } from '@/app/workspace/[workspaceId]/knowledge/[id]/components/connector-access-field/connector-access-field'
-import { confluenceConnectorMeta } from '@/connectors/confluence/meta'
-import { gitlabConnectorMeta } from '@/connectors/gitlab/meta'
-import { slackConnectorMeta } from '@/connectors/slack/meta'
+import { googleDriveConnectorMeta } from '@/connectors/google-drive/meta'
 
 let root: Root
 let container: HTMLDivElement
@@ -51,7 +49,7 @@ async function render(props: Partial<ComponentProps<typeof ConnectorAccessField>
     root.render(
       <ConnectorAccessField
         workspaceId='workspace-1'
-        connectorConfig={confluenceConnectorMeta}
+        connectorConfig={googleDriveConnectorMeta}
         value={{ accessMode: 'members' }}
         onChange={onChange}
         canAdmin
@@ -170,15 +168,9 @@ describe('connection method selection', () => {
     expect(onChange).toHaveBeenCalledWith({ accessMode: 'admin' })
   })
 
-  it('omits the field when the connector supports only the selected method', async () => {
-    await render({ connectorConfig: gitlabConnectorMeta, value: { accessMode: 'admin' } })
-    expect(container.querySelector('[role="radiogroup"]')).toBeNull()
-    expect(container.textContent).toBe('')
-  })
-
   it('keeps pending upgrade actions without restoring the redundant selector', async () => {
     await render({
-      connectorConfig: gitlabConnectorMeta,
+      connectorConfig: { ...googleDriveConnectorMeta, supportedAccessModes: ['admin'] },
       value: { accessMode: 'admin' },
       footer: <button type='button'>Apply changes</button>,
     })
@@ -244,82 +236,5 @@ describe('connection method selection', () => {
     await render({ value: { accessMode: 'admin' }, allowMembers: false, allowAdmin: false })
     expect(container.querySelector('[role="radiogroup"]')).toBeNull()
     expect(container.textContent).toContain('Service account')
-  })
-})
-
-describe('Slack setup continuity', () => {
-  it.each([
-    {
-      scope: { kind: 'workspace', workspaceId: 'workspace-1' },
-      href: '/workspace/workspace-1/settings/credential-groups',
-    },
-    {
-      scope: { kind: 'organization', organizationId: 'org-1' },
-      href: '/o/org-1/settings/integrations?search-setup=slack&connectedAccounts=slack',
-    },
-  ] as const)(
-    'keeps the $scope.kind setup link and draft callback when the method selector is hidden',
-    async ({ scope, href }) => {
-      const onNavigate = vi.fn()
-      await render({
-        scope,
-        connectorConfig: slackConnectorMeta,
-        allowAdmin: false,
-        searchSetupSource: 'slack',
-        slackSetupOnly: true,
-        onSetupNavigate: onNavigate,
-        footer: <button type='button'>Apply changes</button>,
-      })
-      expect(container.querySelector('[role="radiogroup"]')).toBeNull()
-      expect(container.textContent).toContain('Slack app')
-      expect(container.textContent).not.toContain('Member accounts')
-      const link = container.querySelector('a')
-      expect(link).toHaveAttribute('href', href)
-      link?.addEventListener('click', (event) => event.preventDefault())
-      await act(async () => link?.click())
-      expect(onNavigate).toHaveBeenCalledOnce()
-      expect(container.textContent).toContain('Apply changes')
-      expect(mocks.accounts).toHaveBeenLastCalledWith(scope)
-    }
-  )
-
-  it.each(['loading', 'configured'] as const)('hides the Slack detour while %s', async (state) => {
-    mocks.loading = state === 'loading'
-    mocks.configured = state === 'configured'
-    await render({ connectorConfig: slackConnectorMeta, allowAdmin: false })
-    expect(container.querySelector('a')).toBeNull()
-    if (state === 'loading') expect(container.textContent).toContain('Checking Slack setup…')
-  })
-
-  it('retries a failed check without treating it as missing Slack configuration', async () => {
-    mocks.error = new Error('Could not load workspace accounts')
-    await render({ connectorConfig: slackConnectorMeta, allowAdmin: false })
-    expect(container.textContent).toContain('Could not load workspace accounts')
-    expect(container.querySelector('a')).toBeNull()
-    const retry = container.querySelector('button')
-    expect(retry?.textContent).toBe('Try again')
-    await act(async () => retry?.click())
-    expect(mocks.refetch).toHaveBeenCalledOnce()
-
-    mocks.error = null
-    await render({ connectorConfig: slackConnectorMeta, allowAdmin: false })
-    expect(container.querySelector('a')).not.toBeNull()
-  })
-
-  it('locks the retry action while the failed check is being retried', async () => {
-    mocks.error = new Error('Could not load workspace accounts')
-    mocks.retrying = true
-    await render({ connectorConfig: slackConnectorMeta, allowAdmin: false })
-    expect(container.querySelector('a')).toBeNull()
-    expect(container.querySelector('button')).toBeDisabled()
-    expect(container.querySelector('button')?.textContent).toBe('Retrying…')
-  })
-
-  it('does not fetch or show Slack setup controls to ordinary members', async () => {
-    mocks.error = new Error('Could not load workspace accounts')
-    await render({ connectorConfig: slackConnectorMeta, allowAdmin: false, canAdmin: false })
-    expect(mocks.accounts).toHaveBeenLastCalledWith(undefined)
-    expect(container.querySelector('a, button')).toBeNull()
-    expect(container.textContent).not.toContain('Could not load workspace accounts')
   })
 })

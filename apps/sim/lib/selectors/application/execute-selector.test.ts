@@ -20,13 +20,9 @@ const mocks = vi.hoisted(() => ({
   resolveReferences: vi.fn(),
   resolveScope: vi.fn(),
   sanitize: vi.fn(),
-  authorizePersonalSearch: vi.fn(),
   requireOrganizationMembership: vi.fn(),
 }))
 
-vi.mock('@/lib/knowledge/application/personal-search-account', () => ({
-  authorizePersonalSearchSetup: mocks.authorizePersonalSearch,
-}))
 vi.mock('@/lib/core/application/organization-authorization', () => ({
   requireOrganizationMembership: mocks.requireOrganizationMembership,
 }))
@@ -166,7 +162,7 @@ describe('executeSelector', () => {
     ])
   })
 
-  it.each(['gmail.labels', 'github.installationRepositories'])(
+  it.each(['gmail.labels', 'google.drive'])(
     'keeps generic organization browsing admin-only for %s',
     async (selectorKey) => {
       mocks.requireOrganizationMembership.mockRejectedValueOnce(new Error('Admin required'))
@@ -179,26 +175,9 @@ describe('executeSelector', () => {
         'admin',
         'knowledge.use'
       )
-      expect(mocks.authorizePersonalSearch).not.toHaveBeenCalled()
       expect(mocks.getAttachment).not.toHaveBeenCalled()
     }
   )
-
-  it('refuses organization GitHub installation browsing from workspace scope before resolving credentials', async () => {
-    mocks.resolveScope.mockResolvedValue({
-      workspaceId: 'workspace-1',
-      workspaceOrganizationId: null,
-      allowPersonalApiKeys: true,
-      selectorKey: 'github.installationRepositories',
-      selectorManifest: getSelectorManifestEntry('github.installationRepositories'),
-      selectorScope: scope,
-    })
-    await expect(execute({ selectorKey: 'github.installationRepositories' })).rejects.toThrow(
-      'Context unavailable'
-    )
-    expect(mocks.authorizeCredential).not.toHaveBeenCalled()
-    expect(mocks.executeAttachment).not.toHaveBeenCalled()
-  })
 
   it('rejects a personal setup marker outside its approved provider selector and organization scope', async () => {
     await expect(execute({ personalSearchSetup: 'jira' })).rejects.toBeInstanceOf(
@@ -207,81 +186,12 @@ describe('executeSelector', () => {
     await expect(
       execute({
         scope: { kind: 'organization', organizationId: 'org-1' },
-        selectorKey: 'jira.issues',
+        selectorKey: 'gmail.labels',
         personalSearchSetup: 'jira',
       })
     ).rejects.toBeInstanceOf(SelectorContextUnavailableError)
     expect(mocks.authorizeCredential).not.toHaveBeenCalled()
     expect(mocks.executeAttachment).not.toHaveBeenCalled()
-  })
-
-  it('requires the personal setup authorization before canonical discovery and provider calls', async () => {
-    mocks.authorizePersonalSearch.mockRejectedValueOnce(new Error('Integration unapproved'))
-    await expect(
-      execute({
-        scope: { kind: 'organization', organizationId: 'org-1' },
-        selectorKey: 'jira.projectKeys',
-        context: { oauthCredential: 'managed-1', domain: 'example.atlassian.net' },
-        personalSearchSetup: 'jira',
-      })
-    ).rejects.toThrow('Integration unapproved')
-    expect(mocks.authorizePersonalSearch).toHaveBeenCalledWith(principal, {
-      organizationId: 'org-1',
-      connectorType: 'jira',
-    })
-    expect(mocks.resolveScope).not.toHaveBeenCalled()
-    expect(mocks.executeAttachment).not.toHaveBeenCalled()
-  })
-
-  it('uses the shared selector execution and records the prepared account access once', async () => {
-    const personalScope = { kind: 'organization' as const, organizationId: 'org-1' }
-    mocks.resolveScope.mockResolvedValueOnce({
-      organizationId: 'org-1',
-      workspaceId: undefined,
-      selectorKey: 'jira.projectKeys',
-      selectorManifest: getSelectorManifestEntry('jira.projectKeys'),
-      selectorScope: personalScope,
-    })
-    mocks.resolveReferences.mockResolvedValueOnce({
-      context: { oauthCredential: 'managed-1', domain: 'example.atlassian.net' },
-      request: { kind: 'list' },
-      references: new Map(),
-    })
-    mocks.authorizeCredential.mockResolvedValueOnce({
-      suppliedId: 'managed-1',
-      providerId: 'jira',
-      personalSearchSetup: { principal, organizationId: 'org-1', connectorType: 'jira' },
-    })
-    mocks.getAttachment.mockReturnValueOnce({
-      destination: 'fixed',
-      credential: { kind: 'stored', field: 'oauthCredential', serviceIds: ['jira'] },
-      auditCredentialUse: true,
-      execute: async (args: ExecuteServerSelectorArgs) => {
-        args.recordCredentialUse?.('jira')
-        args.recordCredentialUse?.('jira')
-        return { kind: 'list', items: [{ id: 'PROJECT', label: 'Project' }] }
-      },
-    })
-    await expect(
-      execute({
-        selectorKey: 'jira.projectKeys',
-        scope: personalScope,
-        context: { oauthCredential: 'managed-1', domain: 'example.atlassian.net' },
-        personalSearchSetup: 'jira',
-      })
-    ).resolves.toEqual({ kind: 'list', items: [{ id: 'PROJECT', label: 'Project' }] })
-    expect(mocks.authorizeCredential).toHaveBeenCalledWith(
-      expect.objectContaining({ personalSearchSetup: 'jira', organizationId: 'org-1' })
-    )
-    expect(mocks.requireOrganizationMembership).not.toHaveBeenCalled()
-    expect(mocks.recordCredentialAccess).toHaveBeenCalledTimes(1)
-    expect(mocks.recordCredentialAccess).toHaveBeenCalledWith(
-      expect.objectContaining({
-        actorId: principal.userId,
-        resourceId: 'managed-1',
-        providerId: 'jira',
-      })
-    )
   })
 
   /**
@@ -375,31 +285,6 @@ describe('executeSelector', () => {
 
     await expect(execute()).resolves.toMatchObject({ kind: 'list' })
     expect(mocks.executeAttachment).toHaveBeenCalledTimes(1)
-  })
-
-  /** The SharePoint/Excel pair reads SharePoint, whatever credential opened it. */
-  it('refuses a sharepoint selector when only the excel half is allowed', async () => {
-    mocks.authorizeCredential.mockImplementation(async () => {
-      mocks.events.push('credential-authorization')
-      return { suppliedId: 'credential-1', providerId: 'microsoft-excel' }
-    })
-    mocks.getAttachment.mockReturnValue({
-      destination: 'fixed',
-      credential: {
-        kind: 'stored',
-        field: 'oauthCredential',
-        serviceIds: ['sharepoint', 'microsoft-excel'],
-        resourceServiceId: 'sharepoint',
-      },
-      execute: mocks.executeAttachment,
-    })
-    mockResolvePermissionGroupConfig.mockResolvedValue({
-      ...DEFAULT_PERMISSION_GROUP_CONFIG,
-      allowedIntegrations: ['microsoft_excel_v2'],
-    })
-
-    await expect(execute()).rejects.toBeInstanceOf(IntegrationNotAllowedError)
-    expect(mocks.executeAttachment).not.toHaveBeenCalled()
   })
 
   /**

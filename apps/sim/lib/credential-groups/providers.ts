@@ -7,33 +7,12 @@ export const CREDENTIAL_GROUP_STANDARD_OAUTH_PROVIDER_IDS = [
   'google-drive',
   'google-docs',
   'google-forms',
-  'google-chat',
-  'google-meet',
   'google-sheets',
-  'microsoft-teams',
-  'outlook',
-  'onedrive',
-  'sharepoint',
-  'microsoft-excel',
-  'confluence',
-  'jira',
   'airtable',
-  'asana',
-  'attio',
-  'bitbucket',
-  'github-repositories',
-  'box',
   'calcom',
-  'clickup',
-  'docusign',
-  'dropbox',
   'hubspot',
-  'linear',
-  'linkedin',
-  'monday',
   'notion',
   'pipedrive',
-  'salesforce',
   'wordpress',
   'zoom',
 ] as const
@@ -43,7 +22,6 @@ export type CredentialGroupStandardOAuthProvider =
 
 export const CREDENTIAL_GROUP_PROVIDER_IDS = [
   ...CREDENTIAL_GROUP_STANDARD_OAUTH_PROVIDER_IDS,
-  'slack',
 ] as const
 
 export type CredentialGroupProvider = (typeof CREDENTIAL_GROUP_PROVIDER_IDS)[number]
@@ -83,54 +61,9 @@ const CREDENTIAL_GROUP_PROVIDER_SUPPORT: Record<
     description: 'Let each person connect one Google Forms account',
     configuration: 'oauth',
   },
-  'google-chat': {
-    serviceId: 'google-chat',
-    description: 'Let each person connect one Google Chat account',
-    configuration: 'oauth',
-  },
-  'google-meet': {
-    serviceId: 'google-meet',
-    description: 'Let each person connect one Google Meet account',
-    configuration: 'oauth',
-  },
   'google-sheets': {
     serviceId: 'google-sheets',
     description: 'Let each person connect one Google Sheets account',
-    configuration: 'oauth',
-  },
-  'microsoft-teams': {
-    serviceId: 'microsoft-teams',
-    description: 'Let each person connect one Microsoft Teams account',
-    configuration: 'oauth',
-  },
-  outlook: {
-    serviceId: 'outlook',
-    description: 'Let each person connect one Outlook account',
-    configuration: 'oauth',
-  },
-  onedrive: {
-    serviceId: 'onedrive',
-    description: 'Let each person connect one OneDrive account',
-    configuration: 'oauth',
-  },
-  sharepoint: {
-    serviceId: 'sharepoint',
-    description: 'Let each person connect one SharePoint account',
-    configuration: 'oauth',
-  },
-  'microsoft-excel': {
-    serviceId: 'microsoft-excel',
-    description: 'Let each person connect one Microsoft Excel account',
-    configuration: 'oauth',
-  },
-  confluence: {
-    serviceId: 'confluence',
-    description: 'Let each person connect one Confluence account',
-    configuration: 'oauth',
-  },
-  jira: {
-    serviceId: 'jira',
-    description: 'Let each person connect one Jira account',
     configuration: 'oauth',
   },
   airtable: {
@@ -138,39 +71,9 @@ const CREDENTIAL_GROUP_PROVIDER_SUPPORT: Record<
     description: 'Let each person connect one Airtable account',
     configuration: 'oauth',
   },
-  asana: {
-    serviceId: 'asana',
-    description: 'Let each person connect one Asana account',
-    configuration: 'oauth',
-  },
-  attio: {
-    serviceId: 'attio',
-    description: 'Let each person connect one Attio account',
-    configuration: 'oauth',
-  },
-  bitbucket: {
-    serviceId: 'bitbucket',
-    description: 'Let each person connect one Bitbucket account',
-    configuration: 'oauth',
-  },
-  'github-repositories': {
-    serviceId: 'github-repositories',
-    description: 'Let each person connect their GitHub account',
-    configuration: 'oauth',
-  },
-  box: {
-    serviceId: 'box',
-    description: 'Let each person connect one Box account',
-    configuration: 'oauth',
-  },
   calcom: {
     serviceId: 'calcom',
     description: 'Let each person connect one Cal.com account',
-    configuration: 'oauth',
-  },
-  clickup: {
-    serviceId: 'clickup',
-    description: 'Let each person connect one ClickUp account',
     configuration: 'oauth',
   },
   hubspot: {
@@ -178,44 +81,14 @@ const CREDENTIAL_GROUP_PROVIDER_SUPPORT: Record<
     description: 'Let each person connect one HubSpot account',
     configuration: 'oauth',
   },
-  linear: {
-    serviceId: 'linear',
-    description: 'Let each person connect one Linear account',
-    configuration: 'oauth',
-  },
-  monday: {
-    serviceId: 'monday',
-    description: 'Let each person connect one monday.com account',
-    configuration: 'oauth',
-  },
   notion: {
     serviceId: 'notion',
     description: 'Let each person connect one Notion account',
     configuration: 'oauth',
   },
-  docusign: {
-    serviceId: 'docusign',
-    description: 'Let each person connect one DocuSign account',
-    configuration: 'oauth',
-  },
-  dropbox: {
-    serviceId: 'dropbox',
-    description: 'Let each person connect one Dropbox account',
-    configuration: 'oauth',
-  },
-  linkedin: {
-    serviceId: 'linkedin',
-    description: 'Let each person connect one LinkedIn account',
-    configuration: 'oauth',
-  },
   pipedrive: {
     serviceId: 'pipedrive',
     description: 'Let each person connect one Pipedrive account',
-    configuration: 'oauth',
-  },
-  salesforce: {
-    serviceId: 'salesforce',
-    description: 'Let each person connect one Salesforce account',
     configuration: 'oauth',
   },
   wordpress: {
@@ -227,11 +100,6 @@ const CREDENTIAL_GROUP_PROVIDER_SUPPORT: Record<
     serviceId: 'zoom',
     description: 'Let each person connect one Zoom account',
     configuration: 'oauth',
-  },
-  slack: {
-    serviceId: 'slack',
-    description: 'Let each person connect through your custom Slack app',
-    configuration: 'slack_custom_bot',
   },
 }
 
@@ -272,10 +140,7 @@ export function getCredentialGroupProviderId(provider: CredentialGroupProvider):
  * The credential group provider collecting accounts for an OAuth provider id,
  * or `null` when none does.
  *
- * Every provider counts here, not only the standard OAuth ones: Slack is
- * collected through a custom bot app, so resolving against
- * {@link CREDENTIAL_GROUP_STANDARD_OAUTH_PROVIDER_IDS} misses it. Callers that
- * treat a miss as an ordinary answer take this rather than catching the throw
+ * Callers that treat a miss as an ordinary answer take this rather than catching the throw
  * from {@link getCredentialGroupProviderFromProviderId}, so the choice of which
  * provider set counts is made in one place instead of at each call site.
  */

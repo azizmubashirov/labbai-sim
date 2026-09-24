@@ -85,16 +85,4 @@ describe('selector-backed sub-blocks', () => {
       ).toBe(true)
     }
   })
-
-  it('projects the optional Excel drive without requiring it for OneDrive readiness', () => {
-    const match = selectorBacked.find(
-      ({ block, sub }) => block === 'microsoft_excel' && sub.id === 'spreadsheetId'
-    )
-
-    expect(match, 'microsoft_excel.spreadsheetId is missing').toBeDefined()
-    expect(match?.sub.dependsOn).toEqual({
-      all: ['credential'],
-      any: ['credential', 'driveId'],
-    })
-  })
 })

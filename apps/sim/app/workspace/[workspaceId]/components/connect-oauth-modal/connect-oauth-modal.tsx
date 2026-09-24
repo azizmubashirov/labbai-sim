@@ -31,15 +31,8 @@ import {
   parseProvider,
 } from '@/lib/oauth'
 import { getScopeDescription, getServiceConfigByProviderId } from '@/lib/oauth/utils'
-import {
-  MicrosoftDataverseEnvironmentField,
-  useMicrosoftDataverseEnvironmentForm,
-} from '@/app/workspace/[workspaceId]/components/connect-oauth-modal/microsoft-dataverse-environment'
 import { withBrandIcon } from '@/blocks/brand-icon'
 import { useCreateCredentialDraft } from '@/hooks/queries/credentials'
-import {
-  useConnectMicrosoftDataverseOAuthService,
-} from '@/hooks/queries/oauth/microsoft-dataverse-connections'
 import { useConnectOAuthService } from '@/hooks/queries/oauth/oauth-connections'
 import { useScopedCredentials } from '@/hooks/queries/scoped-credentials'
 
@@ -110,10 +103,6 @@ interface ConnectOAuthModalBaseProps {
   /** Used to resolve display metadata and the provider id when not supplied directly. */
   provider?: OAuthProvider
   serviceId?: string
-  /** Enables the environment-bound Dynamics 365 OAuth flow. Legacy Dataverse callers omit it. */
-  requireDataverseEnvironment?: boolean
-  /** Locks an environment-bound connection to the workflow or credential's selected environment. */
-  dataverseEnvironmentUrl?: string
 }
 
 /**
@@ -240,14 +229,6 @@ export function ConnectOAuthModal(props: ConnectOAuthModalProps) {
   })
   const createDraft = useCreateCredentialDraft()
   const connectOAuthService = useConnectOAuthService()
-  const connectMicrosoftDataverseOAuthService = useConnectMicrosoftDataverseOAuthService()
-  const dataverseEnvironmentForm = useMicrosoftDataverseEnvironmentForm({
-    fallbackScopes: requiredScopes,
-    lockedEnvironmentUrl: props.dataverseEnvironmentUrl,
-    open,
-    providerId,
-    required: props.requireDataverseEnvironment === true,
-  })
 
   if (oauthClientFieldsOpen !== open) {
     setOAuthClientFieldsOpen(open)
@@ -271,7 +252,7 @@ export function ConnectOAuthModal(props: ConnectOAuthModalProps) {
   const newScopes = !isConnect ? (props.newScopes ?? EMPTY_SCOPES) : EMPTY_SCOPES
 
   const newScopesSet = new Set(newScopes.filter((scope) => !isHiddenScope(scope)))
-  const displayScopes = [...dataverseEnvironmentForm.effectiveScopes].filter(
+  const displayScopes = [...requiredScopes].filter(
     (scope) => !isHiddenScope(scope)
   )
 
@@ -326,23 +307,8 @@ export function ConnectOAuthModal(props: ConnectOAuthModalProps) {
     setSubmitError(null)
     let returnContextWritten = false
     try {
-      const environmentUrl = dataverseEnvironmentForm.validate()
-      if (dataverseEnvironmentForm.enabled && !environmentUrl) return
-
       let connectorType: string | undefined
       let draftId: string | undefined
-      const quickBooksOAuthClientConfig =
-        providerId === 'quickbooks'
-          ? {
-              clientId: oauthClientFields.clientId?.trim() ?? '',
-              clientSecret: oauthClientFields.clientSecret?.trim() ?? '',
-              environment:
-                oauthClientFields.environment === 'production'
-                  ? ('production' as const)
-                  : ('sandbox' as const),
-              webhookVerifierToken: oauthClientFields.webhookVerifierToken?.trim() ?? '',
-            }
-          : undefined
 
       if (clientConfiguration?.fields.some((field) => !oauthClientFields[field.id]?.trim())) {
         setSubmitError('Complete every OAuth app configuration field.')
@@ -361,7 +327,6 @@ export function ConnectOAuthModal(props: ConnectOAuthModalProps) {
           providerId,
           displayName: trimmed,
           description: description.trim() || undefined,
-          oauthClientConfig: quickBooksOAuthClientConfig,
         })
         draftId = draft.draftId
 
@@ -422,7 +387,6 @@ export function ConnectOAuthModal(props: ConnectOAuthModalProps) {
             providerId,
             credentialId: props.reconnectTarget.credentialId,
             displayName: props.reconnectTarget.displayName,
-            oauthClientConfig: quickBooksOAuthClientConfig,
           })
           draftId = draft.draftId
 
@@ -456,24 +420,15 @@ export function ConnectOAuthModal(props: ConnectOAuthModalProps) {
       const callbackURL = new URL(window.location.href)
       callbackURL.searchParams.delete('error')
       callbackURL.searchParams.delete('error_description')
-      callbackURL.searchParams.delete('quickbooks_connected')
       if (connectorType) {
         callbackURL.searchParams.set(ADD_CONNECTOR_SEARCH_PARAM, connectorType)
       }
 
-      if (environmentUrl) {
-        await connectMicrosoftDataverseOAuthService.mutateAsync({
-          callbackURL: callbackURL.toString(),
-          draftId,
-          environmentUrl,
-        })
-      } else {
-        await connectOAuthService.mutateAsync({
-          providerId,
-          callbackURL: callbackURL.toString(),
-          draftId,
-        })
-      }
+      await connectOAuthService.mutateAsync({
+        providerId,
+        callbackURL: callbackURL.toString(),
+        draftId,
+      })
       handleClose()
     } catch (err: unknown) {
       if (returnContextWritten) clearOAuthReturnContext()
@@ -486,16 +441,13 @@ export function ConnectOAuthModal(props: ConnectOAuthModalProps) {
   const createsDraft = isConnect || (!isConnect && Boolean(props.reconnectTarget))
   const isPending =
     (createsDraft && createDraft.isPending) ||
-    connectOAuthService.isPending ||
-    connectMicrosoftDataverseOAuthService.isPending
+    connectOAuthService.isPending
   const isDisabled = isConnect
     ? !displayName.trim() ||
-      !dataverseEnvironmentForm.isComplete ||
       Boolean(clientConfiguration?.fields.some((field) => !oauthClientFields[field.id]?.trim())) ||
       isPending ||
       Boolean(existingCredential)
-    : !dataverseEnvironmentForm.isComplete ||
-      Boolean(clientConfiguration?.fields.some((field) => !oauthClientFields[field.id]?.trim())) ||
+    : Boolean(clientConfiguration?.fields.some((field) => !oauthClientFields[field.id]?.trim())) ||
       isPending
 
   const displayNameError =
@@ -561,8 +513,6 @@ export function ConnectOAuthModal(props: ConnectOAuthModalProps) {
             error={displayNameError}
           />
         )}
-
-        <MicrosoftDataverseEnvironmentField form={dataverseEnvironmentForm} />
 
         {oauthClientRedirectUri && (
           <ChipModalField

@@ -65,10 +65,6 @@ vi.mock(
   '@/app/workspace/[workspaceId]/integrations/components/connect-service-account-modal/token-service-account-modal',
   () => ({ TokenServiceAccountModal: () => null })
 )
-vi.mock(
-  '@/app/workspace/[workspaceId]/integrations/components/connect-slack-bot-modal/connect-slack-bot-modal',
-  () => ({ ConnectSlackBotModal: () => null })
-)
 
 import { ConnectServiceAccountModal } from '@/app/workspace/[workspaceId]/integrations/components/connect-service-account-modal/connect-service-account-modal'
 

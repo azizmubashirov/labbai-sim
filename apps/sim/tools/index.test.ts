@@ -29,21 +29,18 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import type { BillingAttributionSnapshot } from '@/lib/billing/core/billing-attribution'
 import { projectToolResultForCopilot } from '@/lib/copilot/request/tools/resolved-secret-result'
 import type { EnvironmentResolutionSnapshot } from '@/lib/environment/utils'
-import { executeBitbucketTool } from '@/lib/internal/bitbucket/execute-tool'
 import { createInternalToolFileResult } from '@/lib/internal/tool-operations/file-result'
 import type { InternalToolOperationCall } from '@/lib/internal/tool-operations/types'
 import {
   ANONYMOUS_SECRET_TRACE_REPLACEMENT,
   ResolvedSecretTraceRegistry,
 } from '@/executor/utils/resolved-secret-trace-registry'
-import { bitbucketGetPipelineStepLogTool } from '@/tools/bitbucket/get_pipeline_step_log'
 import { ErrorExtractorId } from '@/tools/error-extractors'
 import { fileGetContentTool } from '@/tools/file/get'
 import { fileFetchTool } from '@/tools/file/parser'
 import { buildFunctionExecuteBody } from '@/tools/function/execute'
 import { memoryAddTool } from '@/tools/memory/add'
 import { createInternalToolOperationInput } from '@/tools/operation-input'
-import { getCallerIdentityTool } from '@/tools/sts/get_caller_identity'
 import { tableBatchInsertRowsTool } from '@/tools/table/batch_insert_rows'
 import type { InternalToolConfig, ToolResponse } from '@/tools/types'
 import { customBlockExecutorTool } from '@/tools/workflow/custom-block-executor'
@@ -196,14 +193,12 @@ vi.mock('@/executor/handlers/workflow/custom-block-tool-runner', () => ({
 // Mock the tools registry to avoid loading the full 4500+ line registry file.
 // Only the tools actually exercised in tests are provided.
 const mockRegistryTools: Record<string, any> = {
-  bitbucket_get_pipeline_step_log: bitbucketGetPipelineStepLogTool,
   deployed_block_executor: customBlockExecutorTool,
   workflow_executor: workflowExecutorTool,
   file_fetch: fileFetchTool,
   file_get_content: fileGetContentTool,
   memory_add: memoryAddTool,
   table_batch_insert_rows: tableBatchInsertRowsTool,
-  sts_get_caller_identity: getCallerIdentityTool,
   http_request: {
     id: 'http_request',
     name: 'HTTP Request',
@@ -1098,57 +1093,6 @@ describe('executeTool Function', () => {
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
-  it('executes registered internal tools in process through the shared provider operation', async () => {
-    mockExecuteInternalToolOperation.mockResolvedValueOnce(
-      Response.json({
-        account: '123456789012',
-        arn: 'arn:aws:iam::123456789012:user/test',
-        userId: 'AIDATEST',
-      })
-    )
-    const fetchSpy = vi.fn()
-    global.fetch = Object.assign(fetchSpy, { preconnect: vi.fn() }) as typeof fetch
-
-    const result = await executeTool(
-      'sts_get_caller_identity',
-      {
-        region: 'us-east-1',
-        accessKeyId: 'access-key',
-        secretAccessKey: 'secret-key',
-      },
-      {
-        executionContext: createToolExecutionContext({
-          userId: 'user-1',
-          workspaceId: 'workspace-456',
-          workflowId: 'workflow-1',
-          executionId: 'execution-1',
-        }),
-      }
-    )
-
-    expect(mockExecuteInternalToolOperation).toHaveBeenCalledWith(
-      expect.objectContaining({
-        toolId: 'sts_get_caller_identity',
-        input: {
-          region: 'us-east-1',
-          accessKeyId: 'access-key',
-          secretAccessKey: 'secret-key',
-        },
-        signal: expect.any(AbortSignal),
-      })
-    )
-    expect(result).toMatchObject({
-      success: true,
-      output: {
-        account: '123456789012',
-        arn: 'arn:aws:iam::123456789012:user/test',
-        userId: 'AIDATEST',
-      },
-    })
-    expect(mockGenerateInternalToken).not.toHaveBeenCalled()
-    expect(fetchSpy).not.toHaveBeenCalled()
-  })
-
   it('preserves a registered operation failure without turning it into success', async () => {
     const mockTool = {
       id: 'test_registered_operation_failure',
@@ -1290,62 +1234,6 @@ describe('executeTool Function', () => {
       success: true,
       output: { files: [], combinedContent: '' },
     })
-  })
-
-  it('bounds ignored Bitbucket pipeline log ranges through the execution path', async () => {
-    mockExecuteInternalToolOperation.mockImplementationOnce(executeBitbucketTool)
-    mockValidateUrlWithDNS.mockResolvedValue({ isValid: true, resolvedIP: '93.184.216.34' })
-
-    const log = 'line 1\nDONE\n'
-    const response = new Response(log, {
-      status: 200,
-      headers: {
-        'content-length': String(Buffer.byteLength(log)),
-        'content-type': 'text/plain',
-      },
-    })
-    mockSecureFetchWithPinnedIP.mockResolvedValueOnce({
-      ok: true,
-      status: response.status,
-      statusText: response.statusText,
-      headers: {
-        get: (name: string) => response.headers.get(name),
-        toRecord: () => Object.fromEntries(response.headers.entries()),
-      },
-      body: response.body,
-    })
-
-    const params = {
-      accessToken: 'oauth-token',
-      workspaceSlug: 'acme',
-      repoSlug: 'demo',
-      pipelineUuid: '{pipeline}',
-      stepUuid: '{step}',
-      maxCharacters: 5,
-    }
-    const accepted = await executeTool('bitbucket_get_pipeline_step_log', params, {
-      skipPostProcess: true,
-      executionContext: createToolExecutionContext({
-        userId: 'user-1',
-        workspaceId: 'workspace-1',
-        workflowId: 'workflow-1',
-      }),
-    })
-
-    expect(accepted, accepted.error).toMatchObject({
-      success: true,
-      output: {
-        log: 'DONE\n',
-        truncated: true,
-        totalBytes: Buffer.byteLength(log),
-      },
-    })
-
-    expect(mockSecureFetchWithPinnedIP).toHaveBeenCalledWith(
-      expect.stringContaining('/pipelines/%7Bpipeline%7D/steps/%7Bstep%7D/log'),
-      '93.184.216.34',
-      expect.objectContaining({ maxResponseBytes: 16 * 1024 * 1024 })
-    )
   })
 
   it('logs a permission database failure without exposing query details to the caller', async () => {
@@ -3758,77 +3646,6 @@ describe('Internal Route Trust', () => {
       expect(params).toEqual(originalParams)
     } finally {
       ;(tools as Record<string, unknown>).test_direct_projected_model_tool = undefined
-    }
-  })
-
-  it('propagates trusted execution scope and cancellation to nested tool calls', async () => {
-    const controller = new AbortController()
-    const fetchSpy = vi.fn()
-    global.fetch = Object.assign(fetchSpy, { preconnect: vi.fn() }) as typeof fetch
-    mockExecuteInternalToolOperation.mockResolvedValueOnce(
-      Response.json({
-        account: '123456789012',
-        arn: 'arn:aws:iam::123456789012:user/test',
-        userId: 'AIDATEST',
-      })
-    )
-    const mockTool = {
-      id: 'test_nested_internal_operation',
-      name: 'Test Nested Internal Operation',
-      description: 'Executes a registered internal operation from post-processing',
-      version: '1.0.0',
-      params: {},
-      operation: { input: (params: Record<string, unknown>) => params },
-      postProcess: async (
-        _result: ToolResponse,
-        _params: Record<string, unknown>,
-        executeNestedTool: typeof executeTool
-      ) =>
-        executeNestedTool('sts_get_caller_identity', {
-          region: 'us-east-1',
-          accessKeyId: 'access-key',
-          secretAccessKey: 'secret-key',
-        }),
-    }
-    ;(tools as Record<string, unknown>).test_nested_internal_operation = mockTool
-
-    try {
-      const executionContext = createToolExecutionContext({
-        userId: 'user-1',
-        workspaceId: 'workspace-456',
-        workflowId: 'workflow-1',
-        executionId: 'execution-1',
-      })
-      const result = await executeTool(
-        'test_nested_internal_operation',
-        {},
-        {
-          executionContext,
-          signal: controller.signal,
-        }
-      )
-
-      expect(result.success).toBe(true)
-      expect(mockExecuteInternalToolOperation).toHaveBeenCalledWith(
-        expect.objectContaining({
-          toolId: 'sts_get_caller_identity',
-          input: {
-            region: 'us-east-1',
-            accessKeyId: 'access-key',
-            secretAccessKey: 'secret-key',
-          },
-          context: expect.objectContaining({
-            userId: 'user-1',
-            workspaceId: 'workspace-456',
-            workflowId: 'workflow-1',
-            executionId: 'execution-1',
-          }),
-          signal: expect.any(AbortSignal),
-        })
-      )
-      expect(fetchSpy).not.toHaveBeenCalled()
-    } finally {
-      Reflect.deleteProperty(tools, 'test_nested_internal_operation')
     }
   })
 

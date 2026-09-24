@@ -1846,7 +1846,7 @@ describe('indexWorkflowSearchMatches', () => {
           value: [
             {
               type: 'slack',
-              toolId: 'slack_message',
+              toolId: 'telegram_message',
               operation: 'send',
               title: 'Slack message',
               params: {
@@ -1915,7 +1915,7 @@ describe('indexWorkflowSearchMatches', () => {
           value: [
             {
               type: 'slack',
-              toolId: 'slack_message',
+              toolId: 'telegram_send_document',
               operation: 'send',
               title: 'Slack message',
               params: {
@@ -2031,13 +2031,13 @@ describe('indexWorkflowSearchMatches', () => {
           value: [
             {
               type: 'slack',
-              toolId: 'slack_message',
+              toolId: 'telegram_message',
               operation: 'send',
               title: 'Slack message',
               params: {
                 authMethod: 'oauth',
                 credential: 'slack-credential',
-                channel: 'COLD',
+                chatId: 'COLD',
                 text: 'message',
               },
             },
@@ -2057,6 +2057,20 @@ describe('indexWorkflowSearchMatches', () => {
         custom: {
           subBlocks: [{ id: 'tools', title: 'Tools', type: 'tool-input' }],
         },
+        slack: {
+          subBlocks: [
+            ...SEARCH_REPLACE_BLOCK_CONFIGS.slack.subBlocks.filter(
+              (subBlock) => subBlock.id !== 'channel'
+            ),
+            {
+              id: 'chatId',
+              title: 'Chat',
+              type: 'channel-selector',
+              selectorKey: 'notion.pages',
+              dependsOn: ['credential'],
+            },
+          ],
+        },
       },
     }).filter((match) => match.kind === 'selector-resource')
 
@@ -2064,7 +2078,7 @@ describe('indexWorkflowSearchMatches', () => {
       expect.objectContaining({
         rawValue: 'COLD',
         resource: expect.objectContaining({
-          selectorKey: 'slack.channels',
+          selectorKey: 'notion.pages',
           selectorContext: expect.objectContaining({
             oauthCredential: 'slack-credential',
             workspaceId: 'workspace-1',
@@ -2092,7 +2106,7 @@ describe('indexWorkflowSearchMatches', () => {
           value: [
             {
               type: 'slack',
-              toolId: 'slack_message',
+              toolId: 'telegram_message',
               operation: 'send',
               title: 'Slack message',
               params: { text: 'hello' },
