@@ -1,7 +1,6 @@
 import { db } from '@sim/db'
-import { webhook, workflowDeploymentVersion } from '@sim/db/schema'
-import { eq } from 'drizzle-orm'
-import { getScheduleExecutionActorUserId, getWorkspaceOwnerId } from '@/lib/workspaces/utils'
+import { webhook, workflowDeploymentVersion, workspace as workspaceTable } from '@sim/db/schema'
+import { and, eq, isNull } from 'drizzle-orm'
 import type { CoreTriggerType } from '@/stores/logs/filters/types'
 
 export const EXECUTION_ACTOR_TYPES = ['user', 'api_key', 'webhook', 'schedule'] as const
@@ -12,6 +11,36 @@ export interface ExecutionActor {
   actorUserId: string
   actorType: ExecutionActorType
   apiKeyId?: string
+}
+
+async function getWorkspaceOwnerId(workspaceId: string): Promise<string | null> {
+  if (!workspaceId) {
+    return null
+  }
+
+  const rows = await db
+    .select({ ownerId: workspaceTable.ownerId })
+    .from(workspaceTable)
+    .where(and(eq(workspaceTable.id, workspaceId), isNull(workspaceTable.archivedAt)))
+    .limit(1)
+
+  return rows[0]?.ownerId ?? null
+}
+
+/**
+ * Resolves the execution actor for scheduled workflow runs.
+ * Prefers the workflow owner (who typically connects block credentials), then
+ * falls back to the workspace owner when the workflow record has no user.
+ */
+async function getScheduleExecutionActorUserId(
+  workspaceId: string,
+  workflowUserId?: string | null
+): Promise<string | null> {
+  if (workflowUserId) {
+    return workflowUserId
+  }
+
+  return getWorkspaceOwnerId(workspaceId)
 }
 
 function isResolvableUserId(userId: string | undefined | null): userId is string {

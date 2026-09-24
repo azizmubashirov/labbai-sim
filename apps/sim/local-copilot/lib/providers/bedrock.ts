@@ -22,11 +22,8 @@ import type {
   TokenUsage,
 } from '@/local-copilot/lib/providers/types'
 import type { LocalCopilotConfig, LocalCopilotToolDefinition } from '@/local-copilot/lib/types'
-import {
-  buildBedrockInferenceConfig,
-  generateToolUseId,
-  getBedrockInferenceProfileId,
-} from '@/providers/bedrock/utils'
+import { buildBedrockInferenceConfig } from '@/local-copilot/lib/compat'
+import { generateToolUseId, getBedrockInferenceProfileId } from '@/providers/bedrock/utils'
 
 const logger = createLogger('LocalCopilotBedrockProvider')
 

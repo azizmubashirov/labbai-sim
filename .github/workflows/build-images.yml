@@ -6,7 +6,10 @@ name: Build images
 # so that job adds a large swap file on the runner's scratch disk first.
 
 on:
-  push:
+  # Only after the type check passes on main (saves a 40-minute build per broken push).
+  workflow_run:
+    workflows: [Type check]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
 
@@ -20,6 +23,7 @@ permissions:
 
 jobs:
   build:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 150
     strategy:
@@ -40,6 +44,8 @@ jobs:
             needs_swap: false
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Free disk space and add swap
         if: matrix.needs_swap
@@ -74,7 +80,7 @@ jobs:
           push: true
           tags: |
             ${{ steps.img.outputs.ref }}:latest
-            ${{ steps.img.outputs.ref }}:${{ github.sha }}
+            ${{ steps.img.outputs.ref }}:${{ github.event.workflow_run.head_sha || github.sha }}
           build-args: |
             NEXT_PUBLIC_APP_URL=${{ vars.NEXT_PUBLIC_APP_URL || 'http://localhost:3300' }}
           cache-from: type=gha,scope=${{ matrix.name }}

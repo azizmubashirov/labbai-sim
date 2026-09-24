@@ -96,7 +96,7 @@ vi.mock('@/lib/workspaces/utils', () => ({
   getWorkspaceBilledAccountUserId: vi.fn().mockResolvedValue('owner-1'),
 }))
 
-import { MOTHERSHIP_CHAT_DEFAULT_MODEL } from '@/lib/copilot/constants'
+import { DEFAULT_LOCAL_COPILOT_MODEL } from '@/local-copilot/lib/config'
 import { executeInboxTask } from '@/lib/mothership/inbox/executor'
 
 const INBOX_TASK = {
@@ -226,7 +226,7 @@ describe('Inbox execution actor', () => {
       expect.objectContaining({
         workspaceId: 'workspace-1',
         type: 'mothership',
-        model: MOTHERSHIP_CHAT_DEFAULT_MODEL,
+        model: DEFAULT_LOCAL_COPILOT_MODEL,
       })
     )
   })

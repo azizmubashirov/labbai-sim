@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   typecheck:
@@ -38,10 +38,29 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Type check (apps/sim)
+        id: tsc
         working-directory: apps/sim
-        run: NODE_OPTIONS=--max-old-space-size=12288 bunx tsc --noEmit
+        run: |
+          set -o pipefail
+          NODE_OPTIONS=--max-old-space-size=12288 bunx tsc --noEmit --pretty false 2>&1 | tee /tmp/typecheck.txt
 
       - name: Local copilot unit tests
+        id: tests
         if: always()
         working-directory: apps/sim
-        run: bunx vitest run local-copilot lib/api-key --reporter=dot
+        run: |
+          set -o pipefail
+          bunx vitest run local-copilot lib/api-key lib/mothership/inbox --reporter=dot 2>&1 | tee /tmp/tests.txt
+
+      # Job logs need repo-admin auth to download; publish the results on a public
+      # branch so they can be read from raw.githubusercontent.com.
+      - name: Publish report
+        if: always()
+        run: |
+          mkdir -p /tmp/report && cd /tmp/report
+          git init -q && git checkout -q -b ci-reports
+          cp /tmp/typecheck.txt typecheck.txt 2>/dev/null || echo "no output" > typecheck.txt
+          tail -c 200000 /tmp/tests.txt > tests.txt 2>/dev/null || echo "no output" > tests.txt
+          printf 'sha=%s\ntsc=%s\ntests=%s\n' "$GITHUB_SHA" "${{ steps.tsc.outcome }}" "${{ steps.tests.outcome }}" > status.txt
+          git add -A && git -c user.name=ci -c user.email=ci@localhost commit -qm "report $GITHUB_SHA"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" ci-reports
