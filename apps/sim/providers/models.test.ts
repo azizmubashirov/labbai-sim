@@ -1,0 +1,691 @@
+/**
+ * @vitest-environment node
+ */
+import { describe, expect, it } from 'vitest'
+import {
+  findProviderFromModel,
+  getBaseModelProviders,
+  getHostedModels,
+  getModelCapabilities,
+  getModelPricing,
+  getModelsWithPromptCaching,
+  getPromptCachingMinimumTokens,
+  getProviderModels,
+  getStaticProviderModels,
+  getThinkingStreamVisibility,
+  isCustomModelId,
+  isKnownModelId,
+  isModelDeprecated,
+  orderModelIdsByReleaseDate,
+  PROVIDER_DEFINITIONS,
+  supportsForcedToolUse,
+  updateFireworksModels,
+  updateOllamaModels,
+} from '@/providers/models'
+import { supportsPromptCaching } from '@/providers/utils'
+
+describe('custom cloud model routing', () => {
+  it.each([
+    'ollama',
+    'ollama-cloud',
+    'vllm',
+    'litellm',
+    'openrouter',
+    'fireworks',
+    'together',
+    'baseten',
+  ] as const)(
+    'accepts new model IDs in the %s namespace without accepting an empty ID',
+    (provider) => {
+      expect(findProviderFromModel(`${provider.toUpperCase()}/Org/CustomModel`)).toBe(provider)
+      expect(isKnownModelId(`${provider}/Org/CustomModel`)).toBe(true)
+      expect(isKnownModelId(`${provider}/`)).toBe(false)
+      expect(isKnownModelId(`${provider}/ `)).toBe(false)
+    }
+  )
+
+  it('keeps explicit provider namespaces authoritative over discovered local model names', () => {
+    const originalModels = PROVIDER_DEFINITIONS.ollama.models
+    try {
+      updateOllamaModels([
+        'azure/MyDeployment',
+        'bedrock/CustomModel',
+        'vertex/CustomModel',
+        'openrouter/Org/CustomModel',
+        'groq/Org/CustomModel',
+        'cerebras/CustomModel',
+      ])
+      expect(findProviderFromModel('azure/MyDeployment')).toBe('azure-openai')
+      expect(findProviderFromModel('bedrock/CustomModel')).toBe('bedrock')
+      expect(findProviderFromModel('vertex/CustomModel')).toBe('vertex')
+      expect(findProviderFromModel('openrouter/Org/CustomModel')).toBe('openrouter')
+      expect(findProviderFromModel('groq/Org/CustomModel')).toBe('groq')
+      expect(findProviderFromModel('cerebras/CustomModel')).toBe('cerebras')
+    } finally {
+      PROVIDER_DEFINITIONS.ollama.models = originalModels
+    }
+  })
+
+  it.each([
+    ['azure/MyDeployment', 'azure-openai'],
+    ['AZURE/MyDeployment', 'azure-openai'],
+    ['azure-anthropic/MyDeployment', 'azure-anthropic'],
+    ['bedrock/custom-model:0', 'bedrock'],
+    ['BEDROCK/custom-model:0', 'bedrock'],
+    ['vertex/publishers/google/models/custom-gemini', 'vertex'],
+    ['VERTEX/CustomModel', 'vertex'],
+    ['GROQ/Org/CustomModel', 'groq'],
+    ['CEREBRAS/CustomModel', 'cerebras'],
+    ['NVIDIA/CustomModel', 'nvidia'],
+  ])('routes %s without requiring a catalog entry', (model, provider) => {
+    expect(findProviderFromModel(model)).toBe(provider)
+    expect(isCustomModelId(model)).toBe(true)
+    expect(isKnownModelId(model)).toBe(false)
+    expect(getModelPricing(model)).toBeNull()
+    expect(getHostedModels()).not.toContain(model)
+  })
+
+  it.each([
+    'azure/',
+    'azure/ ',
+    'azure-anthropic/',
+    'bedrock/',
+    'vertex/',
+    'groq/',
+    'cerebras/',
+    'nvidia/',
+    'unknown/model',
+    'gpt-100/model',
+    'mistral/model',
+  ])('does not accept an empty or unrecognized namespace as a custom model: %s', (model) => {
+    expect(isCustomModelId(model)).toBe(false)
+  })
+
+  it('keeps catalog name typos distinct from custom reseller IDs', () => {
+    expect(isCustomModelId('claude-sonnet-4.6')).toBe(false)
+    expect(isCustomModelId('gpt-100-ultra')).toBe(false)
+  })
+})
+
+describe('OpenAI provider definition', () => {
+  const openai = PROVIDER_DEFINITIONS.openai
+
+  it('registers GPT-6 Astra as the sole recommended model with verified pricing tiers', () => {
+    const astra = openai.models.find((model) => model.id === 'gpt-6-astra')
+
+    expect(astra).toMatchObject({
+      pricing: {
+        input: 10,
+        cachedInput: 1,
+        output: 50,
+        tiers: [
+          {
+            aboveInputTokens: 272000,
+            input: 20,
+            cachedInput: 2,
+            output: 75,
+          },
+        ],
+      },
+      contextWindow: 1050000,
+      recommended: true,
+    })
+    expect(openai.models.filter((model) => model.recommended).map((model) => model.id)).toEqual([
+      'gpt-6-astra',
+    ])
+  })
+
+  it('is included in getHostedModels since Sim provides the OpenAI key server-side', () => {
+    expect(getHostedModels()).toContain('gpt-6-astra')
+  })
+})
+
+describe('direct provider catalog additions', () => {
+  it.each([
+    ['gpt-6-sol', 'openai'],
+    ['gpt-6-luna', 'openai'],
+    ['chat-latest', 'openai'],
+    ['gpt-5.3-codex', 'openai'],
+    ['gemini-3.7-flash', 'google'],
+  ])('routes %s through its hosted provider %s', (model, provider) => {
+    expect(findProviderFromModel(model)).toBe(provider)
+    expect(isKnownModelId(model)).toBe(true)
+    expect(getHostedModels()).toContain(model)
+    expect(getModelPricing(model)?.input).toBeGreaterThan(0)
+  })
+})
+
+describe('catalog featured model metadata', () => {
+  it('defines at most one active featured model per provider', () => {
+    for (const provider of Object.values(PROVIDER_DEFINITIONS)) {
+      const featuredModels = provider.models.filter((model) => model.featured)
+
+      expect(featuredModels.length).toBeLessThanOrEqual(1)
+      expect(featuredModels.every((model) => model.sunset === undefined)).toBe(true)
+    }
+  })
+})
+
+describe('forced tool use capability', () => {
+  it.each(['claude-fable-5-1', 'CLAUDE-FABLE-5-1', 'claude-opus-5-5'])(
+    'disables Force while keeping Auto and None support for %s',
+    (model) => {
+      expect(getModelCapabilities(model)).toMatchObject({
+        toolUsageControl: true,
+        forcedToolUse: false,
+      })
+      expect(supportsForcedToolUse(model)).toBe(false)
+    }
+  )
+
+  it.each(['claude-sonnet-5', 'claude-fable-5', 'claude-opus-5', 'gpt-5.5'])(
+    'inherits provider tool-control support for %s',
+    (model) => {
+      expect(supportsForcedToolUse(model)).toBe(true)
+    }
+  )
+
+  it('does not enable Force for an unknown model without tool-control capabilities', () => {
+    expect(getModelCapabilities('unknown-model')).toBeNull()
+    expect(supportsForcedToolUse('unknown-model')).toBe(false)
+  })
+})
+
+describe('Anthropic thinking stream visibility', () => {
+  it('classifies visible Claude thinking as summarized rather than raw', () => {
+    for (const providerId of ['anthropic', 'azure-anthropic'] as const) {
+      for (const model of PROVIDER_DEFINITIONS[providerId].models) {
+        if (model.capabilities.thinking) {
+          expect(getThinkingStreamVisibility(model.id)).toBe('summary')
+        }
+      }
+    }
+  })
+})
+
+describe('Anthropic provider definition', () => {
+  const anthropic = PROVIDER_DEFINITIONS.anthropic
+
+  it('matches Anthropic lifecycle classifications', () => {
+    expect(
+      anthropic.models.filter((model) => model.sunset?.status === 'legacy').map((model) => model.id)
+    ).toEqual([
+      'claude-fable-5',
+      'claude-opus-5',
+      'claude-opus-4-8',
+      'claude-opus-4-7',
+      'claude-opus-4-6',
+      'claude-sonnet-4-6',
+      'claude-opus-4-5',
+      'claude-sonnet-4-5',
+    ])
+    expect(
+      anthropic.models
+        .filter((model) => model.sunset?.status === 'deprecated')
+        .map((model) => model.id)
+    ).toEqual([
+      'claude-opus-4-1',
+      'claude-opus-4-0',
+      'claude-sonnet-4-0',
+      'claude-3-haiku-20240307',
+    ])
+  })
+})
+
+describe('Meta thinking stream visibility', () => {
+  it('classifies private Muse reasoning as not streamed', () => {
+    expect(getThinkingStreamVisibility('muse-spark-1.1')).toBe('none')
+  })
+})
+
+describe('prompt caching capability', () => {
+  const cachingModels = new Set(getModelsWithPromptCaching())
+
+  it('covers every Claude model on both Anthropic surfaces', () => {
+    for (const providerId of ['anthropic', 'azure-anthropic'] as const) {
+      for (const model of PROVIDER_DEFINITIONS[providerId].models) {
+        expect(cachingModels.has(model.id)).toBe(true)
+      }
+    }
+  })
+
+  /**
+   * OpenAI and Gemini cache automatically with no caller control, so declaring
+   * the capability would put a switch in the UI that does nothing.
+   */
+  it('excludes providers whose caching is automatic', () => {
+    for (const providerId of ['openai', 'google'] as const) {
+      for (const model of PROVIDER_DEFINITIONS[providerId].models) {
+        expect(cachingModels.has(model.id)).toBe(false)
+      }
+    }
+    expect(supportsPromptCaching('gpt-5.5')).toBe(false)
+  })
+
+  it('reports each vendor minimum prefix, including retired Haiku 3', () => {
+    expect(getPromptCachingMinimumTokens('claude-sonnet-5')).toBe(1024)
+    expect(getPromptCachingMinimumTokens('claude-haiku-4-5')).toBe(4096)
+    expect(getPromptCachingMinimumTokens('claude-3-haiku-20240307')).toBe(2048)
+    expect(getPromptCachingMinimumTokens('azure-anthropic/claude-haiku-4-5')).toBe(4096)
+    expect(getPromptCachingMinimumTokens('gpt-5.5')).toBeNull()
+  })
+})
+
+const DYNAMIC_PROVIDERS = new Set([
+  'ollama',
+  'ollama-cloud',
+  'vllm',
+  'litellm',
+  'openrouter',
+  'fireworks',
+  'together',
+  'baseten',
+])
+
+function firstDeprecatedModelId(): string | undefined {
+  for (const [providerId, provider] of Object.entries(PROVIDER_DEFINITIONS)) {
+    if (DYNAMIC_PROVIDERS.has(providerId)) continue
+    const dep = provider.models.find((m) => m.sunset)
+    if (dep) return dep.id
+  }
+  return undefined
+}
+
+/** Maps a lowercased model ID to its provider's index in the catalog. */
+const PROVIDER_INDEX_BY_MODEL = new Map<string, number>()
+/** Maps a lowercased model ID to its release time (ms), or null when undated. */
+const RELEASE_TIME_BY_MODEL = new Map<string, number | null>()
+for (const [providerIndex, provider] of Object.values(PROVIDER_DEFINITIONS).entries()) {
+  for (const model of provider.models) {
+    const id = model.id.toLowerCase()
+    PROVIDER_INDEX_BY_MODEL.set(id, providerIndex)
+    RELEASE_TIME_BY_MODEL.set(id, model.releaseDate ? Date.parse(model.releaseDate) : null)
+  }
+}
+
+describe('orderModelIdsByReleaseDate', () => {
+  it('keeps provider grouping order intact', () => {
+    const ordered = orderModelIdsByReleaseDate(Object.keys(getBaseModelProviders()))
+    let lastProviderIndex = -1
+    const seenProviders = new Set<number>()
+    for (const id of ordered) {
+      const providerIndex = PROVIDER_INDEX_BY_MODEL.get(id.toLowerCase())
+      expect(providerIndex).toBeDefined()
+      // A provider's models must form one contiguous run: once we leave a provider
+      // we never return to it.
+      if (providerIndex !== lastProviderIndex) {
+        expect(seenProviders.has(providerIndex as number)).toBe(false)
+        seenProviders.add(providerIndex as number)
+        lastProviderIndex = providerIndex as number
+      }
+    }
+  })
+
+  it('sorts models within a provider newest-first by release date', () => {
+    const ordered = orderModelIdsByReleaseDate(Object.keys(getBaseModelProviders()))
+    for (let i = 1; i < ordered.length; i++) {
+      const prev = ordered[i - 1].toLowerCase()
+      const curr = ordered[i].toLowerCase()
+      if (PROVIDER_INDEX_BY_MODEL.get(prev) !== PROVIDER_INDEX_BY_MODEL.get(curr)) continue
+
+      const prevTime = RELEASE_TIME_BY_MODEL.get(prev)
+      const currTime = RELEASE_TIME_BY_MODEL.get(curr)
+      // Dated models precede undated ones; among dated models, newer precedes older.
+      if (prevTime == null) {
+        expect(currTime).toBeNull()
+      } else if (currTime != null) {
+        expect(prevTime).toBeGreaterThanOrEqual(currTime)
+      }
+    }
+  })
+
+  it('preserves the cross-provider grouping order given in the input', () => {
+    // Pick the first model of two different providers and feed the second provider
+    // first; the helper must keep that provider's group ahead of the other.
+    const byProvider = new Map<number, string[]>()
+    for (const id of Object.keys(getBaseModelProviders())) {
+      const providerIndex = PROVIDER_INDEX_BY_MODEL.get(id.toLowerCase()) as number
+      const bucket = byProvider.get(providerIndex) ?? []
+      bucket.push(id)
+      byProvider.set(providerIndex, bucket)
+    }
+    const providerIndexes = [...byProvider.keys()]
+    expect(providerIndexes.length).toBeGreaterThanOrEqual(2)
+    const [firstProvider, secondProvider] = providerIndexes
+    const fromFirst = byProvider.get(firstProvider) as string[]
+    const fromSecond = byProvider.get(secondProvider) as string[]
+
+    // Input order intentionally leads with the second provider.
+    const input = [fromSecond[0], fromFirst[0]]
+    const ordered = orderModelIdsByReleaseDate(input)
+    expect(PROVIDER_INDEX_BY_MODEL.get(ordered[0].toLowerCase())).toBe(secondProvider)
+    expect(PROVIDER_INDEX_BY_MODEL.get(ordered[1].toLowerCase())).toBe(firstProvider)
+  })
+
+  it('places unknown model IDs last, preserving their input order', () => {
+    const known = Object.keys(getBaseModelProviders())[0]
+    const ordered = orderModelIdsByReleaseDate(['mystery-a', known, 'mystery-b'])
+    expect(ordered[0]).toBe(known)
+    expect(ordered.slice(1)).toEqual(['mystery-a', 'mystery-b'])
+  })
+
+  it('is case-insensitive when matching catalog IDs', () => {
+    const id = Object.keys(getBaseModelProviders())[0]
+    const ordered = orderModelIdsByReleaseDate([id.toUpperCase()])
+    expect(ordered).toEqual([id.toUpperCase()])
+  })
+
+  it('returns an empty array for empty input', () => {
+    expect(orderModelIdsByReleaseDate([])).toEqual([])
+  })
+
+  it('does not add or drop any IDs', () => {
+    const input = Object.keys(getBaseModelProviders())
+    const ordered = orderModelIdsByReleaseDate(input)
+    expect([...ordered].sort()).toEqual([...input].sort())
+  })
+})
+
+describe('sakana provider definition', () => {
+  const sakana = PROVIDER_DEFINITIONS.sakana
+
+  it('is registered with fugu as the default model', () => {
+    expect(sakana).toBeDefined()
+    expect(sakana.id).toBe('sakana')
+    expect(sakana.defaultModel).toBe('fugu')
+    expect(sakana.modelPatterns).toEqual([/^fugu/])
+  })
+
+  it('preserves existing aliases and exposes current versioned models', () => {
+    expect(sakana.models.map((model) => model.id)).toEqual(
+      expect.arrayContaining([
+        'fugu',
+        'fugu-ultra',
+        'fugu-ultra-v2.0',
+        'fugu-max',
+        'fugu-max-v1.0',
+        'sakana-namazu',
+        'sakana-namazu-v1.0',
+      ])
+    )
+    expect(sakana.models.find((model) => model.id === 'fugu')?.pricing).toMatchObject({
+      input: 5,
+      output: 30,
+      cachedInput: 0.5,
+      updatedAt: '2026-06-22',
+    })
+  })
+
+  it('keeps current Ultra aliases aligned with the versioned long-context rate', () => {
+    for (const id of ['fugu-ultra', 'fugu-ultra-v2.0']) {
+      expect(sakana.models.find((model) => model.id === id)?.pricing).toMatchObject({
+        input: 5,
+        output: 30,
+        cachedInput: 0.5,
+        tiers: [{ aboveInputTokens: 272000, input: 10, cachedInput: 1, output: 45 }],
+      })
+    }
+  })
+
+  it('routes bare fugu model IDs to the sakana provider', () => {
+    const baseModels = getBaseModelProviders()
+    expect(baseModels.fugu).toBe('sakana')
+    expect(baseModels['fugu-ultra']).toBe('sakana')
+    expect(baseModels['fugu-max-v1.0']).toBe('sakana')
+    expect(baseModels['sakana-namazu-v1.0']).toBe('sakana')
+  })
+})
+
+describe('nvidia provider definition', () => {
+  const nvidia = PROVIDER_DEFINITIONS.nvidia
+
+  const expectedModels = [
+    { id: 'nvidia/nemotron-3.5-lightning-30b-a3b', contextWindow: 1000000 },
+    { id: 'nvidia/llama-3.1-nemotron-70b-instruct', contextWindow: 128000 },
+    { id: 'nvidia/llama-3.1-nemotron-ultra-253b-v1', contextWindow: 131072 },
+    { id: 'nvidia/llama-3.3-nemotron-super-49b-v1.5', contextWindow: 131072 },
+    { id: 'nvidia/nemotron-3-nano-30b-a3b', contextWindow: 262144 },
+    { id: 'nvidia/nemotron-3-super-120b-a12b', contextWindow: 1048576 },
+    { id: 'nvidia/nemotron-3-ultra-550b-a55b', contextWindow: 1048576 },
+  ]
+
+  it('is registered with the current-gen Super model as the default', () => {
+    expect(nvidia).toBeDefined()
+    expect(nvidia.id).toBe('nvidia')
+    expect(nvidia.defaultModel).toBe('nvidia/nemotron-3-super-120b-a12b')
+    expect(nvidia.modelPatterns).toEqual([/^nvidia\//])
+  })
+
+  it('exposes Nemotron models with the documented context windows', () => {
+    expect(nvidia.models.map((m) => m.id)).toEqual(expectedModels.map((m) => m.id))
+    for (const expected of expectedModels) {
+      const model = nvidia.models.find((m) => m.id === expected.id)
+      expect(model?.contextWindow).toBe(expected.contextWindow)
+    }
+  })
+
+  it('routes every nvidia model ID to the nvidia provider', () => {
+    const baseModels = getBaseModelProviders()
+    for (const expected of expectedModels) {
+      expect(baseModels[expected.id]).toBe('nvidia')
+    }
+  })
+})
+
+describe('zai provider definition', () => {
+  const zai = PROVIDER_DEFINITIONS.zai
+
+  const expectedModels = [
+    { id: 'glm-5.3', contextWindow: 1000000 },
+    { id: 'glm-5.3-flash', contextWindow: 1000000 },
+    { id: 'glm-5.2', contextWindow: 1000000 },
+    { id: 'glm-5.1', contextWindow: 200000 },
+    { id: 'glm-5', contextWindow: 200000 },
+    { id: 'glm-5-turbo', contextWindow: 200000 },
+    { id: 'glm-4.7', contextWindow: 200000 },
+    { id: 'glm-4.7-flashx', contextWindow: 200000 },
+    { id: 'glm-4.6', contextWindow: 200000 },
+    { id: 'glm-4.5', contextWindow: 128000 },
+    { id: 'glm-4.5-air', contextWindow: 128000 },
+    { id: 'glm-4.5-x', contextWindow: 128000 },
+    { id: 'glm-4.5-airx', contextWindow: 128000 },
+    { id: 'glm-4-32b-0414-128k', contextWindow: 128000 },
+  ]
+
+  it('is registered with a bare glm-4.6 as the default model', () => {
+    expect(zai).toBeDefined()
+    expect(zai.id).toBe('zai')
+    expect(zai.defaultModel).toBe('glm-4.6')
+    expect(zai.defaultModel.startsWith('zai/')).toBe(false)
+    // No fallback pattern — an unscoped `/^glm/` would overmatch unrelated self-hosted
+    // "glm-*" models and misroute them to Z.ai's hosted billing.
+    expect(zai.modelPatterns).toEqual([])
+  })
+
+  it('exposes every GLM model with the documented context window', () => {
+    expect(zai.models.map((m) => m.id)).toEqual(expectedModels.map((m) => m.id))
+    for (const expected of expectedModels) {
+      const model = zai.models.find((m) => m.id === expected.id)
+      expect(model?.contextWindow).toBe(expected.contextWindow)
+    }
+  })
+
+  it('routes every bare glm-* model ID to the zai provider', () => {
+    const baseModels = getBaseModelProviders()
+    for (const expected of expectedModels) {
+      expect(baseModels[expected.id]).toBe('zai')
+    }
+  })
+
+  it('is included in getHostedModels since Sim provides the Z.ai key server-side', () => {
+    expect(getHostedModels()).toContain('glm-4.6')
+  })
+})
+
+describe('kimi provider definition', () => {
+  const kimi = PROVIDER_DEFINITIONS.kimi
+
+  const expectedModels = [
+    { id: 'kimi-k3', contextWindow: 1048576 },
+    { id: 'kimi-k2.7-code', contextWindow: 262144 },
+    { id: 'kimi-k2.7-code-highspeed', contextWindow: 262144 },
+    { id: 'kimi-k2.6', contextWindow: 262144 },
+  ]
+
+  it('is registered with kimi-k2.6 as the default model', () => {
+    expect(kimi).toBeDefined()
+    expect(kimi.id).toBe('kimi')
+    // kimi-k2.6 (not the flagship kimi-k3) — k3 access is tier-gated on Moonshot accounts,
+    // and the default must be a model every account can serve.
+    expect(kimi.defaultModel).toBe('kimi-k2.6')
+    // No fallback pattern — an unscoped `/^kimi/` would overmatch Kimi weights re-hosted by
+    // other providers and misroute them to Moonshot's hosted billing.
+    expect(kimi.modelPatterns).toEqual([])
+  })
+
+  it('exposes every Kimi model with the documented context window', () => {
+    expect(kimi.models.map((m) => m.id)).toEqual(expectedModels.map((m) => m.id))
+    for (const expected of expectedModels) {
+      const model = kimi.models.find((m) => m.id === expected.id)
+      expect(model?.contextWindow).toBe(expected.contextWindow)
+    }
+  })
+
+  it('declares no temperature capability since every current Kimi model pins it server-side', () => {
+    expect(kimi.capabilities?.temperature).toBeUndefined()
+    for (const model of kimi.models) {
+      expect(model.capabilities.temperature).toBeUndefined()
+    }
+  })
+
+  it('exposes the thinking toggle only on kimi-k2.6', () => {
+    for (const model of kimi.models) {
+      const hasToggle = model.id === 'kimi-k2.6'
+      if (hasToggle) {
+        expect(model.capabilities.thinking).toEqual({
+          levels: ['disabled', 'enabled'],
+          default: 'enabled',
+        })
+      } else {
+        expect(model.capabilities.thinking).toBeUndefined()
+      }
+    }
+  })
+
+  it('routes every kimi model ID to the kimi provider', () => {
+    const baseModels = getBaseModelProviders()
+    for (const expected of expectedModels) {
+      expect(baseModels[expected.id]).toBe('kimi')
+    }
+  })
+
+  it('is included in getHostedModels since Sim provides the Kimi key server-side', () => {
+    expect(getHostedModels()).toContain('kimi-k3')
+  })
+})
+
+describe('xai provider definition', () => {
+  const xai = PROVIDER_DEFINITIONS.xai
+
+  it('is registered with grok-4.6 as the default model', () => {
+    expect(xai).toBeDefined()
+    expect(xai.id).toBe('xai')
+    expect(xai.defaultModel).toBe('grok-4.6')
+  })
+
+  it('is included in getHostedModels since Sim provides the xAI key server-side', () => {
+    expect(getHostedModels()).toContain('grok-4.6')
+    expect(getHostedModels()).toContain('grok-4.5')
+  })
+})
+
+describe('fireworks static catalog (the sim-auto pool)', () => {
+  const poolModels = ['fireworks/glm-5.2', 'fireworks/kimi-k3']
+
+  it('is included in getHostedModels since Sim provides the Fireworks key server-side', () => {
+    for (const model of poolModels) {
+      expect(getHostedModels()).toContain(model)
+    }
+  })
+
+  it('prices every pool model so hosted usage is billable', () => {
+    for (const model of poolModels) {
+      const pricing = getModelPricing(model)
+      expect(pricing?.input).toBeGreaterThan(0)
+      expect(pricing?.output).toBeGreaterThan(0)
+    }
+  })
+
+  it('survives a dynamic model sync, which merges rather than replaces', () => {
+    updateFireworksModels(['fireworks/accounts/acme/models/custom'])
+
+    for (const model of poolModels) {
+      expect(getHostedModels()).toContain(model)
+      expect(getModelPricing(model)?.input).toBeGreaterThan(0)
+    }
+    expect(getProviderModels('fireworks')).toContain('fireworks/accounts/acme/models/custom')
+  })
+
+  it('does not duplicate a pool model the dynamic listing also returns', () => {
+    updateFireworksModels(['fireworks/glm-5.2'])
+
+    expect(getProviderModels('fireworks').filter((id) => id === 'fireworks/glm-5.2')).toHaveLength(
+      1
+    )
+    expect(getModelPricing('fireworks/glm-5.2')?.input).toBeGreaterThan(0)
+  })
+})
+
+describe('getStaticProviderModels', () => {
+  it('retains public built-in models after private models are discovered', () => {
+    const originalModels = PROVIDER_DEFINITIONS.fireworks.models
+    const publicModels = getStaticProviderModels('fireworks')
+    try {
+      updateFireworksModels(['fireworks/private-test-model'])
+
+      expect(publicModels.length).toBeGreaterThan(0)
+      expect(getProviderModels('fireworks')).toContain('fireworks/private-test-model')
+      expect(getStaticProviderModels('fireworks')).toEqual(publicModels)
+    } finally {
+      PROVIDER_DEFINITIONS.fireworks.models = originalModels
+    }
+  })
+
+  it("excludes discovered names even when they match another provider's public model", () => {
+    const originalModels = PROVIDER_DEFINITIONS.ollama.models
+    try {
+      updateOllamaModels(['private-local-model', 'fireworks/glm-5.2'])
+
+      expect(getStaticProviderModels('ollama')).toEqual([])
+    } finally {
+      PROVIDER_DEFINITIONS.ollama.models = originalModels
+    }
+  })
+
+  it('returns no models for an unknown provider', () => {
+    expect(getStaticProviderModels('unknown-provider')).toEqual([])
+  })
+})
+
+describe('isModelDeprecated', () => {
+  it('returns true for a catalogued deprecated model (case-insensitive)', () => {
+    const id = firstDeprecatedModelId()
+    expect(id).toBeDefined()
+    expect(isModelDeprecated(id!)).toBe(true)
+    expect(isModelDeprecated(id!.toUpperCase())).toBe(true)
+  })
+
+  it('returns false for the default model of every provider', () => {
+    for (const provider of Object.values(PROVIDER_DEFINITIONS)) {
+      if (provider.defaultModel) expect(isModelDeprecated(provider.defaultModel)).toBe(false)
+    }
+  })
+
+  it('returns false for empty, unknown, and dynamic-provider ids', () => {
+    expect(isModelDeprecated('')).toBe(false)
+    expect(isModelDeprecated(undefined)).toBe(false)
+    expect(isModelDeprecated(null)).toBe(false)
+    expect(isModelDeprecated('not-a-real-model')).toBe(false)
+    expect(isModelDeprecated('openrouter/some/model')).toBe(false)
+  })
+})
