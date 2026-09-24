@@ -53,8 +53,6 @@ export interface ProvisionScimUserResult {
   createdAccount: boolean
   /** False when the account was already a member and only the SCIM link was new. */
   joinedOrganization: boolean
-  /** The subscription seats were validated against, so the post-commit seat sync targets the same one. */
-  subscriptionId: string | undefined
   organizationId: string
   emailChanged: boolean
   resource: ReturnType<typeof toUserResource>

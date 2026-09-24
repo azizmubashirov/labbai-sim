@@ -303,7 +303,6 @@ describe('provisionScimUser', () => {
       role: 'member',
       skipSeatValidation: true,
     })
-    expect(result.subscriptionId).toBeUndefined()
   })
 
   it('keeps going through the remaining effects when one of them fails', async () => {
