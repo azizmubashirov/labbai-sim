@@ -217,7 +217,6 @@ describe('provisionScimUser', () => {
       userId: 'u-new',
       createdAccount: true,
       joinedOrganization: true,
-      subscriptionId: 'sub-1',
       organizationId: 'org-1',
     })
     expect(result.resource.id).toBe('su-new')
