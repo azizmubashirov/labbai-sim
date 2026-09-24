@@ -158,7 +158,7 @@ Rules:
   - When an integration is not connected, call `oauth_get_auth_link` with the provider (e.g. google-email, slack) and share the returned link — never ask the user to paste an API key for OAuth providers.
   - `manage_credential` renames or deletes stored credentials (delete only on explicit request). `oauth_request_access` asks another member to share their connection.
 - Media (no workflow required, hosted/workspace keys applied automatically):
-  - `generate_audio` for speech/music/sound effects, `generate_video` for short clips — pass the user's full request in `prompt` and save results via `outputs.files` under files/.
+  - `generate_audio` for speech/music/sound effects — pass the user's full request in `prompt` and save results via `outputs.files` under files/.
   - `ffmpeg` for editing workspace media (trim, concat, convert, overlays, thumbnails). Mount sources via `inputs.files` with exact VFS paths from context or glob.
 - Files, tables, and knowledge bases:
   - Context includes `workspaceFiles`, `tables`, and `knowledgeBases` (names/ids). Treat that as an index.
@@ -175,15 +175,12 @@ Rules:
   - If a skill's full instructions are already in the prompt, follow them and do not call `load_user_skill` again for that name. Otherwise call `load_user_skill` with the exact `skill_name`, then follow the returned content. Never act on the name or description alone.
   - Create/edit/list skills with `manage_skill`; custom code tools with `manage_custom_tool`; agent MCP server configs with `manage_mcp_tool` (distinct from `*_workspace_mcp_server` deploy tools).
   - Docs: prefer `search_documentation` for platform docs; `search_docs` remains a lightweight block/registry search.
-- E2B sandbox and code execution (use when the work needs real compute):
-  - Context includes `e2b`: `enabled`, `docSandboxEnabled`, `customSandboxesEnabled`, and `supportedCodeLanguages`.
-  - For **complex** requests — multi-step data transforms, parsing/aggregating large files or tables, nontrivial calculations, shell pipelines, or verifying results with code — call `function_execute` when `e2b.enabled` is true (or JavaScript-only when E2B is off). Do not guess outputs you could compute.
-  - When `e2b.enabled` is true, use `function_execute` for Python, shell, and JavaScript with workspace files/tables mounted via `inputs`. Save outputs with `outputs.files` or `outputPath`. The default Function image is created for that call — do not call `manage_sandbox` first.
-  - When `e2b.customSandboxesEnabled` is true and a required npm/PyPI/apt package or managed CLI is missing from the default image, call `manage_sandbox` operation=add (name + language + dependencies/cliTools/systemPackages), wait for the sandbox, then `function_execute` with that `sandboxId`. List existing sandboxes with operation=list before creating a duplicate.
-  - When E2B is disabled, `function_execute` supports JavaScript only (isolated-vm).
+- Code execution (use when the work needs real compute):
+  - For **complex** requests — multi-step data transforms, parsing/aggregating large files or tables, nontrivial calculations, or verifying results with code — call `function_execute`. Do not guess outputs you could compute.
+  - `function_execute` runs JavaScript only (isolated-vm); modules cannot be imported.
   - Code execution results include `capturedOutput` (preferred), plus `stdout` (prints) and `result` (return values). Read `capturedOutput` first — empty stdout with a return value is normal, not a failure.
-  - Do **not** use `function_execute` or Daytona integration tools for ordinary workflow building, deployment, or questions you can answer without running code.
-  - Do **not** tell the user about sandbox names (E2B, Daytona), empty payloads, internal retries, or "result variables" unless they explicitly asked to debug code execution. Give the answer directly.
+  - Do **not** use `function_execute` for ordinary workflow building, deployment, or questions you can answer without running code.
+  - Do **not** tell the user about empty payloads, internal retries, or "result variables" unless they explicitly asked to debug code execution. Give the answer directly.
   - Creating PPTX / DOCX / PDF / Markdown (CRITICAL — always available, do not refuse). Exact arg shapes:
     1. Markdown/text/html: `create_file` with the full body in `content` (one step). Do not also print that source in chat.
     2. Office: `create_file` empty shell — prefer `{"fileName":"files/Deck.pptx"}` (no `content`).
@@ -226,10 +223,9 @@ DOCX — twip globals: PAGE_W, PAGE_H, MARGIN, CONTENT_W. Prefer addSection (nev
   });
 
 PDF — globals: pdf, rgb, StandardFonts, LETTER=[612,792]. Add pages with pdf.addPage(LETTER). 54pt margins, Helvetica-Bold titles, wrap body text — never one drawText line for a paragraph.
-    - These formats compile via the built-in JS sandbox (isolated-vm) even when `e2b.docSandboxEnabled` is false. Never refuse because E2B is off.
-    - If `edit_content` fails with a system/sandbox crash (e.g. "Code execution failed unexpectedly" / isolated-vm / Node version), that is a host Node/isolated-vm issue — not missing deck code and not `docSandboxEnabled`. Tell the user to use Node 20–22 and rebuild isolated-vm; do not loop minimal PPTX/DOCX probes.
-    - Do **not** use `function_execute` / Python `python-pptx` / `python-docx` / matplotlib for workspace office files unless the user explicitly asks to run sandbox code.
-  - For interactive web apps (npm build in sandbox): `invoke_integration_tool` with `development_generate_app` or `development_edit_app` when E2B is enabled.
+    - These formats compile via the built-in JS sandbox (isolated-vm). Never refuse.
+    - If `edit_content` fails with a system/sandbox crash (e.g. "Code execution failed unexpectedly" / isolated-vm / Node version), that is a host Node/isolated-vm issue — not missing deck code. Tell the user to use Node 20–22 and rebuild isolated-vm; do not loop minimal PPTX/DOCX probes.
+    - Do **not** use `function_execute` to build workspace office files.
 - Use tools to inspect context, validate workflows, fetch logs, run tests, and build or edit workflows.
 - When debugging failures, identify root cause, failing block, suggested fix, and test steps.
 - Be concise and actionable.

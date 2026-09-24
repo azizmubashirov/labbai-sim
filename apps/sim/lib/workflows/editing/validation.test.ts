@@ -84,18 +84,6 @@ const agentBlockConfig = {
   ],
 }
 
-const piBlockConfig = {
-  type: 'pi',
-  name: 'Pi Coding Agent',
-  outputs: {},
-  subBlocks: [
-    { id: 'mode', type: 'dropdown' },
-    { id: 'model', type: 'combobox', options: mockGetModelOptions },
-    { id: 'apiKey', type: 'short-input' },
-  ],
-  tools: { access: [] },
-}
-
 const huggingfaceBlockConfig = {
   type: 'huggingface',
   name: 'HuggingFace',
@@ -124,17 +112,17 @@ const canonicalCredBlockConfig = {
   ],
 }
 
-// Mirrors video_generator_v3: routes provider -> tool; only video_falai has hosting.
-const videoBlockConfig = {
-  type: 'video_generator_v3',
-  name: 'Video Generator',
+// A multi-provider generator: routes provider -> tool; only media_falai has hosting.
+const mediaBlockConfig = {
+  type: 'media_generator',
+  name: 'Media Generator',
   outputs: {},
   subBlocks: [{ id: 'provider', type: 'dropdown' }],
   tools: {
-    access: ['video_runway', 'video_falai'],
+    access: ['media_runway', 'media_falai'],
     config: {
       tool: (params: Record<string, unknown>) =>
-        params.provider === 'falai' ? 'video_falai' : 'video_runway',
+        params.provider === 'falai' ? 'media_falai' : 'media_runway',
     },
   },
 }
@@ -177,9 +165,9 @@ const genericWebhookBlockConfig = {
   ],
 }
 
-const mothershipBlockConfig = {
-  type: 'mothership',
-  name: 'Sim Chat',
+const secretMountBlockConfig = {
+  type: 'secret_mount_block',
+  name: 'Secret Mount Block',
   outputs: {},
   subBlocks: [
     { id: 'prompt', type: 'long-input' },
@@ -188,14 +176,14 @@ const mothershipBlockConfig = {
   ],
 }
 
-// Block whose tool selector throws — should fall back to scanning access tools (video_falai).
+// Block whose tool selector throws — should fall back to scanning access tools (media_falai).
 const throwSelectorBlockConfig = {
   type: 'throw_selector_block',
   name: 'Throw Selector Block',
   outputs: {},
   subBlocks: [{ id: 'provider', type: 'dropdown' }],
   tools: {
-    access: ['video_falai'],
+    access: ['media_falai'],
     config: {
       tool: () => {
         throw new Error('selector boom')
@@ -206,8 +194,8 @@ const throwSelectorBlockConfig = {
 
 // Tool registry stand-in for the hosted-tool tests.
 const toolsByIdMock: Record<string, unknown> = {
-  video_falai: { id: 'video_falai', hosting: { apiKeyParam: 'apiKey' } },
-  video_runway: { id: 'video_runway' },
+  media_falai: { id: 'media_falai', hosting: { apiKeyParam: 'apiKey' } },
+  media_runway: { id: 'media_runway' },
   custom_key_tool: { id: 'custom_key_tool', hosting: { apiKeyParam: 'serviceKey' } },
   image_generate: {
     id: 'image_generate',
@@ -233,17 +221,16 @@ const blockConfigsByType: Record<string, unknown> = {
   table: tableBlockConfig,
   router_v2: routerBlockConfig,
   agent: agentBlockConfig,
-  pi: piBlockConfig,
   huggingface: huggingfaceBlockConfig,
   knowledge: knowledgeBlockConfig,
   canonicalcred: canonicalCredBlockConfig,
-  video_generator_v3: videoBlockConfig,
+  media_generator: mediaBlockConfig,
   custom_key_block: customKeyBlockConfig,
   image_generator_v2: imageBlockConfig,
   throw_gate_block: throwGateBlockConfig,
   throw_selector_block: throwSelectorBlockConfig,
   generic_webhook: genericWebhookBlockConfig,
-  mothership: mothershipBlockConfig,
+  secret_mount_block: secretMountBlockConfig,
 }
 
 vi.mock('@/blocks/registry', () => ({
@@ -517,9 +504,9 @@ describe('validateInputsForBlock', () => {
     expect(result.errors[0]?.error).toContain('read-only')
   })
 
-  it('rejects server-only Sim Chat secret-mount policy inputs', () => {
+  it('rejects server-only secret-mount policy inputs', () => {
     const result = validateInputsForBlock(
-      'mothership',
+      'secret_mount_block',
       { prompt: 'Keep this', secretScope: 'all', mountedSecrets: ['API_KEY'] },
       'chat-1'
     )
@@ -751,7 +738,7 @@ describe('preValidateCredentialInputs (hosted-tool blocks)', () => {
         operation_type: 'add' as const,
         block_id: 'video-1',
         params: {
-          type: 'video_generator_v3',
+          type: 'media_generator',
           inputs: { provider: 'falai', model: 'veo-3.1', apiKey: '{{FAL_API_KEY}}' },
         },
       },
@@ -771,7 +758,7 @@ describe('preValidateCredentialInputs (hosted-tool blocks)', () => {
         operation_type: 'add' as const,
         block_id: 'video-1',
         params: {
-          type: 'video_generator_v3',
+          type: 'media_generator',
           inputs: { provider: 'runway', apiKey: 'user-runway-key' },
         },
       },
@@ -789,7 +776,7 @@ describe('preValidateCredentialInputs (hosted-tool blocks)', () => {
         operation_type: 'edit' as const,
         block_id: 'video-1',
         params: {
-          type: 'video_generator_v3',
+          type: 'media_generator',
           inputs: { apiKey: '{{FAL_API_KEY}}' },
         },
       },
@@ -797,7 +784,7 @@ describe('preValidateCredentialInputs (hosted-tool blocks)', () => {
     const workflowState = {
       blocks: {
         'video-1': {
-          type: 'video_generator_v3',
+          type: 'media_generator',
           subBlocks: { provider: { value: 'falai' } },
         },
       },
@@ -821,7 +808,7 @@ describe('preValidateCredentialInputs (hosted-tool blocks)', () => {
     const workflowState = {
       blocks: {
         'video-1': {
-          type: 'video_generator_v3',
+          type: 'media_generator',
           subBlocks: { provider: { value: 'falai' } },
         },
       },
@@ -844,7 +831,7 @@ describe('preValidateCredentialInputs (hosted-tool blocks)', () => {
           inputs: {},
           nestedNodes: {
             'video-child': {
-              type: 'video_generator_v3',
+              type: 'media_generator',
               inputs: { provider: 'falai', model: 'veo-3.1', apiKey: '{{FAL_API_KEY}}' },
             },
           },
@@ -895,7 +882,7 @@ describe('preValidateCredentialInputs (hosted-tool blocks)', () => {
               inputs: {},
               nestedNodes: {
                 'video-child': {
-                  type: 'video_generator_v3',
+                  type: 'media_generator',
                   inputs: { provider: 'falai', apiKey: '{{FAL_API_KEY}}' },
                 },
               },
@@ -925,7 +912,7 @@ describe('preValidateCredentialInputs (hosted-tool blocks)', () => {
           type: 'loop',
           inputs: {},
           nestedNodes: {
-            'video-child': { type: 'video_generator_v3', inputs: { provider: 'falai' } },
+            'video-child': { type: 'media_generator', inputs: { provider: 'falai' } },
           },
         },
       },
@@ -934,7 +921,7 @@ describe('preValidateCredentialInputs (hosted-tool blocks)', () => {
         block_id: 'loop-1',
         params: {
           nestedNodes: {
-            'video-child': { type: 'video_generator_v3', inputs: { apiKey: 'test-key' } },
+            'video-child': { type: 'media_generator', inputs: { apiKey: 'test-key' } },
           },
         },
       },
@@ -967,7 +954,7 @@ describe('preValidateCredentialInputs (hosted-tool blocks)', () => {
     ]
     const workflowState = {
       blocks: {
-        'video-1': { type: 'video_generator_v3', subBlocks: { provider: { value: 'runway' } } },
+        'video-1': { type: 'media_generator', subBlocks: { provider: { value: 'runway' } } },
       },
     }
 
@@ -995,7 +982,7 @@ describe('preValidateCredentialInputs (hosted-tool blocks)', () => {
       ]
       const workflowState = {
         blocks: {
-          'video-1': { type: 'video_generator_v3', subBlocks: { provider: { value: 'falai' } } },
+          'video-1': { type: 'media_generator', subBlocks: { provider: { value: 'falai' } } },
         },
       }
 
@@ -1024,7 +1011,7 @@ describe('preValidateCredentialInputs (hosted-tool blocks)', () => {
     const workflowState = {
       blocks: {
         'video-1': {
-          type: 'video_generator_v3',
+          type: 'media_generator',
           subBlocks: { provider: { value: 'runway' } },
         },
       },
@@ -1080,7 +1067,7 @@ describe('preValidateCredentialInputs (hosted-tool blocks)', () => {
         operation_type: 'add' as const,
         block_id: 'video-1',
         params: {
-          type: 'video_generator_v3',
+          type: 'media_generator',
           inputs: { provider: 'falai', model: 'veo-3.1', apiKey: '{{FAL_API_KEY}}' },
         },
       },
@@ -1142,17 +1129,6 @@ describe('preValidateCredentialInputs (hosted models)', () => {
     setEnvFlags({ isHosted: false })
   })
 
-  const piAddOperation = (mode: string) => [
-    {
-      operation_type: 'add' as const,
-      block_id: 'pi-1',
-      params: {
-        type: 'pi',
-        inputs: { mode, model: 'claude-sonnet-4-6', apiKey: 'user-anthropic-key' },
-      },
-    },
-  ]
-
   it('strips apiKey for a hosted model on a normal LLM block', async () => {
     const operations = [
       {
@@ -1171,29 +1147,6 @@ describe('preValidateCredentialInputs (hosted models)', () => {
     expect(result.errors).toHaveLength(1)
     expect(result.errors[0]?.error).toContain('hosted model')
   })
-
-  // Sandbox modes hand the key to the sandbox, so Sim never covers it with a hosted
-  // key -- stripping it would leave the copilot authoring a block that cannot run.
-  it.each([['cloud'], ['cloud_branch'], ['cloud_plan']])(
-    'preserves apiKey on a Pi block in %s mode when the model is hosted',
-    async (mode) => {
-      const result = await preValidateCredentialInputs(piAddOperation(mode), CTX)
-
-      expect(result.filteredOperations[0]?.params?.inputs?.apiKey).toBe('user-anthropic-key')
-      expect(result.errors).toHaveLength(0)
-    }
-  )
-
-  // Local Dev and Review Code keep the model client in Sim, so the hosted key applies.
-  it.each([['local'], ['cloud_review']])(
-    'strips apiKey on a Pi block in %s mode when the model is hosted',
-    async (mode) => {
-      const result = await preValidateCredentialInputs(piAddOperation(mode), CTX)
-
-      expect(result.filteredOperations[0]?.params?.inputs?.apiKey).toBeUndefined()
-      expect(result.errors).toHaveLength(1)
-    }
-  )
 })
 
 describe('validateWorkflowSelectorIds (credential inclusion)', () => {

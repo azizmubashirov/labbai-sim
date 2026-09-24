@@ -17,9 +17,6 @@ import {
   OAUTH_CHAT_RETURN_TO_PARAM,
   readLatestOAuthChatAttempt,
   readOAuthChatAttempt,
-  resolveActiveDesktopOAuthChatAttempt,
-  resolveDesktopOAuthChatAttempt,
-  setActiveDesktopOAuthChatAttempt,
   setOAuthChatAttemptStatus,
 } from '@/lib/credentials/oauth-chat-attempt'
 
@@ -138,79 +135,6 @@ describe('OAuth chat attempts', () => {
         controlId: 'message-1:0:0',
       })?.status
     ).toBe('connected')
-  })
-
-  it('resolves only the active desktop attempt', () => {
-    const attempt = createOAuthChatAttempt({
-      workspaceId: 'workspace-1',
-      providerId: 'slack',
-      baseProviderId: 'slack',
-      displayName: 'Slack',
-      controlId: 'message-1:0:0',
-      baselineCredentialIds: [],
-    })
-    setActiveDesktopOAuthChatAttempt(attempt.id)
-
-    expect(resolveActiveDesktopOAuthChatAttempt('connected')?.id).toBe(attempt.id)
-    expect(resolveActiveDesktopOAuthChatAttempt('connected')).toBeNull()
-  })
-
-  it('resolves the exact correlated desktop attempt without consuming a sibling', () => {
-    const first = createOAuthChatAttempt({
-      workspaceId: 'workspace-1',
-      providerId: 'slack',
-      baseProviderId: 'slack',
-      displayName: 'Slack',
-      controlId: 'message-1:0:0',
-      baselineCredentialIds: [],
-    })
-    const second = createOAuthChatAttempt({
-      workspaceId: 'workspace-1',
-      providerId: 'google-email',
-      baseProviderId: 'google',
-      displayName: 'Gmail',
-      controlId: 'message-1:0:1',
-      baselineCredentialIds: [],
-    })
-    setActiveDesktopOAuthChatAttempt(second.id)
-
-    expect(resolveDesktopOAuthChatAttempt({ chatAttemptId: first.id }, 'connected')?.id).toBe(
-      first.id
-    )
-    expect(readOAuthChatAttempt(first.id)?.status).toBe('connected')
-    expect(readOAuthChatAttempt(second.id)?.status).toBe('pending')
-    expect(resolveActiveDesktopOAuthChatAttempt('failed')?.id).toBe(second.id)
-  })
-
-  it('does not consume a chat attempt for a correlated ordinary desktop flow', () => {
-    const attempt = createOAuthChatAttempt({
-      workspaceId: 'workspace-1',
-      providerId: 'slack',
-      baseProviderId: 'slack',
-      displayName: 'Slack',
-      controlId: 'message-1:0:0',
-      baselineCredentialIds: [],
-    })
-    setActiveDesktopOAuthChatAttempt(attempt.id)
-
-    expect(resolveDesktopOAuthChatAttempt({ chatAttemptId: null }, 'connected')).toBeNull()
-    expect(readOAuthChatAttempt(attempt.id)?.status).toBe('pending')
-    expect(resolveActiveDesktopOAuthChatAttempt('connected')?.id).toBe(attempt.id)
-  })
-
-  it('falls back to the active attempt for an older desktop completion payload', () => {
-    const attempt = createOAuthChatAttempt({
-      workspaceId: 'workspace-1',
-      providerId: 'slack',
-      baseProviderId: 'slack',
-      displayName: 'Slack',
-      controlId: 'message-1:0:0',
-      baselineCredentialIds: [],
-    })
-    setActiveDesktopOAuthChatAttempt(attempt.id)
-
-    expect(resolveDesktopOAuthChatAttempt({}, 'connected')?.id).toBe(attempt.id)
-    expect(readOAuthChatAttempt(attempt.id)?.status).toBe('connected')
   })
 
   it('requires a new matching credential instead of accepting an existing one', () => {

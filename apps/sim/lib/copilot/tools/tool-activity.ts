@@ -5,14 +5,6 @@ interface SharedObjectActivity {
 
 type ActivityPhrase = string | SharedObjectActivity
 
-const PAGE_NAVIGATION = {
-  verb: 'navigated',
-  object: 'pages',
-} as const satisfies SharedObjectActivity
-const PAGE_READING = { verb: 'read', object: 'pages' } as const satisfies SharedObjectActivity
-const PAGE_SEARCHING = { verb: 'searched', object: 'pages' } as const satisfies SharedObjectActivity
-const PAGE_SCROLLING = { verb: 'scrolled', object: 'pages' } as const satisfies SharedObjectActivity
-
 interface OperationActivity {
   label: string
   parameter: 'operation' | 'action'
@@ -70,52 +62,9 @@ const TABLE_AUTOMATIONS_OPERATIONS = {
   cancel_table_runs: 'stopped table runs',
 } as const
 
-const TABLE_ENRICHMENTS_OPERATIONS = {
-  list_enrichments: 'read table enrichments',
-  add_enrichment: 'configured enrichments',
-} as const
-
 /** Client-owned summaries; the executable tool registry stays outside the UI bundle. */
 export const TOOL_ACTIVITIES: Readonly<Record<string, ActivityPhrase | OperationActivity>> = {
   apply_file_edit: 'edited files',
-  browser_click: 'clicked elements',
-  browser_click_at: 'clicked elements',
-  browser_close_tab: 'closed tabs',
-  browser_drag: 'dragged elements',
-  browser_extract: PAGE_READING,
-  browser_fill_form: 'filled forms',
-  browser_find: PAGE_SEARCHING,
-  browser_go_back: PAGE_NAVIGATION,
-  browser_go_forward: PAGE_NAVIGATION,
-  browser_hover: 'hovered over elements',
-  browser_insert_text: 'entered text',
-  browser_list_downloads: 'listed downloads',
-  browser_list_sessions: 'checked signed-in sites',
-  browser_list_tabs: 'listed tabs',
-  browser_navigate: PAGE_NAVIGATION,
-  browser_open_tab: 'opened tabs',
-  browser_open_url: PAGE_NAVIGATION,
-  browser_press_key: 'pressed keys',
-  browser_read_text: PAGE_READING,
-  browser_reload: PAGE_NAVIGATION,
-  browser_request_takeover: 'resumed browser control',
-  browser_screenshot: 'captured screenshots',
-  browser_scroll: PAGE_SCROLLING,
-  browser_select_option: 'selected options',
-  browser_set_checked: 'updated selections',
-  browser_snapshot: PAGE_READING,
-  browser_switch_tab: 'switched tabs',
-  browser_type: 'entered text',
-  browser_wait_for: 'waited',
-  browser_zoom: {
-    label: 'adjusted page zoom',
-    parameter: 'action',
-    operations: {
-      in: 'adjusted page zoom',
-      out: 'adjusted page zoom',
-      reset: 'adjusted page zoom',
-    },
-  },
   call_integration_tool: 'used integrations',
   cancel_workflow_run: 'stopped workflow runs',
   connect_slack_bot: 'connected integrations',
@@ -152,7 +101,6 @@ export const TOOL_ACTIVITIES: Readonly<Record<string, ActivityPhrase | Operation
   generate_api_key: 'created API keys',
   generate_audio: 'generated audio',
   generate_image: 'generated images',
-  generate_video: 'generated video',
   get_block_outputs: 'read workflow outputs',
   get_block_upstream_references: 'read workflows',
   get_deployed_workflow_state: 'read deployments',
@@ -217,16 +165,6 @@ export const TOOL_ACTIVITIES: Readonly<Record<string, ActivityPhrase | Operation
       list: 'read connections',
     },
   },
-  manage_sandbox: {
-    label: 'managed sandboxes',
-    parameter: 'operation',
-    operations: {
-      add: 'created sandboxes',
-      edit: 'edited sandboxes',
-      delete: 'deleted sandboxes',
-      list: 'read sandboxes',
-    },
-  },
   manage_skill: {
     label: 'managed skills',
     parameter: 'operation',
@@ -274,7 +212,6 @@ export const TOOL_ACTIVITIES: Readonly<Record<string, ActivityPhrase | Operation
   rm: 'deleted resources',
   run_block: 'ran workflows',
   run_code: 'ran code',
-  run_enrichment: 'ran enrichments',
   run_from_block: 'ran workflows',
   run_function: 'ran code',
   run_workflow: 'ran workflows',
@@ -324,11 +261,6 @@ export const TOOL_ACTIVITIES: Readonly<Record<string, ActivityPhrase | Operation
     parameter: 'operation',
     operations: TABLE_COLUMNS_OPERATIONS,
   },
-  table_enrichments: {
-    label: 'used table enrichments',
-    parameter: 'operation',
-    operations: TABLE_ENRICHMENTS_OPERATIONS,
-  },
   table_manage: {
     label: 'used tables',
     parameter: 'operation',
@@ -352,28 +284,6 @@ export const TOOL_ACTIVITIES: Readonly<Record<string, ActivityPhrase | Operation
     },
   },
   tail_agent: 'read agent progress',
-  terminal: {
-    label: 'used the terminal',
-    parameter: 'operation',
-    operations: {
-      run: 'ran commands',
-      read: 'read terminal output',
-      input: 'sent terminal input',
-      kill: 'stopped commands',
-      cwd: 'checked terminal locations',
-      list: 'listed terminals',
-      new: 'opened terminals',
-      switch: 'switched terminals',
-      close: 'closed terminals',
-      panes: 'listed terminal panes',
-      handoff: 'handed over terminal control',
-    },
-  },
-  terminal_cwd: 'checked terminal locations',
-  terminal_input: 'sent terminal input',
-  terminal_kill: 'stopped commands',
-  terminal_read: 'read terminal output',
-  terminal_run: 'ran commands',
   update_deployment_version: 'updated deployment details',
   update_workspace_mcp_server: 'updated MCP servers',
   user_table: {
@@ -385,7 +295,6 @@ export const TOOL_ACTIVITIES: Readonly<Record<string, ActivityPhrase | Operation
       ...TABLE_ROWS_OPERATIONS,
       ...TABLE_COLUMNS_OPERATIONS,
       ...TABLE_AUTOMATIONS_OPERATIONS,
-      ...TABLE_ENRICHMENTS_OPERATIONS,
     },
   },
   wait: 'waited',
@@ -399,7 +308,7 @@ export const TOOL_ACTIVITIES: Readonly<Record<string, ActivityPhrase | Operation
 /** Unknown tools and operations retain a neutral summary for historical/custom calls. */
 function resolveToolActivity(toolName: string, params?: Record<string, unknown>): ActivityPhrase {
   const activity = Object.hasOwn(TOOL_ACTIVITIES, toolName) ? TOOL_ACTIVITIES[toolName] : undefined
-  if (!activity) return toolName.startsWith('browser_') ? 'used the browser' : 'used tools'
+  if (!activity) return 'used tools'
   if (typeof activity === 'string' || 'verb' in activity) return activity
   const suppliedOperation = params?.[activity.parameter]
   const operation = suppliedOperation === undefined ? activity.defaultOperation : suppliedOperation

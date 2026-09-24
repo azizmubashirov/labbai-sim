@@ -36,8 +36,6 @@ import { captureEvent } from '@/lib/posthog/client'
 import { persistImportedWorkflow } from '@/lib/workflows/operations/import-export'
 import { RESOURCE_HEADER_CLASSES } from '@/app/workspace/[workspaceId]/home/components/mothership-view/components/resource-tabs/resource-tab-controls'
 import { SuggestedActions } from '@/app/workspace/[workspaceId]/home/components/suggested-actions'
-import { useBrowserTabResources } from '@/app/workspace/[workspaceId]/home/hooks/use-browser-tab-resources'
-import { useTerminalTabResources } from '@/app/workspace/[workspaceId]/home/hooks/use-terminal-tab-resources'
 import { resolveWorkspaceResourceRef } from '@/app/workspace/[workspaceId]/home/resolve-resource-ref'
 import {
   resolveResourceEventPresentation,
@@ -277,7 +275,6 @@ function HomeContent({ chatId, userName, userId }: HomeProps) {
     sendMessage,
     stopGeneration,
     resolvedChatId,
-    desktopScopeId,
     resources,
     activeResourceId,
     setActiveResourceId,
@@ -313,7 +310,7 @@ function HomeContent({ chatId, userName, userId }: HomeProps) {
     })
   )
 
-  const { mothershipRef, handleResizePointerDown, clearWidth } = useMothershipResize(desktopScopeId)
+  const { mothershipRef, handleResizePointerDown, clearWidth } = useMothershipResize()
   const effectiveActiveResourceIdRef = useRef(activeResourceId)
   effectiveActiveResourceIdRef.current = activeResourceId
   const resourceAttentionChatIdRef = useRef(resolvedChatId)
@@ -353,19 +350,6 @@ function HomeContent({ chatId, userName, userId }: HomeProps) {
     },
     [setActiveResourceId, clearResourceActivity]
   )
-
-  const desktopTabResourceOptions = {
-    scopeId: desktopScopeId,
-    resources,
-    activeResourceId,
-    selectedResourceId: activeResourceParam,
-    addResource,
-    removeResource,
-    selectResource: selectResourceFromUser,
-    onResourceEvent: handleResourceEvent,
-  }
-  useBrowserTabResources(desktopTabResourceOptions)
-  useTerminalTabResources(desktopTabResourceOptions)
 
   const addResourceFromUser = useCallback(
     (resource: MothershipResource) => {
@@ -778,7 +762,6 @@ function HomeContent({ chatId, userName, userId }: HomeProps) {
             ref={mothershipRef}
             workspaceId={workspaceId}
             chatId={resolvedChatId}
-            desktopScopeId={desktopScopeId}
             resources={resources}
             activeResourceId={activeResourceId}
             activityResourceIds={resourceActivityIds}

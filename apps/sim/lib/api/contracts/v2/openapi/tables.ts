@@ -40,7 +40,6 @@ import {
   v2DeleteTableRowsContract,
   v2DeleteTableViewContract,
   v2DeleteWorkflowGroupContract,
-  v2GetRowEnrichmentContract,
   v2GetTableContract,
   v2GetTableDispatchContract,
   v2GetTableExportContract,
@@ -59,7 +58,6 @@ import {
   v2RelocateTableFolderContract,
   v2RestoreTableContract,
   v2RestoreTableFolderContract,
-  v2RunRowEnrichmentContract,
   v2SearchTableRowsContract,
   v2TableExportDownloadContract,
   v2UpdateRowsByFilterContract,
@@ -1109,40 +1107,6 @@ const declaredRoutes = [
     }
   ),
   defineOpenApiRoute(
-    v2RunRowEnrichmentContract,
-    tableOperation({
-      applicationOperation: tableOperations.startRun,
-      operationId: 'runRowEnrichment',
-      summary: 'Run Enrichment For One Row',
-      description:
-        'Start one workflow or enrichment group for a table row. Poll Get Run Dispatch using the returned `dispatchId`. A null `dispatchId` means no dispatch is available to poll; check row outcomes with `includeRunState`.',
-      errors: RESOURCE_ERRORS,
-      success: { description: 'The accepted row enrichment dispatch.' },
-    }),
-    {
-      query: v2RunRowEnrichmentContract.query,
-      params: documentedSchema(
-        v2RunRowEnrichmentContract.params,
-        'RunRowEnrichmentParams',
-        'Run row enrichment path parameters',
-        'Table, row, and producer group selected for execution.'
-      ),
-      body: documentedSchema(
-        v2RunRowEnrichmentContract.body,
-        'RunRowEnrichmentRequest',
-        'Run row enrichment request',
-        'Workspace scope for the row enrichment.',
-        [{ workspaceId: WORKSPACE_ID }]
-      ),
-      response: documentedSchema(
-        v2RunRowEnrichmentContract.response.schema,
-        'V2RunRowEnrichmentResponse',
-        'Run row enrichment response',
-        'Accepted background dispatch identifier.'
-      ),
-    }
-  ),
-  defineOpenApiRoute(
     v2SearchTableRowsContract,
     tableOperation({
       applicationOperation: tableOperations.searchRows,
@@ -1751,38 +1715,6 @@ const declaredRoutes = [
         'V2BulkUpdateTableRowsResponse',
         'Bulk update table rows response',
         'Updated row count and identifiers.'
-      ),
-    }
-  ),
-  defineOpenApiRoute(
-    v2GetRowEnrichmentContract,
-    tableOperation({
-      applicationOperation: tableOperations.readRow,
-      operationId: 'getRowEnrichment',
-      summary: 'Get Enrichment Run Detail',
-      description:
-        "Get an enrichment cell's provider attempts, statuses, hosted-key costs, durations, and matching provider. Null means no run detail was recorded; `404` means the table, row, or group does not exist.",
-      errors: RESOURCE_ERRORS,
-      success: { description: 'The enrichment run detail, or null when none was recorded.' },
-    }),
-    {
-      params: documentedSchema(
-        v2GetRowEnrichmentContract.params,
-        'GetRowEnrichmentParams',
-        'Get row enrichment path parameters',
-        'Table, row, and producer group whose run detail is requested.'
-      ),
-      query: documentedSchema(
-        v2GetRowEnrichmentContract.query,
-        'GetRowEnrichmentQuery',
-        'Get row enrichment query',
-        'Workspace scope for the row.'
-      ),
-      response: documentedSchema(
-        v2GetRowEnrichmentContract.response.schema,
-        'V2RowEnrichmentResponse',
-        'Row enrichment response',
-        'Provider cascade, cost, and timing for one enrichment cell.'
       ),
     }
   ),

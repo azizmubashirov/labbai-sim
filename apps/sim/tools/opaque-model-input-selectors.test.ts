@@ -2,8 +2,6 @@
  * @vitest-environment node
  */
 import { describe, expect, it } from 'vitest'
-import { ResolvedSecretTraceRegistry } from '@/executor/utils/resolved-secret-trace-registry'
-import { a2aSendMessageTool } from '@/tools/a2a/send_message'
 import { elevenLabsAudioIsolationTool } from '@/tools/elevenlabs/audio-isolation'
 import { elevenLabsSpeechToSpeechTool } from '@/tools/elevenlabs/speech-to-speech'
 import { extendParserTool, extendParserV2Tool } from '@/tools/extend/parser'
@@ -14,7 +12,6 @@ import { pulseParserTool, pulseParserV2Tool } from '@/tools/pulse/parser'
 import { quiverImageToSvgTool } from '@/tools/quiver/image_to_svg'
 import { quiverTextToSvgTool } from '@/tools/quiver/text_to_svg'
 import { reductoParserTool, reductoParserV2Tool } from '@/tools/reducto/parser'
-import { projectToolModelInputParams } from '@/tools/request-transport'
 import { assemblyaiSttTool, assemblyaiSttV2Tool } from '@/tools/stt/assemblyai'
 import { deepgramSttTool, deepgramSttV2Tool } from '@/tools/stt/deepgram'
 import { elevenLabsSttTool, elevenLabsSttV2Tool } from '@/tools/stt/elevenlabs'
@@ -24,7 +21,6 @@ import { textractAnalyzeExpenseTool } from '@/tools/textract/analyze-expense'
 import { textractAnalyzeIdTool } from '@/tools/textract/analyze-id'
 import { textractParserTool, textractParserV2Tool } from '@/tools/textract/parser'
 import type { ExecutableToolConfig } from '@/tools/types'
-import { runwayVideoTool } from '@/tools/video/runway'
 import { visionTool } from '@/tools/vision/tool'
 
 const FILE = {
@@ -90,14 +86,6 @@ describe('file model-input selectors', () => {
     }
   })
 
-  it('does not attach private provenance to the Runway server-resolved locator', () => {
-    const modelInput = runwayVideoTool.operation.modelInput
-    expect(modelInput?.mode).toBe('project')
-    if (modelInput?.mode === 'project') {
-      expect(modelInput.privateInputPaths).toBeUndefined()
-    }
-  })
-
   it('keeps only inline Mistral bytes fail-closed', () => {
     expect(
       selectPrivateInputPaths(mistralParserTool, {
@@ -147,59 +135,6 @@ describe('file model-input selectors', () => {
         image: 'data:image/png;base64,c2VjcmV0',
       })
     ).toEqual([['image']])
-  })
-
-  it('projects A2A attachment names without rewriting file content or locators', () => {
-    const modelInput = getProjectingModelInput(a2aSendMessageTool)
-    expect(modelInput.select({ message: 'Analyze', files: [FILE] })).toEqual({
-      message: 'Analyze',
-      data: undefined,
-      files: [{ name: 'private-report.pdf' }],
-    })
-    expect(
-      modelInput.applyProjected(
-        { message: 'Analyze', data: undefined, files: [FILE] },
-        { message: 'Analyze', data: undefined, files: [{ name: '{{FILE_NAME}}' }] }
-      )
-    ).toEqual({ message: 'Analyze', data: undefined, files: [{ ...FILE, name: '{{FILE_NAME}}' }] })
-  })
-
-  it('restores non-name A2A fields after the whole selected file param is projected', () => {
-    const registry = new ResolvedSecretTraceRegistry([
-      { name: 'FILE_NAME', plaintext: 'private-report', encryptedValue: 'encrypted-name' },
-      { name: 'FILE_URL', plaintext: 'private', encryptedValue: 'encrypted-url' },
-      { name: 'INLINE_FIELD', plaintext: 'raw-inline-field', encryptedValue: 'encrypted-inline' },
-    ])
-    registry.recordResolvedAtInputPath('FILE_NAME', 'private-report', ['files', '0', 'name'])
-    registry.recordResolvedInputProjection(
-      ['files', '0', 'name'],
-      'private-report.pdf',
-      '{{FILE_NAME}}.pdf'
-    )
-    registry.recordResolvedAtInputPath('FILE_URL', 'private', ['files', '0', 'url'])
-    registry.recordResolvedInputProjection(
-      ['files', '0', 'url'],
-      FILE.url,
-      'https://storage.example/report.pdf?signature={{FILE_URL}}'
-    )
-    registry.recordResolvedAtInputPath('INLINE_FIELD', 'raw-inline-field', ['files', '0', 'base64'])
-    registry.recordResolvedInputProjection(
-      ['files', '0', 'base64'],
-      FILE.base64,
-      '{{INLINE_FIELD}}'
-    )
-
-    expect(
-      projectToolModelInputParams(
-        a2aSendMessageTool,
-        { message: 'Analyze', files: [FILE] },
-        registry
-      )
-    ).toEqual({
-      message: 'Analyze',
-      data: undefined,
-      files: [{ ...FILE, name: '{{FILE_NAME}}.pdf' }],
-    })
   })
 
   it('projects the Firecrawl multipart filename without rewriting the stored file', () => {

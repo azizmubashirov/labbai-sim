@@ -1,7 +1,6 @@
 import type { WorkspaceSearchFilters } from '@/lib/api/contracts/knowledge/search'
 import type { ManagedMcpConnectorId } from '@/lib/credential-groups/managed-mcp-connectors'
 import type { ChatContext } from '@/stores/panel'
-import type { BrowserTextSelection, TerminalTextSelection } from '@/stores/panel/types'
 
 const EDIT_CONTENT_TOOL_ID = 'apply_file_edit'
 const RUN_SUBAGENT_ID = 'run'
@@ -176,9 +175,6 @@ export interface ChatMessageContext {
   rowIds?: string[]
   /** Selected column ids for a `table_selection` cell range. */
   columnIds?: string[]
-  tabId?: string
-  terminalId?: string
-  selection?: BrowserTextSelection | TerminalTextSelection
 }
 
 export interface ChatMessage {

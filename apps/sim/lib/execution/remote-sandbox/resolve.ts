@@ -40,7 +40,7 @@ const logger = createLogger('SandboxResolve')
 
 /**
  * The DB is reached lazily so the sandbox barrel stays importable without one.
- * `withPiSandbox`, the copilot doc compilers, and `verify-sandbox-parity.ts` all
+ * The copilot doc compilers and `verify-sandbox-parity.ts` all
  * pull in this module through `remote-sandbox/index.ts` but never select a
  * workspace sandbox — a static `@sim/db` import would make every one of them
  * throw at module load when `DATABASE_URL` is unset.
@@ -410,28 +410,9 @@ async function readImage(
 }
 
 /**
- * Re-enqueues a build for a sandbox whose image is unusable.
- *
- * `ensureSandboxImage` otherwise runs only when a sandbox is saved, which left
- * three states permanently stuck until someone re-saved it in Settings: a build
- * that failed, a build whose worker died mid-flight, and — after switching a
- * deployment from a `runtime` provider to a `prebuilt` one — every sandbox
- * created while the old provider was active, since `runtime` writes no image
- * rows at all. Repairing here costs an execution that was going to fail either
- * way and lets the next one succeed, instead of making the user reconfigure a
- * sandbox whose definition was never wrong.
- *
- * Rate-limited, unlike the save path. This fires once per execution, and a bad
- * package name fails in seconds, so re-claiming a failed row on sight would let a
- * per-minute schedule enqueue a per-minute build of something that will never
- * succeed. The cooldown caps that at one attempt per window while a save — an
- * explicit request from a person — still retries immediately. Executions arriving
- * during a healthy build enqueue nothing either way.
- *
- * Imported dynamically for the same reason as {@link sandboxDb} — the registry
- * pulls `@sim/db` into the static import graph, which this module keeps out of
- * the executor bundle. A repair that fails must never replace the caller's
- * message, which is the one naming the sandbox and its build error.
+ * Formerly re-enqueued an image build for a sandbox whose image was unusable.
+ * Workspace sandboxes (and their image registry) were removed, so this only
+ * logs; the caller's own error message still surfaces unchanged.
  */
 async function scheduleImageRepair(
   spec: {
@@ -443,28 +424,12 @@ async function scheduleImageRepair(
   specHash: string,
   options?: { missingImageRef?: string }
 ): Promise<void> {
-  try {
-    const { ensureSandboxImage, FAILED_BUILD_RETRY_COOLDOWN_MS } = await import(
-      '@/lib/execution/remote-sandbox/image-registry'
-    )
-    await ensureSandboxImage(
-      {
-        language: spec.language,
-        dependencies: spec.dependencies,
-        cliTools: spec.cliTools,
-        systemPackages: spec.systemPackages,
-      },
-      specHash,
-      // A create that just failed on a missing image has observed the truth, so it
-      // reclaims whatever the row says and skips the cooldown. Resolution reading a
-      // row it cannot verify only gets the rate-limited retry.
-      options?.missingImageRef
-        ? { missingImageRef: options.missingImageRef }
-        : { minFailureAgeMs: FAILED_BUILD_RETRY_COOLDOWN_MS }
-    )
-  } catch (error) {
-    logger.warn('Failed to schedule sandbox image repair', { specHash, error })
-  }
+  // Image builds were removed together with workspace sandboxes; nothing is queued.
+  logger.warn('Sandbox image repair is unavailable', {
+    language: spec.language,
+    specHash,
+    missingImageRef: options?.missingImageRef,
+  })
 }
 
 /**

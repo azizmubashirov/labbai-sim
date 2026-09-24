@@ -1,29 +1,25 @@
 'use client'
 
 import type { ComponentType } from 'react'
-import type { DesktopUpdateState } from '@sim/desktop-bridge'
 import {
   Chip,
   chipContentLabelClass,
-  chipPrimaryFillTokens,
   chipVariants,
   cn,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuItemLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
   OverflowText,
   Skeleton,
 } from '@sim/emcn'
-import { BookOpen, Download, HelpCircle, LogOut, Settings } from '@sim/emcn/icons'
+import { BookOpen, HelpCircle, LogOut, Settings } from '@sim/emcn/icons'
 import { useRouter } from 'next/navigation'
 import { SlackIcon } from '@/components/icons'
 import { SettingsIntentLink } from '@/components/settings/settings-intent-link'
 import { ANONYMOUS_USER_ID } from '@/lib/auth/constants'
 import { signOutAndRedirect } from '@/lib/auth/sign-out'
-import { getDesktopUpdates } from '@/lib/desktop'
 import { getUserColor } from '@/lib/workspaces/colors'
 import { SidebarTooltip } from '@/app/workspace/[workspaceId]/w/components/sidebar/components/sidebar-tooltip'
 import {
@@ -31,38 +27,7 @@ import {
   SIDEBAR_RAIL_CHIP_CLASS,
 } from '@/app/workspace/[workspaceId]/w/components/sidebar/constants'
 import { useUserProfile } from '@/hooks/queries/user-profile'
-import { useDesktopUpdateState } from '@/hooks/use-desktop-update-state'
 import { useSettingsDirtyStore } from '@/stores/settings/dirty/store'
-
-function hasAvailableDesktopUpdate(state: DesktopUpdateState): boolean {
-  return state.status === 'available' || state.status === 'downloading' || state.status === 'ready'
-}
-
-function desktopUpdateActionLabel(state: DesktopUpdateState): string {
-  if (state.status === 'downloading') {
-    return state.percent === undefined
-      ? 'Downloading update…'
-      : `Downloading update ${state.percent}%`
-  }
-  return state.status === 'ready' ? 'Restart to update' : 'Update'
-}
-
-/** Compact primary update circle using the same footprint as the surrounding sidebar icons. */
-function DesktopUpdateIcon({ className }: { className?: string }) {
-  return (
-    <div
-      className={cn(
-        className,
-        'flex size-[17px] shrink-0 items-center justify-center rounded-full',
-        chipPrimaryFillTokens
-      )}
-    >
-      {/* Download's default viewBox is asymmetric around its paths. Center the
-          artwork itself, not merely its SVG box, inside the avatar-sized circle. */}
-      <Download className='size-[11px]' viewBox='-1.75 -1.75 24 24' />
-    </div>
-  )
-}
 
 interface SidebarNavigationLink {
   label: string
@@ -123,20 +88,9 @@ export function SidebarFooter({
 }: SidebarFooterProps) {
   const { data: profile } = useUserProfile()
   const router = useRouter()
-  const updateState = useDesktopUpdateState()
 
   const name = profile ? profile.name?.trim() || profile.email : ''
-  const updateAvailable = hasAvailableDesktopUpdate(updateState)
   const canSignOut = Boolean(profile && profile.id !== ANONYMOUS_USER_ID)
-
-  const handleUpdateSelect = () => {
-    const updates = getDesktopUpdates()
-    if (updateState.status === 'ready') {
-      updates?.install()
-    } else if (updateState.status === 'available') {
-      updates?.check()
-    }
-  }
 
   /**
    * Built from plain `img`/`div` rather than the emcn `Avatar`, whose Radix root
@@ -267,14 +221,14 @@ export function SidebarFooter({
   const helpMenu = (
     <DropdownMenu>
       <SidebarTooltip
-        label={updateAvailable ? 'Help — update available' : 'Help'}
+        label='Help'
         enabled={showCollapsedTooltips}
       >
         <DropdownMenuTrigger asChild>
           <Chip
             data-item-id='help'
-            aria-label={updateAvailable ? 'Help, update available' : 'Help'}
-            leftIcon={updateAvailable ? DesktopUpdateIcon : HelpCircle}
+            aria-label='Help'
+            leftIcon={HelpCircle}
             fullWidth={isCollapsed}
             /* Never shrinks: while the rail animates open the row is briefly wider
                than the rail, and a shrinking chip would be squeezed onto the avatar.
@@ -286,18 +240,6 @@ export function SidebarFooter({
       </SidebarTooltip>
       {/* Anchored to whichever edge the trigger sits on, so the menu never overhangs the rail. */}
       <DropdownMenuContent align={isCollapsed ? 'start' : 'end'} side='top' sideOffset={4}>
-        {updateAvailable && (
-          <>
-            <DropdownMenuItem
-              onSelect={handleUpdateSelect}
-              disabled={updateState.status === 'downloading'}
-            >
-              <img src='/favicon/favicon-32x32.png' alt='' className='size-[14px] rounded-[3px]' />
-              {desktopUpdateActionLabel(updateState)}
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-          </>
-        )}
         <DropdownMenuItem onSelect={onOpenDocs}>
           <BookOpen className='size-[14px]' />
           Docs

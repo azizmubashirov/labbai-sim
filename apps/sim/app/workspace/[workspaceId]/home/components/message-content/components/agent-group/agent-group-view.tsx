@@ -1,16 +1,13 @@
 'use client'
 
-import { type ComponentType, type ReactNode, useState } from 'react'
+import { type ComponentType, useState } from 'react'
 import { ThinkingLoader } from '@/components/ui/thinking-loader'
-import { isBrowserAgentAvailable } from '@/lib/browser-agent/transport'
-import { RETIRED_BROWSER_REQUEST_TAKEOVER_ID } from '@/lib/copilot/tools/retired-tools'
 import { getToolStatusDisplayTitle } from '@/lib/copilot/tools/tool-display'
 import { ActivityStream } from '@/app/workspace/[workspaceId]/home/components/message-content/components/agent-group/activity-stream'
 import {
   collectGroupTools,
   hasAgentGroupItemContent,
 } from '@/app/workspace/[workspaceId]/home/components/message-content/components/agent-group/agent-group-content'
-import { BrowserAgentIcon } from '@/app/workspace/[workspaceId]/home/components/message-content/components/agent-group/browser-agent-icon'
 import { renderInlineMarkdown } from '@/app/workspace/[workspaceId]/home/components/message-content/components/agent-group/inline-markdown'
 import { MainAgentActivity } from '@/app/workspace/[workspaceId]/home/components/message-content/components/agent-group/main-agent-activity'
 import {
@@ -80,44 +77,6 @@ function hasPendingInteraction(items: AgentGroupItem[]): boolean {
   })
 }
 
-interface ActiveBrowserTakeover {
-  id: string
-  reason: string
-}
-
-/** Returns this group's own active browser hand-back, if any. */
-function getActiveBrowserTakeover(items: AgentGroupItem[]): ActiveBrowserTakeover | null {
-  for (let index = items.length - 1; index >= 0; index--) {
-    const item = items[index]
-    if (item.type !== 'tool') continue
-    if (
-      item.data.toolName === RETIRED_BROWSER_REQUEST_TAKEOVER_ID &&
-      item.data.status === ToolCallStatus.executing
-    ) {
-      const reason = item.data.params?.reason
-      return {
-        id: item.data.id,
-        reason: typeof reason === 'string' ? reason.trim() : '',
-      }
-    }
-    // Browser-agent tools are serialized. Once a newer tool exists, an older
-    // executing takeover is stale and must not keep a question on screen.
-    return null
-  }
-  return null
-}
-
-/** True when a nested group owns a browser hand-back question. */
-function hasNestedBrowserTakeover(items: AgentGroupItem[]): boolean {
-  return items.some(
-    (item) =>
-      item.type === 'agent_group' &&
-      item.group.isOpen &&
-      (getActiveBrowserTakeover(item.group.items) !== null ||
-        hasNestedBrowserTakeover(item.group.items))
-  )
-}
-
 export function isAgentGroupResolved(items: AgentGroupItem[]): boolean {
   let hasWork = false
   for (const item of items) {
@@ -135,7 +94,6 @@ export function isAgentGroupResolved(items: AgentGroupItem[]): boolean {
 interface AgentGroupViewProps extends AgentGroupProps {
   /** Supplies tool behavior without coupling the group layout to the block registry. */
   ToolCallComponent: ComponentType<ToolCallItemProps>
-  renderBrowserTakeover?: (reason: string) => ReactNode
 }
 
 export function AgentGroupView({
@@ -147,45 +105,29 @@ export function AgentGroupView({
   defaultExpanded = false,
   autoScrollActivity = true,
   ToolCallComponent,
-  renderBrowserTakeover,
 }: AgentGroupViewProps) {
   const AgentIcon = getAgentIcon(agentName)
   const isMainAgent = agentName === 'mothership'
   const tools = isMainAgent ? [] : collectGroupTools(items)
   const statusTool = getActivityStatusTool(tools)
   const resolved = isAgentGroupResolved(items)
-  const browserAgentAvailable = isBrowserAgentAvailable()
-  const activeBrowserTakeover =
-    browserAgentAvailable && isLaneOpen ? getActiveBrowserTakeover(items) : null
-  const nestedBrowserTakeover = browserAgentAvailable && hasNestedBrowserTakeover(items)
-  const isWorking =
-    !activeBrowserTakeover && ((isDelegating && !resolved) || (isStreaming && isLaneOpen))
+  const isWorking = (isDelegating && !resolved) || (isStreaming && isLaneOpen)
   const agentIcon =
     isWorking && !statusTool ? (
       <ThinkingLoader size={14} startVariant='corners' />
-    ) : agentName === 'browser' ? (
-      <BrowserAgentIcon items={items} />
     ) : (
       <AgentIcon className='size-full' />
     )
 
   const [manualExpanded, setManualExpanded] = useState(defaultExpanded)
-  const [expandedTakeoverId, setExpandedTakeoverId] = useState<string | null>(null)
   const pendingInteraction = hasPendingInteraction(items)
   /** Blocking interactions override manual collapse so the user can resume the turn. */
-  const expanded =
-    pendingInteraction ||
-    nestedBrowserTakeover ||
-    (activeBrowserTakeover ? expandedTakeoverId === activeBrowserTakeover.id : manualExpanded)
+  const expanded = pendingInteraction || manualExpanded
 
   const meaningfulItems = items.filter(hasAgentGroupItemContent)
   if (meaningfulItems.length === 0) return null
 
   const toggleExpanded = () => {
-    if (activeBrowserTakeover) {
-      setExpandedTakeoverId(expanded ? null : activeBrowserTakeover.id)
-      return
-    }
     setManualExpanded(!expanded)
   }
 
@@ -211,7 +153,6 @@ export function AgentGroupView({
         <AgentGroupView
           key={item.group.id}
           ToolCallComponent={ToolCallComponent}
-          renderBrowserTakeover={renderBrowserTakeover}
           agentName={item.group.agentName}
           agentLabel={item.group.agentLabel}
           items={item.group.items}
@@ -257,12 +198,7 @@ export function AgentGroupView({
       statusTool.status === ToolCallStatus.success)
   const collapsible =
     meaningfulItems.length > 1 ||
-    meaningfulItems.some(
-      (item) =>
-        item.type !== 'tool' ||
-        needsToolInput(item.data) ||
-        item.data.toolName === RETIRED_BROWSER_REQUEST_TAKEOVER_ID
-    )
+    meaningfulItems.some((item) => item.type !== 'tool' || needsToolInput(item.data))
 
   return (
     <div className='flex min-w-0 flex-col gap-1.5'>
@@ -272,20 +208,15 @@ export function AgentGroupView({
         <ActivityStream
           activity={{ label: headerText, isActive: headerActive, icon: agentIcon }}
           activityKey={statusTool?.id}
-          attentionKey={`${getActivityAttentionKey(tools)}:${activeBrowserTakeover?.id ?? ''}`}
+          attentionKey={getActivityAttentionKey(tools)}
           collapsible={collapsible}
           expanded={expanded}
           onToggle={toggleExpanded}
           isStreaming={isStreaming && autoScrollActivity}
-          unbounded={pendingInteraction || nestedBrowserTakeover}
+          unbounded={pendingInteraction}
         >
           {activity}
         </ActivityStream>
-      )}
-      {activeBrowserTakeover && (
-        <div key={activeBrowserTakeover.id} className='animate-stream-fade-in'>
-          {renderBrowserTakeover?.(activeBrowserTakeover.reason)}
-        </div>
       )}
     </div>
   )

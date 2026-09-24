@@ -8,7 +8,6 @@ const mocks = vi.hoisted(() => ({
   executeTableUseCase: vi.fn(),
   useCases: {
     addOutput: { operation: { id: 'tables.groups.update' } },
-    createEnrichment: { operation: { id: 'tables.groups.create' } },
     createFromFile: { operation: { id: 'tables.imports.create_from_workspace_file' } },
     createWorkflowGroup: { operation: { id: 'tables.groups.create' } },
     deleteTables: { operation: { id: 'tables.delete' } },
@@ -23,7 +22,6 @@ vi.mock('@/lib/copilot/application/execute-table-use-case', () => ({
 }))
 vi.mock('@/lib/table/application/groups', () => ({
   addWorkflowTableGroupOutput: mocks.useCases.addOutput,
-  createTableEnrichmentGroup: mocks.useCases.createEnrichment,
   createWorkflowTableGroup: mocks.useCases.createWorkflowGroup,
   updateWorkflowTableGroup: mocks.useCases.updateWorkflowGroup,
 }))
@@ -40,7 +38,6 @@ vi.mock('@/lib/table/application/workspace-file-imports', () => ({
 
 import {
   copilotAddWorkflowTableGroupOutputPolicy,
-  copilotCreateTableEnrichmentGroupPolicy,
   copilotCreateTableFromWorkspaceFilePolicy,
   copilotCreateWorkflowTableGroupPolicy,
   copilotDeleteTablesPolicy,
@@ -48,7 +45,6 @@ import {
   copilotReplaceProjectedWireRowsPolicy,
   copilotUpdateWorkflowTableGroupPolicy,
   executeCopilotAddWorkflowTableGroupOutput,
-  executeCopilotCreateTableEnrichmentGroup,
   executeCopilotCreateTableFromWorkspaceFile,
   executeCopilotCreateWorkflowTableGroup,
   executeCopilotDeleteTables,
@@ -85,11 +81,6 @@ describe('fixed Copilot Table application commands', () => {
       mocks.useCases.updateWorkflowGroup,
     ],
     ['add workflow output', executeCopilotAddWorkflowTableGroupOutput, mocks.useCases.addOutput],
-    [
-      'create enrichment group',
-      executeCopilotCreateTableEnrichmentGroup,
-      mocks.useCases.createEnrichment,
-    ],
     [
       'import a workspace file',
       executeCopilotImportWorkspaceFileIntoTable,
@@ -152,8 +143,7 @@ describe('fixed Copilot Table application commands', () => {
       copilotDeleteTablesPolicy,
       copilotUpdateWorkflowTableGroupPolicy,
       copilotAddWorkflowTableGroupOutputPolicy,
-      copilotCreateTableEnrichmentGroupPolicy,
-      copilotCreateTableFromWorkspaceFilePolicy,
+          copilotCreateTableFromWorkspaceFilePolicy,
       copilotImportWorkspaceFileIntoTablePolicy,
     ]
 

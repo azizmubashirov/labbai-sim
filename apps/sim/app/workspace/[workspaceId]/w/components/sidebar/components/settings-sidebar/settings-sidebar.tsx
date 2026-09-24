@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef } from 'react'
 import {
   Chip,
   ChipConfirmModal,
@@ -17,7 +17,6 @@ import { ArrowUpRight, Building, ChevronLeft, Lock } from '@sim/emcn/icons'
 import { useQueryClient } from '@tanstack/react-query'
 import { useParams, usePathname, useRouter } from 'next/navigation'
 import {
-  type DesktopSettingsSurface,
   getOrganizationSettingsHref,
   getSettingsPermissionConfigKey,
   isSelfHostedOverrideEnabled,
@@ -28,7 +27,6 @@ import { useSession } from '@/lib/auth/auth-client'
 import { getSubscriptionAccessState } from '@/lib/billing/client'
 import { canViewWorkspaceBillingSettings } from '@/lib/billing/workspace-permissions'
 import { useDeploymentShape } from '@/lib/core/config/deployment-shape'
-import { hasBrowserAgent, hasDesktopSettings, hasTerminal } from '@/lib/desktop'
 import { useWorkspaceHostContext } from '@/app/workspace/[workspaceId]/providers/workspace-host-provider'
 import { useUserPermissionsContext } from '@/app/workspace/[workspaceId]/providers/workspace-permissions-provider'
 import type { SettingsSection } from '@/app/workspace/[workspaceId]/settings/navigation'
@@ -50,7 +48,6 @@ import { useWorkspaceAccessRequestFeatures } from '@/ee/access-requests/componen
 import { useSSOProviders } from '@/ee/sso/hooks/sso'
 import { useForkingAvailable } from '@/ee/workspace-forking/hooks/use-forking-available'
 import { useGeneralSettings } from '@/hooks/queries/general-settings'
-import { useInboxConfig } from '@/hooks/queries/inbox'
 import { usePermissionConfig } from '@/hooks/use-permission-config'
 import { useSettingsNavigation } from '@/hooks/use-settings-navigation'
 import { useSettingsDirtyStore } from '@/stores/settings/dirty/store'
@@ -75,9 +72,6 @@ const SECTION_CHUNK_WARMERS: Partial<Record<SettingsSection, () => Promise<unkno
   general: () => import('@/app/workspace/[workspaceId]/settings/components/general/general'),
   secrets: () => import('@/app/workspace/[workspaceId]/settings/components/secrets/secrets'),
   billing: () => import('@/app/workspace/[workspaceId]/settings/components/billing/billing'),
-  desktop: () => import('@/app/workspace/[workspaceId]/settings/components/desktop/desktop'),
-  browser: () => import('@/app/workspace/[workspaceId]/settings/components/browser/browser'),
-  terminal: () => import('@/app/workspace/[workspaceId]/settings/components/terminal/terminal'),
 }
 
 interface SettingsSidebarProps {
@@ -109,18 +103,12 @@ export function SettingsSidebar({
     contentRef: scrollContentRef,
     enabled: !isCollapsed,
   })
-  const [desktopSurfaces, setDesktopSurfaces] = useState<Record<DesktopSettingsSurface, boolean>>({
-    settings: false,
-    browser: false,
-    terminal: false,
-  })
 
   const { data: session } = useSession()
   const hostContext = useWorkspaceHostContext()
   const deployment = useDeploymentShape()
   const { hosted, billingEnabled } = deployment
   const { data: generalSettings } = useGeneralSettings()
-  const { data: inboxConfig } = useInboxConfig(workspaceId)
   const { data: ssoProvidersData, isLoading: isLoadingSSO } = useSSOProviders({
     enabled: !hosted,
   })
@@ -139,7 +127,6 @@ export function SettingsSidebar({
       ? hostContext.hostOrganizationId
       : null
   const subscriptionAccess = getSubscriptionAccessState(hostContext.ownerBilling)
-  const inboxEntitled = inboxConfig?.entitled ?? false
   const hasEnterprisePlan = subscriptionAccess.hasUsableEnterpriseAccess
   const isEnterprisePlan = subscriptionAccess.isEnterprise
 
@@ -178,10 +165,6 @@ export function SettingsSidebar({
         return false
       }
 
-      if (item.requiresDesktopSurface && !desktopSurfaces[item.requiresDesktopSurface]) {
-        return false
-      }
-
       if (item.hideWhenBillingDisabled && !billingEnabled) {
         return false
       }
@@ -200,9 +183,6 @@ export function SettingsSidebar({
       if (item.id === 'apikeys' && permissionConfig.hideApiKeysTab && !accessRequestsEnabled) {
         return false
       }
-      if (item.id === 'inbox' && permissionConfig.hideInboxTab && !accessRequestsEnabled) {
-        return false
-      }
       if (item.id === 'mcp' && permissionConfig.disableMcpTools && !accessRequestsEnabled) {
         return false
       }
@@ -211,9 +191,6 @@ export function SettingsSidebar({
         permissionConfig.disableCustomTools &&
         !accessRequestsEnabled
       ) {
-        return false
-      }
-      if (item.id === 'sandboxes' && permissionConfig.hideSandboxesTab && !accessRequestsEnabled) {
         return false
       }
       if (item.id === 'forks' && !(forkingAvailable && canAdminWorkspace)) {
@@ -289,7 +266,6 @@ export function SettingsSidebar({
     generalSettings?.superUserModeEnabled,
     forkingAvailable,
     canAdminWorkspace,
-    desktopSurfaces,
   ])
 
   const segments = pathname?.split('/') ?? []
@@ -323,14 +299,6 @@ export function SettingsSidebar({
   const handleCancelDiscard = useCallback(() => {
     cancelLeave()
   }, [cancelLeave])
-
-  useEffect(() => {
-    setDesktopSurfaces({
-      settings: hasDesktopSettings(),
-      browser: hasBrowserAgent(),
-      terminal: hasTerminal(),
-    })
-  }, [])
 
   return (
     <>
@@ -431,9 +399,7 @@ export function SettingsSidebar({
                     const isLocked =
                       !selfHostedUnlocked &&
                       item.requiresMax &&
-                      (item.id === 'inbox'
-                        ? !inboxEntitled
-                        : !subscriptionAccess.hasUsableMaxAccess)
+                      !subscriptionAccess.hasUsableMaxAccess
                     const itemClassName = cn(
                       chipVariants({ active, fullWidth: true }),
                       SIDEBAR_RAIL_CHIP_CLASS

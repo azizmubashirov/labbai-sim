@@ -25,14 +25,10 @@ import {
   hasUsableSubscriptionAccess,
   USABLE_SUBSCRIPTION_STATUSES,
 } from '@/lib/billing/subscriptions/utils'
-import { env } from '@/lib/core/config/env'
 import {
   isAccessControlEnabled,
   isBillingEnabled,
   isHosted,
-  isInboxEnabled,
-  isSandboxDeploymentEntitled,
-  isSandboxesEnabled,
   isSsoEnabled,
 } from '@/lib/core/config/env-flags'
 import { getBaseUrl } from '@/lib/core/utils/urls'
@@ -777,8 +773,8 @@ async function hasWorkspaceTierAccess(
 
 /**
  * Whether the workspace's payer is on a usable Max-or-Enterprise subscription.
- * Shared by the inbox (Sim Mailer), live sync, and custom sandboxes, which all
- * sit on the same entitlement tier.
+ * Shared by live sync and custom sandboxes, which sit on the same entitlement
+ * tier.
  *
  * Request-memoized: these features are gated side by side on one settings render,
  * each otherwise repeating the identical workspace and subscription reads. The
@@ -788,62 +784,6 @@ async function hasWorkspaceTierAccess(
 const hasMaxTierWorkspaceAccess = cache(
   (workspaceId: string): Promise<boolean> => hasWorkspaceTierAccess(workspaceId, isMaxTier)
 )
-
-/**
- * Check whether a workspace is entitled to the inbox (Sim Mailer) feature.
- * Entitlement follows the workspace's billing entity — not the acting user — so
- * any workspace admin (including an external member) can manage the inbox when
- * the workspace's organization, or its billed account for personal workspaces,
- * is on a Max or enterprise plan.
- *
- * Always false without `COPILOT_API_KEY` — inbox tasks are executed by the
- * mothership and answered with a link to the resulting chat, so neither half
- * works without it. That check comes first because the `!isBillingEnabled`
- * shortcut below would otherwise hand every self-hosted deployment a broken
- * Inbox.
- *
- * Otherwise returns true if:
- * - on self-hosted deployments, INBOX_ENABLED is set or billing is disabled, OR
- * - the workspace belongs to an organization on a Max/enterprise plan (org-mode), OR
- * - the billed user has an individual Max/enterprise subscription (personal workspace).
- */
-export async function hasWorkspaceInboxAccess(workspaceId: string): Promise<boolean> {
-  try {
-    if (!env.COPILOT_API_KEY) return false
-    if (!isHosted && (isInboxEnabled || !isBillingEnabled)) return true
-    return await hasMaxTierWorkspaceAccess(workspaceId)
-  } catch (error) {
-    logger.error('Error checking workspace inbox access', { error, workspaceId })
-    return false
-  }
-}
-
-/**
- * Whether a workspace should RETAIN its provisioned inbox (Sim Mailer)
- * infrastructure. Unlike {@link hasWorkspaceInboxAccess}, which gates active use
- * on a *usable* (active) subscription, this uses the broader *entitled* status
- * set (active OR `past_due`) so a transient payment failure never triggers the
- * destructive teardown of a paying customer's inbox.
- *
- * Reconciliation should delete AgentMail resources only when this returns
- * `false` — i.e. the plan is genuinely terminal (canceled, downgraded off
- * Max/Enterprise, or gone). Fails open (returns `true`) on any error or
- * ambiguity: never tear down on uncertainty.
- */
-export async function hasWorkspaceInboxGraceAccess(workspaceId: string): Promise<boolean> {
-  try {
-    if (!isHosted && (isInboxEnabled || !isBillingEnabled)) return true
-
-    return await hasWorkspaceTierAccess(workspaceId, isMaxTier, {
-      intent: 'retention',
-      onMissingWorkspace: true,
-      onError: 'throw',
-    })
-  } catch (error) {
-    logger.error('Error checking workspace inbox grace access', { error, workspaceId })
-    return true
-  }
-}
 
 /**
  * Checks whether the exact workspace payer can use five-minute connector sync.
@@ -859,69 +799,15 @@ export async function hasWorkspaceLiveSyncAccess(workspaceId: string): Promise<b
 }
 
 /**
- * Checks whether the exact workspace payer can discover, author, or directly
- * select custom Sim sandboxes through Copilot.
- *
- * A configured remote Function provider is mandatory. On billing-free
- * deployments, the Enterprise pair or Sandbox-specific pair grants access. With
- * billing enabled, an explicit Sandbox deployment override wins; otherwise the
- * workspace payer must hold a usable Max or Enterprise subscription. Builds cost
- * provider compute and storage, so this deliberately sits above the plain paid
- * tier.
- *
- * Function execution consults the retention variant,
- * {@link hasWorkspaceSandboxRetentionAccess}, so a payment retry never fails a
- * running workflow while a terminal downgrade does. Copilot discovery,
- * mutations, attachments, and direct run_function selections re-check this
- * usable-plan gate.
- */
-export async function hasWorkspaceSandboxAccess(workspaceId: string): Promise<boolean> {
-  try {
-    if (!isSandboxesEnabled) return false
-    if (isSandboxDeploymentEntitled) return true
-    if (!isBillingEnabled) return false
-    return await hasMaxTierWorkspaceAccess(workspaceId)
-  } catch (error) {
-    logger.error('Error checking workspace sandbox access', { error, workspaceId })
-    return false
-  }
-}
-
-/**
- * Whether a workspace may keep EXECUTING the sandboxes already attached to its
- * Function blocks.
- *
- * Unlike {@link hasWorkspaceSandboxAccess}, which gates authoring on a *usable*
- * subscription, this uses the retention status set — `active` or `past_due`,
- * block state ignored — so a transient payment failure never turns a deployed
- * workflow into a run-time outage. Only a terminal lapse (cancelled, downgraded
- * off Max/Enterprise, or gone) fails the block. The deployment overrides
- * short-circuit exactly as they do for authoring.
- *
- * The execution path reads this through a bounded cache
- * (`hasWorkspaceSandboxRetentionAccessCached`), which is why `onError: 'throw'`
- * exists: a swallowed read failure is indistinguishable from a real lapse, and
- * caching it would hold every Function block shut for a whole TTL over a
- * momentary outage. The default keeps the one-shot fail-closed behavior.
+ * Whether a workspace may keep executing sandboxes attached to its Function
+ * blocks. Workspace sandboxes were removed, so no workspace is entitled; the
+ * signature stays for the dormant remote-sandbox resolution path.
  */
 export async function hasWorkspaceSandboxRetentionAccess(
-  workspaceId: string,
-  options: { onError?: 'return-false' | 'throw' } = {}
+  _workspaceId: string,
+  _options: { onError?: 'return-false' | 'throw' } = {}
 ): Promise<boolean> {
-  try {
-    if (!isSandboxesEnabled) return false
-    if (isSandboxDeploymentEntitled) return true
-    if (!isBillingEnabled) return false
-    return await hasWorkspaceTierAccess(workspaceId, isMaxTier, {
-      intent: 'retention',
-      onMissingWorkspace: true,
-      ...(options.onError === 'throw' ? { onError: 'throw' as const } : {}),
-    })
-  } catch (error) {
-    logger.error('Error checking workspace sandbox retention access', { error, workspaceId })
-    if (options.onError === 'throw') throw error
-    return false
-  }
+  return false
 }
 
 /**

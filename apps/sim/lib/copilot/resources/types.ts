@@ -9,8 +9,6 @@ export const MothershipResourceType = {
   log: 'log',
   integration: 'integration',
   generic: 'generic',
-  browser: 'browser',
-  terminal: 'terminal',
 } as const
 export type MothershipResourceType =
   (typeof MothershipResourceType)[keyof typeof MothershipResourceType]
@@ -54,12 +52,6 @@ export interface WorkspaceResourceRef {
 interface ResourcePolicy {
   /** Stored with the chat, so the tab is still there when the chat is reopened. */
   persisted: boolean
-  /**
-   * Backed by something only the desktop app can provide. Still persisted, but
-   * a client without the bridge leaves the tab out rather than restoring a
-   * panel with nothing behind it.
-   */
-  desktopOnly?: boolean
 }
 
 /**
@@ -86,11 +78,6 @@ const RESOURCE_POLICY: Record<MothershipResourceType, ResourcePolicy> = {
   integration: { persisted: true },
   // A synthetic panel with no addressable entity behind it to reopen.
   generic: { persisted: false },
-  // One tab per live desktop page or shell, keyed by the native id. The
-  // desktop app owns those lists and restores them itself, so the chat row
-  // never stores these; they are re-derived from the live lists on open.
-  browser: { persisted: false, desktopOnly: true },
-  terminal: { persisted: false, desktopOnly: true },
 }
 
 /**
@@ -103,11 +90,6 @@ export const PERSISTED_RESOURCE_TYPES = (
   MothershipResourceType,
   ...MothershipResourceType[],
 ]
-
-/** True when the resource's panel needs the desktop bridge to show anything. */
-export function isDesktopOnlyResource(resource: MothershipResource): boolean {
-  return RESOURCE_POLICY[resource.type]?.desktopOnly === true
-}
 
 export function isEphemeralResource(resource: MothershipResource): boolean {
   // The in-flight file preview is a placeholder that becomes a real file once
@@ -144,19 +126,7 @@ export function isAddressableResource(resource: MothershipResource): boolean {
 }
 
 /**
- * Drops browser and terminal rows: older clients stored the desktop panels on
- * the chat, but their live tabs are derived from the desktop app rather than
- * the chat row. Module-private: callers want {@link sanitizeChatResources},
- * which also drops unaddressable resources.
- */
-function withoutDesktopSessionResources(
-  resources: readonly MothershipResource[]
-): MothershipResource[] {
-  return resources.filter((resource) => !RESOURCE_POLICY[resource.type]?.desktopOnly)
-}
-
-/**
- * The canonical form of a chat's resource list: legacy desktop panel rows and
+ * The canonical form of a chat's resource list: unknown types and
  * unaddressable resources dropped. Every path that reads or writes stored
  * resources goes through this, which is what heals chats that already hold
  * one.
@@ -164,7 +134,9 @@ function withoutDesktopSessionResources(
 export function sanitizeChatResources(
   resources: readonly MothershipResource[]
 ): MothershipResource[] {
-  return withoutDesktopSessionResources(resources).filter(isAddressableResource)
+  return resources.filter(
+    (resource) => RESOURCE_POLICY[resource.type] !== undefined && isAddressableResource(resource)
+  )
 }
 
 /**

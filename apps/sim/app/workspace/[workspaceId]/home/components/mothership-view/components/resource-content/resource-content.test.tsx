@@ -46,14 +46,6 @@ vi.mock('@/app/workspace/[workspaceId]/files/components/file-viewer', () => ({
 vi.mock('@/app/workspace/[workspaceId]/tables/[tableId]/table', () => ({
   Table: () => null,
 }))
-vi.mock(
-  '@/app/workspace/[workspaceId]/home/components/mothership-view/components/resource-content/components/browser-session/browser-session',
-  () => ({ BrowserSession: () => null })
-)
-vi.mock(
-  '@/app/workspace/[workspaceId]/home/components/mothership-view/components/resource-content/components/terminal-session/terminal-session',
-  () => ({ TerminalSession: () => null })
-)
 
 import {
   ResourceActions,
@@ -86,7 +78,6 @@ describe('ResourceContent handoff', () => {
         (
           <ResourceContent
             workspaceId='workspace-1'
-            desktopScopeId='chat:chat-1'
             resource={resource}
           />
         ) as ReactNode
@@ -165,7 +156,6 @@ describe('ResourceContent handoff', () => {
             />
             <ResourceContent
               workspaceId={file.workspaceId}
-              desktopScopeId='chat:chat-1'
               resource={resource}
               previewSession={previewSession}
               isAgentResponding

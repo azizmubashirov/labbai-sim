@@ -18,26 +18,13 @@ import {
   type TabStripSelectionSource,
   Tooltip,
   tabStripItemSelector,
-  toast,
 } from '@sim/emcn'
 import { Columns3, Eye, Pencil } from '@sim/emcn/icons'
-import type { TerminalTabState } from '@sim/terminal-protocol'
-import { browserTabTitle } from '@/lib/browser-agent/tab-label'
-import {
-  openBrowserTab,
-  reorderBrowserTab,
-  sendBrowserPanelAction,
-} from '@/lib/browser-agent/transport'
 import { SIM_RESOURCE_DRAG_TYPE, SIM_RESOURCES_DRAG_TYPE } from '@/lib/copilot/resource-types'
 import { isEphemeralResource } from '@/lib/copilot/resources/types'
-import { requestTerminalFocus } from '@/lib/terminal/focus'
-import { terminalIdFromResourceId, terminalResourceId } from '@/lib/terminal/resource-id'
-import { terminalTabTitle, terminalTooltip } from '@/lib/terminal/tab-label'
-import { closeTerminal, openTerminal, reorderTerminal } from '@/lib/terminal/transport'
 import type { PreviewMode } from '@/app/workspace/[workspaceId]/files/components/file-viewer'
 import { useMothershipResources } from '@/app/workspace/[workspaceId]/home/components/mothership-resources-context'
 import { AddResourceDropdown } from '@/app/workspace/[workspaceId]/home/components/mothership-view/components/add-resource-dropdown'
-import { useTerminalCloseConfirmation } from '@/app/workspace/[workspaceId]/home/components/mothership-view/components/resource-content/components/terminal-session/use-terminal-close-confirmation'
 import { getResourceConfig } from '@/app/workspace/[workspaceId]/home/components/mothership-view/components/resource-registry'
 import {
   RESOURCE_HEADER_CLASSES,
@@ -58,9 +45,6 @@ import {
 import { useTablesList } from '@/hooks/queries/tables'
 import { useWorkflows } from '@/hooks/queries/workflows'
 import { useWorkspaceFiles } from '@/hooks/queries/workspace-files'
-import { useSettledTerminalCommands } from '@/hooks/use-settled-terminal-commands'
-import { useBrowserSessionStore } from '@/stores/browser-session/store'
-import { useCopilotTerminalStore } from '@/stores/copilot-terminal/store'
 
 /**
  * Types that cannot be opened as a resource tab. Folders and chats have no tab
@@ -74,8 +58,6 @@ const ADD_RESOURCE_EXCLUDED_TYPES: readonly MothershipResourceType[] = [
   'task',
   'integration',
 ] as const
-
-const EMPTY_TERMINAL_TABS: TerminalTabState[] = []
 
 /**
  * Returns the id of the nearest resource to `idx` that is in `filter`
@@ -177,7 +159,6 @@ function useResourceNameLookup(workspaceId: string, enabled: boolean): Map<strin
 
 interface ResourceTabsProps {
   workspaceId: string
-  desktopScopeId: string
   chatId?: string
   resources: MothershipResource[]
   activeId: string | null
@@ -185,8 +166,6 @@ interface ResourceTabsProps {
   previewMode?: PreviewMode
   onCyclePreviewMode?: () => void
   actions?: ReactNode
-  onRequestAddResourceOpen?: (open: () => void) => void
-  onAddResourceClose?: () => Promise<void>
 }
 
 /**
@@ -195,12 +174,10 @@ interface ResourceTabsProps {
  * as context, an add control that is a resource picker rather than a plain
  * button, and the active resource's own actions trailing the row. Everything
  * else — fixed tab widths, clipped-title tooltips, the scroll-edge fades,
- * keyboard navigation, drag reordering — comes from the strip, which is the same
- * component the browser and terminal panels nested inside this one use.
+ * keyboard navigation, drag reordering — comes from the strip.
  */
 export function ResourceTabs({
   workspaceId,
-  desktopScopeId,
   chatId,
   resources,
   activeId,
@@ -208,8 +185,6 @@ export function ResourceTabs({
   previewMode,
   onCyclePreviewMode,
   actions,
-  onRequestAddResourceOpen,
-  onAddResourceClose,
 }: ResourceTabsProps) {
   const PreviewModeIcon = PREVIEW_MODE_ICONS[previewMode ?? 'split']
   const nameLookup = useResourceNameLookup(workspaceId, resources.length > 0)
@@ -224,7 +199,6 @@ export function ResourceTabs({
   const removeResource = useRemoveChatResource(chatId)
   const reorderResources = useReorderChatResources(chatId)
 
-  const { confirmTerminalClose, confirmationDialog } = useTerminalCloseConfirmation(desktopScopeId)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const anchorIdRef = useRef<string | null>(null)
   const prevChatIdRef = useRef(chatId)
@@ -249,77 +223,21 @@ export function ResourceTabs({
     anchorIdRef.current = null
   }
 
-  // Browser and terminal tab titles are live page and shell state, owned by
-  // the desktop app; a terminal is named after its settled foreground program.
-  const browserTabs = useBrowserSessionStore((state) => state.sessions[desktopScopeId]?.tabs)
-  const terminalTabs = useCopilotTerminalStore(
-    (state) => state.sessions[desktopScopeId]?.tabs.tabs ?? EMPTY_TERMINAL_TABS
-  )
-  const settledCommands = useSettledTerminalCommands(terminalTabs)
-
-  const tabs = useMemo<TabStripItem[]>(() => {
-    const browserTitles = new Map(browserTabs?.map((tab) => [tab.tabId, browserTabTitle(tab)]))
-    const terminalsById = new Map(
-      terminalTabs.map((tab) => [terminalResourceId(tab.terminalId), tab])
-    )
-    return resources.map((resource) => {
-      const terminal = resource.type === 'terminal' ? terminalsById.get(resource.id) : undefined
-      return {
+  const tabs = useMemo<TabStripItem[]>(
+    () =>
+      resources.map((resource) => ({
         id: resource.id,
-        title:
-          (resource.type === 'browser'
-            ? browserTitles.get(resource.id)
-            : terminal
-              ? terminalTabTitle(terminal, settledCommands)
-              : nameLookup.get(`${resource.type}:${resource.id}`)) ?? resource.title,
-        // A shell's label is a basename, and it may be running something it is
-        // not naming yet, so hovering identifies the directory and program.
-        ...(terminal ? { tooltip: terminalTooltip(terminal) } : {}),
-        icon: getResourceConfig(resource.type).renderTabIcon(
-          resource,
-          'size-[16px] shrink-0',
-          desktopScopeId
-        ),
+        title: nameLookup.get(`${resource.type}:${resource.id}`) ?? resource.title,
+        icon: getResourceConfig(resource.type).renderTabIcon(resource, 'size-[16px] shrink-0'),
         active: activeId === resource.id,
         selected: selectedIds.size > 1 && selectedIds.has(resource.id),
         attention: activityIds?.has(resource.id) ?? false,
-      }
-    })
-  }, [
-    resources,
-    nameLookup,
-    browserTabs,
-    terminalTabs,
-    settledCommands,
-    desktopScopeId,
-    activeId,
-    selectedIds,
-    activityIds,
-  ])
+      })),
+    [resources, nameLookup, activeId, selectedIds, activityIds]
+  )
 
   const handleAdd = useCallback(
     (resource: MothershipResource) => {
-      // A browser tab or terminal is a live page or shell the desktop app
-      // creates; it joins the strip through the tab list rather than as a
-      // resource of its own.
-      if (resource.type === 'browser') {
-        void openBrowserTab(desktopScopeId)
-          .then((state) => {
-            if (state?.activeTabId) selectResource(state.activeTabId)
-          })
-          .catch(() => toast.error('Could not open a new browser tab. Please try again.'))
-        return
-      }
-      if (resource.type === 'terminal') {
-        void openTerminal(undefined, desktopScopeId)
-          .then((state) => {
-            if (!state.activeTerminalId) return
-            selectResource(terminalResourceId(state.activeTerminalId))
-            requestTerminalFocus(state.activeTerminalId)
-          })
-          .catch(() => toast.error('Could not open a new terminal. Please try again.'))
-        return
-      }
       // Opening a resource before the first message is sent is allowed: there
       // is simply no chat to attach it to yet. `onAddResource` queues it and
       // persists once the chat exists, so only the server call is conditional.
@@ -330,11 +248,11 @@ export function ResourceTabs({
       onAddResource(resource)
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [chatId, desktopScopeId, onAddResource, selectResource]
+    [chatId, onAddResource]
   )
 
   const handleSelect = useCallback(
-    (id: string, source?: TabStripSelectionSource, e?: ReactMouseEvent<HTMLButtonElement>) => {
+    (id: string, _source?: TabStripSelectionSource, e?: ReactMouseEvent<HTMLButtonElement>) => {
       const idx = resources.findIndex((r) => r.id === id)
       const resource = resources[idx]
       if (!resource) return
@@ -380,11 +298,6 @@ export function ResourceTabs({
       anchorIdRef.current = resource.id
       setSelectedIds(new Set([resource.id]))
       selectResource(resource.id)
-      // A pointer pick of a shell also hands it the keyboard; arrow-key
-      // navigation along the strip keeps its own focus.
-      if (resource.type === 'terminal' && source !== 'keyboard') {
-        requestTerminalFocus(terminalIdFromResourceId(resource.id))
-      }
     },
     [resources, selectResource, selectedIds, activeId]
   )
@@ -396,35 +309,16 @@ export function ResourceTabs({
       if (!resource) return
       const isMulti = selectedIds.has(resource.id) && selectedIds.size > 1
       const targets = isMulti ? resources.filter((r) => selectedIds.has(r.id)) : [resource]
-      const terminalIds = targets
-        .filter((target) => target.type === 'terminal')
-        .map((target) => terminalIdFromResourceId(target.id))
-      if (!(await confirmTerminalClose(terminalIds))) return
       // Closing the shown tab moves to its neighbour, right then left, so the
-      // strip does not fall back to its last tab and jump. For a desktop tab
-      // this is also the neighbour the desktop app itself picks.
+      // strip does not fall back to its last tab and jump.
       if (!isMulti && activeId === resource.id) {
         const sameKind = new Set(resources.filter((r) => r.type === resource.type).map((r) => r.id))
         const nextId =
           findNearestId(resources, index, sameKind) ?? findNearestId(resources, index, null)
         if (nextId) selectResource(nextId)
       }
-      // A browser tab's page is closed natively and its resource dropped at
-      // once; the tab list then confirms the removal. A shell's close answers
-      // with the tab list, so its resource follows that list instead — a
-      // close the desktop app refuses must not leave a running shell with no
-      // tab.
       for (const r of targets) {
-        if (r.type === 'terminal') {
-          void closeTerminal(terminalIdFromResourceId(r.id), desktopScopeId).catch(() =>
-            toast.error('Could not close that terminal. Please try again.')
-          )
-          continue
-        }
         onRemoveResource(r.type, r.id)
-        if (r.type === 'browser') {
-          sendBrowserPanelAction('close-tab', { tabId: r.id }, desktopScopeId)
-        }
       }
       // Clear stale selection and anchor for all removed targets
       const removedIds = new Set(targets.map((r) => r.id))
@@ -447,22 +341,10 @@ export function ResourceTabs({
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [
-      activeId,
-      chatId,
-      desktopScopeId,
-      onRemoveResource,
-      resources,
-      selectResource,
-      selectedIds,
-      confirmTerminalClose,
-    ]
+    [activeId, chatId, onRemoveResource, resources, selectResource, selectedIds]
   )
 
-  /**
-   * The strip's own title for a resource: a browser tab's live page title, a
-   * terminal's settled program or directory.
-   */
+  /** The strip's own title for a resource. */
   const withStripTitle = useCallback(
     (resource: MothershipResource): MothershipResource => {
       const title = tabs.find((tab) => tab.id === resource.id)?.title
@@ -516,19 +398,6 @@ export function ResourceTabs({
       const [moved] = reordered.splice(fromIndex, 1)
       reordered.splice(targetIndex, 0, moved)
       onReorderResources(reordered)
-      // Browser tabs and terminals are not stored with the chat; their order
-      // lives in the desktop's native lists, which restore and the agent read
-      // back.
-      const nativeIndex = () => reordered.filter((r) => r.type === moved.type).indexOf(moved)
-      if (moved.type === 'browser') {
-        reorderBrowserTab(moved.id, nativeIndex(), desktopScopeId)
-      } else if (moved.type === 'terminal') {
-        void reorderTerminal(
-          terminalIdFromResourceId(moved.id),
-          nativeIndex(),
-          desktopScopeId
-        ).catch(() => toast.error('Could not reorder that terminal. Please try again.'))
-      }
       if (chatId) {
         const persistable = reordered.filter((r) => !isEphemeralResource(r))
         if (persistable.length > 0) {
@@ -537,7 +406,7 @@ export function ResourceTabs({
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [chatId, desktopScopeId, resources, onReorderResources]
+    [chatId, resources, onReorderResources]
   )
 
   const previewToggle =
@@ -560,7 +429,6 @@ export function ResourceTabs({
 
   return (
     <>
-      {confirmationDialog}
       <TabStrip
         tabs={tabs}
         onSelect={handleSelect}
@@ -581,8 +449,6 @@ export function ResourceTabs({
               workspaceId={workspaceId}
               onAdd={handleAdd}
               excludeTypes={ADD_RESOURCE_EXCLUDED_TYPES}
-              onRequestOpen={onRequestAddResourceOpen}
-              onClose={onAddResourceClose}
             />
           </div>
         }

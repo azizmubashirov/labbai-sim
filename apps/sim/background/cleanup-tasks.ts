@@ -4,7 +4,6 @@ import {
   copilotChats,
   copilotRunCheckpoints,
   copilotRuns,
-  mothershipInboxTask,
 } from '@sim/db/schema'
 import { createLogger } from '@sim/logger'
 import { chunkArray } from '@sim/utils/helpers'
@@ -150,24 +149,10 @@ export async function runCleanupTasks(payload: CleanupJobPayload): Promise<void>
     }
   }
 
-  const inboxResult =
-    scope.kind === 'workspace'
-      ? await batchDeleteByWorkspaceAndTimestamp({
-          tableDef: mothershipInboxTask,
-          workspaceIdCol: mothershipInboxTask.workspaceId,
-          timestampCol: mothershipInboxTask.createdAt,
-          workspaceIds,
-          retentionDate,
-          tableName: `${label}/mothershipInboxTask`,
-          dbClient: cleanupDb,
-        })
-      : { deleted: 0, failed: 0 }
-
   const totalDeleted =
     runChildResults.reduce((s, r) => s + r.deleted, 0) +
     runsResult.deleted +
-    chatsResult.deleted +
-    inboxResult.deleted
+    chatsResult.deleted
 
   logger.info(`[${label}] Complete: ${totalDeleted} total rows deleted`)
 

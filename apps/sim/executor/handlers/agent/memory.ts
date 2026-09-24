@@ -16,7 +16,6 @@ import {
 } from '@/lib/execution/durable-secret-provenance'
 import { mergeFileKeys } from '@/lib/execution/payloads/access-keys'
 import { createExecutorPrincipalFromExecutionContext } from '@/lib/internal/principals/executor'
-import { redactObjectStrings } from '@/lib/logs/execution/pii-redaction'
 import {
   appendAgentMemoryMessageUseCase,
   readAgentMemoryItemsUseCase,
@@ -328,7 +327,7 @@ export class Memory {
     const workspaceId = this.requireWorkspaceId(ctx)
     this.validateConversationId(inputs.conversationId)
 
-    message = this.sanitizeMessageForStorage(await this.maskContentForStorage(ctx, message))
+    message = this.sanitizeMessageForStorage(message)
 
     this.validateContent(message.content)
 
@@ -391,11 +390,7 @@ export class Memory {
       messagesToStore = selectConversationTokenWindow(conversationMessages, maxTokens, inputs.model)
     }
 
-    messagesToStore = await Promise.all(
-      messagesToStore.map(async (message) =>
-        this.sanitizeMessageForStorage(await this.maskContentForStorage(ctx, message))
-      )
-    )
+    messagesToStore = messagesToStore.map((message) => this.sanitizeMessageForStorage(message))
 
     const provenance = ctx.resolvedSecretTraceRegistry
       ? this.captureMessagesProvenance(ctx.resolvedSecretTraceRegistry, messagesToStore)
@@ -406,27 +401,6 @@ export class Memory {
       workspaceId,
       count: messagesToStore.length,
     })
-  }
-
-  /**
-   * Handlers persist messages to memory before the executor redacts block
-   * output, so mask content here too when the block-output stage is enabled —
-   * otherwise raw PII is stored in the memory table and read back on later runs.
-   * `onFailure: 'throw'` aborts rather than persisting unredacted content.
-   */
-  private async maskContentForStorage(ctx: ExecutionContext, message: Message): Promise<Message> {
-    if (!ctx.piiBlockOutputRedaction?.enabled || !message.content) {
-      return message
-    }
-    return {
-      ...message,
-      content: await redactObjectStrings(message.content, {
-        entityTypes: ctx.piiBlockOutputRedaction.entityTypes,
-        language: ctx.piiBlockOutputRedaction.language,
-        customPatterns: ctx.piiBlockOutputRedaction.customPatterns,
-        onFailure: 'throw',
-      }),
-    }
   }
 
   private projectMessageForModel(

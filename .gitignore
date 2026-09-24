@@ -24,8 +24,6 @@ package-lock.json
 /apps/**/out/
 /apps/**/.next/
 /apps/**/build
-# apps/desktop/build holds electron-builder INPUTS (icon, entitlements), not outputs
-!/apps/desktop/build
 
 # production
 /build
@@ -62,11 +60,6 @@ next-env.d.ts
 # cursorrules
 # .cursorrules
 
-# docs
-/apps/docs/.source
-/apps/docs/.contentlayer
-/apps/docs/.content-collections
-
 # database instantiation
 **/postgres_data/
 
@@ -93,7 +86,7 @@ start-collector.sh
 # Personal Cursor Skills
 .cursor/skills/ask-sim/
 
-# Python (apps/pii tests/tooling)
+# Python tooling
 __pycache__/
 .pytest_cache/
 

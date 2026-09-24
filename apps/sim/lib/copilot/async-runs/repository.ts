@@ -428,43 +428,6 @@ export async function releaseWorkflowToolExecutionClaim(toolCallId: string, exec
   )
 }
 
-/**
- * Atomically claims a pending client tool exactly once. Native browser actions
- * use this before crossing the Electron boundary so a replayed renderer event
- * cannot click, type, submit, or navigate twice.
- */
-export async function claimPendingAsyncToolCall(toolCallId: string, claimedBy: string) {
-  return await withDbSpan(
-    TraceSpan.CopilotAsyncRunsMarkAsyncToolStatus,
-    'UPDATE',
-    'copilot_async_tool_calls',
-    {
-      [TraceAttr.ToolCallId]: toolCallId,
-      [TraceAttr.CopilotAsyncToolStatus]: ASYNC_TOOL_STATUS.running,
-      [TraceAttr.CopilotAsyncToolClaimedBy]: claimedBy,
-    },
-    async () => {
-      const now = new Date()
-      const [row] = await db
-        .update(copilotAsyncToolCalls)
-        .set({
-          status: ASYNC_TOOL_STATUS.running,
-          claimedBy,
-          claimedAt: now,
-          updatedAt: now,
-        })
-        .where(
-          and(
-            eq(copilotAsyncToolCalls.toolCallId, toolCallId),
-            eq(copilotAsyncToolCalls.status, ASYNC_TOOL_STATUS.pending)
-          )
-        )
-        .returning()
-      return row ?? null
-    }
-  )
-}
-
 interface CompleteAsyncToolCallInput {
   toolCallId: string
   status: Extract<CopilotAsyncToolStatus, 'completed' | 'failed' | 'cancelled'>
@@ -497,23 +460,6 @@ export async function completeAsyncToolCall(input: CompleteAsyncToolCallInput) {
     ASYNC_TOOL_STATUS.pending,
     ASYNC_TOOL_STATUS.running,
   ])
-}
-
-/**
- * Finalizes a client tool only while it remains unclaimed. This is the inverse
- * CAS of `claimPendingAsyncToolCall`: exactly one of a renderer-side preclaim
- * failure or the native authorization claim may transition the pending row.
- */
-export async function completePendingAsyncToolCall(input: CompleteAsyncToolCallInput) {
-  return await completeAsyncToolCallFromStatuses(input, [ASYNC_TOOL_STATUS.pending])
-}
-
-/** Finalizes only the exact native claim that won a pending completion race. */
-export async function completeClaimedAsyncToolCall(
-  input: CompleteAsyncToolCallInput,
-  claimedBy: string
-) {
-  return await completeAsyncToolCallFromStatuses(input, [ASYNC_TOOL_STATUS.running], claimedBy)
 }
 
 /**

@@ -64,13 +64,7 @@ interface StartSelectionRunInput extends TableRunInput {
   limit?: DispatchLimit
 }
 
-interface StartRowEnrichmentInput extends TableRunInput {
-  kind: 'row_enrichment'
-  rowId: string
-  groupId: string
-}
-
-export type StartTableRunInput = StartSelectionRunInput | StartRowEnrichmentInput
+export type StartTableRunInput = StartSelectionRunInput
 
 export interface StartTableRunResult extends TableRunResult {
   dispatchId: string | null
@@ -105,27 +99,6 @@ export const startTableRun = defineAuthorizedTableUseCase({
      * gate — the same answer an executor delegation gets from the funnel.
      */
     const capabilityGovernedUserId = capabilityGovernedPrincipalUserId(principal)
-    if (input.kind === 'row_enrichment') {
-      requireCanonicalGroups(context.table, [input.groupId])
-      const row = await getRowById(context.tableId, input.rowId, context.workspaceId)
-      if (!row) throw new OrchestrationError('not_found', 'Row not found')
-      const result = await runWorkflowColumn({
-        tableId: context.tableId,
-        workspaceId: context.workspaceId,
-        groupIds: [input.groupId],
-        rowIds: [input.rowId],
-        mode: 'all',
-        requestId: requestId(input),
-        triggeredByUserId,
-        capabilityGovernedUserId,
-      })
-      return {
-        table: context.table,
-        dispatchId: result.dispatchId,
-        shouldSignalRowsChanged: result.shouldSignalRowsChanged,
-      }
-    }
-
     if (input.rowIds && input.predicate) {
       throw new OrchestrationError('validation', 'Provide either predicate or rowIds, but not both')
     }

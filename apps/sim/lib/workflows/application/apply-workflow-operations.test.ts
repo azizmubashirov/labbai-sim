@@ -16,7 +16,6 @@ const mocks = vi.hoisted(() => ({
   applyOperations: vi.fn(),
   loadNormalized: vi.fn(),
   normalizeState: vi.fn(),
-  sandboxAccess: vi.fn(),
   blockVisibility: vi.fn(),
   permissionConfig: vi.fn(),
   preValidate: vi.fn(),
@@ -81,9 +80,6 @@ vi.mock('@/lib/workflows/editing/lint', () => ({
     invalidConnectionTargets: [],
   }),
 }))
-vi.mock('@/lib/billing/core/subscription', () => ({
-  hasWorkspaceSandboxAccess: mocks.sandboxAccess,
-}))
 vi.mock('@/lib/core/config/block-visibility', () => ({ getBlockVisibility: mocks.blockVisibility }))
 vi.mock('@/lib/permission-groups/resolve.server', () => ({
   getUserPermissionConfig: mocks.permissionConfig,
@@ -118,7 +114,6 @@ vi.mock('@/lib/workflows/autolayout', () => ({
   transferBlockHeights: vi.fn(),
 }))
 
-import { ForbiddenOperationError } from '@/lib/core/application'
 import { OrchestrationError } from '@/lib/core/orchestration/types'
 import { applyWorkflowOperations } from '@/lib/workflows/application/apply-workflow-operations'
 import { WorkflowOperationsNotAppliedError } from '@/lib/workflows/application/workflow-operations-error'
@@ -174,7 +169,6 @@ describe('applyWorkflowOperations', () => {
     mocks.resolveContext.mockResolvedValue(context)
     mocks.resolvePermission.mockResolvedValue('write')
     workflowAuthzMockFns.mockAssertWorkflowMutable.mockResolvedValue(undefined)
-    mocks.sandboxAccess.mockResolvedValue(true)
     mocks.blockVisibility.mockResolvedValue({ revealed: [], disabled: [], previewTagged: [] })
     mocks.permissionConfig.mockResolvedValue(null)
     mocks.loadNormalized.mockResolvedValue(graph())
@@ -413,36 +407,6 @@ describe('applyWorkflowOperations', () => {
     expect(mocks.notify).not.toHaveBeenCalled()
   })
 
-  /**
-   * The legacy tool threw a bare `Error(MAX_PLAN_REQUIRED)`, which on a public
-   * surface is an unclassified 500.
-   */
-  it('names the plan capability when the workspace cannot use sandboxes', async () => {
-    mocks.sandboxAccess.mockResolvedValue(false)
-
-    const failure = await applyWorkflowOperations
-      .execute({
-        principal: sessionPrincipal,
-        input: {
-          workflowId: 'workflow-1',
-          operations: [
-            {
-              operation_type: 'edit',
-              block_id: 'block-1',
-              params: { inputs: { sandboxId: 'sandbox-1' } },
-            },
-          ],
-        },
-      })
-      .catch((error: unknown) => error)
-
-    expect(failure).toBeInstanceOf(ForbiddenOperationError)
-    expect((failure as ForbiddenOperationError).detailCode).toBe(
-      'WORKSPACE_PLAN_CAPABILITY_REQUIRED'
-    )
-    expect(mocks.replace).not.toHaveBeenCalled()
-  })
-
   it('honours a caller-supplied base graph only for a delegated principal', async () => {
     const baseGraph = graph({ 'block-9': { ...BLOCK, id: 'block-9' } })
 
@@ -456,7 +420,6 @@ describe('applyWorkflowOperations', () => {
     vi.clearAllMocks()
     mocks.resolveContext.mockResolvedValue(context)
     mocks.resolvePermission.mockResolvedValue('write')
-    mocks.sandboxAccess.mockResolvedValue(true)
     mocks.blockVisibility.mockResolvedValue({ revealed: [], disabled: [], previewTagged: [] })
     mocks.permissionConfig.mockResolvedValue(null)
     mocks.loadNormalized.mockResolvedValue(graph())

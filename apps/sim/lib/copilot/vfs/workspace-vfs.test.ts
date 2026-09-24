@@ -135,16 +135,16 @@ describe('WorkspaceVFS dynamic render reads', () => {
   it('marks render exceptions as file read errors', async () => {
     const vfs = arrangeRenderRead()
     renderDocToGrid.mockRejectedValue(
-      new Error('Document compiler not configured (MOTHERSHIP_E2B_DOC_TEMPLATE_ID is unset)')
+      new Error('Document render failed: compiler unavailable')
     )
 
     const result = await vfs.readFileContent('files/brief.pdf/render')
 
     expect(result).toEqual({
       content:
-        '{"ok":false,"error":"Document compiler not configured (MOTHERSHIP_E2B_DOC_TEMPLATE_ID is unset)"}',
+        '{"ok":false,"error":"Document render failed: compiler unavailable"}',
       totalLines: 1,
-      error: 'Document compiler not configured (MOTHERSHIP_E2B_DOC_TEMPLATE_ID is unset)',
+      error: 'Document render failed: compiler unavailable',
     })
   })
 

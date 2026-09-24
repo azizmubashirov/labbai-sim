@@ -31,7 +31,6 @@ import {
 } from '@/lib/copilot/request/session/file-preview-session-contract'
 import { isStreamBatchEvent, type StreamBatchEvent } from '@/lib/copilot/request/session/types'
 import { type MothershipResource, MothershipResourceType } from '@/lib/copilot/resources/types'
-import { suspendDesktopChatScopes } from '@/lib/desktop/chat-scope'
 import { useMothershipQueueStore } from '@/stores/mothership-queue/store'
 
 export interface MothershipChatMetadata {
@@ -335,7 +334,6 @@ export function useDeleteMothershipChat(owner?: MothershipChatOwner) {
   return useMutation({
     mutationFn: deleteChat,
     onSuccess: async (_data, chatId) => {
-      await suspendDesktopChatScopes(chatId)
       queryClient.removeQueries({ queryKey: mothershipChatKeys.detail(chatId) })
       useMothershipQueueStore.getState().clearChat(chatId)
     },
@@ -377,7 +375,6 @@ export function useDeleteMothershipChats(owner?: MothershipChatOwner) {
       const results = await Promise.allSettled(
         chatIds.map(async (chatId) => {
           await deleteChat(chatId)
-          await suspendDesktopChatScopes(chatId)
           queryClient.removeQueries({ queryKey: mothershipChatKeys.detail(chatId) })
           useMothershipQueueStore.getState().clearChat(chatId)
         })

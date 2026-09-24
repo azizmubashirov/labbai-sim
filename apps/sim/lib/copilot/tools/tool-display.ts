@@ -130,10 +130,6 @@ function splitTableTitle(name: string, args: ToolArgs): string {
       if (is('read', 'get', 'list')) return `Reading automations${ofTable}`
       if (is('delete')) return `Removing automation${inTable}`
       return `Wiring automation${inTable}`
-    case 'table_enrichments':
-      if (is('read', 'get', 'list')) return `Reading enrichments${ofTable}`
-      if (is('delete')) return `Removing enrichment${inTable}`
-      return `Configuring enrichment${suffix}${inTable}`
     case 'table_views':
       if (is('create')) return `Creating view${suffix}${inTable}`
       if (is('delete')) return `Deleting view${suffix}${inTable}`
@@ -359,16 +355,6 @@ function searchKnowledgeBaseTitle(args: ToolArgs): string {
   return query ? `Searching knowledge base for ${query}` : 'Searching knowledge base'
 }
 
-function manageSandboxTitle(args: ToolArgs): string {
-  const titles: Record<string, string> = {
-    add: 'Creating sandbox',
-    edit: 'Updating sandbox',
-    delete: 'Deleting sandbox',
-    list: 'Listing sandboxes',
-  }
-  return titles[stringArg(args, 'operation')] ?? 'Managing sandbox'
-}
-
 function userTableTitle(args: ToolArgs): string {
   const operation = stringArg(args, 'operation')
   const operationArgs = recordArg(args, 'args')
@@ -439,10 +425,6 @@ function userTableTitle(args: ToolArgs): string {
       return 'Cancelling table runs'
     case 'list_workflow_outputs':
       return 'Listing workflow outputs'
-    case 'list_enrichments':
-      return 'Listing enrichments'
-    case 'add_enrichment':
-      return `Adding ${name || 'enrichment'}`
     default:
       return 'Managing table'
   }
@@ -562,7 +544,6 @@ const TOOL_TITLES: Record<string, string> = {
   table_rows: 'Editing rows',
   table_columns: 'Editing columns',
   table_automations: 'Wiring automation',
-  table_enrichments: 'Configuring enrichment',
   table_views: 'Editing views',
   prepare_file_edit: 'Editing file',
   apply_file_edit: 'Writing changes',
@@ -606,7 +587,6 @@ const TOOL_TITLES: Record<string, string> = {
   load_deployment: 'Loading deployment',
   save_upload: 'Saving upload',
   connect_slack_bot: 'Connecting Slack bot',
-  manage_sandbox: 'Managing sandbox',
   move_file: 'Moving file',
   move_file_folder: 'Moving folder',
   move_workflow: 'Moving workflow',
@@ -625,28 +605,6 @@ const TOOL_TITLES: Record<string, string> = {
   set_global_workflow_variables: 'Setting workflow variables',
   update_deployment_version: 'Updating deployment',
   update_workspace_mcp_server: 'Updating MCP server',
-  // Browser agent tools without an argument-aware title.
-  browser_go_back: 'Going back',
-  browser_go_forward: 'Going forward',
-  browser_reload: 'Reloading page',
-  browser_switch_tab: 'Switching tab',
-  browser_close_tab: 'Closing tab',
-  browser_list_tabs: 'Listing tabs',
-  browser_list_sessions: 'Checking signed-in sites',
-  browser_list_downloads: 'Checking downloads',
-  browser_snapshot: 'Scanning page',
-  browser_find: 'Finding page element',
-  browser_read_text: 'Reading page',
-  browser_screenshot: 'Taking screenshot',
-  browser_click: 'Clicking element',
-  browser_click_at: 'Clicking point',
-
-  browser_drag: 'Dragging element',
-  browser_select_option: 'Selecting option',
-  browser_fill_form: 'Filling form',
-  browser_set_checked: 'Updating control',
-  browser_hover: 'Hovering element',
-  browser_zoom: 'Changing page zoom',
   // Subagent trigger tools, when surfaced as a tool call.
   workflow: 'Workflow Agent',
   run: 'Run Agent',
@@ -661,7 +619,6 @@ const TOOL_TITLES: Record<string, string> = {
   platform: 'Platform Agent',
   file: 'File Agent',
   media: 'Media Agent',
-  browser: 'Browser Agent',
   superagent: 'Executing action',
   respond: 'Gathering thoughts',
   context_compaction: CONTEXT_COMPACTION_DISPLAY_TITLE,
@@ -764,13 +721,10 @@ export function getWaitCountdownTitle(args: ToolArgs, elapsedMs: number): string
   return formatWaitTitle(remaining, stringArg(args, 'reason'))
 }
 
-/** Past this a command wraps the row; the terminal panel still shows it in full. */
-const MAX_COMMAND_TITLE_LENGTH = 48
-
 /**
  * Budget for a quoted value embedded in a title.
  *
- * Much shorter than {@link MAX_COMMAND_TITLE_LENGTH}: these rows carry a
+ * Kept short: these rows carry a
  * subagent prefix ("Workflow Agent — ") plus a verb phrase ("Searched Sim docs
  * for ") ahead of the value, and quotes and an ellipsis cost five more columns —
  * roughly 44 characters of fixed overhead before the value starts. The chat pane
@@ -779,47 +733,6 @@ const MAX_COMMAND_TITLE_LENGTH = 48
  * query runs well past any of this if left alone.
  */
 const MAX_QUOTED_TITLE_VALUE_LENGTH = 32
-
-function runningCommandTitle(rawCommand: string): string {
-  const command = rawCommand.replace(/\s+/g, ' ')
-  if (!command) return 'Running command'
-  const shortened =
-    command.length > MAX_COMMAND_TITLE_LENGTH
-      ? `${command.slice(0, MAX_COMMAND_TITLE_LENGTH - 1)}…`
-      : command
-  return `Running ${shortened}`
-}
-
-const TERMINAL_OPERATION_TITLES: Record<string, string> = {
-  read: 'Reading terminal',
-  input: 'Typing into terminal',
-  kill: 'Stopping command',
-  cwd: 'Checking terminal',
-  list: 'Listing terminals',
-  new: 'Opening terminal',
-  switch: 'Switching terminal',
-  close: 'Closing terminal',
-  panes: 'Listing tmux panes',
-}
-
-/**
- * The terminal tool carries what it does in `operation`, so the row title has
- * to come from the arguments rather than the tool name — otherwise every shell
- * action in the transcript reads simply "Terminal".
- */
-function terminalTitle(args: ToolArgs): string {
-  const operation = stringArg(args, 'operation')
-  const nested = args?.args
-  const inner: ToolArgs = isRecordLike(nested) ? (nested as Record<string, unknown>) : undefined
-  if (operation === 'run') return runningCommandTitle(stringArg(inner, 'command'))
-  if (operation === 'handoff') {
-    // Matches the browser takeover row: the reason is the whole point of the
-    // row, since it is what the user has to act on.
-    const reason = stringArg(inner, 'reason')
-    return reason ? `Waiting for you: ${reason}` : 'Waiting for you in the terminal'
-  }
-  return TERMINAL_OPERATION_TITLES[operation] ?? 'Using terminal'
-}
 
 /**
  * Resolve a tool-call display title from its name and arguments. Argument-aware
@@ -849,13 +762,10 @@ export function getToolDisplayTitle(name: string, args?: Record<string, unknown>
     case 'table_rows':
     case 'table_columns':
     case 'table_automations':
-    case 'table_enrichments':
     case 'table_views':
       return splitTableTitle(name, args)
     case 'search_knowledge_base':
       return searchKnowledgeBaseTitle(args)
-    case 'manage_sandbox':
-      return manageSandboxTitle(args)
     case 'user_table':
       return userTableTitle(args)
     case 'save_upload':
@@ -872,29 +782,6 @@ export function getToolDisplayTitle(name: string, args?: Record<string, unknown>
       return `Steering ${humanizeAgentId(stringArg(args, 'agent_id')) || 'agent'}`
     case 'interrupt_agent':
       return `Stopping ${humanizeAgentId(stringArg(args, 'agent_id')) || 'agent'}`
-    case 'terminal':
-      return terminalTitle(args)
-    // The surface used to be one tool per operation. Conversations recorded
-    // then still reference those names, so they keep their titles rather than
-    // regressing to a humanized "Terminal Run".
-    case 'terminal_run':
-      return runningCommandTitle(stringArg(args, 'command'))
-    case 'terminal_read':
-      return 'Reading terminal'
-    case 'terminal_input':
-      return 'Typing into terminal'
-    case 'terminal_kill':
-      return 'Stopping command'
-    case 'terminal_cwd':
-      return 'Checking terminal'
-    case 'terminal_list':
-      return 'Listing terminals'
-    case 'terminal_new':
-      return 'Opening terminal'
-    case 'terminal_switch':
-      return 'Switching terminal'
-    case 'terminal_close':
-      return 'Closing terminal'
     case 'restore_resource': {
       const type = stringArg(args, 'type')
       return `Restoring ${type ? resourceTypeLabel(type) : 'resource'}`
@@ -1017,60 +904,13 @@ export function getToolDisplayTitle(name: string, args?: Record<string, unknown>
       const skill = firstStringArg(args, 'name', 'skillId', 'skill')
       return skill ? `Loading skill ${skill}` : 'Loading skill'
     }
-    case 'run_enrichment': {
-      const subject = nestedStringArg(
-        args,
-        'inputs',
-        'fullName',
-        'companyName',
-        'domain',
-        'email',
-        'companyDomain'
-      )
-      return subject ? `Looking up ${subject}` : 'Looking up data'
-    }
     case 'web_scrape': {
       const url = stringArg(args, 'url')
       return url ? `Scraping ${url}` : 'Scraping page'
     }
-    case 'browser_navigate': {
-      const url = displayUrl(stringArg(args, 'url'))
-      return url ? `Opening ${url}` : 'Opening page'
-    }
-    case 'browser_open_url': {
-      const url = displayUrl(stringArg(args, 'url'))
-      return url ? `Opening ${url}` : 'Opening page'
-    }
-    case 'browser_open_tab': {
-      const url = displayUrl(stringArg(args, 'url'))
-      return url ? `Opening ${url} in a new tab` : 'Opening new tab'
-    }
-    case 'browser_wait_for': {
-      const text = stringArg(args, 'text')
-      const state = stringArg(args, 'state')
-      const url = stringArg(args, 'urlContains')
-      if (text) return `Waiting for "${text}"`
-      if (state) return `Waiting for element to be ${state}`
-      return url ? `Waiting for ${displayUrl(url)}` : 'Waiting for page'
-    }
-    case 'browser_find': {
-      const query = stringArg(args, 'query')
-      return query ? `Finding "${truncateMiddle(query, 32)}"` : 'Finding page element'
-    }
-    case 'browser_set_checked': {
-      return args?.checked === false ? 'Unchecking control' : 'Checking control'
-    }
-    case 'browser_zoom': {
-      const action = stringArg(args, 'action')
-      if (action === 'in') return 'Zooming in'
-      if (action === 'out') return 'Zooming out'
-      return action === 'reset' ? 'Resetting page zoom' : 'Changing page zoom'
-    }
     case 'generate_image':
-    case 'generate_video':
     case 'generate_audio': {
-      const kind =
-        name === 'generate_image' ? 'image' : name === 'generate_video' ? 'video' : 'audio'
+      const kind = name === 'generate_image' ? 'image' : 'audio'
       const target =
         firstStringArg(args, 'toolTitle', 'title') ||
         (stringArg(args, 'path') ? pathLeaf(stringArg(args, 'path')) : '')
@@ -1097,28 +937,6 @@ export function getToolDisplayTitle(name: string, args?: Record<string, unknown>
     case 'run_code': {
       const title = stringArg(args, 'title')
       return title || 'Running code'
-    }
-    case 'browser_type':
-    case 'browser_insert_text': {
-      const verb = name === 'browser_type' ? 'Typing' : 'Inserting'
-      const text = stringArg(args, 'text')
-      return text ? `${verb} "${truncateMiddle(text, 32)}"` : `${verb} text`
-    }
-    case 'browser_press_key': {
-      const key = stringArg(args, 'key')
-      return key ? `Pressing ${key}` : 'Pressing key'
-    }
-    case 'browser_scroll': {
-      const direction = stringArg(args, 'direction')
-      return direction ? `Scrolling ${direction}` : 'Scrolling page'
-    }
-    case 'browser_extract': {
-      const instruction = stringArg(args, 'instruction')
-      return instruction ? `Extracting ${instruction}` : 'Extracting page data'
-    }
-    case 'browser_request_takeover': {
-      const reason = stringArg(args, 'reason')
-      return reason ? `Waiting for you: ${reason}` : 'Waiting for you in the browser'
     }
     case 'web_crawl': {
       const url = stringArg(args, 'url')
@@ -1482,9 +1300,6 @@ export function getToolStatusDisplayTitle(
 ): string {
   const description = normalizeToolActivityDescription(activityDescription)
   title = description ?? title
-  if (status === 'success' && toolName === 'browser_request_takeover') {
-    return 'Resumed browser control'
-  }
   if (status === 'success') {
     return getToolCompletedTitle(title) ?? title
   }

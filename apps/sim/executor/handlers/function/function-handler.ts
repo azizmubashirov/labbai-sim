@@ -86,7 +86,6 @@ export class FunctionBlockHandler implements BlockHandler {
       ...(sourceCode ? { sourceCode } : {}),
       language: inputs.language || DEFAULT_CODE_LANGUAGE,
       timeout,
-      ...(inputs.sandboxId ? { sandboxId: inputs.sandboxId } : {}),
       ...(secretMountPolicy ?? {}),
       ...(unredactedSecretNames.length > 0 ? { unredactedSecretNames } : {}),
       envVars: normalizeStringRecord(ctx.environmentVariables),

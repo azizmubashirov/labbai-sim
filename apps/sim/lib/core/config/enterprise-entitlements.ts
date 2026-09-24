@@ -32,9 +32,7 @@ export type EnterpriseFeature =
   | 'dataDrains'
   | 'dataRetention'
   | 'forking'
-  | 'inbox'
   | 'organizations'
-  | 'sandboxes'
   | 'scim'
   | 'sessionPolicies'
   | 'sso'
@@ -65,11 +63,6 @@ export type EnterpriseFeature =
  *   and it discloses every member's spend, so it stays opt-in rather than
  *   appearing unannounced on upgrade.
  *
- * `sandboxes` is deliberately `false`. A remote Function provider and immutable
- * base are operational prerequisites, so a billing-free deployment must opt in
- * through either the Enterprise pair or the Sandbox-specific pair. This keeps a
- * settings surface from appearing when the deployment cannot execute it.
- *
  * Do not "tidy" these to a uniform value. Each records observed prior behavior,
  * and changing one silently alters a live deployment on upgrade.
  */
@@ -80,9 +73,7 @@ export const ENTERPRISE_FEATURE_LEGACY_DEFAULTS: Readonly<Record<EnterpriseFeatu
   dataDrains: false,
   dataRetention: false,
   forking: false,
-  inbox: true,
   organizations: false,
-  sandboxes: false,
   scim: false,
   sessionPolicies: true,
   sso: false,
@@ -109,26 +100,4 @@ export function resolveEnterpriseEntitlement({
   legacyDefault,
 }: ResolveEnterpriseEntitlementParams): boolean {
   return explicit ?? (masterEnabled || legacyDefault)
-}
-
-interface ResolveSandboxFeatureAvailabilityParams {
-  /** Whether hosted subscription enforcement supplies the deployment entitlement. */
-  billingEnabled: boolean
-  /** Enterprise-master or Sandbox-specific deployment entitlement. */
-  deploymentEntitled: boolean
-  /** Server-verified provider readiness or its public browser projection. */
-  remoteProviderEnabled: boolean
-}
-
-/**
- * Combines Sandbox entitlement with runtime capability. Neither dimension may
- * substitute for the other: a plan cannot create a provider, and provider
- * credentials cannot grant a workspace feature by themselves.
- */
-export function resolveSandboxFeatureAvailability({
-  billingEnabled,
-  deploymentEntitled,
-  remoteProviderEnabled,
-}: ResolveSandboxFeatureAvailabilityParams): boolean {
-  return remoteProviderEnabled && (billingEnabled || deploymentEntitled)
 }

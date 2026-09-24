@@ -4,16 +4,12 @@
  */
 
 import { resolvePrincipalSubject } from '@sim/auth/principal'
-import { db } from '@sim/db'
-import { organization, workspace } from '@sim/db/schema'
 import { createLogger } from '@sim/logger'
 import { getErrorMessage, redactBoundParameters } from '@sim/utils/errors'
 import { filterUndefined, isPlainRecord, isRecordLike } from '@sim/utils/object'
 import { mergeSubblockStateWithValues } from '@sim/workflow-persistence/subblocks'
 import type { Edge } from '@xyflow/react'
-import { eq } from 'drizzle-orm'
 import { z } from 'zod'
-import { type EffectivePiiRedaction, resolveEffectivePiiRedaction } from '@/lib/billing/retention'
 import {
   getExecutionDeadlineAt,
   getTimeoutErrorMessage,
@@ -28,8 +24,6 @@ import { connectExecutionSignalHub } from '@/lib/execution/execution-signal'
 import { warmLargeValueRefs } from '@/lib/execution/payloads/hydration'
 import { parseLargeExecutionValue } from '@/lib/execution/payloads/large-execution-value'
 import type { LoggingSession } from '@/lib/logs/execution/logging-session'
-import { redactLargeValueRefsInValue } from '@/lib/logs/execution/pii-large-values'
-import { redactObjectStrings } from '@/lib/logs/execution/pii-redaction'
 import { buildTraceSpans } from '@/lib/logs/execution/trace-spans/trace-spans'
 import { resolveActiveWorkflowApplicationContext } from '@/lib/workflows/application/context'
 import { waitForChildRuns } from '@/lib/workflows/custom-blocks/child-execution'
@@ -198,22 +192,6 @@ function parseVariableValueByType(value: unknown, type: string): unknown {
 
   // string or plain
   return typeof value === 'string' ? value : String(value)
-}
-
-function restoreBlockStateSecretProvenance(
-  redacted: SerializableExecutionState['blockStates'],
-  original: SerializableExecutionState['blockStates']
-): SerializableExecutionState['blockStates'] {
-  for (const [blockId, originalState] of Object.entries(original)) {
-    const redactedState = redacted[blockId]
-    if (redactedState && originalState.resolvedSecretTraceProvenance) {
-      redacted[blockId] = {
-        ...redactedState,
-        resolvedSecretTraceProvenance: originalState.resolvedSecretTraceProvenance,
-      }
-    }
-  }
-  return redacted
 }
 
 type ExecutionErrorWithFinalizationFlag = Error & {
@@ -870,100 +848,6 @@ async function executeWorkflowCoreImpl(
       allowLargeValueWorkflowScope,
     })
 
-    // Resolve the org/workspace PII redaction policy once; serves both the input
-    // stage (below) and the block-outputs stage (threaded into the executor).
-    // Stored rules are the source of truth; absence yields the disabled default
-    // with one indexed lookup and no masking cost for non-PII organizations.
-    const [row] = await withDatabaseReadRetry(
-      () =>
-        db
-          .select({ orgSettings: organization.dataRetentionSettings })
-          .from(workspace)
-          .leftJoin(organization, eq(organization.id, workspace.organizationId))
-          .where(eq(workspace.id, providedWorkspaceId))
-          .limit(1),
-      { label: 'resolvePiiRedactionPolicy' }
-    )
-    const piiRedaction: EffectivePiiRedaction = resolveEffectivePiiRedaction({
-      orgSettings: row?.orgSettings,
-      workspaceId: providedWorkspaceId,
-    })
-
-    if (piiRedaction.input.enabled) {
-      // Redact the input before the workflow sees it. `onFailure: 'throw'` aborts
-      // the run (handled by the surrounding catch) rather than feeding a scrub
-      // marker into execution or leaking unredacted input. A large input may
-      // already be offloaded to a large-value ref (opaque to the string walk), so
-      // hydrate → mask → re-store refs first, then mask inline strings.
-      const inputOpts = {
-        entityTypes: piiRedaction.input.entityTypes,
-        language: piiRedaction.input.language,
-        customPatterns: piiRedaction.input.customPatterns,
-        onFailure: 'throw' as const,
-      }
-      processedInput = await redactLargeValueRefsInValue(processedInput, {
-        ...inputOpts,
-        store: {
-          workspaceId: providedWorkspaceId,
-          workflowId,
-          executionId,
-          largeValueExecutionIds,
-          largeValueKeys,
-          allowLargeValueWorkflowScope,
-          userId: userId ?? undefined,
-        },
-      })
-      processedInput = await redactObjectStrings(processedInput, inputOpts)
-    }
-
-    if (piiRedaction.blockOutputs.enabled) {
-      // Resume / run-from-block restore prior block outputs into state. If those
-      // predate the blockOutputs stage being enabled, re-mask them so downstream
-      // blocks can't read unredacted PII from restored snapshot state. Masking is
-      // idempotent, so outputs already masked in the original run are unaffected.
-      //
-      // Two disjoint passes cover the whole state: `redactLargeValueRefsInValue`
-      // hydrates → masks → re-stores any value offloaded to large-value storage
-      // (>8MB refs the string walk treats as opaque), then `redactObjectStrings`
-      // masks the remaining inline string leaves. Both fail-fast (`throw`), so an
-      // unmaskable restored value aborts the resume rather than warming raw PII
-      // into `blockStates` for downstream blocks.
-      const blockOutputOpts = {
-        entityTypes: piiRedaction.blockOutputs.entityTypes,
-        language: piiRedaction.blockOutputs.language,
-        customPatterns: piiRedaction.blockOutputs.customPatterns,
-        onFailure: 'throw' as const,
-      }
-      const largeRefOpts = {
-        ...blockOutputOpts,
-        store: {
-          workspaceId: providedWorkspaceId,
-          workflowId,
-          executionId,
-          largeValueExecutionIds,
-          largeValueKeys,
-          allowLargeValueWorkflowScope,
-          userId: userId ?? undefined,
-        },
-      }
-      if (snapshot.state?.blockStates) {
-        const originalBlockStates = snapshot.state.blockStates
-        const hydrated = await redactLargeValueRefsInValue(originalBlockStates, largeRefOpts)
-        snapshot.state.blockStates = restoreBlockStateSecretProvenance(
-          await redactObjectStrings(hydrated, blockOutputOpts),
-          originalBlockStates
-        )
-      }
-      if (runFromBlock?.sourceSnapshot?.blockStates) {
-        const originalBlockStates = runFromBlock.sourceSnapshot.blockStates
-        const hydrated = await redactLargeValueRefsInValue(originalBlockStates, largeRefOpts)
-        runFromBlock.sourceSnapshot.blockStates = restoreBlockStateSecretProvenance(
-          await redactObjectStrings(hydrated, blockOutputOpts),
-          originalBlockStates
-        )
-      }
-    }
-
     let startRunMetadata: StartBlockRunMetadata | undefined
     if (resolvedTriggerBlockId) {
       const entryBlock = serializedWorkflow.blocks.find(
@@ -1024,7 +908,6 @@ async function executeWorkflowCoreImpl(
       },
       isDeployedContext: metadata.useDraftState !== true,
       enforceCredentialAccess: metadata.enforceCredentialAccess ?? false,
-      piiBlockOutputRedaction: piiRedaction.blockOutputs,
       onBlockStart: wrappedOnBlockStart,
       onBlockComplete: wrappedOnBlockComplete,
       onStream,

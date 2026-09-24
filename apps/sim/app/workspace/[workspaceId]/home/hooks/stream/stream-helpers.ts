@@ -223,7 +223,6 @@ export function resolveIntegrationToolDisplayTitle(tool: {
 const TABLE_SCOPED_TOOL_IDS = new Set<string>([
   'table_automations',
   'table_columns',
-  'table_enrichments',
   'table_manage',
   'table_rows',
   'table_views',

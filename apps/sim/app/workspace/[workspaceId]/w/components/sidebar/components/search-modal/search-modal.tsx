@@ -40,7 +40,6 @@ import { Command } from 'cmdk'
 import { useParams, useRouter } from 'next/navigation'
 import { usePostHog } from 'posthog-js/react'
 import { createPortal } from 'react-dom'
-import { supportsAtomicBrowserPanelOcclusion } from '@/lib/browser-agent/transport'
 import { useDeploymentShape } from '@/lib/core/config/deployment-shape'
 import { MothershipHandoffStorage } from '@/lib/core/utils/browser-storage'
 import { getFolderPathNames } from '@/lib/folders/tree'
@@ -160,7 +159,6 @@ function SearchModalContent({
   const currentWorkflowId = params.workflowId as string | undefined
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
-  const atomicBrowserOcclusion = supportsAtomicBrowserPanelOcclusion()
   const nativeSurfaceReady = useNativeSurfaceOcclusionReady(true, 'modal')
   const visuallyOpen = nativeSurfaceReady
   const { navigateToSettings } = useSettingsNavigation()
@@ -1394,7 +1392,7 @@ function SearchModalContent({
                 ref={inputRef}
                 surface='palette'
                 cycleResultsOnTab={!chatEnabled}
-                autoFocus={!atomicBrowserOcclusion}
+                autoFocus
                 aria-label={askMode ? 'Ask Sim' : 'Search anything'}
                 value={search}
                 onValueChange={handleSearchChange}

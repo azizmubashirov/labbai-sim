@@ -16,7 +16,7 @@ function items(tools: ToolCallData[]): AgentGroupItem[] {
   return tools.map((data) => ({ type: 'tool', data }))
 }
 
-describe.each(['mothership', 'workflow', 'browser', 'deploy'])('%s activity', (agentName) => {
+describe.each(['mothership', 'workflow', 'deploy'])('%s activity', (agentName) => {
   let root: Root
   let container: HTMLDivElement
   beforeEach(() => {
@@ -224,12 +224,12 @@ describe.each(['mothership', 'workflow', 'browser', 'deploy'])('%s activity', (a
       [
         tool('first', 'success'),
         { ...tool('second', 'success'), toolName: 'grep' },
-        { ...tool('third', 'success'), toolName: 'terminal_run' },
+        { ...tool('third', 'success'), toolName: 'run_code' },
         { ...tool('fourth', 'success'), toolName: 'run_workflow' },
       ],
       false
     )
-    expect(header()?.textContent).toBe('Read files, searched files, ran commands +1 more')
+    expect(header()?.textContent).toBe('Read files, searched files, ran code +1 more')
     const trigger = container.querySelector<HTMLElement>('[role="button"]')!
     act(() => trigger.click())
     expect(container.querySelector('[data-state="open"]')?.textContent).toBe(

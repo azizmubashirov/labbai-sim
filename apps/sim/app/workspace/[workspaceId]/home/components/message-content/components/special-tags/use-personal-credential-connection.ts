@@ -14,7 +14,6 @@ import {
   readLatestOAuthChatAttempt,
   setOAuthChatAttemptStatus,
 } from '@/lib/credentials/oauth-chat-attempt'
-import { getDesktopBridge } from '@/lib/desktop'
 import { resolveOAuthServiceForSlug } from '@/lib/integrations/oauth-service'
 import {
   usePersonalCredentials,
@@ -146,19 +145,16 @@ export function usePersonalCredentialConnection({
 
   const connectOAuth = useCallback(async () => {
     if (starting.current || !credentials.isSuccess || start.isPending) return
-    const desktop = getDesktopBridge()
     if (pending && popup.current && !popup.current.closed) {
       popup.current.focus()
       return
     }
-    const tab = desktop?.openExternal
-      ? null
-      : window.open('about:blank', '_blank', 'width=600,height=700')
-    if (!tab && !desktop?.openExternal) {
+    const tab = window.open('about:blank', '_blank', 'width=600,height=700')
+    if (!tab) {
       toast.error('Allow pop-ups to connect your account.')
       return
     }
-    if (tab) tab.opener = null
+    tab.opener = null
     popup.current = tab
     starting.current = true
     const fresh = await credentials.refetch({ cancelRefetch: false })
@@ -184,14 +180,7 @@ export function usePersonalCredentialConnection({
             setOAuthChatAttemptStatus(next.id, 'failed')
             return
           }
-          if (desktop?.openExternal) {
-            void desktop
-              .openExternal(target.href)
-              .then((opened) => {
-                if (!opened) setOAuthChatAttemptStatus(next.id, 'failed')
-              })
-              .catch(() => setOAuthChatAttemptStatus(next.id, 'failed'))
-          } else if (tab && !tab.closed) tab.location.href = target.href
+          if (!tab.closed) tab.location.href = target.href
         },
         onError: () => {
           starting.current = false

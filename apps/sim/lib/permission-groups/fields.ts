@@ -291,13 +291,6 @@ export const PERMISSION_GROUP_FIELDS = {
     category: 'Credentials & Access',
     hint: 'Revoke workspace API keys. Members cannot list, create, or revoke one.',
   }),
-  hideInboxTab: booleanRestriction('capability', {
-    scope: 'workspace',
-    id: 'hide-inbox',
-    label: 'Sim Mailer',
-    category: 'Modules',
-    hint: 'Revoke the Sim Mailer inbox. Members cannot read or send mail.',
-  }),
   hideFilesTab: booleanRestriction('capability', {
     scope: 'workspace',
     id: 'hide-files',
@@ -484,13 +477,6 @@ export const PERMISSION_GROUP_FIELDS = {
     label: 'Tool Auto-Approval',
     category: 'Tools',
     hint: 'Prevent silencing a tool confirmation, so every call is confirmed again.',
-  }),
-  hideSandboxesTab: booleanRestriction('capability', {
-    scope: 'workspace',
-    id: 'hide-sandboxes',
-    label: 'Sandboxes',
-    category: 'Modules',
-    hint: 'Revoke the Sandboxes module. Members cannot view, create, or change a workspace sandbox.',
   }),
   disableOAuthAppAccess: booleanRestriction('capability', {
     scope: 'workspace-or-organization',

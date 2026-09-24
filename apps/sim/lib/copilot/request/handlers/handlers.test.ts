@@ -222,44 +222,6 @@ describe('sse-handlers tool lifecycle', () => {
     )
   })
 
-  it('pre-persists browser tools as pending for the desktop authorization claim', async () => {
-    isSimExecuted.mockReturnValue(false)
-    context.runId = 'run-1'
-
-    await prePersistClientExecutableToolCall(
-      {
-        type: MothershipStreamV1EventType.tool,
-        payload: {
-          toolCallId: 'browser-tool-1',
-          toolName: 'browser_list_tabs',
-          arguments: {},
-          executor: MothershipStreamV1ToolExecutor.client,
-          mode: MothershipStreamV1ToolMode.async,
-          phase: MothershipStreamV1ToolPhase.call,
-        },
-      } satisfies StreamEvent,
-      context,
-      {},
-      execContext
-    )
-
-    expect(upsertAsyncToolCall).toHaveBeenCalledWith({
-      runId: 'run-1',
-      toolCallId: 'browser-tool-1',
-      toolName: 'browser_list_tabs',
-      args: {},
-      sealedContext: { __sealedClientToolContextV1: 'sealed-context' },
-      status: MothershipStreamV1AsyncToolRecordStatus.pending,
-    })
-    expect(sealClientToolContext).toHaveBeenCalledWith({
-      toolCallId: 'browser-tool-1',
-      runId: 'run-1',
-      userId: 'user-1',
-      registry: execContext.resolvedSecretTraceRegistry,
-      toolInput: {},
-    })
-  })
-
   it('persists a gated sim tool and stamps the frame so a reload can still answer it', async () => {
     toolRequiresApproval.mockReturnValue(true)
     context.runId = 'run-1'
@@ -383,7 +345,7 @@ describe('sse-handlers tool lifecycle', () => {
     expect(upsertAsyncToolCall).not.toHaveBeenCalled()
   })
 
-  it('keeps non-browser client tools in the established running state', async () => {
+  it('keeps client tools in the established running state', async () => {
     isSimExecuted.mockReturnValue(false)
     context.runId = 'run-1'
 
@@ -918,94 +880,6 @@ describe('sse-handlers tool lifecycle', () => {
     await Promise.allSettled(context.pendingToolPromises.values())
 
     expect(executeTool).not.toHaveBeenCalled()
-  })
-
-  it('waits for the desktop client when a static VFS read is explicitly user-local', async () => {
-    waitForClientToolCompletion.mockResolvedValueOnce({
-      status: 'success',
-      message: 'Read {{SECRET}}',
-      data: { content: '{{SECRET}}', totalLines: 1 },
-    })
-    const onEvent = vi.fn()
-
-    await sseHandlers.tool(
-      {
-        type: MothershipStreamV1EventType.tool,
-        payload: {
-          toolCallId: 'tool-user-local-read',
-          toolName: 'read',
-          arguments: { path: 'user-local/Project--mount/README.md' },
-          executor: MothershipStreamV1ToolExecutor.client,
-          mode: MothershipStreamV1ToolMode.async,
-          phase: MothershipStreamV1ToolPhase.call,
-        },
-      } satisfies StreamEvent,
-      context,
-      execContext,
-      { onEvent, interactive: true, timeout: 1000 }
-    )
-
-    await Promise.allSettled(context.pendingToolPromises.values())
-
-    expect(waitForClientToolCompletion).toHaveBeenCalledWith({
-      toolCallId: 'tool-user-local-read',
-      runId: context.runId,
-      userId: 'user-1',
-      timeoutMs: 1000,
-      abortSignal: undefined,
-      registry: execContext.resolvedSecretTraceRegistry,
-    })
-    expect(onEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: MothershipStreamV1EventType.tool,
-        payload: expect.objectContaining({
-          phase: MothershipStreamV1ToolPhase.result,
-          output: { content: '{{SECRET}}', totalLines: 1 },
-        }),
-      })
-    )
-    expect(JSON.stringify(context.toolCalls.get('tool-user-local-read'))).not.toContain(
-      'resolved-secret'
-    )
-    expect(JSON.stringify(onEvent.mock.calls)).not.toContain('resolved-secret')
-    expect(executeTool).not.toHaveBeenCalled()
-  })
-
-  it('bounds a retired browser takeover that can no longer execute in the client', async () => {
-    isSimExecuted.mockReturnValue(false)
-    waitForClientToolCompletion.mockResolvedValueOnce({
-      status: 'success',
-      message: 'Browser hand-back completed',
-      data: { completed: true },
-    })
-
-    await sseHandlers.tool(
-      {
-        type: MothershipStreamV1EventType.tool,
-        payload: {
-          toolCallId: 'tool-browser-takeover',
-          toolName: 'browser_request_takeover',
-          arguments: { reason: 'Please sign in' },
-          executor: MothershipStreamV1ToolExecutor.client,
-          mode: MothershipStreamV1ToolMode.async,
-          phase: MothershipStreamV1ToolPhase.call,
-        },
-      } satisfies StreamEvent,
-      context,
-      execContext,
-      { interactive: true, timeout: 1000 }
-    )
-
-    await Promise.allSettled(context.pendingToolPromises.values())
-
-    expect(waitForClientToolCompletion).toHaveBeenCalledWith({
-      toolCallId: 'tool-browser-takeover',
-      runId: context.runId,
-      userId: 'user-1',
-      timeoutMs: 1000,
-      abortSignal: undefined,
-      registry: execContext.resolvedSecretTraceRegistry,
-    })
   })
 
   it('keeps an ordinary static VFS read on the Sim executor', async () => {

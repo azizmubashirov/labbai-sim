@@ -1,8 +1,3 @@
-import type { BrowserTabState } from '@sim/browser-protocol'
-import type { TerminalTabState } from '@sim/terminal-protocol'
-import { browserTabTitle } from '@/lib/browser-agent/tab-label'
-import { terminalResourceId } from '@/lib/terminal/resource-id'
-import { terminalTabTitle } from '@/lib/terminal/tab-label'
 import type { AvailableItem } from '@/app/workspace/[workspaceId]/home/components/mothership-view/components/add-resource-dropdown/resource-folder-tree'
 import type { MothershipResourceType } from '@/app/workspace/[workspaceId]/home/types'
 
@@ -33,7 +28,7 @@ export function withFolderMentions(
   )
 }
 
-/** A family query such as "browser" keeps that resource's live tabs visible. */
+/** A family query such as "tables" keeps that family's rows visible. */
 export function resourceMentionMatches(item: AvailableItem, query: string): boolean {
   const normalized = query.toLowerCase().trim()
   if (!normalized) return true
@@ -41,71 +36,6 @@ export function resourceMentionMatches(item: AvailableItem, query: string): bool
     item.name.toLowerCase().includes(normalized) ||
     (typeof item.mentionFamily === 'string' &&
       item.mentionFamily.toLowerCase().includes(normalized))
-  )
-}
-
-function uniqueTabNames<T>(tabs: readonly T[], nameOf: (tab: T) => string): string[] {
-  const names = tabs.map(nameOf)
-  const counts = new Map<string, number>()
-  for (const name of names) counts.set(name, (counts.get(name) ?? 0) + 1)
-  const occurrences = new Map<string, number>()
-  return names.map((name) => {
-    if (counts.get(name) === 1) return name
-    const occurrence = (occurrences.get(name) ?? 0) + 1
-    occurrences.set(name, occurrence)
-    return `${name} ${occurrence}`
-  })
-}
-
-/**
- * Replaces the Browser launcher row with the live pages, which are the only
- * browser things that can be attached or mentioned. With no page open the
- * family disappears from the menu.
- */
-export function withBrowserTabMentions(
-  groups: readonly ResourceMentionGroup[],
-  browserTabs: readonly BrowserTabState[]
-): ResourceMentionGroup[] {
-  const browserNames = uniqueTabNames(browserTabs, browserTabTitle)
-  return groups.map((group) =>
-    group.type === 'browser'
-      ? {
-          ...group,
-          items: browserTabs.map((tab, index) => ({
-            id: tab.tabId,
-            name: browserNames[index],
-            mentionFamily: 'Browser',
-          })),
-        }
-      : group
-  )
-}
-
-/**
- * Replaces the Terminal launcher row with the live shells, which are the only
- * terminal things that can be attached or mentioned. With no shell open the
- * family disappears from the menu. A shell is named after its settled
- * foreground program, else its directory; the strip settles the same way.
- */
-export function withTerminalTabMentions(
-  groups: readonly ResourceMentionGroup[],
-  terminalTabs: readonly TerminalTabState[],
-  settledCommands: ReadonlySet<string>
-): ResourceMentionGroup[] {
-  const terminalNames = uniqueTabNames(terminalTabs, (tab) =>
-    terminalTabTitle(tab, settledCommands)
-  )
-  return groups.map((group) =>
-    group.type === 'terminal'
-      ? {
-          ...group,
-          items: terminalTabs.map((tab, index) => ({
-            id: terminalResourceId(tab.terminalId),
-            name: terminalNames[index],
-            mentionFamily: 'Terminal',
-          })),
-        }
-      : group
   )
 }
 

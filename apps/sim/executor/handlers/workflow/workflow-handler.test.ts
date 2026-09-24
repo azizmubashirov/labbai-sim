@@ -595,17 +595,11 @@ describe('WorkflowBlockHandler', () => {
       expect(mockResolveBillingAttribution).not.toHaveBeenCalled()
     })
 
-    it("runs a non-custom child under the parent's env and redaction policy", async () => {
-      const piiBlockOutputRedaction = {
-        enabled: true,
-        entityTypes: ['EMAIL_ADDRESS'],
-        language: 'en',
-      }
+    it("runs a non-custom child under the parent's env", async () => {
       const ctx = {
         ...mockContext,
         workspaceId: 'workspace-parent',
         environmentVariables: { MY_API_KEY: 'parent-secret' },
-        piiBlockOutputRedaction,
       } as unknown as ExecutionContext
 
       mockFetch.mockResolvedValueOnce({
@@ -626,9 +620,6 @@ describe('WorkflowBlockHandler', () => {
 
       expect(executorOptions).toHaveLength(1)
       expect(executorOptions[0].envVarValues).toEqual({ MY_API_KEY: 'parent-secret' })
-      expect(executorOptions[0].contextExtensions.piiBlockOutputRedaction).toBe(
-        piiBlockOutputRedaction
-      )
       expect(mockGetPersonalAndWorkspaceEnv).not.toHaveBeenCalled()
     })
 

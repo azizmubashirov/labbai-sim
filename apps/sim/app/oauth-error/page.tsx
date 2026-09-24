@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { SSO_REQUIRED_ERROR_CODE, SSO_REQUIRED_MESSAGE } from '@/lib/auth/constants'
-import { DesktopHandoffShell } from '@/app/desktop/components/desktop-handoff-shell'
+import { MessageShell } from '@/app/_shell/message-shell'
 
 export const metadata: Metadata = {
   title: 'Sign-in couldn’t be completed',
@@ -18,10 +18,8 @@ interface OAuthErrorPageProps {
  * be parsed — most commonly the user clicking "Cancel"/"Deny" at the
  * provider's consent screen (`?error=access_denied`). Better Auth redirects
  * such errors to `onAPIError.errorURL` (this page) BEFORE it can honor a
- * per-flow `errorCallbackURL`, so the desktop handoff's loopback is never
- * pinged. Without this page those errors 404'd (a dead-end); here the user
- * gets a clear message and a way back. Re-initiating the sign-in/connect from
- * the app supersedes the idle handoff, so no explicit hand-back is needed.
+ * per-flow `errorCallbackURL`. Without this page those errors 404'd (a
+ * dead-end); here the user gets a clear message and a way back.
  */
 const FRIENDLY: Record<string, string> = {
   access_denied: 'You declined the request at the provider, so nothing was connected.',
@@ -61,7 +59,7 @@ export default async function OAuthErrorPage({ searchParams }: OAuthErrorPagePro
   const code = typeof params.error === 'string' ? params.error : undefined
 
   return (
-    <DesktopHandoffShell
+    <MessageShell
       title='Sign-in couldn’t be completed'
       description={`${messageForError(code)} You can close this tab and return to Sim.`}
     />

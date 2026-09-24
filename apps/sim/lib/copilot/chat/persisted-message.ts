@@ -1,5 +1,4 @@
 import { generateId } from '@sim/utils/id'
-import { isPlainRecord } from '@sim/utils/object'
 import { compactRetrievalCitations } from '@/lib/copilot/chat/retrieval-citations'
 import {
   mergeAndRedactPersistedBlocks,
@@ -21,9 +20,7 @@ import type {
   LocalToolCallStatus,
   OrchestratorResult,
 } from '@/lib/copilot/request/types'
-import { RETIRED_BROWSER_REQUEST_TAKEOVER_ID } from '@/lib/copilot/tools/retired-tools'
 import { normalizeToolActivityDescription } from '@/lib/copilot/tools/tool-display'
-import type { BrowserTextSelection, TerminalTextSelection } from '@/stores/panel/types'
 
 export type PersistedToolState = LocalToolCallStatus | MothershipStreamV1ToolOutcome | 'interrupted'
 
@@ -98,27 +95,6 @@ interface PersistedMessageContext {
    */
   fileName?: string
   tableName?: string
-  tabId?: string
-  terminalId?: string
-  selection?: BrowserTextSelection | TerminalTextSelection
-}
-
-function copyTextSelection(
-  selection: BrowserTextSelection | TerminalTextSelection | undefined
-): BrowserTextSelection | TerminalTextSelection | undefined {
-  if (!selection) return undefined
-  if ('startLine' in selection) {
-    return {
-      text: selection.text,
-      startLine: selection.startLine,
-      endLine: selection.endLine,
-    }
-  }
-  return {
-    text: selection.text,
-    ...(selection.url ? { url: selection.url } : {}),
-    ...(selection.title ? { title: selection.title } : {}),
-  }
 }
 
 export interface PersistedMessage {
@@ -158,24 +134,10 @@ export function stripToolResultOutput(message: PersistedMessage): PersistedMessa
     if (!toolCall || !result || typeof result !== 'object' || !('output' in result)) return block
     const output = result.output
     const citations = result.success ? compactRetrievalCitations(toolCall.name, output) : undefined
-    const userInstruction =
-      toolCall.name === RETIRED_BROWSER_REQUEST_TAKEOVER_ID && isPlainRecord(output)
-        ? output.userInstruction
-        : undefined
-    const normalizedInstruction = typeof userInstruction === 'string' ? userInstruction.trim() : ''
-    if (
-      normalizedInstruction &&
-      isPlainRecord(output) &&
-      Object.keys(output).length === 1 &&
-      output.userInstruction === normalizedInstruction
-    ) {
-      return block
-    }
     changed = true
     const strippedResult: { success: boolean; output?: unknown; error?: string } = {
       success: result.success,
       ...(citations ? { output: citations } : {}),
-      ...(normalizedInstruction ? { output: { userInstruction: normalizedInstruction } } : {}),
     }
     if (result.error !== undefined) strippedResult.error = result.error
     return { ...block, toolCall: { ...toolCall, result: strippedResult } }
@@ -432,9 +394,6 @@ export function buildPersistedUserMessage(params: UserMessageParams): PersistedM
       ...(c.serverId ? { serverId: c.serverId } : {}),
       ...(c.fileName ? { fileName: c.fileName } : {}),
       ...(c.tableName ? { tableName: c.tableName } : {}),
-      ...(c.tabId ? { tabId: c.tabId } : {}),
-      ...(c.terminalId ? { terminalId: c.terminalId } : {}),
-      ...(c.selection ? { selection: copyTextSelection(c.selection) } : {}),
     }))
   }
 
@@ -769,9 +728,6 @@ export function normalizeMessage(raw: Record<string, unknown>): PersistedMessage
       ...(c.serverId ? { serverId: c.serverId } : {}),
       ...(c.fileName ? { fileName: c.fileName } : {}),
       ...(c.tableName ? { tableName: c.tableName } : {}),
-      ...(c.tabId ? { tabId: c.tabId } : {}),
-      ...(c.terminalId ? { terminalId: c.terminalId } : {}),
-      ...(c.selection ? { selection: copyTextSelection(c.selection) } : {}),
     }))
   }
 

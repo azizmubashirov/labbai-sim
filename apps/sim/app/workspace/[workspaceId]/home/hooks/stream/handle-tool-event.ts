@@ -1,5 +1,3 @@
-import { isCurrentBrowserToolName } from '@sim/browser-protocol'
-import { isTerminalToolName } from '@sim/terminal-protocol'
 import {
   MothershipStreamV1ToolExecutor,
   MothershipStreamV1ToolPhase,
@@ -11,7 +9,6 @@ import {
   extractResourcesFromToolResult,
   isResourceToolName,
 } from '@/lib/copilot/resources/extraction'
-import { isUserLocalVfsToolCall } from '@/lib/copilot/tools/local-filesystem'
 import { isWorkflowToolName } from '@/lib/copilot/tools/workflow-tools'
 import { invalidateResourceQueries } from '@/app/workspace/[workspaceId]/home/components/mothership-view/components/resource-registry'
 import type { StreamLoopContext } from '@/app/workspace/[workspaceId]/home/hooks/stream/stream-context'
@@ -192,44 +189,6 @@ export function handleToolEvent(ctx: StreamLoopContext, parsed: ToolEvent): void
     if (shouldStartWorkflowTool) {
       const args = payload.arguments as Record<string, unknown> | undefined
       deps.startClientWorkflowTool(rawId, name, args ?? {})
-    }
-  }
-  const localFilesystemArgs = payload.arguments as Record<string, unknown> | undefined
-  if (isUserLocalVfsToolCall(name, localFilesystemArgs) && !isPartial && clientExecutable) {
-    const shouldStartLocalFilesystemTool =
-      node?.kind === 'tool' && node.status === 'running' && !node.result
-    if (shouldStartLocalFilesystemTool) {
-      deps.startClientLocalFilesystemTool(rawId, name, localFilesystemArgs ?? {})
-    }
-  }
-  if (isCurrentBrowserToolName(name) && !isPartial && clientExecutable) {
-    const shouldStartBrowserTool =
-      !deps.options.suppressedWorkflowToolStartIds?.has(rawId) &&
-      node?.kind === 'tool' &&
-      node.status === 'running' &&
-      !node.result
-    if (shouldStartBrowserTool) {
-      deps.startClientBrowserTool(
-        rawId,
-        name,
-        (payload.arguments as Record<string, unknown> | undefined) ?? {},
-        parsed.ts
-      )
-    }
-  }
-  if (isTerminalToolName(name) && !isPartial && clientExecutable) {
-    const shouldStartTerminalTool =
-      !deps.options.suppressedWorkflowToolStartIds?.has(rawId) &&
-      node?.kind === 'tool' &&
-      node.status === 'running' &&
-      !node.result
-    if (shouldStartTerminalTool) {
-      deps.startClientTerminalTool(
-        rawId,
-        name,
-        (payload.arguments as Record<string, unknown> | undefined) ?? {},
-        parsed.ts
-      )
     }
   }
   ops.flush()

@@ -1,4 +1,3 @@
-import { hasWorkspaceSandboxAccess } from '@/lib/billing/core/subscription'
 import { buildMothershipDelegatedToolDefinitions } from '@/local-copilot/lib/tools/mothership-delegated-tool-defs'
 import {
   buildLocalCopilotUserSkillTool,
@@ -9,8 +8,6 @@ import type { LocalCopilotToolDefinition } from '@/local-copilot/lib/types'
 export interface ResolveLocalCopilotToolsOptions {
   /** Skip a second skills query when context already loaded the catalog. */
   skills?: Array<{ name: string; description: string }>
-  /** Skip the sandbox entitlement query when the snapshot already decided. */
-  sandboxEntitled?: boolean
 }
 
 const CORE_LOCAL_COPILOT_TOOLS: LocalCopilotToolDefinition[] = [
@@ -151,7 +148,7 @@ const CORE_LOCAL_COPILOT_TOOLS: LocalCopilotToolDefinition[] = [
   {
     name: 'invoke_integration_tool',
     description:
-      'Runs a Arena integration tool directly (no workflow). Pass a registered toolId (e.g. exa_search, exa_answer, firecrawl_scrape, gmail_draft_v2) — listing first is not required for known ids. Call list_integration_tools only to discover operations for a service. For live/current web data prefer exa_answer (factual Q&A with citations) or exa_search (result lists) — same as the Exa block. For E2B-backed web apps when e2b.enabled is true, use development_generate_app or development_edit_app. Workspace env keys, BYOK, and hosted keys are applied automatically.',
+      'Runs a Arena integration tool directly (no workflow). Pass a registered toolId (e.g. exa_search, exa_answer, firecrawl_scrape, gmail_draft_v2) — listing first is not required for known ids. Call list_integration_tools only to discover operations for a service. For live/current web data prefer exa_answer (factual Q&A with citations) or exa_search (result lists) — same as the Exa block. Workspace env keys, BYOK, and hosted keys are applied automatically.',
     parameters: {
       type: 'object',
       properties: {
@@ -274,10 +271,7 @@ export async function resolveLocalCopilotTools(
     options?.skills !== undefined
       ? buildLocalCopilotUserSkillToolFromSummaries(options.skills)
       : await buildLocalCopilotUserSkillTool(workspaceId)
-  const tools = skillTool ? [...LOCAL_COPILOT_TOOLS, skillTool] : LOCAL_COPILOT_TOOLS
-  const sandboxEntitled = options?.sandboxEntitled ?? (await hasWorkspaceSandboxAccess(workspaceId))
-  if (sandboxEntitled) return tools
-  return tools.filter((tool) => tool.name !== 'manage_sandbox')
+  return skillTool ? [...LOCAL_COPILOT_TOOLS, skillTool] : LOCAL_COPILOT_TOOLS
 }
 
 export function getToolDefinition(name: string): LocalCopilotToolDefinition | undefined {

@@ -295,10 +295,10 @@ export const LOCAL_COPILOT_PROMPT_SECTIONS: readonly LocalCopilotPromptSection[]
   },
   {
     id: 'media',
-    /** generate_audio / generate_video / ffmpeg. */
+    /** generate_audio / ffmpeg. */
     domains: ['media'],
     content: `- Media (no workflow required, hosted/workspace keys applied automatically):
-  - \`generate_audio\` for speech/music/sound effects, \`generate_video\` for short clips — pass the user's full request in \`prompt\` and save results via \`outputs.files\` under files/.
+  - \`generate_audio\` for speech/music/sound effects — pass the user's full request in \`prompt\` and save results via \`outputs.files\` under files/.
   - \`ffmpeg\` for editing workspace media (trim, concat, convert, overlays, thumbnails). Mount sources via \`inputs.files\` with exact VFS paths from context or glob.`,
   },
   {
@@ -328,26 +328,22 @@ export const LOCAL_COPILOT_PROMPT_SECTIONS: readonly LocalCopilotPromptSection[]
   },
   {
     id: 'codeExecution',
-    /** E2B sandbox + function_execute — always on so complex turns can compute. */
-    content: `- E2B sandbox and code execution (use when the work needs real compute):
-  - Context includes \`e2b\`: \`enabled\`, \`docSandboxEnabled\`, \`customSandboxesEnabled\`, and \`supportedCodeLanguages\`.
-  - For **complex** requests — multi-step data transforms, parsing/aggregating large files or tables, nontrivial calculations, shell pipelines, or verifying results with code — call \`function_execute\` when \`e2b.enabled\` is true (or JavaScript-only when E2B is off). Do not guess outputs you could compute.
-  - When \`e2b.enabled\` is true, use \`function_execute\` for Python, shell, and JavaScript with workspace files/tables mounted via \`inputs\`. Save outputs with \`outputs.files\` or \`outputPath\`. The default Function image is created for that call — do not call \`manage_sandbox\` first.
-  - When \`e2b.customSandboxesEnabled\` is true and a required npm/PyPI/apt package or managed CLI is missing from the default image, call \`manage_sandbox\` operation=add (name + language + dependencies/cliTools/systemPackages), wait for the sandbox, then \`function_execute\` with that \`sandboxId\`. List existing sandboxes with operation=list before creating a duplicate.
-  - When E2B is disabled, \`function_execute\` supports JavaScript only (isolated-vm).
+    /** function_execute — always on so complex turns can compute. */
+    content: `- Code execution (use when the work needs real compute):
+  - For **complex** requests — multi-step data transforms, parsing/aggregating large files or tables, nontrivial calculations, or verifying results with code — call \`function_execute\`. Do not guess outputs you could compute.
+  - \`function_execute\` runs JavaScript only (isolated-vm); modules cannot be imported.
   - Code execution results include \`capturedOutput\` (preferred), plus \`stdout\` (prints) and \`result\` (return values). Read \`capturedOutput\` first — empty stdout with a return value is normal, not a failure.
-  - Do **not** use \`function_execute\` or Daytona integration tools for ordinary workflow building, deployment, or questions you can answer without running code.
-  - Do **not** tell the user about sandbox names (E2B, Daytona), empty payloads, internal retries, or "result variables" unless they explicitly asked to debug code execution. Give the answer directly.
+  - Do **not** use \`function_execute\` for ordinary workflow building, deployment, or questions you can answer without running code.
+  - Do **not** tell the user about empty payloads, internal retries, or "result variables" unless they explicitly asked to debug code execution. Give the answer directly.
   - Creating PPTX / DOCX / PDF / Markdown (CRITICAL — always available, do not refuse). Exact arg shapes:
     1. Markdown/text/html: \`create_file\` with the full body in \`content\` (one step). Do not also print that source in chat.
     2. Office: \`create_file\` empty shell — prefer \`{"fileName":"files/Deck.pptx"}\` (no \`content\`).
     3. Then \`workspace_file\` — \`{"operation":"update","target":{"kind":"path","path":"files/Deck.pptx"},"title":"Deck"}\`. \`target\` MUST be an object, never a string path.
     4. Later round only: \`edit_content\` with pre-initialized globals (do **not** \`require\` / \`import\` libraries). Prefer \`addSection\` for DOCX — never \`docx.addSection\`. Never same batch as \`workspace_file\`.
     ${DOCUMENT_FORMAT_GUIDANCE}
-    - These formats compile via the built-in JS sandbox (isolated-vm) even when \`e2b.docSandboxEnabled\` is false. Never refuse because E2B is off.
-    - If \`edit_content\` fails with a system/sandbox crash (e.g. "Code execution failed unexpectedly" / isolated-vm / Node version), that is a host Node/isolated-vm issue — not missing deck code and not \`docSandboxEnabled\`. Tell the user to use Node 20–22 and rebuild isolated-vm; do not loop minimal PPTX/DOCX probes.
-    - Do **not** use \`function_execute\` / Python \`python-pptx\` / \`python-docx\` / matplotlib for workspace office files unless the user explicitly asks to run sandbox code.
-  - For interactive web apps (npm build in sandbox): \`invoke_integration_tool\` with \`development_generate_app\` or \`development_edit_app\` when E2B is enabled.`,
+    - These formats compile via the built-in JS sandbox (isolated-vm). Never refuse.
+    - If \`edit_content\` fails with a system/sandbox crash (e.g. "Code execution failed unexpectedly" / isolated-vm / Node version), that is a host Node/isolated-vm issue — not missing deck code. Tell the user to use Node 20–22 and rebuild isolated-vm; do not loop minimal PPTX/DOCX probes.
+    - Do **not** use \`function_execute\` to build workspace office files.`,
   },
   {
     id: 'closing',

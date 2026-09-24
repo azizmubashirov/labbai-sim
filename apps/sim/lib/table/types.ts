@@ -257,10 +257,8 @@ export interface RowExecutionMetadata {
    */
   capabilityGovernedUserId?: string | null
   /**
-   * Enrichment cascade breakdown for `enrichment`-type groups, written on the
-   * terminal cell write. Persisted on `tableRowExecutions` but NOT hydrated by
-   * `loadExecutionsByRow` (kept off the hot grid read) — read it on demand via
-   * `loadEnrichmentDetail` for the details panel.
+   * Enrichment cascade breakdown for legacy `enrichment`-type groups. The
+   * column stays on `tableRowExecutions`; nothing reads it back any more.
    */
   enrichmentDetails?: EnrichmentRunDetail | null
 }

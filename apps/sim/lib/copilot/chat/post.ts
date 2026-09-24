@@ -23,10 +23,6 @@ import {
   type AssistantImageContent,
   prepareAssistantImages,
 } from '@/lib/copilot/chat/assistant-images'
-import {
-  DESKTOP_TERMINAL_HINT_ID_MAX_LENGTH,
-  DESKTOP_TERMINAL_HINT_TEXT_MAX_LENGTH,
-} from '@/lib/copilot/chat/desktop-capabilities'
 import { type ChatLoadResult, resolveOrCreateChat } from '@/lib/copilot/chat/lifecycle'
 import { appendCopilotChatMessages } from '@/lib/copilot/chat/messages-store'
 import { authorizeOrganizationChat } from '@/lib/copilot/chat/organization-chats'
@@ -44,7 +40,6 @@ import {
   MAX_FILE_SELECTION_TEXT_LENGTH,
   MAX_TABLE_SELECTION_COLUMNS,
   MAX_TABLE_SELECTION_ROWS,
-  safeBrowserSelectionUrl,
 } from '@/lib/copilot/chat/selection-context'
 import { finalizeAssistantTurn } from '@/lib/copilot/chat/terminal-state'
 import { generateWorkspaceSnapshot } from '@/lib/copilot/chat/workspace-context'
@@ -104,10 +99,6 @@ import type { ChatContext } from '@/stores/panel'
 
 const logger = createLogger('UnifiedChatAPI')
 const DEFAULT_MODEL = DEFAULT_LOCAL_COPILOT_MODEL
-const CHAT_SELECTION_TEXT_MAX_LENGTH = 100_000
-const CHAT_SELECTION_SOURCE_URL_MAX_LENGTH = 8_192
-const CHAT_SELECTION_SOURCE_TITLE_MAX_LENGTH = 512
-const TERMINAL_SELECTION_LINE_MAX = 10_000_000
 
 const FileAttachmentSchema = z.object({
   id: z.string(),
@@ -130,27 +121,10 @@ const ResourceAttachmentSchema = z.object({
     'task',
     'log',
     'generic',
-    'browser',
-    // Filtered out client-side rather than sent, but accepted here so a stray
-    // terminal attachment degrades to a no-op instead of rejecting the whole
-    // chat request.
-    'terminal',
   ]),
   id: z.string().min(1),
   title: z.string().optional(),
   active: z.boolean().optional(),
-  /**
-   * Live page URL for `browser` attachments. The agent browser lives in the
-   * desktop app, so the client supplies its state — the server has nothing
-   * to resolve it from. Web-only: this string is interpolated into LLM
-   * context, and rejecting other schemes (file://, chrome://…) keeps local
-   * host paths from ever entering the copilot payload.
-   */
-  url: z
-    .string()
-    .max(2048)
-    .regex(/^https?:\/\//, 'Must be an http(s) URL')
-    .optional(),
 })
 
 const GENERIC_RESOURCE_TITLE: Record<z.infer<typeof ResourceAttachmentSchema>['type'], string> = {
@@ -164,15 +138,9 @@ const GENERIC_RESOURCE_TITLE: Record<z.infer<typeof ResourceAttachmentSchema>['t
   task: 'Task',
   log: 'Log',
   generic: 'Resource',
-  browser: 'Browser',
-  terminal: 'Terminal',
 }
 
-/**
- * Synthetic client-side panels are context-only: never persisted to the chat.
- * Browser tabs are among them — the desktop app restores its own pages — so
- * their page title and URL remain request context only.
- */
+/** Synthetic client-side panels are context-only: never persisted to the chat. */
 function isPersistableAttachment(resource: z.infer<typeof ResourceAttachmentSchema>): boolean {
   return !isEphemeralResource({
     type: resource.type,
@@ -220,39 +188,6 @@ function resolveOpenWorkflowIdForLocalCopilot(params: {
   return fromChat || undefined
 }
 
-/** Non-strings pass through for the schema to reject; strings are sanitized. */
-function sanitizeBrowserSelectionUrl(value: unknown): unknown {
-  return typeof value === 'string' ? safeBrowserSelectionUrl(value) : value
-}
-
-const BrowserTextSelectionSchema = z
-  .object({
-    text: z.string().min(1).max(CHAT_SELECTION_TEXT_MAX_LENGTH),
-    url: z.preprocess(
-      sanitizeBrowserSelectionUrl,
-      z.string().max(CHAT_SELECTION_SOURCE_URL_MAX_LENGTH).optional()
-    ),
-    title: z.string().max(CHAT_SELECTION_SOURCE_TITLE_MAX_LENGTH).optional(),
-  })
-  .strict()
-  .transform(({ text, title, url }) => ({
-    text,
-    ...(url ? { url } : {}),
-    ...(title ? { title } : {}),
-  }))
-
-const TerminalTextSelectionSchema = z
-  .object({
-    text: z.string().min(1).max(CHAT_SELECTION_TEXT_MAX_LENGTH),
-    startLine: z.number().int().positive().max(TERMINAL_SELECTION_LINE_MAX),
-    endLine: z.number().int().positive().max(TERMINAL_SELECTION_LINE_MAX),
-  })
-  .strict()
-  .refine(({ startLine, endLine }) => endLine >= startLine, {
-    message: 'endLine must be greater than or equal to startLine',
-    path: ['endLine'],
-  })
-
 const ChatContextSchema = z
   .object({
     kind: z.enum([
@@ -273,8 +208,6 @@ const ChatContextSchema = z
       'integration',
       'skill',
       'mcp',
-      'browser_tab',
-      'terminal_tab',
     ]),
     label: z.string(),
     chatId: z.string().optional(),
@@ -291,8 +224,6 @@ const ChatContextSchema = z
     skillId: z.string().optional(),
     serverId: z.string().optional(),
     scheduleId: z.string().optional(),
-    tabId: z.string().optional(),
-    terminalId: z.string().optional(),
     text: z.string().max(MAX_FILE_SELECTION_TEXT_LENGTH).optional(),
     fileName: z.string().optional(),
     startLine: z.number().int().positive().optional(),
@@ -300,21 +231,6 @@ const ChatContextSchema = z
     tableName: z.string().optional(),
     rowIds: z.array(z.string()).max(MAX_TABLE_SELECTION_ROWS).optional(),
     columnIds: z.array(z.string()).max(MAX_TABLE_SELECTION_COLUMNS).optional(),
-    selection: z.union([BrowserTextSelectionSchema, TerminalTextSelectionSchema]).optional(),
-  })
-  .superRefine(({ kind, selection }, refinementContext) => {
-    if (!selection) return
-    const isTerminalSelection = 'startLine' in selection
-    const selectionMatchesKind =
-      (kind === 'browser_tab' && !isTerminalSelection) ||
-      (kind === 'terminal_tab' && isTerminalSelection)
-    if (!selectionMatchesKind) {
-      refinementContext.addIssue({
-        code: 'custom',
-        message: 'selection must match its browser_tab or terminal_tab context kind',
-        path: ['selection'],
-      })
-    }
   })
 
 const ChatMessageSchema = z
@@ -344,37 +260,6 @@ const ChatMessageSchema = z
     commands: z.array(z.string()).optional(),
     userTimezone: z.string().optional(),
     copilotBackend: z.enum(['local', 'external']).optional(),
-    desktopCapabilities: z
-      .object({
-        localFilesystem: z.boolean().optional(),
-        browser: z.boolean().optional(),
-        terminal: z.boolean().optional(),
-        terminals: z
-          .array(
-            z.object({
-              id: z.string().max(DESKTOP_TERMINAL_HINT_ID_MAX_LENGTH),
-              cwd: z.string().max(DESKTOP_TERMINAL_HINT_TEXT_MAX_LENGTH).optional(),
-              running: z.string().max(DESKTOP_TERMINAL_HINT_TEXT_MAX_LENGTH).optional(),
-              interactive: z.boolean().optional(),
-              active: z.boolean().optional(),
-            })
-          )
-          .optional(),
-        browserSessions: z
-          .array(
-            z.object({
-              hostname: z
-                .string()
-                .max(253)
-                .regex(/^[a-z0-9.-]+$/),
-              evidence: z.enum(['sign-in-completed', 'cookies']),
-              lastObservedAt: z.string().datetime(),
-            })
-          )
-          .max(20)
-          .optional(),
-      })
-      .optional(),
   })
   .refine(
     (body) =>
@@ -384,8 +269,6 @@ const ChatMessageSchema = z
   )
 
 type UnifiedChatRequest = z.infer<typeof ChatMessageSchema>
-type BrowserSessions = NonNullable<UnifiedChatRequest['desktopCapabilities']>['browserSessions']
-type Terminals = NonNullable<UnifiedChatRequest['desktopCapabilities']>['terminals']
 type UnifiedChatBranch =
   | {
       kind: 'workflow'
@@ -423,11 +306,6 @@ type UnifiedChatBranch =
         assistantSearch?: WorkspaceSearchFilters
         workspaceContext?: string
         vfs?: VfsSnapshotV1
-        desktopLocalFilesystem?: boolean
-        browser?: boolean
-        terminalCapable?: boolean
-        terminals?: Terminals
-        browserSessions?: BrowserSessions
       }) => Promise<Record<string, unknown>>
       buildExecutionContext: (params: {
         userId: string
@@ -462,11 +340,6 @@ type UnifiedChatBranch =
         assistantSearch?: WorkspaceSearchFilters
         workspaceContext?: string
         vfs?: VfsSnapshotV1
-        desktopLocalFilesystem?: boolean
-        browser?: boolean
-        terminalCapable?: boolean
-        terminals?: Terminals
-        browserSessions?: BrowserSessions
       }) => Promise<Record<string, unknown>>
       buildExecutionContext: (params: {
         userId: string
@@ -568,22 +441,6 @@ async function resolveAgentContexts(params: {
   if (Array.isArray(resourceAttachments) && resourceAttachments.length > 0 && workspaceId) {
     const results = await Promise.allSettled(
       resourceAttachments.map(async (resource) => {
-        // The live browser panel resolves from the attachment itself: its
-        // page state is client-held (the desktop app's embedded browser),
-        // not a workspace entity the server could look up.
-        if (resource.type === 'browser') {
-          if (!resource.url) return null
-          const title = resource.title?.trim()
-          return {
-            type: 'active_resource',
-            tag: resource.active ? '@active_tab' : '@open_tab',
-            content: `The user's ${
-              resource.active ? 'currently visible browser tab' : 'other open browser tab'
-            } (driven by the browser subagent) is open on: ${
-              title ? `"${title}" — ` : ''
-            }${resource.url}`,
-          }
-        }
         const ctx = await resolveActiveResourceContext(
           resource.type,
           resource.id,
@@ -1075,11 +932,6 @@ async function resolveBranch(params: {
             entitlements: payloadParams.entitlements,
             userTimezone: payloadParams.userTimezone,
             userMetadata: payloadParams.userMetadata,
-            desktopLocalFilesystem: payloadParams.desktopLocalFilesystem,
-            browser: payloadParams.browser,
-            terminalCapable: payloadParams.terminalCapable,
-            terminals: payloadParams.terminals,
-            browserSessions: payloadParams.browserSessions,
           },
           { selectedModel }
         ),
@@ -1138,11 +990,6 @@ async function resolveBranch(params: {
           entitlements: payloadParams.entitlements,
           userTimezone: payloadParams.userTimezone,
           userMetadata: payloadParams.userMetadata,
-          desktopLocalFilesystem: payloadParams.desktopLocalFilesystem,
-          browser: payloadParams.browser,
-          terminalCapable: payloadParams.terminalCapable,
-          terminals: payloadParams.terminals,
-          browserSessions: payloadParams.browserSessions,
         },
         { selectedModel: localCatalogId || '' }
       ),
@@ -1493,8 +1340,7 @@ export async function handleUnifiedChatPost(req: NextRequest) {
         actualChatId &&
         body.resourceAttachments?.length
       ) {
-        // Canonicalizes here, not just inside `persistChatResources`, so the
-        // singleton terminal panel is stored once however it was attached.
+        // Canonicalizes here, not just inside `persistChatResources`.
         const persistable = sanitizeChatResources(
           body.resourceAttachments.filter(isPersistableAttachment).map((resource) => ({
             type: resource.type,
@@ -1717,11 +1563,6 @@ export async function handleUnifiedChatPost(req: NextRequest) {
                 implicitFeedback: body.implicitFeedback,
                 workspaceContext,
                 vfs,
-                desktopLocalFilesystem: body.desktopCapabilities?.localFilesystem === true,
-                browser: body.desktopCapabilities?.browser === true,
-                terminalCapable: body.desktopCapabilities?.terminal === true,
-                terminals: body.desktopCapabilities?.terminals,
-                browserSessions: body.desktopCapabilities?.browserSessions,
               })
             : branch.buildPayload({
                 message: body.message,
@@ -1739,11 +1580,6 @@ export async function handleUnifiedChatPost(req: NextRequest) {
                 userMetadata,
                 workspaceContext,
                 vfs,
-                desktopLocalFilesystem: body.desktopCapabilities?.localFilesystem === true,
-                browser: body.desktopCapabilities?.browser === true,
-                terminalCapable: body.desktopCapabilities?.terminal === true,
-                terminals: body.desktopCapabilities?.terminals,
-                browserSessions: body.desktopCapabilities?.browserSessions,
               })
         },
         activeOtelRoot.context

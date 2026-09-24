@@ -960,32 +960,6 @@ describe('runCopilotLifecycle', () => {
           email: `owner+${secret}@example.com`,
           timezone: secret,
         },
-        desktopCapabilities: {
-          terminal: true,
-          terminals: [
-            {
-              id: secret,
-              cwd: `/workspace/${secret}`,
-              running: `command ${secret}`,
-              active: true,
-            },
-            {
-              id: 'safe-terminal-id',
-              cwd: '/workspace/safe',
-              running: `safe command ${secret}`,
-              active: true,
-            },
-          ],
-          browser: true,
-          browserSessions: [
-            { hostname: secret, evidence: 'cookies', lastObservedAt: '2026-01-01T00:00:00.000Z' },
-            {
-              hostname: 'safe.example',
-              evidence: 'sign-in-completed',
-              lastObservedAt: '2026-02-01T00:00:00.000Z',
-            },
-          ],
-        },
         workspaceId: 'ws-1',
         messageId: `stream-low-entropy-${secret}`,
       }
@@ -1377,7 +1351,7 @@ describe('runCopilotLifecycle', () => {
 
     it('arms the gate and loads the allow list once the flag is on', async () => {
       setEnvFlags({ isCopilotToolPermissionsEnabled: true })
-      mockGetAutoAllowedTools.mockResolvedValue(new Set(['terminal_run']))
+      mockGetAutoAllowedTools.mockResolvedValue(new Set(['function_execute']))
       let captured: StreamingContext | undefined
       mockRunStreamLoop.mockImplementation(async (_u, _o, context: StreamingContext) => {
         captured = context
@@ -1386,7 +1360,7 @@ describe('runCopilotLifecycle', () => {
       await runMothershipTurn()
 
       expect(captured?.toolPermissions.enabled).toBe(true)
-      expect(captured?.toolPermissions.autoAllowed.has('terminal_run')).toBe(true)
+      expect(captured?.toolPermissions.autoAllowed.has('function_execute')).toBe(true)
       expect(mockGetAutoAllowedTools).toHaveBeenCalledWith('user-1', 'chat-1')
     })
 
@@ -1398,7 +1372,7 @@ describe('runCopilotLifecycle', () => {
     it('arms the gate but ignores stored auto-allows when the group withholds them', async () => {
       setEnvFlags({ isCopilotToolPermissionsEnabled: true })
       mockGetUserPermissionConfig.mockResolvedValue({ disableToolAutoApproval: true })
-      mockGetAutoAllowedTools.mockResolvedValue(new Set(['terminal_run']))
+      mockGetAutoAllowedTools.mockResolvedValue(new Set(['function_execute']))
       let captured: StreamingContext | undefined
       mockRunStreamLoop.mockImplementation(async (_u, _o, context: StreamingContext) => {
         captured = context
@@ -1420,7 +1394,7 @@ describe('runCopilotLifecycle', () => {
     it('reads a failed capability lookup as withheld instead of aborting the turn', async () => {
       setEnvFlags({ isCopilotToolPermissionsEnabled: true })
       mockGetUserPermissionConfig.mockRejectedValue(new Error('permission group lookup failed'))
-      mockGetAutoAllowedTools.mockResolvedValue(new Set(['terminal_run']))
+      mockGetAutoAllowedTools.mockResolvedValue(new Set(['function_execute']))
       let captured: StreamingContext | undefined
       mockRunStreamLoop.mockImplementation(async (_u, _o, context: StreamingContext) => {
         captured = context
@@ -2466,7 +2440,7 @@ describe('runCopilotLifecycle', () => {
           capturedContext = context
           context.toolCalls.set('tool-hung', {
             id: 'tool-hung',
-            name: 'terminal',
+            name: 'function_execute',
             status: 'awaiting_approval',
           })
           context.pendingToolPromises.set('tool-hung', new Promise(() => {}))
@@ -2546,7 +2520,7 @@ describe('runCopilotLifecycle', () => {
           const approvalId = 'tool-approval'
           context.toolCalls.set(approvalId, {
             id: approvalId,
-            name: 'terminal',
+            name: 'function_execute',
             status: 'awaiting_approval',
           })
           context.pendingToolPromises.set(
@@ -2738,7 +2712,7 @@ describe('runCopilotLifecycle', () => {
           capturedContext = context
           context.toolCalls.set('tool-approval', {
             id: 'tool-approval',
-            name: 'terminal',
+            name: 'function_execute',
             status: 'awaiting_approval',
           })
           context.pendingToolPromises.set(

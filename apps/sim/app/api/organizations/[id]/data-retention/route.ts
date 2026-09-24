@@ -16,7 +16,6 @@ import { isOrganizationOnEnterprisePlan } from '@/lib/billing/core/subscription'
 import { getForeignWorkspaceTargetsReason } from '@/lib/billing/retention'
 import { isBillingEnabled } from '@/lib/core/config/env-flags'
 import { withRouteHandler } from '@/lib/core/utils/with-route-handler'
-import { coercePiiLanguage } from '@/lib/guardrails/pii-entities'
 
 const logger = createLogger('DataRetentionAPI')
 
@@ -26,7 +25,6 @@ function enterpriseDefaults(): OrganizationRetentionValues {
     softDeleteRetentionHours: CLEANUP_CONFIG['cleanup-soft-deletes'].defaults.enterprise,
     taskCleanupHours: CLEANUP_CONFIG['cleanup-tasks'].defaults.enterprise,
     fileVersionRetentionHours: CLEANUP_CONFIG['cleanup-file-versions'].defaults.enterprise,
-    piiRedaction: null,
     retentionOverrides: null,
   }
 }
@@ -39,30 +37,6 @@ function normalizeConfigured(
     softDeleteRetentionHours: settings?.softDeleteRetentionHours ?? null,
     taskCleanupHours: settings?.taskCleanupHours ?? null,
     fileVersionRetentionHours: settings?.fileVersionRetentionHours ?? null,
-    piiRedaction: settings?.piiRedaction?.rules
-      ? {
-          rules: settings.piiRedaction.rules.map((rule) => ({
-            ...rule,
-            language: coercePiiLanguage(rule.language),
-            stages: rule.stages
-              ? {
-                  input: {
-                    ...rule.stages.input,
-                    language: coercePiiLanguage(rule.stages.input?.language),
-                  },
-                  blockOutputs: {
-                    ...rule.stages.blockOutputs,
-                    language: coercePiiLanguage(rule.stages.blockOutputs?.language),
-                  },
-                  logs: {
-                    ...rule.stages.logs,
-                    language: coercePiiLanguage(rule.stages.logs?.language),
-                  },
-                }
-              : undefined,
-          })),
-        }
-      : null,
     retentionOverrides: settings?.retentionOverrides ?? null,
   }
 }
@@ -197,9 +171,6 @@ export const PUT = withRouteHandler(
     if (body.fileVersionRetentionHours !== undefined) {
       merged.fileVersionRetentionHours = body.fileVersionRetentionHours
     }
-    if (body.piiRedaction !== undefined) {
-      merged.piiRedaction = body.piiRedaction
-    }
     if (body.retentionOverrides !== undefined) {
       merged.retentionOverrides = body.retentionOverrides
     }
@@ -207,7 +178,6 @@ export const PUT = withRouteHandler(
     const foreignTargetsReason = await getForeignWorkspaceTargetsReason({
       organizationId,
       retentionOverrides: body.retentionOverrides,
-      piiRedaction: body.piiRedaction,
     })
     if (foreignTargetsReason) {
       return NextResponse.json({ error: foreignTargetsReason }, { status: 400 })

@@ -983,21 +983,6 @@ const INSTAGRAM_TOOL_IDS = [
   'instagram_publish_video',
 ] as const
 
-const VIDEO_TOOL_IDS = [
-  'video_falai',
-  'video_luma',
-  'video_minimax',
-  'video_runway',
-  'video_veo',
-] as const
-
-const A2A_TOOL_IDS = [
-  'a2a_cancel_task',
-  'a2a_get_agent_card',
-  'a2a_get_task',
-  'a2a_send_message',
-] as const
-
 const BUFFER_TOOL_IDS = ['buffer_create_post', 'buffer_edit_post'] as const
 
 const GRAFANA_TOOL_IDS = [
@@ -1348,8 +1333,6 @@ const EMBEDDINGS_TOOL_IDS = [
   'openai_embeddings',
 ] as const
 
-const ENRICHMENT_TOOL_IDS = ['enrichment_run'] as const
-
 const LLM_TOOL_IDS = ['llm_chat'] as const
 
 const GUARDRAILS_TOOL_IDS = ['guardrails_validate'] as const
@@ -1590,12 +1573,6 @@ registerFamily(handlerLoaders, STT_TOOL_IDS, async () => {
 registerFamily(handlerLoaders, INSTAGRAM_TOOL_IDS, async () => {
   return (await import('@/lib/internal/instagram/execute-tool')).executeInstagramTool
 })
-registerFamily(handlerLoaders, VIDEO_TOOL_IDS, async () => {
-  return (await import('@/lib/internal/video/execute-tool')).executeVideoTool
-})
-registerFamily(handlerLoaders, A2A_TOOL_IDS, async () => {
-  return (await import('@/lib/internal/a2a/execute-tool')).executeA2ATool
-})
 registerFamily(handlerLoaders, BUFFER_TOOL_IDS, async () => {
   return (await import('@/lib/internal/buffer/execute-tool')).executeBufferTool
 })
@@ -1731,9 +1708,6 @@ registerFamily(handlerLoaders, IMAGE_TOOL_IDS, async () => {
 })
 registerFamily(handlerLoaders, EMBEDDINGS_TOOL_IDS, async () => {
   return (await import('@/lib/internal/embeddings/execute-tool')).executeEmbeddingsTool
-})
-registerFamily(handlerLoaders, ENRICHMENT_TOOL_IDS, async () => {
-  return (await import('@/lib/internal/enrichment/execute-tool')).executeEnrichmentTool
 })
 registerFamily(handlerLoaders, LLM_TOOL_IDS, async () => {
   return (await import('@/lib/internal/llm/execute-tool')).executeLlmTool

@@ -17,7 +17,6 @@ import { toError } from '@sim/utils/errors'
 import { and, desc, eq, inArray, isNotNull, isNull, or } from 'drizzle-orm'
 import { listApiKeys } from '@/lib/api-key/service'
 import { getAccountBillingSnapshot } from '@/lib/billing/core/account-billing-snapshot'
-import { hasWorkspaceSandboxAccess } from '@/lib/billing/core/subscription'
 import { createCopilotChatPrincipal } from '@/lib/copilot/auth/application-delegation'
 import {
   buildWorkspaceContextMd,
@@ -42,7 +41,6 @@ import {
   filterSecretNamesByMountPolicy,
   type SecretMountPolicy,
 } from '@/lib/copilot/secret-mount-policy'
-import { RESTRICTED_SIM_SANDBOX_INPUTS } from '@/lib/copilot/sim-sandbox-projection'
 import { compileDoc, getE2BDocFormat } from '@/lib/copilot/tools/server/files/doc-compile'
 import { extractDocText, isExtractableDocExt } from '@/lib/copilot/tools/server/files/doc-extract'
 import { runE2BCompiledCheck } from '@/lib/copilot/tools/server/files/doc-recalc'
@@ -98,8 +96,6 @@ import {
   serializeOrgCustomBlockDetail,
   serializePermissionGroupRoster,
   serializeRecentExecutions,
-  serializeSandbox,
-  serializeSandboxCatalog,
   serializeSkill,
   serializeTableMeta,
   serializeTableViews,
@@ -125,10 +121,6 @@ import {
 } from '@/lib/credentials/environment'
 import { getPersonalAndWorkspaceEnv } from '@/lib/environment/utils'
 import { BINARY_DOC_TASKS, MAX_DOCUMENT_PREVIEW_CODE_BYTES } from '@/lib/execution/constants'
-import {
-  currentSandboxStrategy,
-  listWorkspaceSandboxes,
-} from '@/lib/execution/remote-sandbox/workspace-sandboxes'
 import { runSandboxTask, SandboxUserCodeError } from '@/lib/execution/sandbox/run-task'
 import { listFoldersForWorkspace } from '@/lib/folders/queries'
 import {
@@ -264,7 +256,6 @@ function recordContributingFile(
  * (see {@link isStaticFileHidden}).
  */
 let staticComponentFiles: Map<string, string> | null = null
-let staticFunctionSchemaWithRestrictedSimSandboxes: string | null = null
 
 /**
  * Owning block for each `components/integrations/**` file, recorded at build
@@ -459,7 +450,6 @@ const INTEGRATION_SCHEMA_PATH_PREFIX = 'components/integrations/'
 
 /** The per-viewer projections applied to a shared static component file. */
 interface StaticFileProjection {
-  sandboxEntitled: boolean
   deniedOperations: DeniedBlockOperations
   isToolAllowed: IsToolAllowed
 }
@@ -476,9 +466,6 @@ function projectStaticComponentFile(
   content: string,
   projection: StaticFileProjection
 ): string {
-  if (path === 'components/blocks/function.json' && !projection.sandboxEntitled) {
-    return staticFunctionSchemaWithRestrictedSimSandboxes ?? content
-  }
   if (projection.deniedOperations.needsProjection.size === 0) return content
   if (!path.startsWith(BLOCK_SCHEMA_PATH_PREFIX)) return content
 
@@ -523,12 +510,6 @@ function getStaticComponentFiles(): Map<string, string> {
   for (const block of visibleBlocks) {
     const path = `components/blocks/${block.type}.json`
     files.set(path, serializeBlockSchema(block, { toolConfigs }))
-    if (block.type === 'function') {
-      staticFunctionSchemaWithRestrictedSimSandboxes = serializeBlockSchema(block, {
-        toolConfigs,
-        restrictedInputs: RESTRICTED_SIM_SANDBOX_INPUTS,
-      })
-    }
   }
   blocksFiltered = allBlocks.length - visibleBlocks.length
 
@@ -698,8 +679,6 @@ function getStaticComponentFiles(): Map<string, string> {
  *   files/{path}/{name}/style            (dynamic — style extraction for .docx/.pptx/.pdf)
  *   files/{path}/{name}/compiled-check   (dynamic — compile generated source / validate diagrams, returns {ok,error?})
  *   custom-tools/{name}.json
- *   agent/sandboxes/README.md
- *   agent/sandboxes/{name}.json
  *   account/workspace.json                           (this workspace + your role; always present)
  *   account/workspaces.json                          (every workspace you can reach)
  *   account/members.json                             (workspace members; emails admin-only)
@@ -949,10 +928,6 @@ export class WorkspaceVFS {
               'permissions',
               resolvePermissionGroupConfig(userId, workspaceId, undefined)
             )
-            const sandboxEntitlementPromise = timed(
-              'sandbox_entitlement',
-              hasWorkspaceSandboxAccess(workspaceId)
-            )
             // Shared with the account/ and organization/ namespaces so the
             // roster and host context are each read once per materialization.
             const membersPromise = timed('members', getUsersWithPermissions(workspaceId))
@@ -970,11 +945,9 @@ export class WorkspaceVFS {
               customBlocksSummary,
               mcpServersSummary,
               skillsSummary,
-              sandboxesSummary,
               wsRow,
               members,
               permissionConfig,
-              sandboxEntitled,
             ] = await Promise.all([
               timed('workflows', this.materializeWorkflows(workspaceId)),
               timed('knowledge_bases', this.materializeKnowledgeBases(workspaceId)),
@@ -994,16 +967,9 @@ export class WorkspaceVFS {
               timed('custom_blocks', this.materializeCustomBlocks(workspaceId)),
               timed('mcp_servers', this.materializeMcpServers(workspaceId)),
               timed('skills', this.materializeSkills(workspaceId)),
-              timed(
-                'sandboxes',
-                sandboxEntitlementPromise.then((entitled) =>
-                  entitled ? this.materializeSandboxes(workspaceId) : []
-                )
-              ),
               timed('workspace_row', getWorkspaceWithOwner(workspaceId)),
               membersPromise,
               permissionConfigPromise,
-              sandboxEntitlementPromise,
             ])
 
             // account/ and organization/ describe the viewer's standing rather
@@ -1027,7 +993,6 @@ export class WorkspaceVFS {
               customBlocks: customBlocksSummary,
               mcpServers: mcpServersSummary,
               skills: skillsSummary,
-              ...(sandboxEntitled ? { sandboxes: sandboxesSummary } : {}),
             }
 
             this.files.set('WORKSPACE.md', buildWorkspaceMd(workspaceMdData))
@@ -1051,7 +1016,6 @@ export class WorkspaceVFS {
               fullyDeniedBlockTypes: deniedOperations.fullyDenied,
             }
             const staticFileProjection: StaticFileProjection = {
-              sandboxEntitled,
               deniedOperations,
               isToolAllowed,
             }
@@ -2949,39 +2913,6 @@ export class WorkspaceVFS {
     }
   }
 
-  /**
-   * Project the shared sandbox domain objects into discoverable VFS resources.
-   * Entitlement is checked by the caller before this method runs.
-   */
-  private async materializeSandboxes(
-    workspaceId: string
-  ): Promise<NonNullable<WorkspaceMdData['sandboxes']>> {
-    try {
-      const sandboxes = await listWorkspaceSandboxes(workspaceId)
-      const strategy = currentSandboxStrategy()
-      this.files.set('agent/sandboxes/README.md', serializeSandboxCatalog(strategy))
-      for (const sandbox of sandboxes) {
-        this.files.set(
-          `agent/sandboxes/${sanitizeName(sandbox.name)}.json`,
-          serializeSandbox(sandbox, strategy)
-        )
-      }
-      return sandboxes.map((sandbox) => ({
-        id: sandbox.id,
-        name: sandbox.name,
-        language: sandbox.language,
-        dependencies: sandbox.dependencies,
-        systemPackages: sandbox.systemPackages,
-        cliTools: sandbox.cliTools,
-      }))
-    } catch (err) {
-      logger.warn('Failed to materialize Sim sandboxes', {
-        workspaceId,
-        error: toError(err).message,
-      })
-      return []
-    }
-  }
   private async materializeRecentlyDeleted(workspaceId: string): Promise<void> {
     try {
       const [

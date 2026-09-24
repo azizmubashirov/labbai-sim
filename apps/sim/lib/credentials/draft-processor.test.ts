@@ -149,11 +149,11 @@ describe('parseCredentialDraftIdFromCallbackUrl', () => {
   it('reads the relative callback URL Better Auth documents and stores verbatim', () => {
     expect(
       parseCredentialDraftIdFromCallbackUrl(
-        '/desktop/connect/complete?state=abc&port=57979&credentialDraftId=draft-1'
+        '/oauth/connect/complete?state=abc&port=57979&credentialDraftId=draft-1'
       )
     ).toBe('draft-1')
     expect(
-      parseCredentialDraftIdFromCallbackUrl('/desktop/connect/complete?state=abc&port=57979')
+      parseCredentialDraftIdFromCallbackUrl('/oauth/connect/complete?state=abc&port=57979')
     ).toBeUndefined()
   })
 

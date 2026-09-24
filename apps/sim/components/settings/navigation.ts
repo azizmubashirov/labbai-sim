@@ -4,23 +4,18 @@ import {
   ClipboardList,
   Credit,
   Database,
-  Globe,
   GridOffset,
   HexSimple,
   Integration,
   Key,
-  KeySquare,
   ListChecks,
   Lock,
   LogIn,
   Palette,
-  PanelLeft,
-  Send,
   Server,
   Settings,
   ShieldCheck,
   Shuffle,
-  Sprout,
   TerminalWindow,
   Trash,
   Upload,
@@ -28,20 +23,14 @@ import {
   Wrench,
 } from '@sim/emcn/icons'
 import { type PermissionType, permissionSatisfies } from '@sim/platform-authz/workspace'
-import { CodeIcon, McpIcon, SlackIcon } from '@/components/icons'
+import { McpIcon, SlackIcon } from '@/components/icons'
 import type { SettingsHeaderMeta } from '@/components/settings/settings-header'
 import type { DeploymentFeatures, DeploymentShape } from '@/lib/api/contracts/workspaces'
 import { organizationRoutes } from '@/lib/navigation/paths'
 
-export type SettingsPlane = 'account' | 'selfhost' | 'workspace'
+export type SettingsPlane = 'account' | 'workspace'
 
-export type AccountSettingsSection = 'general' | 'billing' | 'api-keys' | 'admin' | 'mothership'
-
-/**
- * Settings a self-hoster needs from the managed service: their profile, what
- * they pay for, and the Chat keys their own deployment authenticates with.
- */
-export type SelfHostSettingsSection = 'general' | 'billing' | 'chat-keys'
+export type AccountSettingsSection = 'general' | 'billing' | 'api-keys' | 'admin'
 
 export type OrganizationSettingsSection =
   | 'recently-deleted'
@@ -65,22 +54,17 @@ export type WorkspaceSettingsSection =
   | 'requests'
   | 'teammates'
   | 'secrets'
-  | 'byok'
-  | 'sandboxes'
   | 'custom-tools'
   | 'mcp'
   | 'workflow-mcp-servers'
   | 'api-keys'
-  | 'inbox'
   | 'recently-deleted'
   | 'forks'
   | 'custom-blocks'
-  | 'self-host'
 
 export type SettingsSection =
   | AccountSettingsSection
   | OrganizationSettingsSection
-  | SelfHostSettingsSection
   | WorkspaceSettingsSection
 
 export interface SettingsNavigationItem<Section extends string = string> {
@@ -95,16 +79,12 @@ export interface SettingsNavigationItem<Section extends string = string> {
 export type UnifiedSettingsSection =
   | 'connected-accounts'
   | 'general'
-  | 'desktop'
-  | 'browser'
-  | 'terminal'
   | 'secrets'
   | 'access-control'
   | 'requests'
   | 'custom-blocks'
   | 'audit-logs'
   | 'apikeys'
-  | 'byok'
   | 'billing'
   | 'teammates'
   | 'organization'
@@ -115,24 +95,13 @@ export type UnifiedSettingsSection =
   | 'mcp'
   | 'custom-tools'
   | 'workflow-mcp-servers'
-  | 'inbox'
-  | 'sandboxes'
   | 'admin'
   | 'security'
   | 'data-retention'
   | 'data-drains'
-  | 'mothership'
   | 'recently-deleted'
-  | 'self-host'
 
 export type UnifiedNavigationSection = 'account' | 'workspace' | 'organization' | 'platform'
-
-/**
- * A bridge surface the desktop shell must expose for a section to be worth
- * showing. Gated on the surface, never on the user's device toggle — the
- * Browser and Terminal pages are where that toggle is flipped back on.
- */
-export type DesktopSettingsSurface = 'settings' | 'browser' | 'terminal'
 
 export interface UnifiedSettingsNavigationItem {
   id: UnifiedSettingsSection
@@ -155,7 +124,6 @@ export interface UnifiedSettingsNavigationItem {
   selfHostedOverride?: SelfHostedOverride
   requiresSuperUser?: boolean
   requiresAdminRole?: boolean
-  requiresDesktopSurface?: DesktopSettingsSurface
   allowNonOrgAdmin?: boolean
   showWhenLocked?: boolean
   hideForEnterprise?: boolean
@@ -180,7 +148,6 @@ interface UnifiedSettingsProjection
 
 interface SettingsPlaneSectionMap {
   account: AccountSettingsSection
-  selfhost: SelfHostSettingsSection
   workspace: WorkspaceSettingsSection
 }
 
@@ -244,13 +211,6 @@ export function getAccountSettingsHref(
   searchParams?: SettingsHrefSearchParams
 ): string {
   return withSettingsSearchParams(`/account/settings/${section}`, searchParams)
-}
-
-export function getSelfHostSettingsHref(
-  section: SelfHostSettingsSection,
-  searchParams?: SettingsHrefSearchParams
-): string {
-  return withSettingsSearchParams(`/selfhost/settings/${section}`, searchParams)
 }
 
 export function getWorkspaceSettingsHref(
@@ -318,24 +278,14 @@ export const ACCOUNT_SETTINGS_GROUPS = [
 /** Planes with their own standalone shell; the workspace plane renders inside the editor. */
 export type StandaloneSettingsPlane = Exclude<SettingsPlane, 'workspace'> | 'organization'
 
-/**
- * Per-plane sidebar chrome. Self-host is reached from outside the app (the CLI
- * wizard, the README), so it leads with the brand mark rather than a Back link
- * into a workspace the visitor may not even be using.
- */
+/** Per-plane sidebar chrome. */
 export const SETTINGS_PLANE_CHROME: Record<
   StandaloneSettingsPlane,
   { label: string; showWordmark: boolean }
 > = {
   account: { label: 'Account', showWordmark: false },
-  selfhost: { label: 'Self-host', showWordmark: true },
   organization: { label: 'Organization', showWordmark: false },
 }
-
-export const SELFHOST_SETTINGS_GROUPS = [
-  { key: 'account', title: 'Account' },
-  { key: 'developer', title: 'Developer' },
-] as const
 
 export const SETTINGS_SECTION_REGISTRY: readonly SettingsSectionRegistryEntry[] = [
   {
@@ -349,40 +299,6 @@ export const SETTINGS_SECTION_REGISTRY: readonly SettingsSectionRegistryEntry[] 
     },
     planes: {
       account: { id: 'general', group: 'account', order: 0 },
-      selfhost: { id: 'general', group: 'account', order: 0 },
-    },
-  },
-  {
-    label: 'Desktop',
-    icon: PanelLeft,
-    unified: {
-      id: 'desktop',
-      description: 'Manage notifications, startup, local folders, and updates.',
-      group: 'account',
-      order: 2,
-      requiresDesktopSurface: 'settings',
-    },
-  },
-  {
-    label: 'Browser',
-    icon: Globe,
-    unified: {
-      id: 'browser',
-      description: 'Control the browser Chat drives and the data it keeps.',
-      group: 'account',
-      order: 3,
-      requiresDesktopSurface: 'browser',
-    },
-  },
-  {
-    label: 'Terminal',
-    icon: TerminalWindow,
-    unified: {
-      id: 'terminal',
-      description: 'Control the shells Chat runs commands in.',
-      group: 'account',
-      order: 4,
-      requiresDesktopSurface: 'terminal',
     },
   },
   {
@@ -456,12 +372,6 @@ export const SETTINGS_SECTION_REGISTRY: readonly SettingsSectionRegistryEntry[] 
     },
     planes: {
       account: {
-        id: 'billing',
-        description: 'Manage your personal plan, usage, and invoices.',
-        group: 'account',
-        order: 1,
-      },
-      selfhost: {
         id: 'billing',
         description: 'Manage your personal plan, usage, and invoices.',
         group: 'account',
@@ -601,66 +511,6 @@ export const SETTINGS_SECTION_REGISTRY: readonly SettingsSectionRegistryEntry[] 
     },
   },
   {
-    label: 'BYOK',
-    icon: KeySquare,
-    unified: {
-      id: 'byok',
-      description: 'Bring your own model-provider API keys.',
-      group: 'workspace',
-      order: 4,
-      requiresHosted: true,
-    },
-    planes: {
-      workspace: { id: 'byok', group: 'workspace', order: 2 },
-    },
-  },
-  {
-    label: 'Sandboxes',
-    icon: CodeIcon,
-    docsLink: 'https://docs.sim.ai/workflows/blocks/function',
-    unified: {
-      id: 'sandboxes',
-      description: 'Install Python or npm packages for Function blocks to import.',
-      group: 'workspace',
-      order: 8,
-      requiresMax: true,
-      selfHostedOverride: 'sandboxes',
-      showWhenLocked: true,
-    },
-    planes: {
-      workspace: { id: 'sandboxes', group: 'workspace', order: 3 },
-    },
-  },
-  {
-    label: 'Chat keys',
-    icon: HexSimple,
-    planes: {
-      selfhost: {
-        id: 'chat-keys',
-        description: 'Manage the model-provider keys that power Chat.',
-        group: 'developer',
-        order: 2,
-      },
-    },
-  },
-  {
-    label: 'Sim Mailer',
-    icon: Send,
-    unified: {
-      id: 'inbox',
-      description: 'Trigger and process workflows from incoming email.',
-      group: 'workspace',
-      order: 5,
-      requiresMax: true,
-      requiresHosted: true,
-      selfHostedOverride: 'inbox',
-      showWhenLocked: true,
-    },
-    planes: {
-      workspace: { id: 'inbox', group: 'system', order: 8 },
-    },
-  },
-  {
     label: 'Recently deleted',
     icon: Trash,
     unified: {
@@ -671,20 +521,6 @@ export const SETTINGS_SECTION_REGISTRY: readonly SettingsSectionRegistryEntry[] 
     },
     planes: {
       workspace: { id: 'recently-deleted', group: 'system', order: 9 },
-    },
-  },
-  {
-    label: 'Self hosting',
-    icon: Sprout,
-    unified: {
-      id: 'self-host',
-      description: 'Manage this deployment from the Sim managed service.',
-      group: 'platform',
-      order: 2,
-      requiresSelfHosted: true,
-    },
-    planes: {
-      workspace: { id: 'self-host', group: 'system', order: 12 },
     },
   },
   {
@@ -724,7 +560,7 @@ export const SETTINGS_SECTION_REGISTRY: readonly SettingsSectionRegistryEntry[] 
     unified: {
       id: 'data-retention',
       description:
-        'Control data retention windows and PII redaction. Workspaces without an override inherit the organization defaults.',
+        'Control data retention windows. Workspaces without an override inherit the organization defaults.',
       group: 'organization',
       order: 9,
       requiresHosted: true,
@@ -795,20 +631,6 @@ export const SETTINGS_SECTION_REGISTRY: readonly SettingsSectionRegistryEntry[] 
       account: { id: 'admin', group: 'platform', order: 4 },
     },
   },
-  {
-    label: 'Mothership',
-    icon: Server,
-    unified: {
-      id: 'mothership',
-      description: 'Internal Sim operations and license management.',
-      group: 'platform',
-      order: 1,
-      requiresAdminRole: true,
-    },
-    planes: {
-      account: { id: 'mothership', group: 'platform', order: 5 },
-    },
-  },
 ]
 
 /**
@@ -862,9 +684,6 @@ function buildPlaneSettingsItems<Plane extends SettingsPlane>(
 
 export const ACCOUNT_SETTINGS_ITEMS: SettingsNavigationItem<AccountSettingsSection>[] =
   buildPlaneSettingsItems('account')
-
-export const SELFHOST_SETTINGS_ITEMS: SettingsNavigationItem<SelfHostSettingsSection>[] =
-  buildPlaneSettingsItems('selfhost')
 
 export const WORKSPACE_SETTINGS_ITEMS: SettingsNavigationItem<WorkspaceSettingsSection>[] =
   buildPlaneSettingsItems('workspace')
@@ -1102,10 +921,8 @@ export function isOrganizationSettingsSectionAvailable(
 export interface WorkspacePermissionConfig {
   hideSecretsTab?: boolean
   hideApiKeysTab?: boolean
-  hideInboxTab?: boolean
   disableMcpTools?: boolean
   disableCustomTools?: boolean
-  hideSandboxesTab?: boolean
 }
 
 export const WORKSPACE_PERMISSION_CONFIG_KEYS: Partial<
@@ -1113,10 +930,8 @@ export const WORKSPACE_PERMISSION_CONFIG_KEYS: Partial<
 > = {
   secrets: 'hideSecretsTab',
   'api-keys': 'hideApiKeysTab',
-  inbox: 'hideInboxTab',
   mcp: 'disableMcpTools',
   'custom-tools': 'disableCustomTools',
-  sandboxes: 'hideSandboxesTab',
 }
 
 export function workspaceSectionUsesPermissionConfig(section: WorkspaceSettingsSection): boolean {
@@ -1131,8 +946,6 @@ export function getSettingsPermissionConfigKey(section: UnifiedSettingsSection) 
 export interface WorkspaceSettingsEntitlements {
   customBlocks: boolean
   forks: boolean
-  inbox: boolean
-  sandboxes: boolean
 }
 
 /**
@@ -1143,10 +956,7 @@ export interface WorkspaceSettingsEntitlements {
  */
 const LOCKABLE_WORKSPACE_SECTIONS: Partial<
   Record<WorkspaceSettingsSection, keyof WorkspaceSettingsEntitlements>
-> = {
-  inbox: 'inbox',
-  sandboxes: 'sandboxes',
-}
+> = {}
 
 interface ResolveWorkspaceNavigationOptions {
   permission: PermissionType
@@ -1198,17 +1008,13 @@ const WORKSPACE_MUTATION_PERMISSION: Record<WorkspaceSettingsSection, Permission
   requests: 'read',
   teammates: 'admin',
   secrets: 'write',
-  byok: 'admin',
-  sandboxes: 'admin',
   'custom-tools': 'write',
   mcp: 'write',
   'workflow-mcp-servers': 'write',
   'api-keys': 'admin',
-  inbox: 'admin',
   'recently-deleted': 'write',
   forks: 'admin',
   'custom-blocks': 'admin',
-  'self-host': 'admin',
 }
 
 export interface WorkspaceMutationCapabilities {
@@ -1268,12 +1074,7 @@ export function getSettingsSectionMeta(
   plane: SettingsPlane,
   section: string
 ): Pick<SettingsNavigationItem, 'label' | 'description' | 'docsLink'> | null {
-  const catalog =
-    plane === 'account'
-      ? ACCOUNT_SETTINGS_ITEMS
-      : plane === 'selfhost'
-        ? SELFHOST_SETTINGS_ITEMS
-        : WORKSPACE_SETTINGS_ITEMS
+  const catalog = plane === 'account' ? ACCOUNT_SETTINGS_ITEMS : WORKSPACE_SETTINGS_ITEMS
   const item = catalog.find((candidate) => candidate.id === section)
   return item ? { label: item.label, description: item.description, docsLink: item.docsLink } : null
 }

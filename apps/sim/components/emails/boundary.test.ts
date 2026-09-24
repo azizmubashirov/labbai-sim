@@ -7,7 +7,6 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { renderInboxResponseEmail } from '@/components/emails/render'
 
 const APP_ROOT = join(__dirname, '../..')
 const EMAILS_DIR = join(__dirname)
@@ -87,14 +86,5 @@ describe('every email goes through the shared layer', () => {
       }
     }
     expect(offenders).toEqual([])
-  })
-
-  it('the agent reply keeps markdown emphasis on the platform weight scale', async () => {
-    const html = await renderInboxResponseEmail({
-      markdown: 'Some **emphasis** here.',
-      chatUrl: 'https://example.test/chat',
-    })
-    expect(html).not.toMatch(/font-weight:(700|bold)/)
-    expect(html).toContain('font-weight:600')
   })
 })

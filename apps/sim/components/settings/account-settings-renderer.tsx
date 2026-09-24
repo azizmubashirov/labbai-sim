@@ -22,11 +22,6 @@ const Admin = dynamic(() =>
     (module) => module.Admin
   )
 )
-const Mothership = dynamic(() =>
-  import('@/app/workspace/[workspaceId]/settings/components/mothership/mothership').then(
-    (module) => module.Mothership
-  )
-)
 
 interface AccountSettingsRendererProps {
   section: AccountSettingsSection
@@ -42,6 +37,5 @@ export function AccountSettingsRenderer({ section }: AccountSettingsRendererProp
   if (section === 'general') return <General />
   if (section === 'billing') return <Billing scope='account' />
   if (section === 'api-keys') return <ApiKeys scope='personal' />
-  if (section === 'admin') return <Admin />
-  return <Mothership />
+  return <Admin />
 }

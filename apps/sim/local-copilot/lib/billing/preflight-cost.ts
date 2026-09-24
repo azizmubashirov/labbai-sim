@@ -10,7 +10,6 @@ export interface LocalPreflightCostEstimate {
 const COSTLY_TOOL_ESTIMATES: Record<string, LocalPreflightCostEstimate> = {
   generate_image: { estimatedCostUsd: 0.04, estimatedCostLabel: '~$0.04 per image' },
   generate_audio: { estimatedCostUsd: 0.02, estimatedCostLabel: '~$0.02 per audio clip' },
-  generate_video: { estimatedCostUsd: 0.2, estimatedCostLabel: '~$0.20 per video' },
 }
 
 const SPECIALIST_ROUND_ESTIMATE_USD = 0.03

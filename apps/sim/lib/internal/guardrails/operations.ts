@@ -1,7 +1,6 @@
 import { createLogger } from '@sim/logger'
 import { authorizeWorkflowByWorkspacePermission } from '@sim/platform-authz/workflow'
 import { getErrorMessage } from '@sim/utils/errors'
-import { truncate } from '@sim/utils/string'
 import { authorizeCredentialUseForAuth } from '@/lib/auth/credential-access'
 import { AuthType } from '@/lib/auth/hybrid'
 import {
@@ -16,7 +15,6 @@ import { inspectModelInputProvenanceRequest } from '@/lib/execution/model-input-
 import { validateHallucination } from '@/lib/guardrails/validate_hallucination'
 import { validateJson } from '@/lib/guardrails/validate_json'
 import { validateRegex } from '@/lib/guardrails/validate_regex'
-import { validatePIIViaHttp } from '@/lib/guardrails/validation-client'
 import { GuardrailsOperationError } from '@/lib/internal/guardrails/errors'
 import type { GuardrailsValidationInput } from '@/lib/internal/guardrails/input'
 import type { InternalToolOperationContext } from '@/lib/internal/tool-operations/types'
@@ -36,8 +34,6 @@ interface GuardrailsValidationResult {
   error?: string
   score?: number
   reasoning?: string
-  detectedEntities?: unknown[]
-  maskedText?: string
   cost?: number
 }
 
@@ -50,8 +46,6 @@ export interface GuardrailsOperationOutput {
     error?: string
     score?: number
     reasoning?: string
-    detectedEntities?: unknown[]
-    maskedText?: string
   }
 }
 
@@ -249,27 +243,6 @@ async function executeValidation(
       abortSignal: context.signal,
     })
   }
-  if (input.validationType === 'pii') {
-    try {
-      return await validatePIIViaHttp(
-        {
-          text: inputString,
-          entityTypes: input.piiEntityTypes || [],
-          mode: input.piiMode === 'mask' ? 'mask' : 'block',
-          language: input.piiLanguage || 'en',
-          customPatterns: input.piiCustomPatterns,
-        },
-        context.signal
-      )
-    } catch (error) {
-      if (isAbortError(error) || context.signal?.aborted) throw error
-      return {
-        passed: false,
-        error: `PII validation failed: ${truncate(getErrorMessage(error), 950)}`,
-        detectedEntities: [],
-      }
-    }
-  }
   return { passed: false, error: 'Unknown validation type' }
 }
 
@@ -318,11 +291,11 @@ export async function executeGuardrailsValidation(
   if (originalInput === undefined || originalInput === null) {
     return failedVerdict(validationType, '', 'Input is missing or undefined')
   }
-  if (!['json', 'regex', 'hallucination', 'pii'].includes(validationType)) {
+  if (!['json', 'regex', 'hallucination'].includes(validationType)) {
     return failedVerdict(
       validationType,
       originalInput || '',
-      'Invalid validationType. Must be "json", "regex", "hallucination", or "pii"'
+      'Invalid validationType. Must be "json", "regex", or "hallucination"'
     )
   }
   if (validationType === 'regex' && !input.regex) {
@@ -384,8 +357,6 @@ export async function executeGuardrailsValidation(
       error: result.error,
       score: result.score,
       reasoning: result.reasoning,
-      detectedEntities: result.detectedEntities,
-      maskedText: result.maskedText,
     },
   }
 }

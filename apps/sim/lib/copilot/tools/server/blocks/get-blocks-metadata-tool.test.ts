@@ -17,9 +17,7 @@ vi.mock('@/lib/integrations/availability.server', () => ({
   isIntegrationDeploymentAvailableForVisibility: mockIsIntegrationDeploymentAvailable,
 }))
 
-import { computeBlockLevelInputs } from '@/lib/catalog/projection/block-detail'
 import { getBlocksMetadataServerTool } from '@/lib/copilot/tools/server/blocks/get-blocks-metadata-tool'
-import { MothershipBlock } from '@/blocks/blocks/mothership'
 import { getBlock } from '@/blocks/registry'
 import type { BlockConfig } from '@/blocks/types'
 
@@ -28,13 +26,6 @@ describe('get blocks metadata', () => {
     vi.clearAllMocks()
     mockGetUserPermissionConfig.mockResolvedValue({ allowedIntegrations: ['slack'] })
     mockIsIntegrationDeploymentAvailable.mockReturnValue(true)
-  })
-
-  it('omits server-only Mothership policy inputs from block metadata definitions', () => {
-    const definitions = computeBlockLevelInputs(MothershipBlock)
-
-    expect(definitions).not.toHaveProperty('secretScope')
-    expect(definitions).not.toHaveProperty('mountedSecrets')
   })
 
   /**

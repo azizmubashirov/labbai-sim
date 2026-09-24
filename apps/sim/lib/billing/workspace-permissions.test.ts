@@ -50,8 +50,6 @@ const DEPLOYMENT: DeploymentShape = {
     customBlocks: false,
     dataDrains: false,
     dataRetention: false,
-    inbox: false,
-    sandboxes: false,
     sessionPolicies: false,
     sso: false,
     usageMonitoring: false,

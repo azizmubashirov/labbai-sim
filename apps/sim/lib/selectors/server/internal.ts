@@ -9,10 +9,6 @@ import {
   readKnowledgeDocument,
 } from '@/lib/knowledge/application/documents'
 import { getServiceConfigByProviderId } from '@/lib/oauth/utils'
-import {
-  getWorkspaceSandboxUseCase,
-  listWorkspaceSandboxesUseCase,
-} from '@/lib/sandboxes/application/use-cases'
 import type { InternalSelectorKey } from '@/lib/selectors/manifest'
 import {
   SelectorContextUnavailableError,
@@ -281,42 +277,6 @@ export const internalSelectorAttachments = {
         )
       )
       return listSelectorResult([...names].sort().map((name) => ({ id: name, label: name })))
-    },
-  },
-  'workspace.sandboxes': {
-    destination: 'fixed',
-    async execute(args: ExecuteServerSelectorArgs) {
-      if (!args.workspaceId) throw new SelectorContextUnavailableError()
-      const language = args.context.language
-      if (args.request.kind === 'detail') {
-        const result = await getWorkspaceSandboxUseCase
-          .execute({
-            principal: args.principal,
-            input: { workspaceId: args.workspaceId, sandboxId: args.request.id },
-          })
-          .catch((error: unknown) => {
-            if (error instanceof OrchestrationError && error.code === 'not_found') return null
-            throw error
-          })
-        if (!result) return detailSelectorResult(null)
-        const { sandbox } = result
-        const wrongLanguage =
-          (language === 'python' || language === 'javascript') && sandbox.language !== language
-        return detailSelectorResult({
-          id: sandbox.id,
-          label: wrongLanguage ? `${sandbox.name} · wrong language for this block` : sandbox.name,
-        })
-      }
-      const { sandboxes, nextCursorKeys } = await listWorkspaceSandboxesUseCase.execute({
-        principal: args.principal,
-        input: { workspaceId: args.workspaceId, limit: 1000 },
-      })
-      if (nextCursorKeys) throw new SelectorOptionsUnavailableError()
-      return listSelectorResult(
-        sandboxes
-          .filter((sandbox) => !language || language === 'shell' || sandbox.language === language)
-          .map((sandbox) => ({ id: sandbox.id, label: sandbox.name }))
-      )
     },
   },
   'providers.ollamaEmbeddingModels': {

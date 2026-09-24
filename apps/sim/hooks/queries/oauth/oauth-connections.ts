@@ -9,7 +9,6 @@ import {
 } from '@/lib/api/contracts/oauth-connections'
 import { client } from '@/lib/auth/auth-client'
 import { OAUTH_CREDENTIAL_DRAFT_CALLBACK_PARAM } from '@/lib/credentials/draft-constants'
-import { getDesktopBridge } from '@/lib/desktop'
 import { OAUTH_PROVIDERS, type OAuthServiceConfig } from '@/lib/oauth'
 import { getPerRequestOAuthLinkScopes } from '@/lib/oauth/utils'
 
@@ -152,22 +151,6 @@ export function useConnectOAuthService() {
 
   return useMutation({
     mutationFn: async ({ providerId, callbackURL, draftId }: ConnectServiceParams) => {
-      /**
-       * Desktop keeps the entire provider flow in the system browser so the
-       * authorization route's state cookies and callback use one cookie jar.
-       */
-      const desktopBridge = getDesktopBridge()
-      if (desktopBridge?.beginOAuthConnect) {
-        const opened = await desktopBridge.beginOAuthConnect(
-          providerId,
-          draftId ? { draftId } : undefined
-        )
-        if (!opened) {
-          throw new Error('Could not open your browser to connect this account.')
-        }
-        return { success: true }
-      }
-
       if (providerId === 'trello') {
         const returnUrl = encodeURIComponent(callbackURL)
         const draftQuery = draftId ? `&draftId=${encodeURIComponent(draftId)}` : ''

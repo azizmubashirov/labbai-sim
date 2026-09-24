@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import {
   cn,
   DropdownMenu,
@@ -12,14 +12,10 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
-  NATIVE_SURFACE_OCCLUSION_PREPARE_EVENT,
   TabStripAction,
   Tooltip,
 } from '@sim/emcn'
 import { Folder, Plus } from '@sim/emcn/icons'
-import { isBrowserAgentAvailable } from '@/lib/browser-agent/transport'
-import { subscribeDesktopPreferences } from '@/lib/desktop'
-import { isTerminalAvailable } from '@/lib/terminal/transport'
 import {
   type AvailableItem,
   buildResourceFolderTree,
@@ -46,15 +42,6 @@ import { useWorkflows } from '@/hooks/queries/workflows'
 import { useWorkspaceFileFolders } from '@/hooks/queries/workspace-file-folders'
 import { useWorkspaceFiles } from '@/hooks/queries/workspace-files'
 
-/**
- * Placeholder id for the Browser launcher row. It never names a resource: the
- * page the desktop app creates becomes the browser tab, keyed by its own id.
- */
-export const BROWSER_LAUNCHER_ID = 'browser'
-
-/** Placeholder id for the Terminal launcher row; the shell the desktop app opens becomes the tab. */
-export const TERMINAL_LAUNCHER_ID = 'terminal'
-
 export interface AddResourceDropdownProps {
   workspaceId: string
   onAdd: (resource: MothershipResource) => void
@@ -63,10 +50,6 @@ export interface AddResourceDropdownProps {
    * (a module constant) — it keys the underlying group memo.
    */
   excludeTypes?: readonly MothershipResourceType[]
-  /** Delays mounting the menu until a native surface beneath it is hidden. */
-  onRequestOpen?: (open: () => void) => void
-  /** Restores any native surface hidden for this menu. */
-  onClose?: () => Promise<void>
 }
 
 interface AvailableItemsByType {
@@ -119,15 +102,6 @@ const NO_RESOURCE_GROUPS: AvailableItemsByType[] = []
 
 const LOG_DROPDOWN_LIMIT = 50
 
-/** Hide Radix's still-mounted exit surface before a full-screen effect paints. */
-function hideMountedMenuSurfaces(): void {
-  for (const menu of document.querySelectorAll<HTMLElement>(
-    '[data-native-surface-overlay][role="menu"]'
-  )) {
-    menu.style.setProperty('visibility', 'hidden', 'important')
-  }
-}
-
 const LOG_DROPDOWN_FILTERS = {
   timeRange: 'All time' as const,
   level: 'all',
@@ -146,16 +120,6 @@ export function useAvailableResources(
 ): AvailableResources {
   const enabled = options?.enabled ?? true
   const excludeTypes = options?.excludeTypes
-  const browserAvailable = useSyncExternalStore(
-    subscribeDesktopPreferences,
-    isBrowserAgentAvailable,
-    () => false
-  )
-  const terminalAvailable = useSyncExternalStore(
-    subscribeDesktopPreferences,
-    isTerminalAvailable,
-    () => false
-  )
   // Destructured without `= []` defaults on purpose: a literal default allocates a
   // fresh array every render while `data` is undefined (exactly the disabled state),
   // which would bust the group memo below on every render. Undefined is stable.
@@ -303,37 +267,9 @@ export function useAvailableResources(
         }),
       },
     ]
-    // A new browser tab — desktop app only (needs the agent-browser bridge).
-    // Every launch opens another page; the strip lists each as its own tab.
-    if (browserAvailable) {
-      groups.push({
-        type: 'browser' as const,
-        items: [
-          {
-            id: BROWSER_LAUNCHER_ID,
-            name: 'Browser',
-          },
-        ],
-      })
-    }
-    // The live terminal — desktop app only (needs the PTY bridge), and a
-    // single top-level panel like the browser.
-    if (terminalAvailable) {
-      groups.push({
-        type: 'terminal' as const,
-        items: [
-          {
-            id: TERMINAL_LAUNCHER_ID,
-            name: 'Terminal',
-          },
-        ],
-      })
-    }
     return groups.filter((g) => !excluded.has(g.type)).sort(byResourceMenuOrder)
   }, [
     enabled,
-    browserAvailable,
-    terminalAvailable,
     workflows,
     folders,
     fileFolders,
@@ -541,22 +477,6 @@ export function ResourceMenuSections({
         const Icon = config.icon
         const section = sectionByType.get(type)
 
-        // The Browser and Terminal launchers are flat rows that open a new page
-        // or shell. Live pages and shells offered as context are an ordinary
-        // picker submenu.
-        if (
-          !section &&
-          (items[0]?.id === BROWSER_LAUNCHER_ID || items[0]?.id === TERMINAL_LAUNCHER_ID)
-        ) {
-          const item = items[0]
-          return (
-            <DropdownMenuItem key={type} onClick={() => onSelect(resourceFromItem(type, item))}>
-              <Icon className='size-[14px]' />
-              <DropdownMenuItemLabel label={config.label} />
-            </DropdownMenuItem>
-          )
-        }
-
         return (
           <DropdownMenuSub key={type}>
             <DropdownMenuSubTrigger>
@@ -593,11 +513,8 @@ export function AddResourceDropdown({
   workspaceId,
   onAdd,
   excludeTypes,
-  onRequestOpen,
-  onClose,
 }: AddResourceDropdownProps) {
   const [open, setOpen] = useState(false)
-  const contentRef = useRef<HTMLDivElement>(null)
   const [search, setSearch] = useState('')
   const [activeIndex, setActiveIndex] = useState(0)
   // Gated on `open` so an idle tab bar never fetches the workspace lists.
@@ -606,41 +523,23 @@ export function AddResourceDropdown({
     excludeTypes,
   })
   const treeSections = useResourceTreeSections({ groups: available, structureFolders })
-  const hasNativeResourceSurface = isBrowserAgentAvailable() || isTerminalAvailable()
   const closeMenu = useCallback(() => {
     setOpen(false)
     setSearch('')
     setActiveIndex(0)
-    return onClose?.() ?? Promise.resolve()
-  }, [onClose])
-
-  // This popover is shared by Browser and Terminal and sits above the modal
-  // z-layer. Close it inside the pre-paint handshake so resource chrome cannot
-  // remain floating over a newly opened full-screen effect.
-  useEffect(() => {
-    if (!hasNativeResourceSurface) return
-    const handlePrepare = () => {
-      if (open || contentRef.current) hideMountedMenuSurfaces()
-      if (open) void closeMenu()
-    }
-    window.addEventListener(NATIVE_SURFACE_OCCLUSION_PREPARE_EVENT, handlePrepare)
-    return () => window.removeEventListener(NATIVE_SURFACE_OCCLUSION_PREPARE_EVENT, handlePrepare)
-  }, [closeMenu, hasNativeResourceSurface, open])
+  }, [])
 
   const handleOpenChange = (next: boolean) => {
     if (next) {
-      if (onRequestOpen) {
-        onRequestOpen(() => setOpen(true))
-      } else {
-        setOpen(true)
-      }
+      setOpen(true)
       return
     }
-    void closeMenu()
+    closeMenu()
   }
 
   const select = (resource: MothershipResource) => {
-    void closeMenu().then(() => onAdd(resource))
+    closeMenu()
+    onAdd(resource)
   }
 
   const filtered = useMemo(() => {
@@ -683,7 +582,6 @@ export function AddResourceDropdown({
         </Tooltip.Content>
       </Tooltip.Root>
       <DropdownMenuContent
-        ref={contentRef}
         align='start'
         sideOffset={8}
         className='flex w-[320px] flex-col overflow-hidden'

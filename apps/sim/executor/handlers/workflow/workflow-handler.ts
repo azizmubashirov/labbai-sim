@@ -887,9 +887,6 @@ export class WorkflowBlockHandler implements BlockHandler {
           abortSignal: childCancellation?.signal ?? ctx.abortSignal,
           stream: shouldStreamChild,
           selectedOutputs: childSelectedOutputs,
-          // Propagate in-flight block-output redaction into child workflows so
-          // nested blocks mask outputs too (recurses: each child forwards it).
-          piiBlockOutputRedaction: ctx.piiBlockOutputRedaction,
           callChain: childCallChain,
           // A custom block's own session markers and the parent's live stream, fanned
           // out together — see `childCallbacks` above for why this is not two spreads.

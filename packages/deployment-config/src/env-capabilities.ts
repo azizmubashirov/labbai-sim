@@ -4,15 +4,6 @@
  *
  * @packageDocumentation
  */
-import {
-  IMMUTABLE_DAYTONA_SNAPSHOT_REF_ERROR,
-  IMMUTABLE_E2B_TEMPLATE_REF_ERROR,
-  isImmutableDaytonaSnapshotRef,
-  isImmutableE2BTemplateRef,
-  isValidSandboxReleaseGeneration,
-  SANDBOX_RELEASE_GENERATION_ERROR,
-} from '@sim/utils/sandbox-references'
-
 export type EnvCapabilityValue = string | number | boolean | null | undefined
 
 export const CORE_CONFIGURATION_KEYS = [
@@ -43,18 +34,6 @@ export type EnvValueValidation =
   | {
       kind: 'pattern'
       pattern: RegExp
-      message: string
-    }
-  | {
-      kind: 'immutable-e2b-template-ref'
-      message: string
-    }
-  | {
-      kind: 'immutable-daytona-snapshot-ref'
-      message: string
-    }
-  | {
-      kind: 'sandbox-release-generation'
       message: string
     }
   | {
@@ -393,15 +372,6 @@ function isValidEnvCapabilityFieldValue(
   if (validation.kind === 'pattern') {
     validation.pattern.lastIndex = 0
     return validation.pattern.test(serialized)
-  }
-  if (validation.kind === 'immutable-e2b-template-ref') {
-    return isImmutableE2BTemplateRef(serialized)
-  }
-  if (validation.kind === 'immutable-daytona-snapshot-ref') {
-    return isImmutableDaytonaSnapshotRef(serialized)
-  }
-  if (validation.kind === 'sandbox-release-generation') {
-    return isValidSandboxReleaseGeneration(serialized)
   }
   try {
     const parsed = new URL(serialized)
@@ -1076,62 +1046,6 @@ export const STORAGE_CAPABILITY = defineCapability({
   ],
 } as const)
 
-export const SANDBOX_CAPABILITY = defineCapability({
-  strategy: 'selected',
-  id: 'sandbox',
-  label: 'Remote sandbox',
-  selectorKey: 'SANDBOX_PROVIDER',
-  whenUnset: 'default',
-  defaultProvider: { id: 'e2b', kind: 'provider' },
-  providers: [
-    {
-      id: 'e2b',
-      label: 'E2B',
-      activation: { mode: 'enabled', key: 'E2B_ENABLED' },
-      requires: allOf(
-        envField('E2B_API_KEY'),
-        envField('E2B_FUNCTION_TEMPLATE_ID', {
-          validation: {
-            kind: 'immutable-e2b-template-ref',
-            message: IMMUTABLE_E2B_TEMPLATE_REF_ERROR,
-          },
-        }),
-        envField('E2B_FUNCTION_TEMPLATE_GENERATION', {
-          validation: {
-            kind: 'sandbox-release-generation',
-            message: SANDBOX_RELEASE_GENERATION_ERROR,
-          },
-        })
-      ),
-      optionalFields: [
-        envField('NEXT_PUBLIC_E2B_ENABLED'),
-        envField('NEXT_PUBLIC_SANDBOXES_ENABLED'),
-      ],
-    },
-    {
-      id: 'daytona',
-      label: 'Daytona',
-      activation: {
-        mode: 'any-present',
-        keys: ['DAYTONA_API_KEY', 'DAYTONA_FUNCTION_SNAPSHOT_ID'],
-      },
-      requires: allOf(
-        envField('DAYTONA_API_KEY'),
-        envField('DAYTONA_FUNCTION_SNAPSHOT_ID', {
-          validation: {
-            kind: 'immutable-daytona-snapshot-ref',
-            message: IMMUTABLE_DAYTONA_SNAPSHOT_REF_ERROR,
-          },
-        })
-      ),
-      optionalFields: [
-        envField('NEXT_PUBLIC_E2B_ENABLED'),
-        envField('NEXT_PUBLIC_SANDBOXES_ENABLED'),
-      ],
-    },
-  ],
-} as const)
-
 export const ASYNC_JOBS_CAPABILITY = defineCapability({
   strategy: 'selected',
   id: 'jobs',
@@ -1519,7 +1433,6 @@ export const OAUTH_CLIENT_CAPABILITIES = {
 export const ENV_CAPABILITIES = [
   EMAIL_CAPABILITY,
   STORAGE_CAPABILITY,
-  SANDBOX_CAPABILITY,
   ASYNC_JOBS_CAPABILITY,
   CACHE_CAPABILITY,
   OCR_CAPABILITY,
@@ -1564,8 +1477,6 @@ export const DEPLOYMENT_CONFIGURATION_KEYS: readonly string[] = [
     'COPILOT_API_KEY',
     'EMAIL_VERIFICATION_ENABLED',
     'NEXT_PUBLIC_CHAT_DISABLED',
-    'NEXT_PUBLIC_E2B_ENABLED',
-    'NEXT_PUBLIC_SANDBOXES_ENABLED',
     'SIM_AGENT_API_URL',
     ...Object.values(LLM_KEY_POOLS).flatMap((pool) => [
       ...pool.keys,

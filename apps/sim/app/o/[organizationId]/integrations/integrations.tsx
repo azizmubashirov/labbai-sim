@@ -9,7 +9,7 @@ import { SlackSearchActions } from '@/app/o/[organizationId]/integrations/slack-
 import { useOrganizationContext } from '@/app/o/[organizationId]/providers/organization-provider'
 import { SearchIntegrationConnection } from '@/app/workspace/[workspaceId]/home/components/message-content/components/special-tags/search-integration-connection'
 import { useDebounce } from '@/hooks/use-debounce'
-import { useDesktopOAuthConnectListener, useOAuthReturnRouter } from '@/hooks/use-oauth-return'
+import { useOAuthReturnRouter } from '@/hooks/use-oauth-return'
 
 interface OrganizationIntegrationsProps {
   connectionRequest?: { target: SearchConnectionTarget; userId: string }
@@ -21,7 +21,6 @@ export function OrganizationIntegrations({
   connectionRequest,
 }: OrganizationIntegrationsProps = {}) {
   useOAuthReturnRouter()
-  useDesktopOAuthConnectListener()
   const { organization } = useOrganizationContext()
   const { search } = useOrganizationPageFilters()
   const sourceSearch = useDebounce(search.trim(), SEARCH_DEBOUNCE_MS)

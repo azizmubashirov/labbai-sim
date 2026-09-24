@@ -6,7 +6,6 @@ import { useParams } from 'next/navigation'
 import {
   addOAuthChatAttemptToAuthorizeUrl,
   buildOAuthChatCompleteAuthorizeUrl,
-  clearActiveDesktopOAuthChatAttempt,
   createOAuthChatAttempt,
   getOAuthCredentialBaseline,
   hasOAuthCredentialChanged,
@@ -17,10 +16,8 @@ import {
   type OAuthChatAttemptStatus,
   readLatestOAuthChatAttempt,
   readOAuthChatAttempt,
-  setActiveDesktopOAuthChatAttempt,
   setOAuthChatAttemptStatus,
 } from '@/lib/credentials/oauth-chat-attempt'
-import { getDesktopBridge } from '@/lib/desktop'
 import { isAppSurfacePath } from '@/lib/navigation/paths'
 import type { OAuthProvider } from '@/lib/oauth/types'
 import { parseProvider, providerIdsForService } from '@/lib/oauth/utils'
@@ -245,7 +242,7 @@ export function useOAuthChipConnection({
 
   /**
    * A credential can appear without this row launching it — the integrations
-   * page in another tab, or a desktop flow that never returns through the URL.
+   * page in another tab, or a flow that never returns through the URL.
    * Diffing the workspace list against this scope's baseline surfaces that.
    *
    * Workspace-wide, so it cannot be attributed to one row: it only ever *shows*
@@ -472,15 +469,6 @@ export function useOAuthChipConnection({
     }
   }, [connectionStatus, settleFromCredentials])
 
-  /**
-   * Desktop app: OAuth cannot run in an embedded window — not in the app
-   * window (better-auth binds the flow's state to the initiating browser's
-   * cookies) and not in the Sim browser panel (its partition isn't signed in
-   * to Sim, and Google/Microsoft reject embedded user agents outright). So
-   * the chip hands the whole flow to the system browser via the connect
-   * handoff, carrying the workspace/credential scope from the authorize URL;
-   * completion returns through the app's loopback and refreshes credentials.
-   */
   const onConnectClick = useCallback(
     (event: React.MouseEvent<HTMLAnchorElement>) => {
       if (!connectUrl || !isFetched || connectedFromAttempt) {
@@ -514,27 +502,7 @@ export function useOAuthChipConnection({
       setActiveAttemptId(attempt.id)
       setConnectionStatus('pending')
 
-      const bridge = getDesktopBridge()
-      if (bridge?.beginOAuthConnect) {
-        event.preventDefault()
-        const url = new URL(connectUrl)
-        setActiveDesktopOAuthChatAttempt(attempt.id)
-        void bridge
-          .beginOAuthConnect(providerId, {
-            workspaceId: url.searchParams.get('workspaceId') ?? workspaceId,
-            credentialId: url.searchParams.get('credentialId') ?? undefined,
-            chatAttemptId: attempt.id,
-          })
-          .then((opened) => {
-            if (!opened) {
-              clearActiveDesktopOAuthChatAttempt(attempt.id)
-              setOAuthChatAttemptStatus(attempt.id, 'failed')
-            }
-          })
-        return
-      }
-
-      // Web: run the whole flow in a popup so this tab never navigates — the
+      // Run the whole flow in a popup so this tab never navigates — the
       // return leg lands on the self-closing chat-complete page, whose verdict
       // reaches this row over the storage listener. A blocked popup navigates
       // to the same URL instead, so the flow keeps the completion page's

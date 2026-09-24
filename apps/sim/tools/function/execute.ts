@@ -60,7 +60,6 @@ export function buildFunctionExecuteBody(params: CodeExecutionInput): FunctionEx
     outputTable: params.outputTable,
     outputSandboxPath: params.outputSandboxPath,
     outputMimeType: params.outputMimeType,
-    sandboxId: params.sandboxId,
     secretScope: params.secretScope,
     mountedSecrets: params.mountedSecrets,
     unredactedSecretNames: params.unredactedSecretNames,
@@ -93,9 +92,8 @@ export function buildFunctionExecuteBody(params: CodeExecutionInput): FunctionEx
 export const functionExecuteTool: InternalToolConfig<CodeExecutionInput, CodeExecutionOutput> = {
   id: 'function_execute',
   name: 'Function Execute',
-  description: `Execute JavaScript, Python, or shell scripts in a secure sandbox. For JS: fetch() is available, code runs in an async IIFE wrapper. Shell includes general utilities such as jq, curl, git, and rg. Use outputPath/outputTable to persist returned data, or outputSandboxPath + outputPath to export a file created inside the sandbox into the workspace. Naming outputSandboxPath exports only those paths — the /tmp/sim/outputs directory is not harvested in the same call, so use one or the other.
-To read a file, pass its id in \`files\`: each one is mounted read-only under ${SANDBOX_INPUT_DIR}. List that directory to find them rather than guessing a path — names are sanitized and de-duplicated, so they do not always match the original.
-To return a file, write it to ${SANDBOX_OUTPUT_DIR}. Everything there comes back in this tool's \`files\` output as a platform file object, which another tool that takes a file accepts directly — no upload step in between.`,
+  description:
+    'Execute JavaScript in an isolated VM. fetch() is available and the code runs in an async IIFE wrapper; modules cannot be imported. Use outputPath/outputTable to persist returned data.',
   version: '1.0.0',
 
   params: {
@@ -104,13 +102,13 @@ To return a file, write it to ${SANDBOX_OUTPUT_DIR}. Everything there comes back
       required: true,
       visibility: 'user-or-llm',
       description:
-        'Source code in the selected language. JavaScript runs as an async function body and returns a result with return. Python runs as a module and returns an optional result through __sim_result__; legacy snippets with a top-level return remain supported. Shell runs as Bash and can emit a typed result with __SIM_RESULT__=<json>.',
+        'JavaScript source. It runs as an async function body and returns a result with return.',
     },
     language: {
       type: 'string',
       required: false,
       visibility: 'user-only',
-      description: 'Language to execute (javascript, python, or shell)',
+      description: 'Language to execute (javascript)',
       default: DEFAULT_CODE_LANGUAGE,
     },
     timeout: {
@@ -172,12 +170,6 @@ To return a file, write it to ${SANDBOX_OUTPUT_DIR}. Everything there comes back
       required: false,
       visibility: 'user-or-llm',
       description: `Files to mount read-only into the sandbox under ${SANDBOX_INPUT_DIR}. Pass file ids from earlier tool results (or canonical workspace file ids); the runtime resolves them into full file objects before the code runs.`,
-    },
-    sandboxId: {
-      type: 'string',
-      required: false,
-      visibility: 'user-only',
-      description: 'Workspace sandbox providing importable packages and CLI tools',
     },
     secretScope: {
       type: 'string',

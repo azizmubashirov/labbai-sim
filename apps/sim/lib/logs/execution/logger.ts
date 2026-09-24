@@ -1,12 +1,5 @@
 import { db, dbFor } from '@sim/db'
-import {
-  organization,
-  usageLog,
-  user as userTable,
-  workflow,
-  workflowExecutionLogs,
-  workspace,
-} from '@sim/db/schema'
+import { usageLog, user as userTable, workflow, workflowExecutionLogs } from '@sim/db/schema'
 import { createLogger } from '@sim/logger'
 import { describeError, getErrorMessage } from '@sim/utils/errors'
 import { generateId } from '@sim/utils/id'
@@ -28,7 +21,6 @@ import {
   recordUsage,
   stableEventKey,
 } from '@/lib/billing/core/usage-log'
-import { resolveEffectivePiiRedaction } from '@/lib/billing/retention'
 import { checkAndBillPayerOverageThreshold } from '@/lib/billing/threshold-billing'
 import { isBillingEnabled } from '@/lib/core/config/env-flags'
 import { redactApiKeys } from '@/lib/core/security/redaction'
@@ -37,8 +29,6 @@ import {
   collectLargeValueReferenceKeys,
   replaceLargeValueReferenceKeysWithClient,
 } from '@/lib/execution/payloads/large-value-metadata'
-import { redactLargeValueRefs } from '@/lib/logs/execution/pii-large-values'
-import { type RedactablePayload, redactPIIFromExecution } from '@/lib/logs/execution/pii-redaction'
 import {
   clearProgressMarkers,
   type ExecutionProgressMarkers,
@@ -771,109 +761,6 @@ export class ExecutionLogger implements IExecutionLoggerService {
     }
   }
 
-  /**
-   * Mask PII from log content before persistence when the execution's workspace
-   * (via workspace override or org default) has enterprise PII redaction enabled.
-   * Resolved at persist time so both the inline and externalized write paths are
-   * covered. Returns the payload unchanged when disabled or non-enterprise.
-   */
-  private async applyPiiRedaction(
-    workspaceId: string | null,
-    payload: RedactablePayload,
-    storeContext: { workflowId?: string | null; executionId: string; userId?: string | null },
-    onRedactionStart?: () => Promise<void>
-  ): Promise<RedactablePayload> {
-    if (!workspaceId) return payload
-
-    const [row] = await db
-      .select({ orgSettings: organization.dataRetentionSettings })
-      .from(workspace)
-      .leftJoin(organization, eq(organization.id, workspace.organizationId))
-      .where(eq(workspace.id, workspaceId))
-      .limit(1)
-    if (!row) return payload
-
-    // Stored rules are the source of truth. Absence of rules yields the disabled
-    // default, so non-PII organizations incur only the lookup.
-    const config = resolveEffectivePiiRedaction({ orgSettings: row.orgSettings, workspaceId }).logs
-    if (!config.enabled) return payload
-
-    // Masking large payloads can take a while; let the caller surface the phase
-    // (e.g. flip the log row to 'redacting') before the slow work starts.
-    await onRedactionStart?.()
-
-    // The string redactor can't reach values already offloaded to large-value
-    // storage (>8MB refs). Always hydrate → mask → re-store them under the LOGS
-    // policy, even if the block-output stage already masked before offload: that
-    // used the block-output entity set, which can differ from the logs set, so
-    // the log's large values must get the logs policy applied like inline content
-    // does. Masking is idempotent, so already-masked spans are unaffected; a ref
-    // that can't be materialized/re-stored falls back to a marker.
-    const working = await redactLargeValueRefs(payload, {
-      entityTypes: config.entityTypes,
-      language: config.language,
-      customPatterns: config.customPatterns,
-      store: {
-        workspaceId,
-        workflowId: storeContext.workflowId ?? undefined,
-        executionId: storeContext.executionId,
-        userId: storeContext.userId ?? undefined,
-      },
-    })
-
-    return redactPIIFromExecution(working, {
-      entityTypes: config.entityTypes,
-      language: config.language,
-      customPatterns: config.customPatterns,
-    })
-  }
-
-  /** Restores server-only lifecycle metadata after broad execution-state PII masking. */
-  private preservePrivateExecutionStateMetadata(
-    redactedState: SerializableExecutionState | undefined,
-    originalState: SerializableExecutionState | undefined
-  ): SerializableExecutionState | undefined {
-    if (!redactedState) return redactedState
-
-    const provenance = originalState?.resolvedSecretTraceProvenance
-    const provenanceCheckpointVersion = originalState?.resolvedSecretTraceCheckpointVersion
-    const trustedLargeValueAccess = originalState?.trustedLargeValueAccess
-    const blockStates = { ...redactedState.blockStates }
-    for (const [blockId, originalBlockState] of Object.entries(originalState?.blockStates ?? {})) {
-      const redactedBlockState = blockStates[blockId]
-      if (redactedBlockState && originalBlockState.resolvedSecretTraceProvenance) {
-        blockStates[blockId] = {
-          ...redactedBlockState,
-          resolvedSecretTraceProvenance: originalBlockState.resolvedSecretTraceProvenance,
-        }
-      }
-    }
-    const blockLogs = redactedState.blockLogs.map((log, index) => {
-      const displayProvenance =
-        originalState?.blockLogs[index]?.displayResolvedSecretTraceProvenance
-      return displayProvenance
-        ? { ...log, displayResolvedSecretTraceProvenance: displayProvenance }
-        : log
-    })
-
-    return {
-      ...redactedState,
-      blockStates,
-      blockLogs,
-      ...(provenance !== undefined ? { resolvedSecretTraceProvenance: provenance } : {}),
-      ...(originalState?.workflowVariableResolvedSecretTraceProvenance !== undefined
-        ? {
-            workflowVariableResolvedSecretTraceProvenance:
-              originalState.workflowVariableResolvedSecretTraceProvenance,
-          }
-        : {}),
-      ...(provenanceCheckpointVersion !== undefined
-        ? { resolvedSecretTraceCheckpointVersion: provenanceCheckpointVersion }
-        : {}),
-      ...(trustedLargeValueAccess !== undefined ? { trustedLargeValueAccess } : {}),
-    }
-  }
-
   async loadTraceSpansForProjection(params: {
     executionId: string
     workflowId: string
@@ -912,17 +799,7 @@ export class ExecutionLogger implements IExecutionLoggerService {
     traceSpans: TraceSpan[]
   }): Promise<TraceSpan[]> {
     const filtered = filterForDisplay(params.traceSpans)
-    const redacted = redactApiKeys(filtered)
-    const pii = await this.applyPiiRedaction(
-      params.workspaceId,
-      { traceSpans: redacted },
-      {
-        workflowId: params.workflowId,
-        executionId: params.executionId,
-        userId: params.userId ?? undefined,
-      }
-    )
-    return pii.traceSpans as TraceSpan[]
+    return redactApiKeys(filtered) as TraceSpan[]
   }
 
   async completeWorkflowExecution(params: {
@@ -1059,59 +936,6 @@ export class ExecutionLogger implements IExecutionLoggerService {
     const redactedWorkflowInput =
       filteredWorkflowInput !== undefined ? redactApiKeys(filteredWorkflowInput) : undefined
 
-    const pii = await this.applyPiiRedaction(
-      existingLog?.workspaceId ?? null,
-      {
-        traceSpans: [],
-        finalOutput: redactedFinalOutput,
-        ...(redactedWorkflowInput !== undefined ? { workflowInput: redactedWorkflowInput } : {}),
-        ...(builtExecutionData.error !== undefined ? { error: builtExecutionData.error } : {}),
-        ...(builtExecutionData.completionFailure !== undefined
-          ? { completionFailure: builtExecutionData.completionFailure }
-          : {}),
-        ...(builtExecutionData.trigger !== undefined
-          ? { trigger: builtExecutionData.trigger }
-          : {}),
-        ...(builtExecutionData.executionState !== undefined
-          ? { executionState: builtExecutionData.executionState }
-          : {}),
-        ...(builtExecutionData.environment !== undefined
-          ? { environment: builtExecutionData.environment }
-          : {}),
-        ...(builtExecutionData.correlation !== undefined
-          ? { correlation: builtExecutionData.correlation }
-          : {}),
-      },
-      {
-        workflowId: existingLog?.workflowId ?? null,
-        executionId,
-        userId: actorUserId,
-      },
-      async () => {
-        // Execution is done but the log payload is still being masked — surface
-        // that as 'redacting' so the Logs UI doesn't show a stale 'running'.
-        // Guarded on 'running' so a concurrent cancellation is never clobbered;
-        // the terminal update below overwrites with the final status either way.
-        // Purely cosmetic: a failed write must never abort masking/finalization.
-        try {
-          await db
-            .update(workflowExecutionLogs)
-            .set({ status: 'redacting' })
-            .where(
-              and(
-                eq(workflowExecutionLogs.executionId, executionId),
-                eq(workflowExecutionLogs.status, 'running')
-              )
-            )
-        } catch (error) {
-          logger.warn('Failed to set redacting status on execution log', {
-            executionId,
-            error: getErrorMessage(error),
-          })
-        }
-      }
-    )
-
     const rawDurationMs =
       isResume && existingLog?.startedAt
         ? new Date(endedAt).getTime() - new Date(existingLog.startedAt).getTime()
@@ -1121,17 +945,9 @@ export class ExecutionLogger implements IExecutionLoggerService {
         ? Math.max(0, Math.round(rawDurationMs))
         : 0
 
-    const safeExecutionState = this.preservePrivateExecutionStateMetadata(
-      pii.executionState as SerializableExecutionState | undefined,
-      builtExecutionData.executionState
-    )
-
     /**
      * Duplicated top-level so the display projection can still rebuild its
-     * registry after compaction drops `executionState`. Read from the
-     * pre-redaction state: `preservePrivateExecutionStateMetadata` copies the
-     * provenance across verbatim, and this one also survives redaction
-     * producing no state at all.
+     * registry after compaction drops `executionState`.
      */
     const runProvenance = builtExecutionData.executionState?.resolvedSecretTraceProvenance
 
@@ -1139,20 +955,8 @@ export class ExecutionLogger implements IExecutionLoggerService {
       ...builtExecutionData,
       ...(runProvenance !== undefined ? { resolvedSecretTraceProvenance: runProvenance } : {}),
       traceSpans: copyTraceSpansWithoutCosts(preparedTraceSpans),
-      finalOutput: pii.finalOutput as BlockOutputData,
-      ...(pii.workflowInput !== undefined ? { workflowInput: pii.workflowInput } : {}),
-      ...(pii.error !== undefined ? { error: pii.error as string } : {}),
-      ...(pii.completionFailure !== undefined
-        ? { completionFailure: pii.completionFailure as string }
-        : {}),
-      ...(pii.trigger !== undefined ? { trigger: pii.trigger as ExecutionTrigger } : {}),
-      ...(safeExecutionState !== undefined ? { executionState: safeExecutionState } : {}),
-      ...(pii.environment !== undefined
-        ? { environment: pii.environment as ExecutionEnvironment }
-        : {}),
-      ...(pii.correlation !== undefined
-        ? { correlation: pii.correlation as ExecutionData['correlation'] }
-        : {}),
+      finalOutput: redactedFinalOutput as BlockOutputData,
+      ...(redactedWorkflowInput !== undefined ? { workflowInput: redactedWorkflowInput } : {}),
     }
 
     // Bounded in-memory form. Returned to callers (notification delivery/events)

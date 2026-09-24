@@ -7,7 +7,6 @@ import {
   getMainCSPPolicy,
   getWorkflowExecutionCSPPolicy,
 } from './lib/core/security/csp'
-import { LANDING_ROUTES } from './lib/landing/routes'
 
 const nextConfig: NextConfig = {
   devIndicators: false,
@@ -21,12 +20,8 @@ const nextConfig: NextConfig = {
   },
   images: {
     formats: ['image/avif', 'image/webp'],
-    /**
-     * Allowed `quality` values for next/image. 75 is the app-wide default;
-     * 90 exists for large photographic marketing assets (the landing hero
-     * backdrop) where the default visibly softens texture.
-     */
-    qualities: [75, 90],
+    /** Allowed `quality` values for next/image. 75 is the app-wide default. */
+    qualities: [75],
     remotePatterns: [
       {
         protocol: 'https',
@@ -94,11 +89,6 @@ const nextConfig: NextConfig = {
     '@1password/sdk',
     'ws',
     'isolated-vm',
-    '@e2b/code-interpreter',
-    'e2b',
-    '@daytona/sdk',
-    '@earendil-works/pi-ai',
-    '@earendil-works/pi-coding-agent',
     /**
      * Keep PDF.js and its native canvas implementation intact. The shared server
      * loader initializes canvas primitives before PDF.js evaluates its module.
@@ -269,16 +259,6 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        /** Generated footer artwork uses content hashes, so URLs are immutable. */
-        source: '/landing/footer-artwork/:path*',
-        headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
-      },
-      {
-        /** Generated hero artwork uses content hashes, so URLs are immutable. */
-        source: '/landing/hero-artwork/:path*',
-        headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
-      },
-      {
         source: '/.well-known/:path*',
         headers: [
           { key: 'Access-Control-Allow-Origin', value: '*' },
@@ -310,13 +290,12 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        // Exclude Vercel internal resources and static assets from strict COOP, Google Drive Picker
-        // and the /demo Cal.com booking embed to prevent 'refused to connect' / slow-load issues.
-        // The pages an OAuth popup can land on are excluded too: `same-origin` would disown the
-        // popup from its opener, leaving it not reliably script-closable and reporting `closed`
-        // for a live window.
+        // Exclude Vercel internal resources and static assets from strict COOP and Google Drive
+        // Picker to prevent 'refused to connect' / slow-load issues. The pages an OAuth popup can
+        // land on are excluded too: `same-origin` would disown the popup from its opener, leaving
+        // it not reliably script-closable and reporting `closed` for a live window.
         source:
-          '/((?!_next|_vercel|api|favicon.ico|w/.*|workspace|api/tools/drive|demo|oauth-error|oauth/chat-complete).*)',
+          '/((?!_next|_vercel|api|favicon.ico|w/.*|workspace|api/tools/drive|oauth-error|oauth/chat-complete).*)',
         headers: [
           {
             key: 'Cross-Origin-Opener-Policy',
@@ -327,10 +306,9 @@ const nextConfig: NextConfig = {
       {
         // COEP stays on by default - a new route is cross-origin isolated unless
         // it is named here. The exemptions are the app surfaces that embed
-        // credentialed third parties (Drive Picker, Vercel resources) and the
-        // marketing surface, which must opt out wholesale: see LANDING_ROUTES.
+        // credentialed third parties (Drive Picker, Vercel resources).
         // The trailing `|$` exempts the root path.
-        source: `/((?!_next|_vercel|api|favicon.ico|w/.*|workspace/.*|api/tools/drive|${LANDING_ROUTES.join('|')}|$).*)`,
+        source: '/((?!_next|_vercel|api|favicon.ico|w/.*|workspace/.*|api/tools/drive|$).*)',
         headers: [
           {
             key: 'Cross-Origin-Embedder-Policy',
@@ -339,11 +317,11 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        // For main app routes, Google Drive Picker, the /demo Cal.com embed, the OAuth popup pages,
-        // and Vercel resources - use permissive policies. The popup pages match their opener's
-        // value so the two stay in one browsing-context group.
+        // For main app routes, Google Drive Picker, the OAuth popup pages, and Vercel resources -
+        // use permissive policies. The popup pages match their opener's value so the two stay in
+        // one browsing-context group.
         source:
-          '/(w/.*|workspace.*|api/tools/drive|demo.*|oauth-error|oauth/chat-complete|_next/.*|_vercel/.*)',
+          '/(w/.*|workspace.*|api/tools/drive|oauth-error|oauth/chat-complete|_next/.*|_vercel/.*)',
         headers: [
           {
             key: 'Cross-Origin-Embedder-Policy',
@@ -461,55 +439,6 @@ const nextConfig: NextConfig = {
       }
     )
 
-    // Redirect /building and /studio to /blog (legacy URL support)
-    redirects.push(
-      {
-        source: '/building/:path*',
-        destination: 'https://www.sim.ai/blog/:path*',
-        permanent: true,
-      },
-      {
-        source: '/studio/:path*',
-        destination: 'https://www.sim.ai/blog/:path*',
-        permanent: true,
-      }
-    )
-
-    // The scheduled-tasks marketing page is retired with the feature. The URL is
-    // indexed, so send it to the surface that still carries scheduled execution
-    // (the workflow Schedule trigger) instead of letting it 404.
-    redirects.push({
-      source: '/scheduled-tasks',
-      destination: '/workflows',
-      permanent: true,
-    })
-
-    /**
-     * The marketing Academy course/lesson pages were removed; content is
-     * consolidated into the docs site instead. Old course/lesson slugs have
-     * no equivalent path there, so every sub-path collapses to the new
-     * landing page rather than forwarding to a path that may not exist.
-     */
-    redirects.push({
-      source: '/academy/:path*',
-      destination: 'https://docs.sim.ai/academy',
-      permanent: true,
-    })
-
-    // Move root feeds to blog namespace
-    redirects.push(
-      {
-        source: '/rss.xml',
-        destination: '/blog/rss.xml',
-        permanent: true,
-      },
-      {
-        source: '/sitemap-images.xml',
-        destination: '/blog/sitemap-images.xml',
-        permanent: true,
-      }
-    )
-
     // Legacy chat URL support: the workspace chat route was renamed from
     // `/workspace/:workspaceId/task/:chatId` to `/workspace/:workspaceId/chat/:chatId`.
     // Preserve existing bookmarks and deeplinks.
@@ -519,146 +448,6 @@ const nextConfig: NextConfig = {
       permanent: true,
     })
 
-    // Legacy integration slug: the incident.io block's display name was fixed
-    // from `incidentio` to `incident.io`, which moved its catalog slug.
-    // Preserve the previously indexed landing URL.
-    redirects.push({
-      source: '/integrations/incidentio',
-      destination: '/integrations/incident-io',
-      permanent: true,
-    })
-
-    /**
-     * Legacy integration slug: the SAP block's display name was fixed from
-     * `SAP S/4HANA` to `SAP S4HANA`, which moved its catalog slug. Preserves
-     * the previously indexed landing URL.
-     */
-    redirects.push({
-      source: '/integrations/sap-s-4hana',
-      destination: '/integrations/sap-s4hana',
-      permanent: true,
-    })
-
-    /**
-     * Legacy integration slug: the Cal.com block's display name briefly
-     * shipped as `CalCom` before being fixed to `Cal Com`/`Cal.com`, which
-     * moved its catalog slug from `calcom` to `cal-com`.
-     */
-    redirects.push({
-      source: '/integrations/calcom',
-      destination: '/integrations/cal-com',
-      permanent: true,
-    })
-
-    /**
-     * The partner program page was removed; routes existing links/bookmarks
-     * to contact instead of leaving a dead, previously-indexed URL.
-     */
-    redirects.push({
-      source: '/partners',
-      destination: '/contact',
-      permanent: true,
-    })
-
-    /**
-     * AEO/GEO-style posts (listicles, comparisons, how-tos) were split out of
-     * `/blog` into the dedicated `/library` section so `/blog` stays
-     * editorial-only. Preserve previously indexed URLs for the moved posts.
-     */
-    for (const slug of [
-      'best-zapier-alternatives',
-      'ai-agents-vs-rpa',
-      'ai-agent-vs-chatbot',
-      'openai-vs-n8n-vs-sim',
-      'ai-agent-ideas',
-      'how-to-create-an-ai-agent',
-    ]) {
-      redirects.push({
-        source: `/blog/${slug}`,
-        destination: `/library/${slug}`,
-        permanent: true,
-      })
-    }
-
-    /**
-     * The comparison route was renamed from `/comparison` to `/comparisons`
-     * for naming consistency with `/integrations/[slug]` (plural category,
-     * singular item). Preserve previously indexed URLs for the hub page and
-     * every competitor detail page.
-     */
-    redirects.push(
-      {
-        source: '/comparison',
-        destination: '/comparisons',
-        permanent: true,
-      },
-      {
-        source: '/comparison/:path*',
-        destination: '/comparisons/:path*',
-        permanent: true,
-      }
-    )
-
-    /**
-     * Stray crawler/artifact URLs picked up in an external SEO audit — no
-     * page ever existed at these paths, but they were indexed or linked
-     * somewhere with junk characters/casing. Send them home instead of 404.
-     */
-    redirects.push(
-      {
-        source: '/$',
-        destination: '/',
-        permanent: true,
-      },
-      {
-        source: '/&',
-        destination: '/',
-        permanent: true,
-      },
-      {
-        source: '/Sim',
-        destination: '/',
-        permanent: true,
-      },
-      {
-        source: '/homepage',
-        destination: '/',
-        permanent: true,
-      },
-      {
-        source: '/logo',
-        destination: '/',
-        permanent: true,
-      },
-      {
-        source: '/en-US',
-        destination: '/',
-        permanent: true,
-      }
-    )
-
-    /**
-     * Indexed 404s from an external SEO audit. The capability paths read as
-     * tool/feature pages and map to the integrations catalog; the rest have no
-     * closer successor than the homepage.
-     *
-     * `/security` is deliberately excluded: security.txt advertises it as the
-     * RFC 9116 `Policy` URI, so a permanent redirect to marketing would both
-     * mislead that link and shadow a real policy page added later.
-     */
-    redirects.push(
-      ...['read', 'research', 'scrape'].map((slug) => ({
-        source: `/${slug}`,
-        destination: '/integrations',
-        permanent: true,
-      })),
-      ...['actions', 'crawl', 'fast'].map((slug) => ({
-        source: `/${slug}`,
-        destination: '/',
-        permanent: true,
-      }))
-    )
-
     return redirects
   },
   async rewrites() {
@@ -666,10 +455,6 @@ const nextConfig: NextConfig = {
       {
         source: '/favicon.ico',
         destination: '/icon.svg',
-      },
-      {
-        source: '/r/:shortCode',
-        destination: 'https://go.trybeluga.ai/:shortCode',
       },
     ]
   },

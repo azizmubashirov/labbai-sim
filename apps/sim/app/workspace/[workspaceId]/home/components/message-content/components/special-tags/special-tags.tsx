@@ -8,19 +8,15 @@ import {
   ChevronDown,
   Lock,
   SquareArrowUpRight,
-  TerminalWindow,
 } from '@sim/emcn/icons'
 import { isRecordLike } from '@sim/utils/object'
 import { useParams } from 'next/navigation'
 import { useSession } from '@/lib/auth/auth-client'
 import { buildHostedUpgradeUrl, HOSTED_BILLING_SETTINGS_URL } from '@/lib/billing/upgrade-reasons'
 import { canManageWorkspaceBilling } from '@/lib/billing/workspace-permissions'
-import { isBrowserAgentAvailable, sendBrowserPanelAction } from '@/lib/browser-agent/transport'
 import { useDeploymentShape } from '@/lib/core/config/deployment-shape'
 import { isSafeHttpUrl } from '@/lib/core/utils/urls'
 import { readLatestOAuthChatAttempt } from '@/lib/credentials/oauth-chat-attempt'
-import { getDesktopBridge } from '@/lib/desktop'
-import { desktopChatScopeId } from '@/lib/desktop/chat-scope'
 import { resolveCredentialDisplay } from '@/lib/integrations/credential-display'
 import {
   resolveOAuthServiceForSlug,
@@ -36,7 +32,6 @@ import {
 } from '@/lib/knowledge/search/connection-target'
 import { OAUTH_PROVIDERS } from '@/lib/oauth/oauth'
 import { getServiceConfigByProviderId } from '@/lib/oauth/utils'
-import { finishTerminalHandoff, isTerminalAvailable } from '@/lib/terminal/transport'
 import { useChatSurface } from '@/app/workspace/[workspaceId]/home/components/chat-surface-context'
 import { ContextMentionIcon } from '@/app/workspace/[workspaceId]/home/components/context-mention-icon'
 import {
@@ -46,10 +41,7 @@ import {
   InteractionCardInputRow,
   InteractionCardRecap,
 } from '@/app/workspace/[workspaceId]/home/components/message-content/components/interaction-card'
-import {
-  parseQuestionAnswerMessage,
-  QuestionDisplay,
-} from '@/app/workspace/[workspaceId]/home/components/message-content/components/question'
+import { QuestionDisplay } from '@/app/workspace/[workspaceId]/home/components/message-content/components/question'
 import { ResourceMention } from '@/app/workspace/[workspaceId]/home/components/message-content/components/resource-mention'
 import { ChartDisplay } from '@/app/workspace/[workspaceId]/home/components/message-content/components/special-tags/chart-display'
 import {
@@ -139,9 +131,6 @@ export const CREDENTIAL_TAG_TYPES = [
   'credential_id',
   'link',
   'secret_input',
-  'folder_access',
-  'browser_takeover',
-  'terminal_handoff',
   'service_account',
 ] as const
 
@@ -157,8 +146,7 @@ export interface CredentialItemData {
   provider?: string
   /**
    * Env-var key name to save the pasted secret under (secret_input), e.g.
-   * "OPENAI_API_KEY"; the folder hint for folder_access; the takeover reason
-   * for browser_takeover; what the user needs to do for terminal_handoff.
+   * "OPENAI_API_KEY".
    */
   name?: string
   /** Where a secret_input value is persisted. Defaults to "workspace". */
@@ -572,16 +560,6 @@ function isCredentialItemData(value: unknown): value is CredentialItemData {
     }
     return typeof value.name === 'string' && value.name.trim().length > 0
   }
-  // folder_access, browser_takeover and terminal_handoff are value-less action
-  // chips (optional `name` carries the folder hint / reason).
-  if (
-    value.type === 'folder_access' ||
-    value.type === 'browser_takeover' ||
-    value.type === 'terminal_handoff'
-  ) {
-    return value.name === undefined || typeof value.name === 'string'
-  }
-
   // A service_account tag is a control, not a value: it names the provider
   // whose setup form to open, and the user types the secret into that form —
   // so it never carries a `value`, but it is useless without a provider. An
@@ -2391,143 +2369,6 @@ function CredentialSecretInputRow({
 }
 
 /**
- * Folder icon for the local-folder grant chip (matches the credential chip
- * icon sizing).
- */
-const FolderGrantIcon = ({ className }: { className?: string }) => (
-  <svg className={className} viewBox='0 0 16 16' fill='none' xmlns='http://www.w3.org/2000/svg'>
-    <path
-      d='M1.5 4.5A1.5 1.5 0 0 1 3 3h3.2l1.6 1.8H13A1.5 1.5 0 0 1 14.5 6.3v5.2A1.5 1.5 0 0 1 13 13H3a1.5 1.5 0 0 1-1.5-1.5v-7z'
-      stroke='currentColor'
-      strokeWidth='1.2'
-      strokeLinejoin='round'
-    />
-  </svg>
-)
-
-/**
- * Inline grant chip rendered for
- * `<credential>{"type":"folder_access","name":"Desktop"}</credential>`.
- * Clicking opens the desktop app's native folder picker (read-only grant,
- * same flow as the Desktop settings folder picker). Renders nothing outside the
- * desktop app — there is no local filesystem bridge to grant against.
- */
-function FolderAccessDisplay({ data }: { data: CredentialItemData }) {
-  const [picking, setPicking] = useState(false)
-  const [grantedName, setGrantedName] = useState<string | null>(null)
-
-  const bridge = getDesktopBridge()
-  if (!bridge?.localFilesystem) return null
-
-  const hint = (data.name ?? '').trim()
-  const label = grantedName
-    ? `Access granted — ${grantedName}`
-    : hint
-      ? `Grant access to ${hint}`
-      : 'Grant access to a local folder'
-
-  const handleClick = async () => {
-    if (picking || grantedName) return
-    setPicking(true)
-    try {
-      const response = await bridge.localFilesystem({ operation: 'mount_directory' })
-      if (response.ok && 'mount' in response.data && response.data.mount) {
-        setGrantedName(response.data.mount.name)
-        toast.success(`Granted access to ${response.data.mount.name}`)
-      }
-    } catch {
-      toast.error("Couldn't open the folder picker. Please try again.")
-    } finally {
-      setPicking(false)
-    }
-  }
-
-  return (
-    <button
-      type='button'
-      onClick={() => void handleClick()}
-      disabled={picking || grantedName !== null}
-      className={cn(
-        'flex w-full items-center gap-2 rounded-2xl border border-[var(--border-1)] px-3 py-2.5 text-left transition-colors',
-        grantedName === null && !picking && 'hover-hover:bg-[var(--surface-5)]',
-        picking && 'opacity-60'
-      )}
-    >
-      <FolderGrantIcon className='size-[16px] shrink-0' />
-      <span className='flex-1 text-[var(--text-body)] text-sm'>
-        {picking ? 'Choose a folder…' : label}
-      </span>
-      {grantedName === null && (
-        <ArrowRight className='size-[16px] shrink-0 text-[var(--text-icon)]' />
-      )}
-    </button>
-  )
-}
-
-/**
- * Shared browser hand-back question. While active it reports the selected
- * answer; after completion the same component renders its answered recap.
- */
-export function BrowserTakeoverQuestion({
-  reason,
-  answer,
-  onAnswer,
-}: {
-  reason?: string
-  answer?: string
-  onAnswer?: (answer: string) => void
-}) {
-  const normalizedReason = reason?.trim() ?? ''
-  const normalizedAnswer = answer?.trim() ?? ''
-  const prompt = normalizedReason || 'Finish in the browser'
-  const questions: QuestionItem[] = [
-    {
-      type: 'single_select',
-      prompt,
-      options: [{ id: 'continue', label: 'Continue' }],
-    },
-  ]
-
-  return (
-    <QuestionDisplay
-      data={questions}
-      answers={normalizedAnswer ? [normalizedAnswer] : undefined}
-      dismissible={false}
-      onSelect={
-        onAnswer
-          ? (message) => {
-              const answer = parseQuestionAnswerMessage(questions, message)?.[0]?.trim()
-              if (answer) onAnswer(answer)
-            }
-          : undefined
-      }
-    />
-  )
-}
-
-/** Connects the active browser question to the desktop panel action. */
-function BrowserTakeoverDisplay({ data }: { data: CredentialItemData }) {
-  const { workspaceId } = useParams<{ workspaceId: string }>()
-  const { chatId } = useChatSurface()
-
-  if (!isBrowserAgentAvailable()) return null
-
-  return (
-    <BrowserTakeoverQuestion
-      reason={data.name}
-      onAnswer={(answer) => {
-        const takeoverResponse = answer !== 'Continue' ? answer : undefined
-        sendBrowserPanelAction(
-          'takeover-done',
-          takeoverResponse ? { takeoverResponse } : {},
-          desktopChatScopeId(workspaceId, chatId)
-        )
-      }}
-    />
-  )
-}
-
-/**
  * Inline "set up a service account" control rendered for
  * `<credential>{"type":"service_account","provider":"slack"}</credential>`.
  *
@@ -2789,47 +2630,6 @@ function PersonalCredentialLinkDisplay({
 }
 
 /**
- * Inline hand-back chip rendered while a terminal handoff waits on the user —
- * a command sitting on a prompt only they can answer. Without it the tool row
- * just spins: the command is blocked in a panel the user may not even be
- * looking at, with nothing saying it wants them. Clicking tells the waiting
- * handoff they are done; the terminal id rides in `value` so the click reaches
- * the right shell. Renders nothing outside the desktop app.
- */
-function TerminalHandoffDisplay({ data }: { data: CredentialItemData }) {
-  const { workspaceId } = useParams<{ workspaceId: string }>()
-  const { chatId } = useChatSurface()
-  const [handedBack, setHandedBack] = useState(false)
-
-  if (!isTerminalAvailable()) return null
-
-  const reason = (data.name ?? '').trim()
-  const label = handedBack
-    ? 'Handed control back to Sim'
-    : reason || 'Finish in the terminal, then hand control back'
-
-  return (
-    <button
-      type='button'
-      onClick={() => {
-        if (handedBack) return
-        setHandedBack(true)
-        finishTerminalHandoff(data.value ?? '', desktopChatScopeId(workspaceId, chatId))
-      }}
-      disabled={handedBack}
-      className={cn(
-        'flex w-full items-center gap-2 rounded-2xl border border-[var(--border-1)] px-3 py-2.5 text-left transition-colors',
-        !handedBack && 'hover-hover:bg-[var(--surface-5)]'
-      )}
-    >
-      <TerminalWindow className='size-[16px] shrink-0' />
-      <span className='flex-1 text-[var(--text-body)] text-sm'>{label}</span>
-      {!handedBack && <ArrowRight className='size-[16px] shrink-0 text-[var(--text-icon)]' />}
-    </button>
-  )
-}
-
-/**
  * sim_key stays in the routing set so a payload carrying one still takes the
  * card path (CredentialDisplay renders its reveal separately), but it is an
  * output, so the card itself never shows it as a row.
@@ -2887,13 +2687,7 @@ function CredentialItemDisplay({
   const { organizationId } = useParams<{ organizationId?: string }>()
   const { SearchConnectionComponent } = useChatSurface()
   const { data: session } = useSession()
-  if (
-    requestMode === 'assistant' &&
-    data.type !== 'link' &&
-    data.type !== 'browser_takeover' &&
-    data.type !== 'terminal_handoff'
-  )
-    return null
+  if (requestMode === 'assistant' && data.type !== 'link') return null
   if (data.type === 'secret_input') {
     const secretName = data.name?.trim()
     if (embedded) {
@@ -2910,18 +2704,6 @@ function CredentialItemDisplay({
     return (
       <SecretInputDisplay data={data} embedded={embedded} divided={divided} onSaved={onSaved} />
     )
-  }
-
-  if (data.type === 'folder_access') {
-    return <FolderAccessDisplay data={data} />
-  }
-
-  if (data.type === 'browser_takeover') {
-    return <BrowserTakeoverDisplay data={data} />
-  }
-
-  if (data.type === 'terminal_handoff') {
-    return <TerminalHandoffDisplay data={data} />
   }
 
   if (data.type === 'link') {

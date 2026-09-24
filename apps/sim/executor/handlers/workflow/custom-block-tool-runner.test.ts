@@ -15,18 +15,11 @@ vi.mock('@/executor/handlers/workflow/workflow-handler', () => ({
 }))
 
 import { ChildWorkflowError } from '@/executor/errors/child-workflow-error'
-import type { PiiBlockOutputRedaction } from '@/executor/execution/types'
 import {
   buildCustomBlockExecutionContext,
   runCustomBlockTool,
 } from '@/executor/handlers/workflow/custom-block-tool-runner'
 import { ResolvedSecretTraceRegistry } from '@/executor/utils/resolved-secret-trace-registry'
-
-const PII_POLICY: PiiBlockOutputRedaction = {
-  enabled: true,
-  entityTypes: ['EMAIL_ADDRESS'],
-  language: 'en',
-}
 
 const mockRunnerLogger =
   vi.mocked(createLogger).mock.results[
@@ -72,17 +65,15 @@ describe('buildCustomBlockExecutionContext', () => {
     expect(buildCustomBlockExecutionContext({}, { environmentVariables: {} }).callChain).toEqual([])
   })
 
-  it('carries the caller-supplied env map and redaction policy verbatim', () => {
+  it('carries the caller-supplied env map verbatim', () => {
     const ctx = buildCustomBlockExecutionContext(
       { workspaceId: 'ws-1' },
       {
         environmentVariables: { MY_API_KEY: 'secret-value' },
-        piiBlockOutputRedaction: PII_POLICY,
       }
     )
 
     expect(ctx.environmentVariables).toEqual({ MY_API_KEY: 'secret-value' })
-    expect(ctx.piiBlockOutputRedaction).toBe(PII_POLICY)
   })
 })
 
@@ -158,14 +149,13 @@ describe('runCustomBlockTool', () => {
     expect(res.output).toEqual({})
   })
 
-  it('runs the child with no env and no redaction policy — the custom branch re-derives both', async () => {
+  it('runs the child with no env — the custom branch re-derives it', async () => {
     mockExecute.mockResolvedValue({ success: true })
 
     await runCustomBlockTool({ blockType: 'custom_block_abc', _context: {} })
 
     const [ctxArg] = mockExecute.mock.calls[0]
     expect(ctxArg.environmentVariables).toEqual({})
-    expect(ctxArg.piiBlockOutputRedaction).toBeUndefined()
   })
 
   it('rejects a missing block type without invoking the handler', async () => {

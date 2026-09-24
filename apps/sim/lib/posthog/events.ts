@@ -416,7 +416,7 @@ export interface PostHogEventMap {
   }
 
   settings_tab_viewed: {
-    plane: 'account' | 'organization' | 'selfhost' | 'workspace'
+    plane: 'account' | 'organization' | 'workspace'
     section: string
   }
 

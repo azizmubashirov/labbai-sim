@@ -8,8 +8,6 @@ import { redactApiKeys } from '@/lib/core/security/redaction'
 import { normalizeStringArray } from '@/lib/core/utils/arrays'
 import { getBaseUrl } from '@/lib/core/utils/urls'
 import { compactExecutionPayload } from '@/lib/execution/payloads/serializer'
-import { redactLargeValueRefsInValue } from '@/lib/logs/execution/pii-large-values'
-import { redactObjectStrings } from '@/lib/logs/execution/pii-redaction'
 import {
   containsUserFileWithMetadata,
   hydrateUserFilesWithBase64,
@@ -265,9 +263,8 @@ export class BlockExecutor {
      * Cost of a handler that already finished, kept for the catch below.
      *
      * A Function block's sandbox is paid for the moment it completes, but the
-     * steps after the handler returns — base64 hydration, and large-value
-     * redaction that deliberately throws rather than emit unredacted data — can
-     * still fail the block. The error those raise carries no cost of its own, so
+     * steps after the handler returns — base64 hydration and payload
+     * compaction — can still fail the block. The error those raise carries no cost of its own, so
      * without holding it here the completed sandbox would go unbilled. Hoisted
      * for the same reason `streamingPartialOutput` above is.
      */
@@ -295,9 +292,7 @@ export class BlockExecutor {
         const streamingExec = output as StreamingExecution
 
         // Always drain via the agent stream pump (tokens/cost/timing callbacks),
-        // even with no `onStream`. When block-output redaction is on we do not
-        // live-forward chunks; content is masked before persist and the masked
-        // final output reaches the client via block-complete.
+        // even with no `onStream`.
         try {
           await this.handleStreamingExecution(
             blockCtx,
@@ -347,36 +342,6 @@ export class BlockExecutor {
           maxBytes: blockCtx.base64MaxBytes,
           preserveLargeValueMetadata: true,
         })) as NormalizedBlockOutput
-      }
-
-      if (blockCtx.piiBlockOutputRedaction?.enabled) {
-        // In-flight redaction before the log/state split below, so both the
-        // downstream state copy and the persisted log copy are masked.
-        // `onFailure: 'throw'` aborts the run rather than feeding corrupted/leaked
-        // data downstream.
-        const redactionOptions = {
-          entityTypes: blockCtx.piiBlockOutputRedaction.entityTypes,
-          language: blockCtx.piiBlockOutputRedaction.language,
-          customPatterns: blockCtx.piiBlockOutputRedaction.customPatterns,
-          onFailure: 'throw' as const,
-        }
-        // Tools like the function executor offload large outputs to large-value
-        // refs BEFORE they reach here, and the string walk treats a ref as opaque.
-        // So hydrate → mask → re-store any refs first, then mask inline strings —
-        // otherwise PII inside an offloaded output is never redacted.
-        normalizedOutput = await redactLargeValueRefsInValue(normalizedOutput, {
-          ...redactionOptions,
-          store: {
-            workspaceId: blockCtx.workspaceId,
-            workflowId: blockCtx.workflowId,
-            executionId: blockCtx.executionId,
-            largeValueExecutionIds: blockCtx.largeValueExecutionIds,
-            largeValueKeys: blockCtx.largeValueKeys,
-            allowLargeValueWorkflowScope: blockCtx.allowLargeValueWorkflowScope,
-            userId: blockCtx.userId,
-          },
-        })
-        normalizedOutput = await redactObjectStrings(normalizedOutput, redactionOptions)
       }
 
       normalizedOutput = (await compactExecutionPayload(normalizedOutput, {
@@ -1184,9 +1149,8 @@ export class BlockExecutor {
     executionOrder?: number
   ): Promise<void> {
     const blockId = node.metadata?.originalBlockId ?? node.id
-    const piiEnabled = Boolean(ctx.piiBlockOutputRedaction?.enabled)
-    // Live-forward only when a client stream exists and PII redaction is off.
-    const forwardToClient = Boolean(ctx.onStream) && !piiEnabled
+    // Live-forward only when a client stream exists.
+    const forwardToClient = Boolean(ctx.onStream)
     const projectStreamDiagnosticError = (error: unknown): Record<string, unknown> => {
       const sourceRegistry = streamingExec.diagnosticResolvedSecretTraceRegistry
       const resultRegistry = ctx.resolvedSecretTraceRegistry
@@ -1287,12 +1251,6 @@ export class BlockExecutor {
       throw new DOMException('Provider request timed out', 'AbortError')
     }
 
-    // Provider onComplete may have attached thinking to timing segments during drain.
-    // Under PII redaction, never retain raw thinking in traces.
-    if (piiEnabled) {
-      stripThinkingContentFromOutput(streamingExec.execution?.output)
-    }
-
     // User/unknown cancel: persist truncated answer when present, then return.
     if (pumpResult.cancelled) {
       const truncated = pumpResult.answerText
@@ -1317,19 +1275,9 @@ export class BlockExecutor {
       return
     }
 
-    let fullContent = pumpResult.answerText
+    const fullContent = pumpResult.answerText
     if (!fullContent) {
       return
-    }
-
-    if (piiEnabled && ctx.piiBlockOutputRedaction) {
-      // Mask before writing to `execution.output` or `onFullContent`.
-      fullContent = await redactObjectStrings(fullContent, {
-        entityTypes: ctx.piiBlockOutputRedaction.entityTypes,
-        language: ctx.piiBlockOutputRedaction.language,
-        customPatterns: ctx.piiBlockOutputRedaction.customPatterns,
-        onFailure: 'throw',
-      })
     }
 
     const executionOutput = streamingExec.execution?.output
@@ -1368,19 +1316,6 @@ export class BlockExecutor {
           ...projectStreamDiagnosticError(error),
         })
       }
-    }
-  }
-}
-
-/** Removes retained thinking from provider timing segments (PII safe default). */
-function stripThinkingContentFromOutput(output: unknown): void {
-  if (!output || typeof output !== 'object') return
-  const providerTiming = (output as { providerTiming?: { timeSegments?: unknown } }).providerTiming
-  const segments = providerTiming?.timeSegments
-  if (!Array.isArray(segments)) return
-  for (const segment of segments) {
-    if (segment && typeof segment === 'object' && 'thinkingContent' in segment) {
-      ;(segment as { thinkingContent?: string }).thinkingContent = undefined
     }
   }
 }

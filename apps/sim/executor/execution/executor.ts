@@ -426,7 +426,6 @@ export class DAGExecutor {
       executorDelegationOrigin: this.contextExtensions.executorDelegationOrigin,
       isDeployedContext: this.contextExtensions.isDeployedContext,
       enforceCredentialAccess: this.contextExtensions.enforceCredentialAccess,
-      piiBlockOutputRedaction: this.contextExtensions.piiBlockOutputRedaction,
       blockStates: state.getBlockStates(),
       blockLogs: restoredBlockLogs,
       /*

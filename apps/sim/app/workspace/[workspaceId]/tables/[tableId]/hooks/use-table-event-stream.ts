@@ -473,13 +473,11 @@ export function useTableEventStream({
           else if (entry.event?.kind === 'edit') applyEdit(entry.event)
           // A collaborator changed the table structure: mirror the local
           // invalidateTableSchema set — the definition (exact, so rows stay on the
-          // debounce), the run-state + enrichment sibling queries under detail (a group
-          // delete/restructure can otherwise leave a stale running badge or enrichment
-          // panel), the tables list (column/row counts), and the debounced rows.
+          // debounce), the run-state sibling query under detail (a group
+          // delete/restructure can otherwise leave a stale running badge), the tables list (column/row counts), and the debounced rows.
           else if (entry.event?.kind === 'schema') {
             void queryClient.invalidateQueries({ queryKey: tableKeys.detail(tableId), exact: true })
             void queryClient.invalidateQueries({ queryKey: tableKeys.activeDispatches(tableId) })
-            void queryClient.invalidateQueries({ queryKey: tableKeys.enrichmentDetails(tableId) })
             void queryClient.invalidateQueries({ queryKey: tableKeys.lists() })
             scheduleRowsInvalidate()
           }

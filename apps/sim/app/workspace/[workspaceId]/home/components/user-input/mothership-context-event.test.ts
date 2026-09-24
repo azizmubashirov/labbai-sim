@@ -21,10 +21,9 @@ function mockEditor() {
 
 it('claims a context event, inserts it, and restores composer focus on the next frame', () => {
   const context = {
-    kind: 'browser_tab' as const,
-    tabId: 'tab-1',
-    label: 'Browser',
-    selection: { text: 'selected text', url: 'https://example.com' },
+    kind: 'workflow' as const,
+    workflowId: 'wf-1',
+    label: 'Deploy',
   }
   const event = new CustomEvent<MothershipAddContextDetail>(MOTHERSHIP_ADD_CONTEXT_EVENT, {
     detail: { context },
@@ -68,10 +67,9 @@ it('does not let a second composer claim an event already handled elsewhere', ()
   const event = new CustomEvent<MothershipAddContextDetail>(MOTHERSHIP_ADD_CONTEXT_EVENT, {
     detail: {
       context: {
-        kind: 'browser_tab',
-        tabId: 'tab-1',
-        label: 'Browser',
-        selection: { text: 'selected text' },
+        kind: 'workflow',
+        workflowId: 'wf-1',
+        label: 'Deploy',
       },
     },
     cancelable: true,

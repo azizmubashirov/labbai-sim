@@ -342,6 +342,6 @@ describe('live call-site values', () => {
 
   it.concurrent('stringifies a numeric id these call sites used to reject', () => {
     expect(safeUrlPathSegment(2487956, 'deploymentId')).toBe('2487956')
-    expect(safeUrlPathSegment(0, 'sandboxId')).toBe('0')
+    expect(safeUrlPathSegment(0, 'accountId')).toBe('0')
   })
 })

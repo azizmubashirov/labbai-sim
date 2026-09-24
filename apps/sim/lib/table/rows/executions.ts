@@ -14,7 +14,6 @@ import { areGroupDepsSatisfied } from '@/lib/table/deps'
 import { TableRunStateCollectionLimitExceededError } from '@/lib/table/rows/errors'
 import { normalizeBlockErrors } from '@/lib/table/rows/run-state'
 import type {
-  EnrichmentRunDetail,
   RowData,
   RowExecutionMetadata,
   RowExecutions,
@@ -82,8 +81,7 @@ export async function loadExecutionsByRow(
     }
     const chunk = ids.slice(offset, offset + RUN_STATE_ID_CHUNK_SIZE)
     // Explicit column list, never `select()` — `enrichmentDetails` is large and
-    // must stay off the hot grid read path (fetched on demand via
-    // `loadEnrichmentDetail`).
+    // must stay off the hot grid read path.
     const rows = await trx
       .select({
         rowId: tableRowExecutions.rowId,
@@ -135,31 +133,6 @@ export async function loadExecutionsForRow(
 ): Promise<RowExecutions> {
   const byRow = await loadExecutionsByRow(trx, [rowId], options)
   return byRow.get(rowId) ?? {}
-}
-
-/**
- * Loads the enrichment cascade breakdown for one `(tableId, rowId, groupId)`,
- * or `null` when there is no exec row or it predates the feature. Read on demand
- * by the enrichment details panel — kept off `loadExecutionsByRow`.
- */
-export async function loadEnrichmentDetail(
-  trx: DbOrTx,
-  tableId: string,
-  rowId: string,
-  groupId: string
-): Promise<EnrichmentRunDetail | null> {
-  const [row] = await trx
-    .select({ enrichmentDetails: tableRowExecutions.enrichmentDetails })
-    .from(tableRowExecutions)
-    .where(
-      and(
-        eq(tableRowExecutions.tableId, tableId),
-        eq(tableRowExecutions.rowId, rowId),
-        eq(tableRowExecutions.groupId, groupId)
-      ) as SQL
-    )
-    .limit(1)
-  return (row?.enrichmentDetails as EnrichmentRunDetail | null | undefined) ?? null
 }
 
 /**

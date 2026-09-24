@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef } from 'react'
-import { beginBrowserPanelDividerDrag } from '@/lib/browser-agent/transport'
 import { MOTHERSHIP_WIDTH } from '@/stores/constants'
 
 /**
@@ -51,20 +50,6 @@ export function panelWidthAt(clientX: number, geometry: DragGeometry): number {
 }
 
 /**
- * Viewport x the panel's left edge lands at for a pointer position, clamps
- * included.
- *
- * Defined in terms of {@link panelWidthAt} rather than from the pointer, so the
- * divider reported to the native browser view cannot describe a different edge
- * than the width write produces. Keeping these two derivations in one place is
- * the invariant — when they drifted apart the native view composited beside the
- * panel instead of on it, and alternated with the measured report every frame.
- */
-export function dividerXAt(clientX: number, geometry: DragGeometry): number {
-  return geometry.panelRight - panelWidthAt(clientX, geometry)
-}
-
-/**
  * Hook for managing resize of the MothershipView resource panel.
  *
  * Uses imperative DOM manipulation (zero React re-renders during drag) with
@@ -73,11 +58,9 @@ export function dividerXAt(clientX: number, geometry: DragGeometry): number {
  * `handleResizePointerDown` to the drag handle's onPointerDown.
  * Call `clearWidth` when the panel collapses so the CSS class retakes control.
  */
-export function useMothershipResize(desktopScopeId: string) {
+export function useMothershipResize() {
   const mothershipRef = useRef<HTMLDivElement | null>(null)
   const cleanupRef = useRef<(() => void) | null>(null)
-  const desktopScopeIdRef = useRef(desktopScopeId)
-  desktopScopeIdRef.current = desktopScopeId
 
   const handleResizePointerDown = useCallback((e: React.PointerEvent) => {
     e.preventDefault()
@@ -102,16 +85,6 @@ export function useMothershipResize(desktopScopeId: string) {
       grabOffset: e.clientX - startRect.left,
       maxWidth: measureMaxWidth(el),
     }
-
-    // The panel's left edge IS the divider. Handing it to the browser
-    // transport lets the native browser view (when one is showing) be
-    // repositioned arithmetically per pointer move instead of waiting for the
-    // renderer's layout → measure → report round-trip; no-op (null) when no
-    // browser resource is live
-    const predictBrowserBounds = beginBrowserPanelDividerDrag(
-      startRect.left,
-      desktopScopeIdRef.current
-    )
 
     // Disable CSS transition to prevent animation lag during drag
     const prevTransition = el.style.transition
@@ -139,9 +112,7 @@ export function useMothershipResize(desktopScopeId: string) {
       // Land on the exact final pointer position before transitions come back,
       // so a fast flick whose last move never got a frame is not lost. The
       // flush is what stops that catch-up delta from animating: without it the
-      // width write and the transition restore land in one style change, and
-      // the panel eases into its final width over 200ms while the native view
-      // chases it.
+      // width write and the transition restore land in one style change.
       if (lastClientX !== null) applyWidth(lastClientX)
       void el.offsetWidth
       el.style.transition = prevTransition
@@ -156,13 +127,8 @@ export function useMothershipResize(desktopScopeId: string) {
       (moveEvent: PointerEvent) => {
         if (moveEvent.pointerId !== pointerId) return
         lastClientX = moveEvent.clientX
-        // Fast path first: hand the native browser view its next rect at
-        // pointer-event time (clamped exactly like the width write below), a
-        // full layout pass ahead of the measured geometry report
-        predictBrowserBounds?.(dividerXAt(moveEvent.clientX, geometry))
         // Coalesce to one width write per frame: pointermove can outpace the
-        // display refresh, and every unbatched write forces an extra layout
-        // pass that the embedded browser view then has to chase
+        // display refresh, and every unbatched write forces an extra layout pass
         rafId ??= requestAnimationFrame(() => {
           rafId = null
           if (lastClientX !== null) applyWidth(lastClientX)
@@ -204,9 +170,7 @@ export function useMothershipResize(desktopScopeId: string) {
   // window-edge drag, so measuring in the handler would flush layout per event.
   // The container measurement `computeMaxWidth` does need costs one flush, but
   // it happens inside the coalesced frame, not per event.
-  // The clamp also has to land without animating — the transition on the panel
-  // would otherwise make the embedded browser view chase a moving rect for
-  // 200ms after the drag stops.
+  // The clamp also has to land without animating.
   useEffect(() => {
     let rafId: number | null = null
 

@@ -1,10 +1,8 @@
 import { Skeleton } from '@sim/emcn'
-import { DesktopTitleBarLane } from '@/app/_shell/desktop-title-bar'
 
 export function ChatLoadingState() {
   return (
-    <div className='light desktop-title-bar-page fixed inset-0 z-[var(--z-dropdown)] flex flex-col bg-[var(--bg)]'>
-      <DesktopTitleBarLane />
+    <div className='light fixed inset-0 z-[var(--z-dropdown)] flex flex-col bg-[var(--bg)]'>
       <div className='flex flex-1 items-center justify-center px-4'>
         <div className='w-full max-w-[410px]'>
           <div className='flex flex-col items-center justify-center'>

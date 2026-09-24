@@ -24,7 +24,6 @@ import {
   reportManualRunToolStop,
 } from '@/lib/copilot/tools/client/run-tool-execution'
 import { canonicalWorkspaceFilePath } from '@/lib/copilot/vfs/path-utils'
-import { prefersInPlaceNavigation } from '@/lib/desktop'
 import { type FileDownloadSource, triggerFileDownload } from '@/lib/uploads/client/download'
 import { getFileExtension, getMimeTypeFromExtension } from '@/lib/uploads/utils/file-utils'
 import {
@@ -32,10 +31,7 @@ import {
   type PreviewMode,
   resolveFileCategory,
 } from '@/app/workspace/[workspaceId]/files/components/file-viewer'
-import type { BrowserPanelOverlayController } from '@/app/workspace/[workspaceId]/home/components/mothership-view/components/resource-content/components/browser-session/browser-panel-occlusion'
-import { BrowserSession } from '@/app/workspace/[workspaceId]/home/components/mothership-view/components/resource-content/components/browser-session/browser-session'
 import { GenericResourceContent } from '@/app/workspace/[workspaceId]/home/components/mothership-view/components/resource-content/components/generic-resource-content'
-import { TerminalSession } from '@/app/workspace/[workspaceId]/home/components/mothership-view/components/resource-content/components/terminal-session/terminal-session'
 import { RESOURCE_TAB_ICON_CLASS } from '@/app/workspace/[workspaceId]/home/components/mothership-view/components/resource-tabs/resource-tab-controls'
 import { hasRenderableFilePreviewContent } from '@/app/workspace/[workspaceId]/home/hooks/preview'
 import type {
@@ -72,28 +68,15 @@ const LOADING_SKELETON = (
   </div>
 )
 
-/**
- * Opens an internal app link the way the host expects: a new browser tab on the
- * web, and the current view in the desktop app, whose shell would otherwise turn
- * the same-origin `window.open` into a second Sim window.
- */
+/** Opens an internal app link in a new browser tab. */
 function useOpenInternalLink() {
-  const router = useRouter()
-  return useCallback(
-    (href: string) => {
-      if (prefersInPlaceNavigation()) {
-        router.push(href)
-        return
-      }
-      window.open(href, '_blank')
-    },
-    [router]
-  )
+  return useCallback((href: string) => {
+    window.open(href, '_blank')
+  }, [])
 }
 
 interface ResourceContentProps {
   workspaceId: string
-  desktopScopeId: string
   resource: MothershipResource
   downloadSourceRef?: React.MutableRefObject<FileDownloadSource | null>
   previewMode?: PreviewMode
@@ -102,15 +85,6 @@ interface ResourceContentProps {
   genericResourceData?: GenericResourceData
   previewContextKey?: string
   onNotFound?: (resourceId: string) => void
-  /**
-   * Whether this resource is the one on screen. Only the persistent panels
-   * (browser, terminal) read it — to stand down document-wide observers while
-   * hidden — so it defaults to visible for every other resource, which is only
-   * ever rendered when active.
-   */
-  visible?: boolean
-  /** Registers the active browser's targeted renderer-overlay handshake. */
-  onBrowserOverlayControllerChange?: (controller: BrowserPanelOverlayController | null) => void
 }
 
 /**
@@ -166,7 +140,6 @@ function useAgentFileEditLock(isStreamingToFile: boolean, isAgentResponding: boo
 
 export const ResourceContent = memo(function ResourceContent({
   workspaceId,
-  desktopScopeId,
   resource,
   downloadSourceRef,
   previewMode,
@@ -175,8 +148,6 @@ export const ResourceContent = memo(function ResourceContent({
   genericResourceData,
   previewContextKey,
   onNotFound,
-  visible = true,
-  onBrowserOverlayControllerChange,
 }: ResourceContentProps) {
   const observedTableViewRef = useRef<{ tableId: string; viewId?: string } | null>(null)
 
@@ -330,24 +301,6 @@ export const ResourceContent = memo(function ResourceContent({
         <GenericResourceContent key={resource.id} data={genericResourceData ?? { entries: [] }} />
       )
 
-    case 'browser':
-      // One panel serves every browser tab of the chat: the desktop app
-      // composites whichever page is selected, so switching tabs must not
-      // remount it.
-      return (
-        <BrowserSession
-          key={desktopScopeId}
-          scopeId={desktopScopeId}
-          visible={visible}
-          onOverlayControllerChange={onBrowserOverlayControllerChange}
-        />
-      )
-
-    case 'terminal':
-      // One panel serves every terminal tab of the chat, keeping each shell's
-      // emulator alive across tab switches.
-      return <TerminalSession key={desktopScopeId} scopeId={desktopScopeId} visible={visible} />
-
     default:
       return null
   }
@@ -386,8 +339,6 @@ export function ResourceActions({
       return <EmbeddedLogActions workspaceId={workspaceId} logId={resource.id} />
     case 'folder':
     case 'generic':
-    case 'browser':
-    case 'terminal':
       return null
     default:
       return null

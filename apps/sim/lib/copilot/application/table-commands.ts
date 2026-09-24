@@ -7,9 +7,7 @@ import {
 import {
   type AddTableGroupOutputInput,
   addWorkflowTableGroupOutput,
-  type CreateTableEnrichmentGroupInput,
   type CreateWorkflowTableGroupInput,
-  createTableEnrichmentGroup,
   createWorkflowTableGroup,
   type UpdateWorkflowTableGroupInput,
   updateWorkflowTableGroup,
@@ -99,20 +97,6 @@ export function executeCopilotAddWorkflowTableGroupOutput(
   input: AddTableGroupOutputInput
 ) {
   return executeCopilotTableUseCase(context, addWorkflowTableGroupOutput, input, {
-    tableId: input.tableId,
-  })
-}
-
-export const copilotCreateTableEnrichmentGroupPolicy = {
-  rate: INHERITED_COPILOT_RATE_POLICY,
-  cost: NO_DIRECT_PROVIDER_COST_POLICY,
-} as const
-
-export function executeCopilotCreateTableEnrichmentGroup(
-  context: CopilotTableDelegationContext | undefined,
-  input: CreateTableEnrichmentGroupInput
-) {
-  return executeCopilotTableUseCase(context, createTableEnrichmentGroup, input, {
     tableId: input.tableId,
   })
 }

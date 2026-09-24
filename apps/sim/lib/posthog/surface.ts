@@ -6,7 +6,6 @@ import { resolveBrowserSurface } from '@/lib/api/client-info'
  * carry the same `surface` property the server stamps from `X-Sim-Client-Info`,
  * and a single breakdown covers both.
  */
-export function surfaceSuperProperties(): { surface: 'web' | 'desktop'; app_version?: string } {
-  const { surface, version } = resolveBrowserSurface()
-  return version === undefined ? { surface } : { surface, app_version: version }
+export function surfaceSuperProperties(): { surface: 'web' } {
+  return { surface: resolveBrowserSurface().surface }
 }

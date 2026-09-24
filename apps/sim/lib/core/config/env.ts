@@ -1,12 +1,3 @@
-import {
-  IMMUTABLE_DAYTONA_SNAPSHOT_REF_ERROR,
-  IMMUTABLE_E2B_TEMPLATE_REF_ERROR,
-  isImmutableDaytonaSnapshotRef,
-  isImmutableE2BTemplateRef,
-  isValidSandboxReleaseGeneration,
-  SANDBOX_PROVIDER_IDS,
-  SANDBOX_RELEASE_GENERATION_ERROR,
-} from '@sim/utils/sandbox-references'
 import { createEnv } from '@t3-oss/env-nextjs'
 import { z } from 'zod'
 
@@ -492,10 +483,6 @@ export const env = createEnv({
     SIM_MCP_URL:                           z.string().url().optional(),            // Public URL of the Sim MCP server when served on its own host (e.g., https://mcp.sim.ai/mcp); defaults to <NEXT_PUBLIC_APP_URL>/api/mcp
     INTERNAL_API_BASE_URL:                 z.string().optional(),                  // Optional internal base URL for server-side self-calls; must include protocol if set (e.g., http://sim-app.namespace.svc.cluster.local:3000)
     ALLOWED_ORIGINS:                       z.string().optional(),                  // CORS allowed origins
-    PII_URL:                               z.string().optional(),                  // Presidio PII service base URL serving /analyze + /anonymize (standalone ECS service; default http://localhost:5001 for local dev)
-    PII_MASK_CHUNK_CONCURRENCY:            z.coerce.number().int().positive().optional(), // Max in-flight mask-batch requests per redaction (default 64); tune to the Presidio fleet size behind the internal ALB, lower to 1 for a single instance
-    PII_REF_CONCURRENCY:                   z.coerce.number().int().positive().optional(), // Max large-value refs hydrated+masked+re-stored in parallel per payload (default 4); multiplies with PII_MASK_CHUNK_CONCURRENCY for total in-flight Presidio load
-    PII_SERVICE_CHUNK_CONCURRENCY:         z.coerce.number().int().positive().optional(), // Max Presidio requests in flight from a single mask-batch call (route -> Presidio fan-out, default 4); inner to PII_MASK_CHUNK_CONCURRENCY
 
     // OAuth Integration Credentials - All optional, enables third-party integrations
     GOOGLE_CLIENT_ID:                      z.string().optional(),                  // Google OAuth client ID for Google services
@@ -587,33 +574,6 @@ export const env = createEnv({
     CALCOM_CLIENT_ID:                      z.string().optional(),                  // Cal.com OAuth client ID
     ATTIO_CLIENT_ID:                       z.string().optional(),                  // Attio OAuth client ID
     ATTIO_CLIENT_SECRET:                   z.string().optional(),                  // Attio OAuth client secret
-
-    // AgentMail - Mothership Email Inbox
-    AGENTMAIL_API_KEY:                     z.string().min(1).optional(),           // AgentMail API key for mothership email inbox
-    AGENTMAIL_DOMAIN:                      z.string().optional(),                  // Custom domain for AgentMail inboxes (default: agentmail.to)
-    INBOX_ENABLED:                         z.boolean().optional(),                 // Enable inbox (Sim Mailer) on self-hosted (bypasses hosted requirements)
-    SANDBOXES_ENABLED:                     z.boolean().optional(),                 // Enable custom sandboxes on self-hosted (bypasses hosted requirements)
-
-    // E2B Remote Code Execution
-    E2B_ENABLED:                           z.string().optional(),                  // Enable E2B remote code execution
-    E2B_API_KEY:                           z.string().optional(),                  // E2B API key for sandbox creation
-    E2B_FUNCTION_TEMPLATE_ID:               z.string().refine(isImmutableE2BTemplateRef, { message: `E2B_FUNCTION_TEMPLATE_ID ${IMMUTABLE_E2B_TEMPLATE_REF_ERROR}` }).optional(), // Immutable dedicated E2B build for Function JavaScript/Python/Shell and workspace sandbox layers; no Mothership fallback
-    E2B_FUNCTION_TEMPLATE_GENERATION:       z.string().refine(isValidSandboxReleaseGeneration, { message: `E2B_FUNCTION_TEMPLATE_GENERATION ${SANDBOX_RELEASE_GENERATION_ERROR}` }).optional(), // Monotonic release epoch printed by the Function E2B builder
-    MOTHERSHIP_E2B_TEMPLATE_ID:             z.string().optional(),                  // Mothership code-tool template; never a Function-base fallback
-    MOTHERSHIP_E2B_DOC_TEMPLATE_ID:         z.string().optional(),                  // Dedicated E2B template with python-pptx/docx/openpyxl/reportlab for document generation; when set (and E2B enabled), docs compile via Python instead of the JS isolated-vm path
-    E2B_PI_TEMPLATE_ID:                     z.string().optional(),                  // E2B template ID/alias with the Pi CLI + git baked in (Create PR, its Babysit continuation, and Review Code)
-    PI_SANDBOX_LIFETIME_MS:                 z.string().optional(),                  // Lower the Pi sandbox lifetime (ms) below the default; E2B caps a sandbox at 1h on Hobby accounts and 24h on Pro
-    E2B_DOMAIN:                            z.string().optional(),                  // E2B control-plane domain (defaults to e2b.app, matching the SDK); only the template-delete endpoint the SDK omits reads this
-
-    // Remote Code Execution provider selection
-    SANDBOX_PROVIDER:                      z.enum(SANDBOX_PROVIDER_IDS).optional(), // Which sandbox provider serves remote executions: 'e2b' (default) or 'daytona'
-
-    // Daytona Remote Code Execution (used when SANDBOX_PROVIDER=daytona)
-    DAYTONA_API_KEY:                       z.string().optional(),                  // Daytona API key; needs write:snapshots to build images, write:sandboxes to run them
-    DAYTONA_FUNCTION_SNAPSHOT_ID:          z.string().refine(isImmutableDaytonaSnapshotRef, { message: `DAYTONA_FUNCTION_SNAPSHOT_ID ${IMMUTABLE_DAYTONA_SNAPSHOT_REF_ERROR}` }).optional(), // Immutable dedicated Daytona Function snapshot ID; no Mothership fallback
-    DAYTONA_SHELL_SNAPSHOT_ID:             z.string().optional(),                  // Mothership code-tool snapshot; never a Function-base fallback
-    DAYTONA_DOC_SNAPSHOT_ID:               z.string().optional(),                  // Daytona snapshot mirroring mothership-docs
-    DAYTONA_PI_SNAPSHOT_ID:                z.string().optional(),                  // Daytona snapshot mirroring the Pi template (Create PR, its Babysit continuation, and Review Code)
 
     // Access Control (Permission Groups) - for self-hosted deployments
     ACCESS_CONTROL_ENABLED:                z.boolean().optional(),                 // Enable access control on self-hosted (bypasses plan requirements)
@@ -722,12 +682,9 @@ export const env = createEnv({
     NEXT_PUBLIC_CUSTOM_CSS_URL:            z.string().url().optional(),            // Custom CSS stylesheet URL
     NEXT_PUBLIC_SUPPORT_EMAIL:             z.string().email().optional(),          // Custom support email
 
-    NEXT_PUBLIC_E2B_ENABLED:               z.string().optional(),
-    NEXT_PUBLIC_SANDBOXES_ENABLED:         z.string().optional(),              // Client twin of isRemoteSandboxEnabled — true under either sandbox provider
     NEXT_PUBLIC_BEDROCK_DEFAULT_CREDENTIALS: z.string().optional(),              // Hide Bedrock credential fields when deployment uses AWS default credential chain (IAM roles, instance profiles, ECS task roles, IRSA)
     NEXT_PUBLIC_AZURE_CONFIGURED:          z.string().optional(),              // Hide Azure credential fields when endpoint/key/version are pre-configured server-side
     NEXT_PUBLIC_COHERE_CONFIGURED:         z.string().optional(),              // Hide Cohere API key field on Knowledge block when COHERE_API_KEY is pre-configured server-side
-    NEXT_PUBLIC_ENABLE_PLAYGROUND:         z.string().optional(),                  // Enable component playground at /playground
     NEXT_PUBLIC_DOCUMENTATION_URL:         z.string().url().optional(),            // Custom documentation URL
     NEXT_PUBLIC_TERMS_URL:                 z.string().url().optional(),            // Custom terms of service URL
     NEXT_PUBLIC_PRIVACY_URL:               z.string().url().optional(),            // Custom privacy policy URL
@@ -757,7 +714,6 @@ export const env = createEnv({
     NEXT_PUBLIC_ORGANIZATIONS_ENABLED:     z.boolean().optional(),                   // Enable organizations on self-hosted (bypasses plan requirements)
     NEXT_PUBLIC_DISABLE_INVITATIONS:       z.boolean().optional(),                   // Disable workspace invitations globally (for self-hosted deployments)
     NEXT_PUBLIC_DISABLE_PUBLIC_API:        z.boolean().optional(),                   // Disable public API access UI toggle globally
-    NEXT_PUBLIC_INBOX_ENABLED:             z.boolean().optional(),                   // Enable inbox (Sim Mailer) on self-hosted
     NEXT_PUBLIC_CHAT_DISABLED:             z.boolean().optional(),                   // Hide the Chat module (Chat is shown when unset)
     NEXT_PUBLIC_PLATFORM_LLM_PROVIDERS:    z.string().optional(),                    // Labbai: providers (openai,anthropic,google) whose keys are set server-side; Agent blocks use them without a per-block key
     NEXT_PUBLIC_STATUS_NOTICE_PREVIEW:     z.boolean().optional(),                   // Force the sidebar service-status notice into its critical preview state
@@ -805,18 +761,14 @@ export const env = createEnv({
     NEXT_PUBLIC_ORGANIZATIONS_ENABLED: process.env.NEXT_PUBLIC_ORGANIZATIONS_ENABLED,
     NEXT_PUBLIC_DISABLE_INVITATIONS: process.env.NEXT_PUBLIC_DISABLE_INVITATIONS,
     NEXT_PUBLIC_DISABLE_PUBLIC_API: process.env.NEXT_PUBLIC_DISABLE_PUBLIC_API,
-    NEXT_PUBLIC_INBOX_ENABLED: process.env.NEXT_PUBLIC_INBOX_ENABLED,
     NEXT_PUBLIC_CHAT_DISABLED: process.env.NEXT_PUBLIC_CHAT_DISABLED,
     NEXT_PUBLIC_PLATFORM_LLM_PROVIDERS: process.env.NEXT_PUBLIC_PLATFORM_LLM_PROVIDERS,
     NEXT_PUBLIC_STATUS_NOTICE_PREVIEW: process.env.NEXT_PUBLIC_STATUS_NOTICE_PREVIEW,
     NEXT_PUBLIC_EMAIL_PASSWORD_SIGNUP_ENABLED: process.env.NEXT_PUBLIC_EMAIL_PASSWORD_SIGNUP_ENABLED,
     NEXT_PUBLIC_TURNSTILE_SITE_KEY: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
-    NEXT_PUBLIC_E2B_ENABLED: process.env.NEXT_PUBLIC_E2B_ENABLED,
-    NEXT_PUBLIC_SANDBOXES_ENABLED: process.env.NEXT_PUBLIC_SANDBOXES_ENABLED,
     NEXT_PUBLIC_BEDROCK_DEFAULT_CREDENTIALS: process.env.NEXT_PUBLIC_BEDROCK_DEFAULT_CREDENTIALS,
     NEXT_PUBLIC_AZURE_CONFIGURED: process.env.NEXT_PUBLIC_AZURE_CONFIGURED,
     NEXT_PUBLIC_COHERE_CONFIGURED: process.env.NEXT_PUBLIC_COHERE_CONFIGURED,
-    NEXT_PUBLIC_ENABLE_PLAYGROUND: process.env.NEXT_PUBLIC_ENABLE_PLAYGROUND,
     NEXT_PUBLIC_POSTHOG_ENABLED: process.env.NEXT_PUBLIC_POSTHOG_ENABLED,
     NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
     NODE_ENV: process.env.NODE_ENV,

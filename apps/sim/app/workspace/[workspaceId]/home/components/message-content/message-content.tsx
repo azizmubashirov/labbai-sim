@@ -16,7 +16,6 @@ import { PrepareFileEdit, Read as ReadTool } from '@/lib/copilot/generated/tool-
 import { isToolHiddenInUi } from '@/lib/copilot/tools/client/hidden-tools'
 import { resolveToolDisplay } from '@/lib/copilot/tools/client/store-utils'
 import { ClientToolCallState } from '@/lib/copilot/tools/client/tool-call-state'
-import { RETIRED_BROWSER_REQUEST_TAKEOVER_ID } from '@/lib/copilot/tools/retired-tools'
 import {
   getToolDisplayTitle,
   getToolStatusDisplayTitle,
@@ -791,8 +790,7 @@ export function assistantMessageHasVisibleActivity(
     return (
       index === segments.length - 1 &&
       lastItem?.type === 'tool' &&
-      lastItem.data.status === 'success' &&
-      lastItem.data.toolName !== RETIRED_BROWSER_REQUEST_TAKEOVER_ID
+      lastItem.data.status === 'success'
     )
   })
 }

@@ -18,9 +18,6 @@ vi.mock('@/lib/internal/principals/executor', () => ({
   createExecutorPrincipalFromExecutionContext: mocks.principal,
 }))
 vi.mock('@/lib/tokenization/accurate', () => ({ getAccurateTokenCount: () => 1 }))
-vi.mock('@/lib/logs/execution/pii-redaction', () => ({
-  redactObjectStrings: async (value: unknown) => value,
-}))
 
 import { OrchestrationError } from '@/lib/core/orchestration/types'
 import { hashDurableSecretProvenanceValue } from '@/lib/execution/durable-secret-provenance'

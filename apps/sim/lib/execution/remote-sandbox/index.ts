@@ -28,7 +28,6 @@ import {
   SandboxOutputFileCountError,
   SandboxOutputLimitError,
 } from '@/lib/execution/remote-sandbox/output-limits'
-import { resolvePiSandboxLifetimeMs } from '@/lib/execution/remote-sandbox/pi-lifetime'
 import { resolveProvider } from '@/lib/execution/remote-sandbox/provider'
 import {
   provisionRuntimeDependencies,
@@ -1104,103 +1103,4 @@ export function executeShellInSandbox(
   return withSandboxExecutionBudget(req.timeoutMs, req.signal, (signal) =>
     executeShellInSandboxWithinBudget({ ...req, signal })
   )
-}
-
-/** Result of one command run inside a Pi sandbox. */
-export interface PiSandboxCommandResult {
-  stdout: string
-  stderr: string
-  exitCode: number
-}
-
-/** Runs commands and moves files inside a live Pi sandbox. */
-export interface PiSandboxRunner {
-  run(
-    command: string,
-    options: {
-      envs?: Record<string, string>
-      timeoutMs: number
-      onStdout?: (chunk: string) => void
-      onStderr?: (chunk: string) => void
-    }
-  ): Promise<PiSandboxCommandResult>
-  readFile(path: string): Promise<string>
-  /**
-   * Writes a file via the sandbox filesystem API. Bytes go through the provider
-   * SDK, never a shell, so untrusted content (the assembled prompt, a commit
-   * message) is delivered without any shell parsing — callers reference it by a
-   * fixed path.
-   */
-  writeFile(path: string, content: string): Promise<void>
-}
-
-/**
- * Creates a Pi sandbox, keeps it alive for the duration of `fn` (so the cloned
- * repo persists across the clone -> agent -> push commands), streams command
- * output, and always kills the sandbox afterward. Per-command envs are isolated,
- * so secrets handed to one command never leak into the next.
- *
- * `options.lifetimeMs` is the run's own budget from `resolvePiRunLifetimeMs`,
- * which a caller holding the execution signal can narrow below the provider
- * ceiling. Omitting it keeps that ceiling — correct for a caller with no
- * deadline to honor, and never longer than before.
- *
- * Options precede the callback so that adding one did not re-indent every
- * caller's sandbox body, which would have buried the change in whitespace.
- */
-export async function withPiSandbox<T>(
-  options: { lifetimeMs?: number; cost?: SandboxCostSink },
-  fn: (runner: PiSandboxRunner) => Promise<T>
-): Promise<T> {
-  const lifetimeMs =
-    options.lifetimeMs !== undefined ? options.lifetimeMs : resolvePiSandboxLifetimeMs()
-  const created = await createSandbox('pi', { lifetimeMs }, Boolean(options.cost))
-  const { sandbox } = created
-  logger.info('Started Pi sandbox', { sandboxId: sandbox.sandboxId, lifetimeMs })
-
-  const runner: PiSandboxRunner = {
-    run: (command, options) =>
-      sandbox.runCommand(command, {
-        envs: options.envs,
-        timeoutMs: options.timeoutMs,
-        maxOutputBytes: MAX_SANDBOX_PROCESS_OUTPUT_BYTES,
-        rootUser: true,
-        onStdout: options.onStdout,
-        onStderr: options.onStderr,
-      }),
-    readFile: (path) => sandbox.readFile(path),
-    writeFile: (path, content) => sandbox.writeFile(path, content),
-  }
-
-  let sessionCompleted = false
-  try {
-    const result = await fn(runner)
-    sessionCompleted = true
-    return result
-  } finally {
-    /*
-     * Charged only for a session that ran to completion, which is the same rule
-     * the Function path applies to its own outcomes: a run whose sandbox never
-     * delivered is not billed, because a charge nobody can tie to delivered work
-     * is not one worth defending. A session that ends by throwing — a provider
-     * crash, a lifetime limit, a cancellation — is absorbed, and a create that
-     * throws never reaches here at all.
-     *
-     * A command exiting non-zero is not a failure by this rule. `fn` returns
-     * normally there, the agent produced its answer, and the Function path bills
-     * its own non-zero exits for the same reason.
-     *
-     * Measured up to teardown rather than to the last command, so the window
-     * covers the whole time the provider held the sandbox.
-     */
-    if (sessionCompleted) {
-      const cost = calculateSandboxCost(created, Date.now())
-      if (cost && options.cost) options.cost.total += cost.total
-    }
-    try {
-      await sandbox.kill()
-    } catch {
-      await sandbox.kill().catch(() => {})
-    }
-  }
 }

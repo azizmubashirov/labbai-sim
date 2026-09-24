@@ -19,7 +19,6 @@ import {
   orderModelIdsByReleaseDate,
   SIM_AUTO_MODEL_ID,
 } from '@/providers/models'
-import { isPiSupportedModel } from '@/providers/pi-providers'
 import type { ProviderId } from '@/providers/types'
 import { getProviderFromModel } from '@/providers/utils'
 import { useProvidersStore } from '@/stores/providers/store'
@@ -105,21 +104,6 @@ function buildModelOptions(includeEvaluation: boolean) {
   }
 
   return options
-}
-
-/**
- * Model options filtered to exact provider/model pairs in Pi's pinned catalog.
- * Unresolved or blacklisted models (which `getProviderFromModel` can throw on)
- * are excluded.
- */
-export function getPiModelOptions() {
-  return getModelOptions().filter((option) => {
-    try {
-      return isPiSupportedModel(getProviderFromModel(option.id), option.id)
-    } catch {
-      return false
-    }
-  })
 }
 
 function getProviderFromStore(model: string): string | null {
@@ -691,9 +675,6 @@ export const BUILT_IN_TOOL_TYPES = new Set([
   'thinking',
   'image_generator',
   'image_generator_v2',
-  'video_generator',
-  'video_generator_v2',
-  'video_generator_v3',
   'vision',
   'translate',
   'tts',

@@ -19,7 +19,6 @@ vi.mock('@/lib/api/client/request', () => ({ requestJson: mocks.request }))
 vi.mock('@/lib/core/utils/browser-storage', () => ({
   WorkspaceRecencyStorage: { getMostRecent: mocks.recentWorkspace },
 }))
-vi.mock('@/app/_shell/desktop-title-bar', () => ({ DesktopTitleBarLane: () => null }))
 vi.mock('@/hooks/queries/workspace', () => ({ useWorkspacesWithMetadata: mocks.workspaces }))
 
 import WorkspacePage from '@/app/workspace/page'

@@ -27,30 +27,15 @@ if (grafanaConfigured && !grafanaFullyConfigured) {
 }
 
 /**
- * Environment a run needs for sandboxed work. Function block runs and the
- * document compiler share one provider selection, and the doc-template
- * variables decide whether a run reads a generated document through the doc
- * sandbox's artifact store or the isolated-vm fallback. The app authors
- * documents for whichever compiler it sees, so a worker missing the doc
- * template falls back to isolated-vm and tries to run Python or Node-style
- * sources as sandbox JavaScript. Reading a generated document under the doc
- * sandbox means loading its compiled artifact from the copilot storage
- * context, so that bucket has to be visible to the run as well. The values
- * still have to exist in the Trigger.dev environment; syncing only keeps the
- * worker's view of them aligned with the app's.
+ * Environment a run needs for Function execution and generated documents.
+ * Reading a generated document loads its compiled artifact from the copilot
+ * storage context, so that bucket has to be visible to the run as well. The
+ * values still have to exist in the Trigger.dev environment; syncing only keeps
+ * the worker's view of them aligned with the app's.
  */
 const FUNCTION_EXECUTION_ENV = [
   { name: 'REDIS_URL', secret: true },
   { name: 'REDIS_TLS_SERVERNAME', secret: false },
-  { name: 'SANDBOX_PROVIDER', secret: false },
-  { name: 'E2B_ENABLED', secret: false },
-  { name: 'E2B_API_KEY', secret: true },
-  { name: 'E2B_FUNCTION_TEMPLATE_ID', secret: false },
-  { name: 'E2B_FUNCTION_TEMPLATE_GENERATION', secret: false },
-  { name: 'MOTHERSHIP_E2B_DOC_TEMPLATE_ID', secret: false },
-  { name: 'DAYTONA_API_KEY', secret: true },
-  { name: 'DAYTONA_FUNCTION_SNAPSHOT_ID', secret: false },
-  { name: 'DAYTONA_DOC_SNAPSHOT_ID', secret: false },
   { name: 'S3_COPILOT_BUCKET_NAME', secret: false },
   { name: 'AZURE_STORAGE_COPILOT_CONTAINER_NAME', secret: false },
   { name: 'GCS_COPILOT_BUCKET_NAME', secret: false },
@@ -123,15 +108,7 @@ export default defineConfig({
   build: {
     external: [
       'isolated-vm',
-      '@earendil-works/pi-ai',
-      '@earendil-works/pi-coding-agent',
       'cpu-features',
-      // `@e2b/code-interpreter` copies `e2b`'s members onto its exports at runtime, so
-      // bundling drops every name a static analyzer cannot see — `Template` among them.
-      // Same reason `next.config.ts` keeps these in `serverExternalPackages`.
-      'e2b',
-      '@e2b/code-interpreter',
-      '@daytona/sdk',
       // pdf.js resolves its worker via a runtime-relative dynamic import that
       // breaks inside the worker bundle; it must load from node_modules.
       'pdfjs-dist',
@@ -162,10 +139,6 @@ export default defineConfig({
           'isolated-vm',
           'react-dom',
           '@react-email/render',
-          '@earendil-works/pi-ai',
-          '@earendil-works/pi-coding-agent',
-          '@e2b/code-interpreter',
-          '@daytona/sdk',
           'pdfjs-dist',
           '@napi-rs/canvas',
         ],

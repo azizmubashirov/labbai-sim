@@ -67,7 +67,7 @@ const SPECIALIST_SPECS: SpecialistToolSpec[] = [
   },
   {
     domain: 'table',
-    description: 'Table Agent — tables, rows, schemas, and enrichments.',
+    description: 'Table Agent — tables, rows, and schemas.',
     properties: {
       request: { type: 'string', description: 'What table action is needed.' },
     },

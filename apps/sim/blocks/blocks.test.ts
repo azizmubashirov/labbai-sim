@@ -353,13 +353,11 @@ describe.concurrent('Blocks Module', () => {
         expect(block?.bgColor).toBe('#FF402F')
       })
 
-      it('should have language and code subBlocks', () => {
+      it('should have a code subBlock and no language or sandbox pickers', () => {
         expect(block?.subBlocks.length).toBeGreaterThanOrEqual(1)
-        const languageSubBlock = block?.subBlocks.find((sb) => sb.id === 'language')
         const codeSubBlock = block?.subBlocks.find((sb) => sb.id === 'code')
-        const sandboxSubBlock = block?.subBlocks.find((sb) => sb.id === 'sandboxId')
-        expect(languageSubBlock?.showWhenEnvSet).toBeUndefined()
-        expect(sandboxSubBlock?.showWhenEnvSet).toBe('NEXT_PUBLIC_SANDBOXES_ENABLED')
+        expect(block?.subBlocks.find((sb) => sb.id === 'language')).toBeUndefined()
+        expect(block?.subBlocks.find((sb) => sb.id === 'sandboxId')).toBeUndefined()
         expect(codeSubBlock).toBeDefined()
         expect(codeSubBlock?.type).toBe('code')
       })
@@ -830,31 +828,19 @@ describe.concurrent('Blocks Module', () => {
 
     it('should mark generator provider dropdowns as command-searchable', () => {
       const imageGeneratorBlock = getBlock('image_generator_v2')
-      const videoGeneratorBlock = getBlock('video_generator_v3')
 
       const imageProviderSubBlock = imageGeneratorBlock?.subBlocks.find(
         (sb) => sb.id === 'provider'
       )
-      const videoProviderSubBlock = videoGeneratorBlock?.subBlocks.find(
-        (sb) => sb.id === 'provider'
-      )
       const imageProviderOptions = imageProviderSubBlock?.options
-      const videoProviderOptions = videoProviderSubBlock?.options
 
       expect(imageGeneratorBlock?.hideFromToolbar).not.toBe(true)
-      expect(videoGeneratorBlock?.hideFromToolbar).not.toBe(true)
       expect(imageProviderSubBlock?.commandSearchable).toBe(true)
-      expect(videoProviderSubBlock?.commandSearchable).toBe(true)
       expect(imageProviderSubBlock?.value?.()).toBe('falai')
-      expect(videoProviderSubBlock?.value?.()).toBe('falai')
       expect(
         Array.isArray(imageProviderOptions) ? imageProviderOptions.map((option) => option.id) : []
       ).toContain('falai')
-      expect(
-        Array.isArray(videoProviderOptions) ? videoProviderOptions.map((option) => option.id) : []
-      ).toContain('falai')
       expect(getBlock('image_generator')?.hideFromToolbar).toBe(true)
-      expect(getBlock('video_generator_v2')?.hideFromToolbar).toBe(true)
     })
 
     it('should keep the legacy openai block registered but out of discovery', () => {
@@ -1020,7 +1006,7 @@ describe.concurrent('Blocks Module', () => {
     })
 
     it('should hide generator API keys on hosted only for Fal.ai providers', () => {
-      for (const blockType of ['image_generator_v2', 'video_generator_v3']) {
+      for (const blockType of ['image_generator_v2']) {
         const block = getBlock(blockType)
         const apiKeySubBlocks = block?.subBlocks.filter((sb) => sb.id === 'apiKey') ?? []
 

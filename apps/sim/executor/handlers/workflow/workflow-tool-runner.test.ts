@@ -23,17 +23,10 @@ vi.mock('@/lib/core/security/encryption', () => ({
 import { projectToolResultForCopilot } from '@/lib/copilot/request/tools/resolved-secret-result'
 import type { ToolExecutionResult } from '@/lib/copilot/tool-executor/types'
 import { ExecutionState } from '@/executor/execution/state'
-import type { PiiBlockOutputRedaction } from '@/executor/execution/types'
 import { runWorkflowTool } from '@/executor/handlers/workflow/workflow-tool-runner'
 import type { ExecutionContext } from '@/executor/types'
 import { ResolvedSecretTraceRegistry } from '@/executor/utils/resolved-secret-trace-registry'
 import { EnvResolver } from '@/executor/variables/resolvers/env'
-
-const PII_POLICY: PiiBlockOutputRedaction = {
-  enabled: true,
-  entityTypes: ['EMAIL_ADDRESS'],
-  language: 'en',
-}
 
 describe('runWorkflowTool execution context', () => {
   beforeEach(() => {
@@ -49,16 +42,6 @@ describe('runWorkflowTool execution context', () => {
 
     const [ctxArg] = mockExecute.mock.calls[0]
     expect(ctxArg.environmentVariables).toEqual({ MY_API_KEY: 'secret-value' })
-  })
-
-  it("forwards the invoking run's block-output redaction policy", async () => {
-    await runWorkflowTool(
-      { workflowId: 'wf-child', _context: { workspaceId: 'ws-1' } },
-      { environmentVariables: {}, piiBlockOutputRedaction: PII_POLICY }
-    )
-
-    const [ctxArg] = mockExecute.mock.calls[0]
-    expect(ctxArg.piiBlockOutputRedaction).toBe(PII_POLICY)
   })
 
   it('ignores an env map smuggled in through the model-reachable _context bag', async () => {

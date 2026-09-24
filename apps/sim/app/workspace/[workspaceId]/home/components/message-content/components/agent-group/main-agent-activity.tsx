@@ -1,5 +1,4 @@
 import { type ComponentType, Fragment, type ReactNode } from 'react'
-import { RETIRED_BROWSER_REQUEST_TAKEOVER_ID } from '@/lib/copilot/tools/retired-tools'
 import type { AgentGroupItem } from '@/app/workspace/[workspaceId]/home/components/message-content/components/agent-group/agent-group-view'
 import { ToolActivityGroup } from '@/app/workspace/[workspaceId]/home/components/message-content/components/agent-group/tool-activity-group'
 import type { ToolCallItemProps } from '@/app/workspace/[workspaceId]/home/components/message-content/components/agent-group/tool-call-item'
@@ -16,11 +15,7 @@ interface MainAgentActivityProps {
 
 /** Keep answers and interactions in the transcript, outside collapsible tool history. */
 function isStandaloneItem(item: AgentGroupItem): boolean {
-  return (
-    item.type !== 'tool' ||
-    needsToolInput(item.data) ||
-    item.data.toolName === RETIRED_BROWSER_REQUEST_TAKEOVER_ID
-  )
+  return item.type !== 'tool' || needsToolInput(item.data)
 }
 
 export function MainAgentActivity({

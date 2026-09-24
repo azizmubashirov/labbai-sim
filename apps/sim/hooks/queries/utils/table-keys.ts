@@ -46,8 +46,4 @@ export const tableKeys = {
   views: (tableId: string) => [...tableKeys.viewsRoot(), tableId] as const,
   activeDispatches: (tableId: string) =>
     [...tableKeys.detail(tableId), 'active-dispatches'] as const,
-  enrichmentDetails: (tableId: string) =>
-    [...tableKeys.detail(tableId), 'enrichment-detail'] as const,
-  enrichmentDetail: (tableId: string, rowId: string, groupId: string) =>
-    [...tableKeys.enrichmentDetails(tableId), rowId, groupId] as const,
 }

@@ -2142,13 +2142,8 @@ describe('executeTool Function', () => {
     expect(global.fetch).not.toHaveBeenCalled()
   })
 
-  it("hands the in-process runner the invoking run's env and redaction policy", async () => {
+  it("hands the in-process runner the invoking run's env", async () => {
     mockRunWorkflowTool.mockResolvedValueOnce({ success: true, output: { ok: true } })
-    const piiBlockOutputRedaction = {
-      enabled: true,
-      entityTypes: ['EMAIL_ADDRESS'],
-      language: 'en',
-    }
 
     await executeTool(
       'workflow_executor_child-workflow',
@@ -2159,7 +2154,6 @@ describe('executeTool Function', () => {
       {
         executionContext: createToolExecutionContext({
           environmentVariables: { MY_API_KEY: 'parent-secret' },
-          piiBlockOutputRedaction,
         }),
       }
     )
@@ -2168,7 +2162,6 @@ describe('executeTool Function', () => {
       expect.anything(),
       expect.objectContaining({
         environmentVariables: { MY_API_KEY: 'parent-secret' },
-        piiBlockOutputRedaction,
       })
     )
   })
@@ -2196,7 +2189,7 @@ describe('executeTool Function', () => {
     expect(executionContext.environmentVariables).toEqual({ MY_API_KEY: 'parent-secret' })
   })
 
-  it('leaves the custom-block runner without the consumer redaction policy', async () => {
+  it('leaves the custom-block runner without the consumer env', async () => {
     mockRunCustomBlockTool.mockResolvedValueOnce({ success: true, output: { ok: true } })
 
     await executeTool(
@@ -2205,14 +2198,12 @@ describe('executeTool Function', () => {
       {
         executionContext: createToolExecutionContext({
           environmentVariables: { MY_API_KEY: 'consumer-secret' },
-          piiBlockOutputRedaction: { enabled: true, entityTypes: [], language: 'en' },
         }),
       }
     )
 
     const options = mockRunCustomBlockTool.mock.calls[0]?.[1] as Record<string, unknown>
     expect(options).not.toHaveProperty('environmentVariables')
-    expect(options).not.toHaveProperty('piiBlockOutputRedaction')
   })
 
   it('overwrites custom-block tool context with the trusted workflow scope', async () => {

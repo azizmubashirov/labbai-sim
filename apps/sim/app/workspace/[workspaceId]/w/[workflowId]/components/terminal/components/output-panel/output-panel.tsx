@@ -19,12 +19,10 @@ import {
   Clipboard,
   Download,
   MoreHorizontal,
-  Palette,
   Search,
   Trash,
   X,
 } from '@sim/emcn/icons'
-import Link from 'next/link'
 import { AgentStreamThinkingChrome } from '@/components/agent-stream/agent-stream-chrome'
 import {
   OutputContextMenu,
@@ -94,7 +92,6 @@ export interface OutputPanelProps {
   showInput: boolean
   setShowInput: (show: boolean) => void
   hasInputData: boolean
-  isPlaygroundEnabled: boolean
   showCopySuccess: boolean
   handleCopy: () => void
   hasEntries: boolean
@@ -118,7 +115,6 @@ export const OutputPanel = React.memo(function OutputPanel({
   showInput,
   setShowInput,
   hasInputData,
-  isPlaygroundEnabled,
   showCopySuccess,
   handleCopy,
   hasEntries,
@@ -366,26 +362,6 @@ export const OutputPanel = React.memo(function OutputPanel({
                 </Tooltip.Trigger>
                 <Tooltip.Content>
                   <span>Search</span>
-                </Tooltip.Content>
-              </Tooltip.Root>
-            )}
-
-            {isPlaygroundEnabled && (
-              <Tooltip.Root>
-                <Tooltip.Trigger asChild>
-                  <Link href='/playground'>
-                    <Button
-                      variant='ghost'
-                      aria-label='Component Playground'
-                      iconPadding='md'
-                      className='-m-1.5'
-                    >
-                      <Palette className='size-[14px]' />
-                    </Button>
-                  </Link>
-                </Tooltip.Trigger>
-                <Tooltip.Content>
-                  <span>Component Playground</span>
                 </Tooltip.Content>
               </Tooltip.Root>
             )}

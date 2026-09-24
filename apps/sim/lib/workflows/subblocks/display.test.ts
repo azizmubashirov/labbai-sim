@@ -17,7 +17,6 @@ import {
   resolveFallbackModelsLabel,
   resolveFilterFieldLabel,
   resolveFolderPathLabel,
-  resolveSandboxLabel,
   resolveSkillsLabel,
   resolveToolsLabel,
   resolveVariablesLabel,
@@ -36,7 +35,6 @@ const workflowMulti = {
 const variablesInput = { id: 'variables', type: 'variables-input' } as SubBlockConfig
 const toolInput = { id: 'tools', type: 'tool-input' } as SubBlockConfig
 const skillInput = { id: 'skills', type: 'skill-input' } as SubBlockConfig
-const sandboxPicker = { id: 'sandboxId', type: 'combobox' } as SubBlockConfig
 
 describe('summarizeNames', () => {
   it('formats 0, 1, 2, and 2+N name lists', () => {
@@ -205,28 +203,6 @@ describe('resolveFallbackModelsLabel', () => {
     expect(resolveFallbackModelsLabel(skillInput, [{ model: 'gpt-5' }])).toBeNull()
     expect(resolveFallbackModelsLabel(fallbackList, [])).toBeNull()
     expect(resolveFallbackModelsLabel(fallbackList, [{ id: 'a', model: '' }])).toBeNull()
-  })
-})
-
-describe('resolveSandboxLabel', () => {
-  const sandboxes = [{ id: '443f4934-26ab-44ab-8000-000000000000', name: 'Test' }]
-
-  it('resolves the stored id to the name so the card never shows a uuid', () => {
-    expect(resolveSandboxLabel(sandboxPicker, sandboxes[0].id, sandboxes)).toBe('Test')
-  })
-
-  it('returns null for an id the workspace no longer has', () => {
-    expect(resolveSandboxLabel(sandboxPicker, 'sbx-deleted', sandboxes)).toBeNull()
-  })
-
-  it('returns null before the list loads, and for an empty selection', () => {
-    expect(resolveSandboxLabel(sandboxPicker, sandboxes[0].id, [])).toBeNull()
-    expect(resolveSandboxLabel(sandboxPicker, '', sandboxes)).toBeNull()
-  })
-
-  it('ignores other comboboxes so it cannot relabel an unrelated field', () => {
-    const other = { id: 'model', type: 'combobox' } as SubBlockConfig
-    expect(resolveSandboxLabel(other, sandboxes[0].id, sandboxes)).toBeNull()
   })
 })
 

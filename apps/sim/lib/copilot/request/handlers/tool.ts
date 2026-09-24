@@ -1,6 +1,4 @@
-import { isCurrentBrowserToolName } from '@sim/browser-protocol'
 import { createLogger } from '@sim/logger'
-import { isTerminalToolName } from '@sim/terminal-protocol'
 import { getErrorMessage, toError } from '@sim/utils/errors'
 import { AsyncToolCallOwnershipError } from '@/lib/copilot/async-runs/errors'
 import type {
@@ -45,7 +43,6 @@ import type {
 } from '@/lib/copilot/request/types'
 import { getToolEntry, isSimExecuted } from '@/lib/copilot/tool-executor'
 import { isToolHiddenInUi } from '@/lib/copilot/tools/client/hidden-tools'
-import { isUserLocalVfsToolCall } from '@/lib/copilot/tools/local-filesystem'
 import { extractStreamingStringArgument } from '@/lib/copilot/tools/streaming-args'
 import {
   getToolDisplayTitle,
@@ -227,8 +224,7 @@ export async function prePersistClientExecutableToolCall(
     if (!ui.clientExecutable) return
 
     const delegateWorkflowRunToClient = isWorkflowToolName(data.toolName)
-    const userLocalVfsCall = isUserLocalVfsToolCall(data.toolName, data.arguments)
-    if (isSimExecuted(data.toolName) && !delegateWorkflowRunToClient && !userLocalVfsCall) return
+    if (isSimExecuted(data.toolName) && !delegateWorkflowRunToClient) return
   }
 
   if (!context.runId) return
@@ -274,16 +270,11 @@ export async function prePersistClientExecutableToolCall(
     toolName: data.toolName,
     args: data.arguments,
     sealedContext,
-    // Browser and terminal actions cross a second, native authorization
-    // boundary. Leave those rows pending until Electron atomically claims
-    // them — the authorize endpoint only hands over a pending call, so a row
-    // that arrives already running can never be executed natively. All other
-    // client tools retain the established "already dispatched" running state.
-    // A gated tool is likewise pending: nothing has been dispatched yet.
-    status:
-      gated || isCurrentBrowserToolName(data.toolName) || isTerminalToolName(data.toolName)
-        ? MothershipStreamV1AsyncToolRecordStatus.pending
-        : MothershipStreamV1AsyncToolRecordStatus.running,
+    // Client tools retain the established "already dispatched" running state.
+    // A gated tool is pending: nothing has been dispatched yet.
+    status: gated
+      ? MothershipStreamV1AsyncToolRecordStatus.pending
+      : MothershipStreamV1AsyncToolRecordStatus.running,
   }).catch((err) => {
     if (err instanceof AsyncToolCallOwnershipError) throw err
     logger.warn('Failed to pre-persist async tool row before forwarding call frame', {
@@ -786,8 +777,7 @@ async function dispatchToolExecution(
 
     if (clientExecutable) {
       const delegateWorkflowRunToClient = isWorkflowToolName(toolName)
-      const userLocalVfsCall = isUserLocalVfsToolCall(toolName, args)
-      if (isSimExecuted(toolName) && !delegateWorkflowRunToClient && !userLocalVfsCall) {
+      if (isSimExecuted(toolName) && !delegateWorkflowRunToClient) {
         if (abortPendingToolIfStreamDead(toolCall, toolCallId, options, context)) return null
         return fireToolExecution()
       }
@@ -830,7 +820,7 @@ async function dispatchToolExecution(
   if (pending) registerPendingToolPromise(context, toolCallId, pending)
 
   /**
-   * A client-executed tool runs in the browser or desktop app; this side only
+   * A client-executed tool runs in the browser; this side only
    * waits for it to report back through `/api/copilot/confirm`.
    */
   function waitForClientExecution(): Promise<AsyncCompletionSignal> {

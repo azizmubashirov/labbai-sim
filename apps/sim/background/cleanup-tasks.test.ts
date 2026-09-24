@@ -101,20 +101,14 @@ describe('chat retention ownership', () => {
     )
   })
 
-  it('keeps workspace run and inbox retention on the workspace path', async () => {
+  it('keeps workspace run retention on the workspace path', async () => {
     queueTableRows(schemaMock.copilotChats, [{ id: 'workspace-chat' }])
     queueTableRows(schemaMock.copilotRuns, [])
     await runCleanupTasks({ ...organizationPayload, organizationIds: [], workspaceIds: ['ws-1'] })
-    expect(mockBatchDelete).toHaveBeenCalledTimes(2)
+    expect(mockBatchDelete).toHaveBeenCalledTimes(1)
     expect(mockBatchDelete).toHaveBeenCalledWith(
       expect.objectContaining({
         tableDef: schemaMock.copilotRuns,
-        workspaceIds: ['ws-1'],
-      })
-    )
-    expect(mockBatchDelete).toHaveBeenCalledWith(
-      expect.objectContaining({
-        tableDef: schemaMock.mothershipInboxTask,
         workspaceIds: ['ws-1'],
       })
     )

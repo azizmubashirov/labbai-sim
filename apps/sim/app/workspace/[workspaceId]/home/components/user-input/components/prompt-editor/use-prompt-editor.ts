@@ -359,11 +359,7 @@ export function usePromptEditor({
     (context: ChatContext) => {
       const currentValue = valueRef.current
       const selectedContexts = contextManagementRef.current.selectedContexts
-      const normalizedContext =
-        context.kind === 'browser_tab' && context.selection
-          ? { ...context, label: 'Browser' }
-          : context
-      const baseLabel = normalizedContext.label
+      const baseLabel = context.label
       let label = baseLabel
       let suffix = 1
 
@@ -377,8 +373,7 @@ export function usePromptEditor({
         suffix += 1
       }
 
-      const resolvedContext =
-        label === normalizedContext.label ? normalizedContext : { ...normalizedContext, label }
+      const resolvedContext = label === context.label ? context : { ...context, label }
       const needsSpaceBefore = currentValue.length > 0 && !/\s$/.test(currentValue)
       const insertText = `${needsSpaceBefore ? ' ' : ''}@${label} `
       const nextValue = `${currentValue}${insertText}`

@@ -9,12 +9,6 @@ import type {
   VerificationRecord,
 } from '@/local-copilot/lib/verification/types'
 
-export interface LocalCopilotE2bCapabilities {
-  enabled: boolean
-  docSandboxEnabled: boolean
-  supportedCodeLanguages: Array<'javascript' | 'python' | 'shell'>
-}
-
 export type LocalCopilotProviderId =
   | 'openai'
   | 'anthropic'
@@ -97,8 +91,6 @@ export interface LocalCopilotStructuredContext {
   envVariables: string[]
   /** When true, platform-hosted API keys may be injected at execution time. */
   hostedKeysAvailable: boolean
-  /** E2B sandbox availability for code execution and document compilation. */
-  e2b?: LocalCopilotE2bCapabilities
   workflow?: {
     id: string
     name: string

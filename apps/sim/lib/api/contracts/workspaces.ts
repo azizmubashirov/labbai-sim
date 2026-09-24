@@ -243,8 +243,6 @@ export const deploymentFeaturesSchema = z.object({
   customBlocks: z.boolean(),
   dataDrains: z.boolean(),
   dataRetention: z.boolean(),
-  inbox: z.boolean(),
-  sandboxes: z.boolean(),
   scim: z.boolean(),
   sessionPolicies: z.boolean(),
   sso: z.boolean(),

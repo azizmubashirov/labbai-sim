@@ -11,7 +11,6 @@ import {
   normalizeDurableSecretProvenanceEntries,
 } from '@/lib/execution/durable-secret-provenance'
 import { isLargeValueRef } from '@/lib/execution/payloads/large-value-ref'
-import { redactObjectStrings } from '@/lib/logs/execution/pii-redaction'
 import { getMemoryArtifactHandle } from '@/lib/memory/artifact-handle'
 import {
   MAX_MEMORY_ARTIFACT_BYTES,
@@ -52,7 +51,7 @@ export type MemoryRetrievalArguments = z.infer<typeof memoryRetrievalArgumentsSc
 
 export interface RetrieveMemoryInput extends MemoryArtifactScope {
   arguments: MemoryRetrievalArguments
-  projection: Pick<ExecutionContext, 'resolvedSecretTraceRegistry' | 'piiBlockOutputRedaction'>
+  projection: Pick<ExecutionContext, 'resolvedSecretTraceRegistry'>
 }
 
 export interface MemoryRetrievalResult {
@@ -194,11 +193,7 @@ async function projectText(
     return undefined
   const projected = projectResolvedSecretModelContent(value, registry, MAX_MEMORY_ARTIFACT_BYTES)
   if (!projected.safe) return undefined
-  const redaction = input.projection.piiBlockOutputRedaction
-  const safe = redaction?.enabled
-    ? await redactObjectStrings(projected.value, { ...redaction, onFailure: 'throw' })
-    : projected.value
-  return stringifyBoundedJson(withOpaqueHandles(safe), MAX_MEMORY_ARTIFACT_BYTES)
+  return stringifyBoundedJson(withOpaqueHandles(projected.value), MAX_MEMORY_ARTIFACT_BYTES)
 }
 
 function textChunk(text: string, offset: number, args: MemoryRetrievalArguments) {

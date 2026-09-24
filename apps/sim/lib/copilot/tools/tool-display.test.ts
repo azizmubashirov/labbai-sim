@@ -498,18 +498,6 @@ describe('getToolDisplayTitle for context management', () => {
   })
 })
 
-describe('getToolStatusDisplayTitle for browser takeover', () => {
-  it('uses a neutral completed title after browser control resumes', () => {
-    expect(
-      getToolStatusDisplayTitle(
-        'Waiting for you: Pick a match in the draw',
-        'success',
-        'browser_request_takeover'
-      )
-    ).toBe('Resumed browser control')
-  })
-})
-
 describe('wait titles', () => {
   // The row is on screen for the whole pause, so a bare "Wait" reads as a
   // stall. The duration is the entire content of this tool.
@@ -538,59 +526,6 @@ describe('wait titles', () => {
     expect(getToolCompletedTitle('Waiting 15s for the test suite to finish')).toBe(
       'Waited 15s for the test suite to finish'
     )
-  })
-})
-
-describe('terminal titles', () => {
-  const call = (operation: string, args?: Record<string, unknown>) =>
-    getToolDisplayTitle('terminal', { operation, ...(args ? { args } : {}) })
-
-  it('names the command being run', () => {
-    expect(call('run', { command: 'bun test' })).toBe('Running bun test')
-  })
-
-  it('titles each operation rather than reading as a bare "Terminal"', () => {
-    expect(call('read')).toBe('Reading terminal')
-    expect(call('input')).toBe('Typing into terminal')
-    expect(call('kill')).toBe('Stopping command')
-    expect(call('list')).toBe('Listing terminals')
-    expect(call('new')).toBe('Opening terminal')
-    expect(call('panes')).toBe('Listing tmux panes')
-  })
-
-  it('collapses newlines so a multi-line command stays one row', () => {
-    expect(call('run', { command: 'cd apps/sim\n  bun test' })).toBe('Running cd apps/sim bun test')
-  })
-
-  it('truncates a long command rather than wrapping the row', () => {
-    const title = call('run', { command: 'echo '.repeat(40) })
-    expect(title.length).toBeLessThanOrEqual('Running '.length + 48)
-    expect(title.endsWith('…')).toBe(true)
-  })
-
-  it('falls back to a generic label before the arguments have streamed in', () => {
-    expect(call('run')).toBe('Running command')
-    expect(getToolDisplayTitle('terminal', {})).toBe('Using terminal')
-  })
-
-  it('names what the user has to do when the terminal is handed over', () => {
-    expect(call('handoff', { reason: 'Enter your sudo password' })).toBe(
-      'Waiting for you: Enter your sudo password'
-    )
-    expect(call('handoff')).toBe('Waiting for you in the terminal')
-  })
-
-  it('still titles rows from before the tools were consolidated', () => {
-    // Persisted transcripts reference the old one-tool-per-operation names.
-    expect(getToolDisplayTitle('terminal_run', { command: 'bun test' })).toBe('Running bun test')
-    expect(getToolDisplayTitle('terminal_read')).toBe('Reading terminal')
-  })
-
-  it('reads as past tense once each terminal action settles', () => {
-    expect(getToolCompletedTitle('Running bun test')).toBe('Ran bun test')
-    expect(getToolCompletedTitle('Stopping command')).toBe('Stopped command')
-    expect(getToolCompletedTitle('Reading terminal')).toBe('Read terminal')
-    expect(getToolCompletedTitle('Using terminal')).toBe('Used terminal')
   })
 })
 
@@ -763,34 +698,6 @@ describe('resource-naming titles', () => {
     expect(
       getToolDisplayTitle('read', { path: 'components/blocks/google_sheets_v2/README.md' })
     ).toBe('Loading Google Sheets tips')
-  })
-
-  it('shows the text a browser type/insert call sends', () => {
-    expect(getToolDisplayTitle('browser_type', { text: 'hello there' })).toBe(
-      'Typing "hello there"'
-    )
-    expect(getToolDisplayTitle('browser_insert_text', {})).toBe('Inserting text')
-  })
-
-  it('describes semantic browser controls without exposing element ids', () => {
-    expect(
-      getToolDisplayTitle('browser_fill_form', {
-        fields: [{ elementId: 42, kind: 'text', text: 'private form content' }],
-      })
-    ).toBe('Filling form')
-    expect(getToolCompletedTitle('Filling form')).toBe('Filled form')
-    expect(getToolDisplayTitle('browser_find', { query: 'Submit order' })).toBe(
-      'Finding "Submit order"'
-    )
-    expect(getToolDisplayTitle('browser_set_checked', { elementId: 42, checked: false })).toBe(
-      'Unchecking control'
-    )
-    expect(getToolDisplayTitle('browser_wait_for', { elementId: 42, state: 'visible' })).toBe(
-      'Waiting for element to be visible'
-    )
-    expect(getToolDisplayTitle('browser_zoom', { action: 'reset' })).toBe('Resetting page zoom')
-    expect(getToolCompletedTitle('Unchecking control')).toBe('Unchecked control')
-    expect(getToolCompletedTitle('Changing page zoom')).toBe('Changed page zoom')
   })
 
   it('names downloads, docs searches, and generated files', () => {

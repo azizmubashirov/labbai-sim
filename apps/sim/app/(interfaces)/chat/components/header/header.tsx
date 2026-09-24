@@ -3,7 +3,6 @@
 import { SimWordmark } from '@sim/emcn'
 import Image from 'next/image'
 import Link from 'next/link'
-import { GithubIcon } from '@/components/icons'
 import { useBrandConfig } from '@/ee/whitelabeling'
 
 interface ChatHeaderProps {
@@ -16,10 +15,9 @@ interface ChatHeaderProps {
       primaryColor?: string
     }
   } | null
-  starCount: string
 }
 
-export function ChatHeader({ chatConfig, starCount }: ChatHeaderProps) {
+export function ChatHeader({ chatConfig }: ChatHeaderProps) {
   const brand = useBrandConfig()
   const customImage = chatConfig?.customizations?.imageUrl || chatConfig?.customizations?.logoUrl
 
@@ -48,18 +46,7 @@ export function ChatHeader({ chatConfig, starCount }: ChatHeaderProps) {
 
       {!brand.logoUrl && (
         <div className='flex items-center gap-4'>
-          <a
-            href='https://github.com/simstudioai/sim'
-            target='_blank'
-            rel='noopener noreferrer'
-            className='flex items-center gap-2 text-[var(--text-muted)] transition-colors hover-hover:text-[var(--text-primary)]'
-            aria-label={`GitHub repository - ${starCount} stars`}
-          >
-            <GithubIcon className='size-[16px]' aria-hidden='true' />
-            <span aria-live='polite'>{starCount}</span>
-          </a>
           {/* Only show Sim logo if no custom branding is set */}
-
           <Link
             href='https://sim.ai'
             target='_blank'

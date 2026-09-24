@@ -3,7 +3,6 @@
  * Display-only metadata; keeps block implementations out of permission previews.
  */
 export const BLOCK_NAMES: Readonly<Record<string, string>> = {
-  a2a: 'A2A',
   affinity: 'Affinity',
   agent: 'Agent',
   agentmail: 'AgentMail',
@@ -77,7 +76,6 @@ export const BLOCK_NAMES: Readonly<Record<string, string>> = {
   emailbison: 'Email Bison',
   embeddings: 'Embeddings',
   enrich: 'Enrich',
-  enrichment: 'Data Enrichment',
   enrow: 'Enrow',
   evaluator: 'Evaluator',
   exa: 'Exa',
@@ -180,7 +178,6 @@ export const BLOCK_NAMES: Readonly<Record<string, string>> = {
   modal: 'Modal',
   monday: 'Monday',
   mongodb: 'MongoDB',
-  mothership: 'Sim Chat',
   mssql: 'Microsoft SQL Server',
   mysql: 'MySQL',
   neo4j: 'Neo4j',
@@ -200,7 +197,6 @@ export const BLOCK_NAMES: Readonly<Record<string, string>> = {
   peopledatalabs: 'People Data Labs',
   perplexity: 'Perplexity',
   persona: 'Persona',
-  pi: 'Pi Coding Agent',
   pinecone: 'Pinecone',
   pipedrive: 'Pipedrive',
   pitchbook: 'PitchBook',
@@ -290,7 +286,6 @@ export const BLOCK_NAMES: Readonly<Record<string, string>> = {
   vanta: 'Vanta',
   variables: 'Variables',
   vercel: 'Vercel',
-  video_generator_v3: 'Video Generator',
   vision: 'Vision (Legacy)',
   vision_v2: 'Vision',
   wait: 'Wait',

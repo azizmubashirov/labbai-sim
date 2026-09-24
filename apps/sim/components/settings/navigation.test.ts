@@ -1,8 +1,6 @@
 /**
  * @vitest-environment node
  */
-import { createElement } from 'react'
-import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import {
   ACCOUNT_SETTINGS_ITEMS,
@@ -18,7 +16,6 @@ import {
   parseSettingsPathSection,
   resolveOrganizationSectionAccess,
   resolveWorkspaceNavigation,
-  SELFHOST_SETTINGS_ITEMS,
   SETTINGS_SECTION_REGISTRY,
   UNIFIED_TO_ORGANIZATION_SECTION,
   UNIFIED_TO_WORKSPACE_SECTION,
@@ -39,8 +36,6 @@ const SELF_HOSTED: DeploymentShape = {
     customBlocks: false,
     dataDrains: false,
     dataRetention: false,
-    inbox: true,
-    sandboxes: false,
     sessionPolicies: true,
     sso: false,
     usageMonitoring: false,
@@ -56,16 +51,12 @@ const SELF_HOSTED_ALL_FEATURES: DeploymentShape = {
   features: { ...SELF_HOSTED.features, customBlocks: true },
 }
 
-/** Every workspace-plane section a self-hosted deployment offers; BYOK is Sim Cloud only. */
-const SELF_HOSTED_WORKSPACE_SECTIONS = WORKSPACE_SETTINGS_ITEMS.map(({ id }) => id).filter(
-  (id) => id !== 'byok'
-)
+/** Every workspace-plane section a self-hosted deployment offers. */
+const SELF_HOSTED_WORKSPACE_SECTIONS = WORKSPACE_SETTINGS_ITEMS.map(({ id }) => id)
 
 const ALL_ENTITLEMENTS = {
   customBlocks: true,
   forks: true,
-  inbox: true,
-  sandboxes: true,
 }
 
 describe('settings navigation boundaries', () => {
@@ -94,9 +85,6 @@ describe('settings navigation boundaries', () => {
   it('preserves the order of all four settings catalogs', () => {
     expect(buildUnifiedSettingsCatalog().map(({ id }) => id)).toEqual([
       'general',
-      'desktop',
-      'browser',
-      'terminal',
       'requests',
       'access-control',
       'audit-logs',
@@ -111,11 +99,7 @@ describe('settings navigation boundaries', () => {
       'mcp',
       'apikeys',
       'workflow-mcp-servers',
-      'byok',
-      'sandboxes',
-      'inbox',
       'recently-deleted',
-      'self-host',
       'sso',
       'security',
       'data-retention',
@@ -123,105 +107,25 @@ describe('settings navigation boundaries', () => {
       'whitelabeling',
       'custom-blocks',
       'admin',
-      'mothership',
     ])
     expect(ACCOUNT_SETTINGS_ITEMS.map(({ id }) => id)).toEqual([
       'general',
       'billing',
       'api-keys',
       'admin',
-      'mothership',
     ])
-    expect(SELFHOST_SETTINGS_ITEMS.map(({ id }) => id)).toEqual(['general', 'billing', 'chat-keys'])
     expect(WORKSPACE_SETTINGS_ITEMS.map(({ id }) => id)).toEqual([
       'teammates',
       'secrets',
-      'byok',
-      'sandboxes',
       'custom-tools',
       'mcp',
       'workflow-mcp-servers',
       'api-keys',
-      'inbox',
       'recently-deleted',
       'forks',
       'custom-blocks',
       'requests',
-      'self-host',
     ])
-  })
-
-  it('keeps the Sandboxes section in the catalog and the workspace navigation', () => {
-    expect(buildUnifiedSettingsCatalog().map(({ id }) => id)).toContain('sandboxes')
-    expect(
-      resolveWorkspaceNavigation({
-        permission: 'admin',
-        permissionConfig: {},
-        entitlements: ALL_ENTITLEMENTS,
-        deployment: SELF_HOSTED,
-      }).map(({ id }) => id)
-    ).toContain('sandboxes')
-  })
-
-  /**
-   * The Self-host section links out to the managed service that issues this
-   * deployment's Chat keys. On Sim Cloud that surface is reached from the
-   * account plane instead, so the workspace-plane gate the route consults must
-   * drop it there.
-   */
-  it('shows the Self-host section only on a self-hosted deployment', () => {
-    const navigate = (deployment: DeploymentShape) =>
-      resolveWorkspaceNavigation({
-        permission: 'admin',
-        permissionConfig: {},
-        entitlements: ALL_ENTITLEMENTS,
-        deployment,
-      }).map(({ id }) => id)
-
-    expect(navigate(SELF_HOSTED)).toContain('self-host')
-    expect(navigate(HOSTED)).not.toContain('self-host')
-  })
-
-  /**
-   * The route gate and the sidebar must agree on deployment-gated sections: a
-   * hosted-only section is offered on a self-hosted deployment only when its
-   * feature override resolves on, so a direct link cannot open what the sidebar
-   * hides. BYOK has no override and stays Sim Cloud only.
-   */
-  it('offers hosted-only workspace sections on self-hosted only through their override', () => {
-    const navigate = (deployment: DeploymentShape) =>
-      resolveWorkspaceNavigation({
-        permission: 'admin',
-        permissionConfig: {},
-        entitlements: ALL_ENTITLEMENTS,
-        deployment,
-      }).map(({ id }) => id)
-
-    const inboxDisabled: DeploymentShape = {
-      ...SELF_HOSTED,
-      features: { ...SELF_HOSTED.features, inbox: false },
-    }
-    expect(navigate(inboxDisabled)).not.toContain('inbox')
-    expect(navigate(SELF_HOSTED)).toContain('inbox')
-    expect(navigate({ ...HOSTED, features: inboxDisabled.features })).toContain('inbox')
-
-    expect(navigate(SELF_HOSTED)).not.toContain('byok')
-    expect(navigate(HOSTED)).toContain('byok')
-  })
-
-  /**
-   * The catalog keeps every section regardless of deployment so the route can
-   * tell an unavailable section from an unknown one and redirect to General
-   * instead of answering 404 — the sidebar applies deployment visibility itself.
-   */
-  it('keeps deployment-gated sections in the catalog', () => {
-    const ids = buildUnifiedSettingsCatalog().map(({ id }) => id)
-
-    expect(ids).toContain('self-host')
-    expect(ids).toContain('byok')
-    expect(
-      buildUnifiedSettingsCatalog().find(({ id }) => id === 'self-host')?.requiresSelfHosted
-    ).toBe(true)
   })
 
   it('derives organization settings features from the deployment shape', () => {
@@ -253,20 +157,6 @@ describe('settings navigation boundaries', () => {
     })
   })
 
-  /**
-   * The mark must be a line icon that inherits `--text-icon` like every other
-   * nav glyph — an emoji would render in the platform's own colors and be the
-   * one colored item in a monochrome icon column.
-   */
-  it('marks the Self hosting section with a currentColor line icon', () => {
-    const selfHost = buildUnifiedSettingsCatalog().find(({ id }) => id === 'self-host')
-    const markup = renderToStaticMarkup(createElement(selfHost!.icon, {}))
-
-    expect(selfHost?.label).toBe('Self hosting')
-    expect(markup).toContain('<svg')
-    expect(markup).toContain('stroke="currentColor"')
-  })
-
   it('has one registry source for every unified and plane item', () => {
     const unifiedIds = SETTINGS_SECTION_REGISTRY.flatMap(({ unified }) =>
       unified ? [unified.id] : []
@@ -274,16 +164,12 @@ describe('settings navigation boundaries', () => {
     const accountIds = SETTINGS_SECTION_REGISTRY.flatMap(({ planes }) =>
       planes?.account ? [planes.account.id] : []
     )
-    const selfHostIds = SETTINGS_SECTION_REGISTRY.flatMap(({ planes }) =>
-      planes?.selfhost ? [planes.selfhost.id] : []
-    )
     const workspaceIds = SETTINGS_SECTION_REGISTRY.flatMap(({ planes }) =>
       planes?.workspace ? [planes.workspace.id] : []
     )
 
     expect(new Set(unifiedIds).size).toBe(unifiedIds.length)
     expect(new Set(accountIds).size).toBe(accountIds.length)
-    expect(new Set(selfHostIds).size).toBe(selfHostIds.length)
     expect(new Set(workspaceIds).size).toBe(workspaceIds.length)
     expect([...unifiedIds].sort()).toEqual(
       buildUnifiedSettingsCatalog()
@@ -291,7 +177,6 @@ describe('settings navigation boundaries', () => {
         .sort()
     )
     expect([...accountIds].sort()).toEqual(ACCOUNT_SETTINGS_ITEMS.map(({ id }) => id).sort())
-    expect([...selfHostIds].sort()).toEqual(SELFHOST_SETTINGS_ITEMS.map(({ id }) => id).sort())
     expect([...workspaceIds].sort()).toEqual(WORKSPACE_SETTINGS_ITEMS.map(({ id }) => id).sort())
   })
 
@@ -338,17 +223,13 @@ describe('settings navigation boundaries', () => {
       requests: 'requests',
       teammates: 'teammates',
       secrets: 'secrets',
-      byok: 'byok',
-      sandboxes: 'sandboxes',
       'custom-tools': 'custom-tools',
       mcp: 'mcp',
       'workflow-mcp-servers': 'workflow-mcp-servers',
       apikeys: 'api-keys',
-      inbox: 'inbox',
       'recently-deleted': 'recently-deleted',
       forks: 'forks',
       'custom-blocks': 'custom-blocks',
-      'self-host': 'self-host',
     })
   })
 
@@ -358,36 +239,6 @@ describe('settings navigation boundaries', () => {
     )
 
     expect(unifiedOrganization?.label).toBe('Members')
-  })
-
-  it('keeps self-host settings on their standalone account projection', () => {
-    expect(
-      SELFHOST_SETTINGS_ITEMS.map(({ id, label, description, group }) => ({
-        id,
-        label,
-        description,
-        group,
-      }))
-    ).toEqual([
-      {
-        id: 'general',
-        label: 'General',
-        description: 'Manage your profile, appearance, and preferences.',
-        group: 'account',
-      },
-      {
-        id: 'billing',
-        label: 'Subscription',
-        description: 'Manage your personal plan, usage, and invoices.',
-        group: 'account',
-      },
-      {
-        id: 'chat-keys',
-        label: 'Chat keys',
-        description: 'Manage the model-provider keys that power Chat.',
-        group: 'developer',
-      },
-    ])
   })
 
   it('builds canonical settings hrefs across all three planes', () => {
@@ -558,16 +409,13 @@ describe('settings navigation boundaries', () => {
       visible: [
         'teammates',
         'secrets',
-        'sandboxes',
         'custom-tools',
         'mcp',
         'workflow-mcp-servers',
         'api-keys',
-        'inbox',
         'recently-deleted',
         'custom-blocks',
         'requests',
-        'self-host',
       ],
       mutable: ['requests'],
     },
@@ -576,16 +424,13 @@ describe('settings navigation boundaries', () => {
       visible: [
         'teammates',
         'secrets',
-        'sandboxes',
         'custom-tools',
         'mcp',
         'workflow-mcp-servers',
         'api-keys',
-        'inbox',
         'recently-deleted',
         'custom-blocks',
         'requests',
-        'self-host',
       ],
       mutable: [
         'secrets',
@@ -622,10 +467,8 @@ describe('settings navigation boundaries', () => {
       permissionConfig: {
         hideSecretsTab: true,
         hideApiKeysTab: true,
-        hideInboxTab: true,
         disableMcpTools: true,
         disableCustomTools: true,
-        hideSandboxesTab: true,
       },
       entitlements: ALL_ENTITLEMENTS,
       deployment: SELF_HOSTED_ALL_FEATURES,
@@ -638,7 +481,6 @@ describe('settings navigation boundaries', () => {
       'forks',
       'custom-blocks',
       'requests',
-      'self-host',
     ])
   })
 
@@ -649,6 +491,5 @@ describe('settings navigation boundaries', () => {
     expect(canMutateWorkspaceSettingsSection('recently-deleted', writer)).toBe(true)
     expect(canMutateWorkspaceSettingsSection('workflow-mcp-servers', writer)).toBe(true)
     expect(canMutateWorkspaceSettingsSection('api-keys', writer)).toBe(false)
-    expect(canMutateWorkspaceSettingsSection('inbox', writer)).toBe(false)
   })
 })

@@ -31,7 +31,7 @@ const PRODUCTION_TOOLS = new Set([
   'update_deployment_version',
 ])
 const CREDENTIAL_TOOLS = new Set(['generate_api_key'])
-const COSTLY_TOOLS = new Set(['generate_audio', 'generate_video'])
+const COSTLY_TOOLS = new Set(['generate_audio'])
 const DESTRUCTIVE_OPERATIONS = new Set(['archive', 'delete', 'remove', 'revoke', 'disconnect'])
 
 function getString(args: Record<string, unknown>, key: string): string | undefined {

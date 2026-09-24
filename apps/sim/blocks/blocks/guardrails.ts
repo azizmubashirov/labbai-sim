@@ -1,5 +1,4 @@
 import { ShieldCheckIcon } from '@/components/icons'
-import { PII_ENTITY_GROUPS, PII_LANGUAGES } from '@/lib/guardrails/pii-entities'
 import type { BlockConfig } from '@/blocks/types'
 import {
   getModelOptions,
@@ -24,16 +23,14 @@ export const GuardrailsBlock: BlockConfig<GuardrailsResponse> = {
   name: 'Guardrails',
   description: 'Validate content with guardrails',
   longDescription:
-    'Validate content using guardrails. Check if content is valid JSON, matches a regex pattern, detect hallucinations using RAG + LLM scoring, or detect PII.',
+    'Validate content using guardrails. Check if content is valid JSON, matches a regex pattern, or detect hallucinations using RAG + LLM scoring.',
   bestPractices: `
   - Reference block outputs using <blockName.output> syntax in the Content field
   - Use JSON validation to ensure structured output from LLMs before parsing
   - Use regex validation for format checking (emails, phone numbers, URLs, etc.)
   - Use hallucination check to validate LLM outputs against knowledge base content
-  - Use PII detection to block or mask sensitive personal information
   - Access validation result with <guardrails.passed> (true/false)
   - For hallucination check, access <guardrails.score> (0-10 confidence) and <guardrails.reasoning>
-  - For PII detection, access <guardrails.detectedEntities> and <guardrails.maskedText>
   - Chain with Condition block to handle validation failures
   `,
   docsLink: 'https://docs.sim.ai/workflows/blocks/guardrails',
@@ -71,7 +68,6 @@ export const GuardrailsBlock: BlockConfig<GuardrailsResponse> = {
         { label: 'Valid JSON', id: 'json' },
         { label: 'Regex Match', id: 'regex' },
         { label: 'Hallucination Check', id: 'hallucination' },
-        { label: 'PII Detection', id: 'pii' },
       ],
       defaultValue: 'json',
     },
@@ -184,65 +180,6 @@ Return ONLY the regex pattern - no explanations, no quotes, no forward slashes, 
         : { field: 'validationType' as const, value: ['hallucination'] },
       dependsOn: ['validationType'],
     })),
-    {
-      id: 'piiEntityTypes',
-      title: 'PII Types to Detect',
-      type: 'grouped-checkbox-list',
-      maxHeight: 400,
-      // Driven by the shared catalog (includes VIN and custom recognizers) so the
-      // block and the Data Retention settings never drift.
-      options: PII_ENTITY_GROUPS.flatMap((group) =>
-        group.entities.map((entity) => ({
-          label: entity.label,
-          id: entity.value,
-          group: group.label,
-        }))
-      ),
-      condition: {
-        field: 'validationType',
-        value: ['pii'],
-      },
-      dependsOn: ['validationType'],
-    },
-    {
-      id: 'piiMode',
-      title: 'Action',
-      type: 'dropdown',
-      required: true,
-      options: [
-        { label: 'Block Request', id: 'block' },
-        { label: 'Mask PII', id: 'mask' },
-      ],
-      defaultValue: 'block',
-      condition: {
-        field: 'validationType',
-        value: ['pii'],
-      },
-      dependsOn: ['validationType'],
-    },
-    {
-      id: 'piiLanguage',
-      title: 'Language',
-      type: 'dropdown',
-      options: PII_LANGUAGES.map((language) => ({ label: language.label, id: language.value })),
-      defaultValue: 'en',
-      condition: {
-        field: 'validationType',
-        value: ['pii'],
-      },
-      dependsOn: ['validationType'],
-    },
-    {
-      id: 'piiCustomPatterns',
-      title: 'Custom Patterns',
-      type: 'table',
-      columns: ['Name', 'Pattern', 'Replacement'],
-      condition: {
-        field: 'validationType',
-        value: ['pii'],
-      },
-      dependsOn: ['validationType'],
-    },
   ],
   tools: {
     access: ['guardrails_validate'],
@@ -254,7 +191,7 @@ Return ONLY the regex pattern - no explanations, no quotes, no forward slashes, 
     },
     validationType: {
       type: 'string',
-      description: 'Type of validation to perform (json, regex, hallucination, or pii)',
+      description: 'Type of validation to perform (json, regex, or hallucination)',
     },
     regex: {
       type: 'string',
@@ -277,31 +214,11 @@ Return ONLY the regex pattern - no explanations, no quotes, no forward slashes, 
       description: 'LLM model for hallucination scoring (default: gpt-4o-mini)',
     },
     ...PROVIDER_CREDENTIAL_INPUTS,
-    piiEntityTypes: {
-      type: 'json',
-      description: 'PII entity types to detect (array of strings, empty = detect all)',
-    },
-    piiMode: {
-      type: 'string',
-      description: 'PII action mode: block or mask',
-    },
-    piiLanguage: {
-      type: 'string',
-      description: 'Language for PII detection (default: en)',
-    },
-    piiCustomPatterns: {
-      type: 'json',
-      description: 'Custom regex patterns to detect and replace (name, pattern, replacement rows)',
-    },
   },
   outputs: {
     input: {
       type: 'string',
       description: 'Original input that was validated',
-    },
-    maskedText: {
-      type: 'string',
-      description: 'Text with PII masked (only for PII detection in mask mode)',
     },
     validationType: {
       type: 'string',
@@ -319,10 +236,6 @@ Return ONLY the regex pattern - no explanations, no quotes, no forward slashes, 
     reasoning: {
       type: 'string',
       description: 'Reasoning for confidence score (only for hallucination check)',
-    },
-    detectedEntities: {
-      type: 'array',
-      description: 'Detected PII entities (only for PII detection)',
     },
     error: {
       type: 'string',

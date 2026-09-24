@@ -19,7 +19,6 @@ const config = {
   subBlocks: [
     { id: 'credential', type: 'oauth-input', serviceId: 'gmail', title: 'Connection' },
     { id: 'credential2', type: 'oauth-input', serviceId: 'gmail', title: 'Second connection' },
-    { id: 'sandboxId', type: 'combobox', selectorKey: 'workspace.sandboxes', title: 'Sandbox' },
     {
       id: 'knowledgeBaseId',
       type: 'knowledge-base-selector',
@@ -342,7 +341,6 @@ describe('portable workflow references', () => {
     const source = state({
       credential: 'cred-source',
       credential2: 'cred-source',
-      sandboxId: 'sandbox-source',
       password: 'secret-password',
       headers: [{ name: 'Authorization', value: 'Bearer secret-token' }],
       invented: 'secret-disguised-as-id',
@@ -351,7 +349,6 @@ describe('portable workflow references', () => {
     expect(
       manifest.references.find((reference) => reference.kind === 'credential')?.occurrences
     ).toHaveLength(2)
-    expect(manifest.references.some((reference) => reference.kind === 'sandbox')).toBe(true)
     expect(JSON.stringify(manifest)).not.toMatch(
       /secret-password|secret-token|secret-disguised-as-id/
     )

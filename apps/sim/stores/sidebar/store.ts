@@ -32,8 +32,6 @@ function clampSidebarWidth(width: number): number {
  *
  * `--sidebar-width` is the width the rail currently occupies (the collapsed width while
  * collapsed), whereas `--sidebar-expanded-width` always holds the width to restore to.
- * The desktop hover-peek needs the latter: it renders the sidebar at full width while
- * the rail itself is still collapsed to zero.
  */
 function applySidebarWidths(expandedWidth: number, collapsed: boolean) {
   if (typeof window === 'undefined') return

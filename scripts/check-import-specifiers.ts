@@ -23,7 +23,7 @@ import { fileURLToPath } from 'node:url'
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url))
 const ROOT = resolve(SCRIPT_DIR, '..')
-const SCAN_DIRS = ['apps/sim', 'apps/realtime', 'apps/docs', 'packages']
+const SCAN_DIRS = ['apps/sim', 'apps/realtime', 'packages']
 const SKIP_DIRS = new Set(['node_modules', '.next', 'dist', 'build', '.turbo'])
 
 /**
@@ -41,8 +41,8 @@ const DYNAMIC_RE = /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g
 const REQUIRE_RE = /\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)/g
 
 /**
- * Subpath-only packages. Opt-in: `@sim/emcn` and `@sim/desktop-bridge` are barrel-first by
- * design, so flagging them would bury the one rule that matters.
+ * Subpath-only packages. Opt-in: `@sim/emcn` is barrel-first by
+ * design, so flagging it would bury the one rule that matters.
  */
 const SUBPATH_REQUIRED = new Set(['@sim/utils'])
 const repositoryFiles = new Set<string>()

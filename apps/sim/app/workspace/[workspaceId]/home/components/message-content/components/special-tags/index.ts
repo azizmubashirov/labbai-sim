@@ -21,7 +21,6 @@ export type {
   WorkspaceResourceTagType,
 } from './special-tags'
 export {
-  BrowserTakeoverQuestion,
   CREDENTIAL_TAG_TYPES,
   CredentialDisplay,
   credentialTagHasVisibleCard,

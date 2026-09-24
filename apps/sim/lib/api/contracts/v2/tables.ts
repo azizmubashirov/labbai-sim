@@ -226,9 +226,8 @@ export const v2RowDataSchema = z
  *
  * Mirrors the stored `table_row_executions` sidecar minus two fields: `jobId`
  * is the async scheduler's own identity and addresses nothing public, and
- * `enrichmentDetails` is the deep provider cascade, which has its own
- * sub-resource (`GET /tables/{tableId}/rows/{rowId}/enrichment/{groupId}`)
- * precisely so it stays off the paged row read.
+ * `enrichmentDetails` is a legacy provider-cascade blob kept off the paged
+ * row read.
  *
  * The status enum is the column's full domain, not the subset any one caller
  * happens to observe: a run reaches a terminal state, and a response schema
@@ -1837,118 +1836,6 @@ export const v2CreateTableDispatchContract = defineRouteContract({
   response: {
     mode: 'json',
     schema: v2DataResponse(v2RunColumnDataSchema),
-  },
-})
-
-export const v2RowEnrichmentParamsSchema = tableRowParamsSchema.extend({
-  groupId: z.string().min(1).describe('Workflow or enrichment group to run.'),
-})
-export type V2RowEnrichmentParams = z.output<typeof v2RowEnrichmentParamsSchema>
-
-/**
- * The single-cell case of {@link v2CreateTableDispatchContract}: runs one group for
- * one row. The scope lives entirely in the path, so the body carries only the
- * workspace.
- */
-export const v2RunRowEnrichmentContract = defineRouteContract({
-  method: 'POST',
-  path: '/api/v2/tables/[tableId]/rows/[rowId]/enrichment/[groupId]',
-  query: noInputSchema,
-  params: v2RowEnrichmentParamsSchema,
-  body: v2WorkspaceScopedBodySchema,
-  response: {
-    mode: 'json',
-    schema: v2DataResponse(v2RunColumnDataSchema),
-  },
-})
-
-/** One provider's outcome inside an enrichment cascade. */
-export const v2EnrichmentProviderOutcomeSchema = z
-  .object({
-    id: z.string().describe('Provider identifier, e.g. `hunter`.'),
-    label: z.string().describe('Human-readable provider name.'),
-    toolId: z.string().describe('Sim tool identifier the provider ran.'),
-    status: z
-      .string()
-      .describe(
-        'Provider outcome: `matched`, `no_match`, `skipped`, `error`, or `not_run`. Handle unrecognized values, since additional statuses may be returned.'
-      ),
-    cost: z
-      .number()
-      .describe('Hosted-key cost in USD this provider incurred; zero when Sim did not bill it.'),
-    durationMs: z.number().describe('Wall-clock milliseconds this provider took; zero if skipped.'),
-    error: z.string().nullable().describe('Failure reason when `status` is `error`, else null.'),
-  })
-  .meta({
-    id: 'V2EnrichmentProviderOutcome',
-    title: 'Enrichment provider outcome',
-    description: "One provider's result within an enrichment cascade.",
-  })
-export type V2EnrichmentProviderOutcome = z.output<typeof v2EnrichmentProviderOutcomeSchema>
-
-/**
- * The provider cascade behind one enrichment cell: which providers ran, in what
- * order, what each cost and took, and which one produced the match.
- *
- * Declared field-by-field rather than reusing the internal contract's opaque
- * `domainObjectSchema`: this payload is not opaque, and `z.unknown()` in a
- * response slot would need an `untyped-response` annotation it does not
- * deserve.
- *
- * But it IS read back out of a schemaless JSONB column through a bare `as`
- * cast, so the declared shape is what a writer intended rather than what the
- * column holds. Every field a blob could be missing is therefore nullable, and
- * the route projects the stored value onto these keys (`toApiEnrichmentDetail`)
- * before presenting it — the same shape `normalizeStoredViewConfig` uses on the
- * other stored blob this surface publishes. Without both halves a row written
- * by an older runner is a caller-reachable `500` on a well-formed read.
- */
-export const v2EnrichmentRunDetailSchema = z
-  .object({
-    startedAt: v2TimestampSchema
-      .nullable()
-      .describe('ISO 8601 timestamp when the cascade started, or null when not recorded.'),
-    completedAt: v2TimestampSchema
-      .nullable()
-      .describe('ISO 8601 timestamp when the cascade finished, or null when not recorded.'),
-    durationMs: z
-      .number()
-      .describe('Wall-clock milliseconds across the whole cascade; zero when not recorded.'),
-    totalCost: z
-      .number()
-      .describe('Sum of per-provider hosted-key cost in USD; zero when not recorded.'),
-    matchedProvider: z
-      .string()
-      .nullable()
-      .describe('Provider that produced the match, or null when none did.'),
-    aborted: z.boolean().describe('True when the run was canceled before it settled.'),
-    providers: z
-      .array(v2EnrichmentProviderOutcomeSchema)
-      .describe('Every configured provider, in cascade order, including those that never ran.'),
-  })
-  .meta({
-    id: 'V2EnrichmentRunDetail',
-    title: 'Enrichment run detail',
-    description: 'Provider cascade, cost, and timing for one enrichment cell.',
-  })
-export type V2EnrichmentRunDetail = z.output<typeof v2EnrichmentRunDetailSchema>
-
-/**
- * The deep read deliberately kept off the paged row surface: `includeRunState`
- * on the row reads reports the cell's status, this reports how it got there.
- *
- * `null` is a real answer — the cell has never run, or it ran before the
- * cascade breakdown was recorded — and is distinct from a 404, which means the
- * table, row, or group does not exist.
- */
-export const v2GetRowEnrichmentContract = defineRouteContract({
-  method: 'GET',
-  path: '/api/v2/tables/[tableId]/rows/[rowId]/enrichment/[groupId]',
-  params: v2RowEnrichmentParamsSchema,
-  query: v2TableWorkspaceQuerySchema,
-  response: {
-    mode: 'json',
-    schema: v2DataResponse(v2EnrichmentRunDetailSchema.nullable()),
   },
 })
 

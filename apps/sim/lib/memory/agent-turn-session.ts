@@ -16,7 +16,6 @@ import {
 } from '@/lib/execution/durable-secret-provenance'
 import { isLargeValueRef, type LargeValueRef } from '@/lib/execution/payloads/large-value-ref'
 import { createExecutorPrincipalFromExecutionContext } from '@/lib/internal/principals/executor'
-import { redactObjectStrings } from '@/lib/logs/execution/pii-redaction'
 import {
   openAgentMemoryTurnUseCase,
   readAgentMemoryArtifactUseCase,
@@ -480,11 +479,7 @@ export async function openAgentTurnSession(
   const project = async (value: unknown): Promise<unknown> => {
     const projected = projectResolvedSecretModelContent(value, ctx.resolvedSecretTraceRegistry)
     if (!projected.safe) throw new Error('Memory history projection unavailable')
-    if (!ctx.piiBlockOutputRedaction?.enabled) return projected.value
-    return redactObjectStrings(projected.value, {
-      ...ctx.piiBlockOutputRedaction,
-      onFailure: 'throw',
-    })
+    return projected.value
   }
   const turnId = record?.turnId ?? generateId()
   const session = new AgentTurnSession(
@@ -516,11 +511,7 @@ export async function openAgentTurnSession(
           }
           if (step.native) {
             const native = projectableMemoryCheckpoint(step.native.value)
-            if (
-              ctx.piiBlockOutputRedaction?.enabled ||
-              !isDeepStrictEqual(await project(native), native)
-            )
-              step.native = undefined
+            if (!isDeepStrictEqual(await project(native), native)) step.native = undefined
           }
         } catch {
           degrade()

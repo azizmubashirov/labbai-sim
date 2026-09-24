@@ -48,9 +48,6 @@ export function handleResourceEvent(ctx: StreamLoopContext, parsed: ResourceEven
   if (!workspaceId) return
   const onResourceEvent = onResourceEventRef.current
   const payload = parsed.payload
-  // Browser and terminal tabs are projected from the desktop app's live
-  // lists, never from the stream; older servers announced them as resources.
-  if (payload.resource.type === 'browser' || payload.resource.type === 'terminal') return
   const shouldClearViewId =
     payload.resource.type === 'table' && payload.resource.clearViewId === true
   // A saved view the agent just created or edited: the table opens on it, and

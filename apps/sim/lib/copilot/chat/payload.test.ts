@@ -526,59 +526,6 @@ describe('buildCopilotRequestPayload', () => {
     )
   })
 
-  it('advertises desktop capabilities without adding parallel local_* tool schemas', async () => {
-    const capablePayload = await buildCopilotRequestPayload(
-      {
-        message: 'inspect my local project',
-        userId: 'user-1',
-        userMessageId: 'msg-1',
-        mode: 'agent',
-        model: '',
-        workspaceId: 'ws-1',
-        desktopLocalFilesystem: true,
-      },
-      { selectedModel: '' }
-    )
-    expect(capablePayload).toMatchObject({
-      desktopCapabilities: { localFilesystem: true },
-    })
-    expect(capablePayload).not.toHaveProperty('mothershipTools')
-
-    const browserPayload = await buildCopilotRequestPayload(
-      {
-        message: 'inspect my local project',
-        userId: 'user-1',
-        userMessageId: 'msg-2',
-        mode: 'agent',
-        model: '',
-        workspaceId: 'ws-1',
-        browser: true,
-        browserSessions: [
-          {
-            hostname: 'example.com',
-            evidence: 'cookies',
-            lastObservedAt: '2026-08-01T00:00:00.000Z',
-          },
-        ],
-      },
-      { selectedModel: '' }
-    )
-    expect(browserPayload).not.toHaveProperty('mothershipTools')
-    expect(browserPayload).toMatchObject({
-      desktopCapabilities: {
-        browser: true,
-        browserSessions: [
-          {
-            hostname: 'example.com',
-            evidence: 'cookies',
-            lastObservedAt: '2026-08-01T00:00:00.000Z',
-          },
-        ],
-      },
-    })
-    expect(browserPayload).not.toHaveProperty('browserCapable')
-  })
-
   it('passes user metadata through to the Go request payload', async () => {
     const payload = await buildCopilotRequestPayload(
       {
@@ -674,7 +621,7 @@ describe('Assistant payload', () => {
     expect(mockTrackChatUpload).not.toHaveBeenCalled()
   })
 
-  it('forwards organization scope without workspace, integration, or desktop authority', async () => {
+  it('forwards organization scope without workspace or integration authority', async () => {
     const payload = await buildCopilotRequestPayload(
       {
         message: 'Find the policy',
@@ -683,15 +630,11 @@ describe('Assistant payload', () => {
         organizationId: 'org-1',
         mode: 'assistant',
         model: '',
-        browser: true,
-        terminalCapable: true,
-        desktopLocalFilesystem: true,
       },
       { selectedModel: '' }
     )
     expect(payload.organizationId).toBe('org-1')
     expect(payload).not.toHaveProperty('workspaceId')
-    expect(payload).not.toHaveProperty('desktopCapabilities')
     expect(payload.integrationTools ?? []).toEqual([])
   })
 
@@ -710,13 +653,9 @@ describe('Assistant payload', () => {
         contexts: [{ type: 'skill', content: 'Build instructions' }],
         commands: ['run_function'],
         mcpServerIds: ['shared-server'],
-        desktopLocalFilesystem: true,
-        browser: true,
-        terminalCapable: true,
       },
       { selectedModel: '' }
     )
-    expect(payload.desktopCapabilities).toEqual({ browser: true, terminal: true })
     expect(payload.mode).toBe('assistant')
     expect(payload.assistantSearch).toEqual({ source: 'slack', documentIds: ['document-1'] })
     for (const field of ['context', 'commands', 'mothershipTools', 'workflowId']) {

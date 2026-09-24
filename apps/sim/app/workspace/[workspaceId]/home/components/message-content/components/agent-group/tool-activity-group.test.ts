@@ -14,37 +14,12 @@ describe('getToolActivitySummary', () => {
     expect(
       getToolActivitySummary([
         tool('read'),
-        tool('terminal_run'),
+        tool('run_code'),
         tool('read'),
         tool('grep'),
-        tool('browser_navigate'),
+        tool('web_search'),
       ])
-    ).toBe('Read files, ran commands, searched files +1 more')
-  })
-
-  it('summarizes browser navigation and interactions without repeating actions', () => {
-    expect(
-      getToolActivitySummary([
-        tool('browser_navigate'),
-        tool('browser_read_text'),
-        tool('browser_type'),
-        tool('browser_navigate'),
-      ])
-    ).toBe('Navigated, read pages, entered text')
-  })
-
-  it.each([
-    [['browser_navigate', 'browser_read_text'], 'Navigated, read pages'],
-    [['browser_read_text', 'browser_navigate'], 'Read, navigated pages'],
-    [
-      ['browser_navigate', 'browser_read_text', 'browser_scroll'],
-      'Navigated, read, scrolled pages',
-    ],
-    [['browser_navigate', 'browser_type'], 'Navigated pages, entered text'],
-    [['browser_navigate', 'browser_navigate'], 'Navigated pages'],
-    [['read', 'browser_read_text'], 'Read files, read pages'],
-  ])('compacts only explicit shared objects: %j', (names, expected) => {
-    expect(getToolActivitySummary((names as string[]).map((name) => tool(name)))).toBe(expected)
+    ).toBe('Read files, ran code, searched files +1 more')
   })
 
   it('does not describe unsuccessful work as completed actions', () => {
@@ -52,8 +27,8 @@ describe('getToolActivitySummary', () => {
       getToolActivitySummary([
         tool('read'),
         tool('apply_file_edit', 'error'),
-        tool('terminal_run', 'cancelled'),
-        tool('browser_type', 'rejected'),
+        tool('run_code', 'cancelled'),
+        tool('web_search', 'rejected'),
       ])
     ).toBe('Read files · 1 stopped')
   })
@@ -62,14 +37,14 @@ describe('getToolActivitySummary', () => {
     expect(
       getToolActivitySummary([
         tool('apply_file_edit', 'error'),
-        tool('terminal_run', 'interrupted'),
+        tool('run_code', 'interrupted'),
       ])
     ).toBe('Tool activity · 1 stopped')
   })
 
   it('uses a neutral summary when every call failed', () => {
     expect(
-      getToolActivitySummary([tool('run_workflow', 'error'), tool('terminal', 'rejected')])
+      getToolActivitySummary([tool('run_workflow', 'error'), tool('run_code', 'rejected')])
     ).toBe('Tool activity')
   })
 
@@ -94,28 +69,28 @@ describe('getToolActivitySummary', () => {
     ['interrupted', 'Stopped running checks'],
   ] as const)('labels a single %s tool as finished', (status, expected) => {
     expect(
-      getToolActivitySummary([{ ...tool('terminal', status), displayTitle: 'Running checks' }])
+      getToolActivitySummary([{ ...tool('run_code', status), displayTitle: 'Running checks' }])
     ).toBe(expected)
   })
 
   it('keeps unknown tools visible with a neutral summary', () => {
-    expect(getToolActivitySummary([tool('future_tool'), tool('browser_future_action')])).toBe(
-      'Used tools, used the browser'
+    expect(getToolActivitySummary([tool('future_tool'), tool('another_future_tool')])).toBe(
+      'Used tools'
     )
   })
 
-  it('describes current browser and workflow tools', () => {
+  it('describes current web, file, and workflow tools', () => {
     expect(
       getToolActivitySummary([
-        tool('browser_open_url'),
-        tool('browser_fill_form'),
-        tool('browser_insert_text'),
+        tool('web_search'),
+        tool('web_fetch'),
+        tool('apply_file_edit'),
         tool('read_document'),
         tool('run_workflow'),
         tool('deploy_as_api'),
         tool('table_rows'),
       ])
-    ).toBe('Navigated pages, filled forms, entered text +4 more')
+    ).toBe('Searched the web, read web pages, edited files +4 more')
   })
 
   it('keeps interruption counts without failure badges when action categories are capped', () => {
@@ -123,17 +98,17 @@ describe('getToolActivitySummary', () => {
       getToolActivitySummary([
         tool('read'),
         tool('grep'),
-        tool('terminal'),
-        tool('browser_navigate'),
+        tool('run_code'),
+        tool('web_search'),
         tool('apply_file_edit', 'error'),
         tool('wait', 'interrupted'),
-        tool('browser_type', 'skipped'),
+        tool('web_fetch', 'skipped'),
       ])
-    ).toBe('Read files, searched files, used the terminal +1 more · 1 stopped · 1 skipped')
+    ).toBe('Read files, searched files, ran code +1 more · 1 stopped · 1 skipped')
   })
 
   it('keeps individual unsuccessful actions neutral without aggregate failure badges', () => {
-    const rejected = { ...tool('terminal', 'rejected'), displayTitle: 'Running checks' }
+    const rejected = { ...tool('run_code', 'rejected'), displayTitle: 'Running checks' }
     expect(getToolActivitySummary([rejected])).toBe('Running checks')
     expect(getToolActivitySummary([rejected, tool('read', 'skipped')])).toBe(
       'Tool activity · 1 skipped'
@@ -151,9 +126,12 @@ describe('getToolActivitySummary', () => {
     ).toBe('Deployed workflows, undeployed workflows, read files')
   })
 
-  it('describes terminal runs from their operation', () => {
+  it('describes operation-based tools from their operation', () => {
     expect(
-      getToolActivitySummary([{ ...tool('terminal'), params: { operation: 'run' } }, tool('read')])
-    ).toBe('Ran commands, read files')
+      getToolActivitySummary([
+        { ...tool('table_rows'), params: { operation: 'batch_insert_rows' } },
+        tool('read'),
+      ])
+    ).toBe('Added rows, read files')
   })
 })

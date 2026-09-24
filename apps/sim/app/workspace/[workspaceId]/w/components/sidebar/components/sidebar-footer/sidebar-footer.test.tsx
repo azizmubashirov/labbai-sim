@@ -6,15 +6,6 @@ import { Building, Credit, Trash, Users } from '@sim/emcn/icons'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const desktopMocks = vi.hoisted(() => ({
-  getState: vi.fn(),
-  onState: vi.fn(),
-  check: vi.fn(),
-  install: vi.fn(),
-  listener: null as ((state: unknown) => void) | null,
-  unsubscribe: vi.fn(),
-}))
-
 const authMocks = vi.hoisted(() => ({ signOut: vi.fn(), userId: 'user-1' }))
 vi.mock('@/lib/auth/sign-out', () => ({ signOutAndRedirect: authMocks.signOut }))
 vi.mock('next/link', () => ({
@@ -37,14 +28,6 @@ vi.mock('next/link', () => ({
   ),
 }))
 
-vi.mock('@/lib/desktop', () => ({
-  getDesktopUpdates: () => ({
-    getState: desktopMocks.getState,
-    onState: desktopMocks.onState,
-    check: desktopMocks.check,
-    install: desktopMocks.install,
-  }),
-}))
 vi.mock('@/hooks/queries/user-profile', () => ({
   useUserProfile: () => ({ data: { id: authMocks.userId, name: 'Ada', email: 'ada@sim.ai' } }),
 }))
@@ -69,11 +52,7 @@ import { useSettingsDirtyStore } from '@/stores/settings/dirty/store'
 let container: HTMLDivElement
 let root: Root
 
-async function renderFooter(
-  initialState: Record<string, unknown>,
-  overrides: Partial<Parameters<typeof SidebarFooter>[0]> = {}
-) {
-  desktopMocks.getState.mockResolvedValue(initialState)
+async function renderFooter(overrides: Partial<Parameters<typeof SidebarFooter>[0]> = {}) {
   await act(async () => {
     root.render(
       <SidebarFooter
@@ -151,11 +130,6 @@ beforeEach(() => {
   vi.clearAllMocks()
   authMocks.userId = 'user-1'
   useSettingsDirtyStore.getState().reset()
-  desktopMocks.listener = null
-  desktopMocks.onState.mockImplementation((listener) => {
-    desktopMocks.listener = listener
-    return desktopMocks.unsubscribe
-  })
   ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   container = document.createElement('div')
   document.body.appendChild(container)
@@ -169,7 +143,7 @@ afterEach(() => {
 
 describe('SidebarFooter', () => {
   it('keeps the familiar Settings entry in the profile menu', async () => {
-    await renderFooter({ status: 'idle' })
+    await renderFooter()
     openProfileMenu()
     expect(
       [...document.querySelectorAll('[role="menuitem"]')].map((item) => item.textContent)
@@ -181,7 +155,6 @@ describe('SidebarFooter', () => {
   it('guards returning to the organization when settings are unsaved', async () => {
     const onNavigate = vi.fn()
     await renderFooter(
-      { status: 'idle' },
       {
         navigationLinks: [{ label: 'Organization', icon: Building, href: '/o/org-1', onNavigate }],
       }
@@ -196,14 +169,14 @@ describe('SidebarFooter', () => {
   })
 
   it('uses the shared sign-out flow', async () => {
-    await renderFooter({ status: 'idle' })
+    await renderFooter()
     openProfileMenu()
     await act(async () => menuItem('Sign out').click())
     expect(authMocks.signOut).toHaveBeenCalledOnce()
   })
 
   it('defers sign-out while settings are unsaved', async () => {
-    await renderFooter({ status: 'idle' })
+    await renderFooter()
     useSettingsDirtyStore.getState().setDirty(true)
     openProfileMenu()
     await act(async () => menuItem('Sign out').click())
@@ -214,7 +187,7 @@ describe('SidebarFooter', () => {
 
   it('hides sign-out for auth-disabled deployments', async () => {
     authMocks.userId = ANONYMOUS_USER_ID
-    await renderFooter({ status: 'idle' })
+    await renderFooter()
     openProfileMenu()
     expect(document.querySelector('[role="menu"]')).not.toHaveTextContent('Sign out')
     expect(document.querySelector('[role="separator"]')).toBeNull()
@@ -222,14 +195,14 @@ describe('SidebarFooter', () => {
 
   it('opens the shared support flow', async () => {
     const onContactSupport = vi.fn()
-    await renderFooter({ status: 'idle' }, { onContactSupport })
+    await renderFooter({ onContactSupport })
     openHelpMenu()
     act(() => menuItem('Contact support').click())
     expect(onContactSupport).toHaveBeenCalledOnce()
   })
 
   it('keeps the overflow tooltip disabled while the collapsed tooltip still owns the trigger', async () => {
-    await renderFooter({ status: 'idle' }, { isCollapsed: false, showCollapsedTooltips: true })
+    await renderFooter({ isCollapsed: false, showCollapsedTooltips: true })
     const label = profileTrigger().querySelector<HTMLElement>('[data-overflow-text]')
     if (!label) throw new Error('Profile label was not rendered')
     Object.defineProperties(label, {
@@ -244,8 +217,8 @@ describe('SidebarFooter', () => {
     expect(document.querySelector('[data-native-surface-overlay]')).toBeNull()
   })
 
-  it('keeps the ordinary help treatment when no update is available', async () => {
-    await renderFooter({ status: 'idle' })
+  it('keeps the ordinary help treatment', async () => {
+    await renderFooter()
 
     expect(helpTrigger()).toHaveAttribute('aria-label', 'Help')
     expect(helpTrigger()).not.toHaveClass('bg-[var(--text-primary)]')
@@ -254,54 +227,5 @@ describe('SidebarFooter', () => {
     openHelpMenu()
     expect(document.querySelector('[role="menu"]')).not.toHaveTextContent('Update')
     expect(menuItem('Docs')).toBeVisible()
-  })
-
-  it('replaces Help with a same-size primary update icon and starts it from the same menu', async () => {
-    await renderFooter({ status: 'available', version: '1.4.0' })
-
-    expect(helpTrigger()).toHaveAttribute('aria-label', 'Help, update available')
-    expect(helpTrigger()).toHaveClass('h-[30px]', 'px-2')
-    expect(helpTrigger()).not.toHaveClass('bg-[var(--text-primary)]')
-    expect(helpTrigger().querySelector('circle')).not.toBeInTheDocument()
-    expect(helpTrigger().querySelector('div')).toHaveClass(
-      'size-[17px]',
-      'rounded-full',
-      'bg-[var(--text-primary)]'
-    )
-    expect(helpTrigger().querySelector('svg')).toHaveClass('size-[11px]')
-    expect(helpTrigger().querySelector('svg')).toHaveAttribute('viewBox', '-1.75 -1.75 24 24')
-    openHelpMenu()
-    expect(menuItem('Update').querySelector('img')).toHaveAttribute(
-      'src',
-      '/favicon/favicon-32x32.png'
-    )
-    act(() => menuItem('Update').click())
-
-    expect(desktopMocks.check).toHaveBeenCalledTimes(1)
-    expect(desktopMocks.install).not.toHaveBeenCalled()
-  })
-
-  it('uses a collapsed-sidebar-safe element for the update icon', async () => {
-    await renderFooter(
-      { status: 'available', version: '1.4.0' },
-      { isCollapsed: true, showCollapsedTooltips: true }
-    )
-
-    expect(helpTrigger().querySelector('div')).toHaveClass('size-[17px]')
-    expect(helpTrigger().querySelector('span')).toBeNull()
-  })
-
-  it('turns the menu action into restart-and-install when the update is ready', async () => {
-    await renderFooter({ status: 'idle' })
-
-    act(() => {
-      desktopMocks.listener?.({ status: 'ready', version: '1.4.0' })
-    })
-    expect(helpTrigger().querySelector('div')).toHaveClass('bg-[var(--text-primary)]')
-    openHelpMenu()
-    act(() => menuItem('Restart to update').click())
-
-    expect(desktopMocks.install).toHaveBeenCalledTimes(1)
-    expect(desktopMocks.check).not.toHaveBeenCalled()
   })
 })

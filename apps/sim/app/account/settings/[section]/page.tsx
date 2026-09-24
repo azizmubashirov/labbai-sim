@@ -52,7 +52,7 @@ export default async function AccountSettingsSectionPage({
   })
   if (!parsed) notFound()
   if (parsed === 'billing' && !isBillingEnabled) redirect(getAccountSettingsHref('general'))
-  if (parsed === 'admin' || parsed === 'mothership') {
+  if (parsed === 'admin') {
     const isSuperUser = await isPlatformAdmin(session.user.id)
     if (!isSuperUser) notFound()
   }

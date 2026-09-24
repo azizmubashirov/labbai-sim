@@ -1,11 +1,10 @@
 /**
- * Shared types for the integrations catalog. Mirrors the JSON shape written by
- * `scripts/generate-docs.ts` → `writeIntegrationsJson()`, which is the
- * serialized projection of `BlockConfig` consumed by landing + workspace UIs.
+ * Shared types for the integrations catalog: the serialized projection of
+ * `BlockConfig` in `@sim/deployment-config/integrations.json`, consumed by the
+ * workspace UI.
  */
 
 import type { IntegrationMetadata } from '@sim/deployment-config/integration-metadata'
-import type { IntegrationLandingContent } from '@/app/(landing)/integrations/data/types'
 import type { BlockConfig, IntegrationTag } from '@/blocks/types'
 
 /** Normalized authentication mode surfaced in the catalog. */
@@ -51,8 +50,6 @@ export interface Integration extends IntegrationMetadata {
   /** Triggers enriched with details from the trigger registry. */
   triggers: TriggerInfo[]
   triggerCount: number
-  /** Hand-authored landing content baked in at generation time (see `landing-content.ts`). */
-  landingContent?: IntegrationLandingContent
 }
 
 /**

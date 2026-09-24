@@ -41,7 +41,6 @@ import { useParams, usePathname, useRouter } from 'next/navigation'
 import { usePostHog } from 'posthog-js/react'
 import { useSession } from '@/lib/auth/auth-client'
 import { canViewWorkspaceBillingSettings } from '@/lib/billing/workspace-permissions'
-import { focusVisibleBrowserOmnibox } from '@/lib/browser-agent/renderer-shortcuts'
 import { SIM_RESOURCES_DRAG_TYPE } from '@/lib/copilot/resource-types'
 import { useDeploymentShape } from '@/lib/core/config/deployment-shape'
 import { isStatusNoticePreviewEnabled } from '@/lib/core/config/env-flags'
@@ -338,13 +337,6 @@ export const SIDEBAR_SCROLL_EVENT = 'sidebar-scroll-to-item'
 const HIDDEN_STYLE = { display: 'none' } as const
 
 /**
- * Opts a control out of the desktop shell's window-drag region. The header row is
- * draggable chrome, so anything clickable inside it has to say so or the click is
- * swallowed by the drag handler.
- */
-const DRAG_EXEMPT_CLASS = '[-webkit-app-region:no-drag]'
-
-/**
  * Sidebar component with resizable width that persists across page refreshes.
  *
  * Uses a CSS-based approach to prevent hydration mismatches:
@@ -354,15 +346,12 @@ const DRAG_EXEMPT_CLASS = '[-webkit-app-region:no-drag]'
  *
  * This ensures server and client render identical HTML, preventing hydration errors.
  *
- * Collapse and peek state come from the hosting chrome through
- * {@link useSidebarChrome}; the peek card always renders the expanded layout,
- * whatever the rail's state.
+ * Collapse state comes from the hosting chrome through {@link useSidebarChrome}.
  *
  * @returns Sidebar with workflows panel
  */
 export const Sidebar = memo(function Sidebar() {
-  const { isCollapsed: isCollapsedProp, isPeeking } = useSidebarChrome()
-  const isCollapsed = isCollapsedProp && !isPeeking
+  const { isCollapsed } = useSidebarChrome()
   const params = useParams()
   const workspaceId = params.workspaceId as string
   const workflowId = params.workflowId as string | undefined
@@ -1267,7 +1256,6 @@ export const Sidebar = memo(function Sidebar() {
       {
         id: 'goto-logs',
         handler: () => {
-          if (focusVisibleBrowserOmnibox()) return
           try {
             const pathWorkspaceId = resolveWorkspaceIdFromPath()
             if (pathWorkspaceId) {
@@ -1329,20 +1317,7 @@ export const Sidebar = memo(function Sidebar() {
           onClick={handleSidebarClick}
         >
           <div className='flex h-full flex-col'>
-            {/* The peek card already sits below the lane; reserving it again doubles the offset. */}
-            {!isPeeking && (
-              <div
-                aria-hidden
-                className='desktop-window-drag-region desktop-workspace-window-drag-region h-[var(--desktop-title-bar-height)]'
-              />
-            )}
-            <div
-              className={cn(
-                'relative flex shrink-0 items-center px-2 pt-2',
-                !isPeeking &&
-                  '[[data-sim-desktop-title-bar=inset]_&]:pt-[var(--desktop-title-bar-height)]'
-              )}
-            >
+            <div className='relative flex shrink-0 items-center px-2 pt-2'>
               <WorkspaceHeader
                 activeWorkspace={activeWorkspace ?? routeWorkspace}
                 workspaceId={workspaceId}
@@ -1376,8 +1351,7 @@ export const Sidebar = memo(function Sidebar() {
                * is remapped to `--border-width`, which thins to 0.5px on hidpi so
                * hairline rules stay hairlines.
                *
-               * The expanded width is EXPLICIT (2 icon chips × 32px + the 1px gap;
-               * 32px when the desktop inset title bar hides the collapse chip) so the
+               * The expanded width is EXPLICIT (2 icon chips × 32px + the 1px gap) so the
                * cluster never claims more than its chips: it refuses to flex-shrink
                * (min-width: auto) while the workspace chip's wrapper is `min-w-0
                * flex-1`, so an `auto` width would crush the workspace chip instead.
@@ -1386,9 +1360,7 @@ export const Sidebar = memo(function Sidebar() {
                 inert={isCollapsed}
                 className={cn(
                   'flex h-[30px] items-center gap-[1px] overflow-hidden',
-                  isCollapsed
-                    ? 'w-0 opacity-0'
-                    : 'w-[65px] [[data-sim-desktop-title-bar=inset]_&]:w-[32px]'
+                  isCollapsed ? 'w-0 opacity-0' : 'w-[65px]'
                 )}
               >
                 <SidebarTooltip
@@ -1404,7 +1376,6 @@ export const Sidebar = memo(function Sidebar() {
                        options object, which a raw handler would fill with the event. */
                     onClick={() => openSearchModal()}
                     tabIndex={isCollapsed ? -1 : undefined}
-                    className={DRAG_EXEMPT_CLASS}
                   />
                 </SidebarTooltip>
                 <SidebarTooltip
@@ -1418,10 +1389,6 @@ export const Sidebar = memo(function Sidebar() {
                     aria-label='Collapse sidebar'
                     onClick={toggleCollapsed}
                     tabIndex={isCollapsed ? -1 : undefined}
-                    className={cn(
-                      DRAG_EXEMPT_CLASS,
-                      '[[data-sim-desktop-title-bar=inset]_&]:hidden'
-                    )}
                   />
                 </SidebarTooltip>
               </div>
@@ -1863,23 +1830,19 @@ export const Sidebar = memo(function Sidebar() {
           </div>
         </aside>
 
-        {/* Not on the peek card: the resize hook writes an inline `--sidebar-width` that
-            out-specifies the `[data-peek]` rule, stranding the card at a stale width. */}
-        {!isPeeking && (
-          <div
-            className={cn(
-              'absolute top-0 right-0 bottom-0 z-20 w-[8px] translate-x-1/2',
-              isCollapsed ? 'cursor-e-resize' : 'cursor-ew-resize'
-            )}
-            onPointerDown={isCollapsed ? undefined : handlePointerDown}
-            onClick={isCollapsed ? toggleCollapsed : undefined}
-            onKeyDown={handleEdgeKeyDown}
-            role={isCollapsed ? 'button' : 'separator'}
-            tabIndex={0}
-            aria-orientation={isCollapsed ? undefined : 'vertical'}
-            aria-label={isCollapsed ? 'Expand sidebar' : 'Resize sidebar'}
-          />
-        )}
+        <div
+          className={cn(
+            'absolute top-0 right-0 bottom-0 z-20 w-[8px] translate-x-1/2',
+            isCollapsed ? 'cursor-e-resize' : 'cursor-ew-resize'
+          )}
+          onPointerDown={isCollapsed ? undefined : handlePointerDown}
+          onClick={isCollapsed ? toggleCollapsed : undefined}
+          onKeyDown={handleEdgeKeyDown}
+          role={isCollapsed ? 'button' : 'separator'}
+          tabIndex={0}
+          aria-orientation={isCollapsed ? undefined : 'vertical'}
+          aria-label={isCollapsed ? 'Expand sidebar' : 'Resize sidebar'}
+        />
       </div>
 
       <SearchModal

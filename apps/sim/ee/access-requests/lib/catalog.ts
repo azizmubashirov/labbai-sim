@@ -1,9 +1,7 @@
 import {
   isChatEnabled,
-  isInboxEnabled,
   isInvitationsDisabled,
   isPublicApiDisabled,
-  isSandboxesEnabled,
   isSsoEnabled,
 } from '@/lib/core/config/env-flags'
 import { PLATFORM_FEATURES } from '@/lib/permission-groups/features'
@@ -72,8 +70,6 @@ export function getAccessRequestDeploymentUnavailableReason(
   if (target.kind !== 'feature') return null
   const disabled =
     (target.configKey === 'hideCopilot' && !isChatEnabled) ||
-    (target.configKey === 'hideInboxTab' && !isInboxEnabled) ||
-    (target.configKey === 'hideSandboxesTab' && !isSandboxesEnabled) ||
     (target.configKey === 'disableInvitations' && isInvitationsDisabled) ||
     (target.configKey === 'disablePublicApi' && isPublicApiDisabled)
   return disabled

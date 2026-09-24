@@ -68,8 +68,7 @@ COPY --from=pruner /app/bun.lock ./bun.lock
 # JOBS=4 caps node-gyp parallelism — higher values OOM isolated-vm (laverdet/isolated-vm#428).
 #
 # node-gyp comes from the lockfile, not `npx`. It is a devDependency of apps/sim
-# purely so `turbo prune` keeps it: the only other copy is transitive through
-# `@electron/rebuild`, which belongs to apps/desktop and is pruned away. `npx`
+# purely so `turbo prune` keeps it. `npx`
 # resolved it from the registry at build time, which pulled a different major
 # (13.x vs the pinned 12.4.0) and bypassed the `minimumReleaseAge` supply-chain
 # gate in bunfig.toml on every production image build.
@@ -184,10 +183,6 @@ COPY --from=builder --chown=nextjs:nodejs /app/apps/sim/lib/execution/isolated-v
 # run inside the V8 isolate. Committed into the repo; see
 # apps/sim/lib/execution/sandbox/bundles/build.ts to regenerate.
 COPY --from=builder --chown=nextjs:nodejs /app/apps/sim/lib/execution/sandbox/bundles ./apps/sim/lib/execution/sandbox/bundles
-
-# Guardrails PII runs in a standalone Presidio service (combined analyzer +
-# anonymizer, docker/pii.Dockerfile), reached over the network via PII_URL —
-# no Python/Presidio in this image.
 
 # Create .next/cache directory with correct ownership
 RUN mkdir -p apps/sim/.next/cache && \

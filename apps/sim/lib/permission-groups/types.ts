@@ -28,7 +28,6 @@ export const permissionGroupConfigSchema = z.object({
   hideIntegrationsTab: z.boolean().optional(),
   hideSecretsTab: z.boolean().optional(),
   hideApiKeysTab: z.boolean().optional(),
-  hideInboxTab: z.boolean().optional(),
   hideFilesTab: z.boolean().optional(),
   disableMcpTools: z.boolean().optional(),
   disableCustomTools: z.boolean().optional(),
@@ -65,7 +64,6 @@ export interface PermissionGroupConfig {
   hideIntegrationsTab: boolean
   hideSecretsTab: boolean
   hideApiKeysTab: boolean
-  hideInboxTab: boolean
   hideFilesTab: boolean
   disableMcpTools: boolean
   disableCustomTools: boolean
@@ -94,7 +92,6 @@ export const DEFAULT_PERMISSION_GROUP_CONFIG: PermissionGroupConfig = {
   hideIntegrationsTab: false,
   hideSecretsTab: false,
   hideApiKeysTab: false,
-  hideInboxTab: false,
   hideFilesTab: false,
   disableMcpTools: false,
   disableCustomTools: false,
@@ -133,7 +130,6 @@ export function parsePermissionGroupConfig(config: unknown): PermissionGroupConf
     hideIntegrationsTab: typeof c.hideIntegrationsTab === 'boolean' ? c.hideIntegrationsTab : false,
     hideSecretsTab: typeof c.hideSecretsTab === 'boolean' ? c.hideSecretsTab : false,
     hideApiKeysTab: typeof c.hideApiKeysTab === 'boolean' ? c.hideApiKeysTab : false,
-    hideInboxTab: typeof c.hideInboxTab === 'boolean' ? c.hideInboxTab : false,
     hideFilesTab: typeof c.hideFilesTab === 'boolean' ? c.hideFilesTab : false,
     disableMcpTools: typeof c.disableMcpTools === 'boolean' ? c.disableMcpTools : false,
     disableCustomTools: typeof c.disableCustomTools === 'boolean' ? c.disableCustomTools : false,

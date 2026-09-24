@@ -31,7 +31,6 @@ describe('Function Execute Tool', () => {
       outputTable: undefined,
       outputSandboxPath: undefined,
       outputMimeType: undefined,
-      sandboxId: undefined,
       secretScope: undefined,
       mountedSecrets: undefined,
       unredactedSecretNames: undefined,

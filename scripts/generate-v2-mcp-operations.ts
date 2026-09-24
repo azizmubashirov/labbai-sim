@@ -10,9 +10,8 @@
  * thing that cannot be derived at runtime: Next.js loads route modules by file
  * path, so something has to name each module statically for the bundler.
  *
- * Operations come from {@link collectOperations} — the same contract discovery
- * the CLI generator uses — so the terminal and MCP expose one operation set
- * under one set of names. An operation is left out only when its transport
+ * Operations come from {@link collectOperations} (scripts/v2-operations.ts).
+ * An operation is left out only when its transport
  * cannot be expressed as a JSON tool call: a binary response, or a body that
  * must be streamed as multipart. A route built by anything this script does not
  * recognize fails generation rather than being guessed at.
@@ -33,7 +32,7 @@ import {
   loadWorkspaceKeyDenialMarkers,
   type Operation,
   type OperationDoc,
-} from './generate-v2-cli-api'
+} from './v2-operations'
 import { localBin } from './local-bin'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -161,7 +160,7 @@ function format(source: string): string {
 
 async function main() {
   const check = process.argv.includes('--check')
-  const docs = loadSummaries(await loadWorkspaceKeyDenialMarkers())
+  const docs = await loadSummaries(await loadWorkspaceKeyDenialMarkers())
   const readRoute = (relativePath: string) => {
     const file = path.join(APP_ROOT, relativePath)
     return existsSync(file) ? readFileSync(file, 'utf8') : null

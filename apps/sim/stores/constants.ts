@@ -90,8 +90,7 @@ export const MOTHERSHIP_WIDTH = {
   CHAT_MIN: 240,
   /**
    * Share of the viewport the panel takes while unpinned — the `w-1/2` class in
-   * mothership-view. Also reported to the desktop shell so it can re-derive the
-   * panel rect mid-resize, so the two must agree.
+   * mothership-view; the two must agree.
    */
   DEFAULT_RATIO: 0.5,
 } as const

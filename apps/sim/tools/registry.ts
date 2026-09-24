@@ -1,10 +1,4 @@
 import {
-  a2aCancelTaskTool,
-  a2aGetAgentCardTool,
-  a2aGetTaskTool,
-  a2aSendMessageTool,
-} from '@/tools/a2a'
-import {
   affinityBatchUpdateEntityFieldsTool,
   affinityBatchUpdateListEntryFieldsTool,
   affinityCreateListFieldDropdownOptionTool,
@@ -1446,7 +1440,6 @@ import {
   enrichSearchSimilarCompaniesTool,
   enrichVerifyEmailTool,
 } from '@/tools/enrich'
-import { enrichmentRunTool } from '@/tools/enrichment'
 import { enrowFindEmailTool, enrowVerifyEmailTool } from '@/tools/enrow'
 import {
   exaAgentTool,
@@ -5762,13 +5755,6 @@ import {
   vercelUpdateProjectTool,
   vercelVerifyProjectDomainTool,
 } from '@/tools/vercel'
-import {
-  falaiVideoTool,
-  lumaVideoTool,
-  minimaxVideoTool,
-  runwayVideoTool,
-  veoVideoTool,
-} from '@/tools/video'
 import { visionTool, visionToolV2 } from '@/tools/vision'
 import {
   wealthboxReadContactTool,
@@ -6003,10 +5989,6 @@ import {
 
 // Registry of all available tools
 export const tools: Record<string, ExecutableToolConfig> = {
-  a2a_cancel_task: a2aCancelTaskTool,
-  a2a_get_agent_card: a2aGetAgentCardTool,
-  a2a_get_task: a2aGetTaskTool,
-  a2a_send_message: a2aSendMessageTool,
   affinity_batch_update_entity_fields: affinityBatchUpdateEntityFieldsTool,
   affinity_batch_update_list_entry_fields: affinityBatchUpdateListEntryFieldsTool,
   affinity_create_list: affinityCreateListTool,
@@ -8723,7 +8705,6 @@ export const tools: Record<string, ExecutableToolConfig> = {
   enrich_search_posts: enrichSearchPostsTool,
   enrich_search_similar_companies: enrichSearchSimilarCompaniesTool,
   enrich_verify_email: enrichVerifyEmailTool,
-  enrichment_run: enrichmentRunTool,
   extend_parser: extendParserTool,
   extend_parser_v2: extendParserV2Tool,
   exa_search: exaSearchTool,
@@ -9842,11 +9823,6 @@ export const tools: Record<string, ExecutableToolConfig> = {
   tts_google: googleTtsTool,
   tts_azure: azureTtsTool,
   tts_playht: playhtTtsTool,
-  video_runway: runwayVideoTool,
-  video_veo: veoVideoTool,
-  video_luma: lumaVideoTool,
-  video_minimax: minimaxVideoTool,
-  video_falai: falaiVideoTool,
   s3_get_object: s3GetObjectTool,
   s3_put_object: s3PutObjectTool,
   s3_list_objects: s3ListObjectsTool,

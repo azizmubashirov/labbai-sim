@@ -1791,8 +1791,8 @@ describe('canonical mode policy (fork/promote)', () => {
       [
         {
           id: 'b1',
-          name: 'Pi',
-          type: 'pi',
+          name: 'Mode Block',
+          type: 'mode_block',
           subBlocks: {
             mode: entry('mode', 'dropdown', 'local'),
             cloudKb: entry('cloudKb', 'knowledge-base-selector', 'kb-hidden'),
@@ -1917,8 +1917,8 @@ describe('canonical mode policy (fork/promote)', () => {
       [
         {
           id: 'b1',
-          name: 'Pi',
-          type: 'pi',
+          name: 'Mode Block',
+          type: 'mode_block',
           subBlocks: {
             mode: entry('mode', 'dropdown', 'local'),
             cloudKey: entry('cloudKey', 'short-input', '{{HIDDEN_SECRET}}'),

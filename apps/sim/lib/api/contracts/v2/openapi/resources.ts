@@ -54,13 +54,6 @@ import {
 import { workspaceInvitationOpenApiRoutes } from '@/lib/api/contracts/v2/openapi/workspace-invitations'
 import { workspacePermissionOpenApiRoutes } from '@/lib/api/contracts/v2/openapi/workspace-permissions'
 import {
-  v2CreateSandboxContract,
-  v2DeleteSandboxContract,
-  v2GetSandboxContract,
-  v2ListSandboxesContract,
-  v2UpdateSandboxContract,
-} from '@/lib/api/contracts/v2/sandboxes'
-import {
   v2DeleteSecretContract,
   v2ListSecretsContract,
   v2SetSecretContract,
@@ -99,7 +92,6 @@ import { catalogOperations } from '@/lib/catalog/application/operations'
 import { credentialOperations } from '@/lib/credentials/application/operations'
 import { customToolOperations } from '@/lib/custom-tools/application/operations'
 import { mcpServerOperations } from '@/lib/mcp/application/operations'
-import { sandboxOperations } from '@/lib/sandboxes/application/operations'
 import { secretOperations } from '@/lib/secrets/application/operations'
 import { skillOperations } from '@/lib/skills/application/operations'
 import { toolExecutionOperations } from '@/lib/tool-execution/application/operations'
@@ -239,11 +231,6 @@ const TOOL_EXECUTION_EXAMPLE = {
   output: { ts: '1718191234.004500' },
   error: null,
 } as const
-
-const SANDBOX_ADMIN_PLAN_NOTE =
-  'Requires a workspace admin on Max or Enterprise; lower plans return `403` with `error.details.code: WORKSPACE_PLAN_CAPABILITY_REQUIRED`.'
-const SANDBOX_BUILD_BUDGET_NOTE =
-  'Creates and updates share a write budget; bursts return `429` with `Retry-After`.'
 
 const TOOL_DETAIL_EXAMPLE = {
   ...TOOL_SUMMARY_EXAMPLE,
@@ -397,27 +384,6 @@ const CUSTOM_TOOL_EXAMPLE = {
   updatedAt: '2026-06-20T14:02:11.000Z',
 } as const
 
-/**
- * No managed CLI in the example: the catalog pins exact versions that rotate
- * with every upgrade, and an example naming one would break the spec check on
- * each bump.
- */
-const SANDBOX_EXAMPLE = {
-  id: 'V1StGXR8Z5jdHi6BmyT',
-  name: 'data-tools',
-  language: 'python',
-  dependencies: ['pandas==2.2.2', 'requests'],
-  cliTools: [],
-  systemPackages: ['graphviz'],
-  buildStatus: 'ready',
-  errorCode: null,
-  errorMessage: null,
-  errorDetail: null,
-  builtAt: '2026-06-20T14:05:40.000Z',
-  createdAt: '2026-06-01T09:14:00.000Z',
-  updatedAt: '2026-06-20T14:02:11.000Z',
-} as const
-
 const CREDENTIAL_EXAMPLE = {
   id: '7c9e6679-7425-40de-944b-e07fc1f90ae7',
   type: 'service_account',
@@ -516,7 +482,6 @@ type ResourceTag =
   | 'MCP Servers'
   | 'Skills'
   | 'Custom Tools'
-  | 'Sandboxes'
   | 'Credentials'
   | 'Secrets'
   | 'Catalog'
@@ -1264,180 +1229,6 @@ const declaredRoutes = [
     }
   ),
   defineOpenApiRoute(
-    v2ListSandboxesContract,
-    resourceOperation('Sandboxes', {
-      applicationOperation: sandboxOperations.list,
-      operationId: 'listSandboxes',
-      summary: 'List Sandboxes',
-      description:
-        'List reusable dependency environments for Function blocks, including language packages, managed CLIs, and system packages. Sandboxes remain visible after a plan downgrade.',
-      errors: RESOURCE_ERRORS,
-      success: { description: 'Sandboxes defined in the workspace.' },
-    }),
-    {
-      query: documentedSchema(
-        v2ListSandboxesContract.query,
-        'ListSandboxesQuery',
-        'List sandboxes query',
-        'Workspace, search, sorting, and paging controls for sandboxes.'
-      ),
-      response: documentedSchema(
-        v2ListSandboxesContract.response.schema,
-        'ListSandboxesResponse',
-        'List sandboxes response',
-        'Sandboxes defined in the workspace.',
-        [{ data: [SANDBOX_EXAMPLE], nextCursor: null }]
-      ),
-    }
-  ),
-  defineOpenApiRoute(
-    v2CreateSandboxContract,
-    resourceOperation('Sandboxes', {
-      applicationOperation: sandboxOperations.create,
-      operationId: 'createSandbox',
-      summary: 'Create Sandbox',
-      description: `Create a uniquely named dependency environment. If a build is needed, track readiness with \`buildStatus\`; null means no build is required. Invalid dependencies return \`400\` with field details. Requires workspace admin access on Max or Enterprise. Creates and updates share a rate limit; respect \`Retry-After\`. ${WORKSPACE_API_KEY_DENIED}`,
-      errors: RESOURCE_CONFLICT_ERRORS,
-      success: {
-        description:
-          'The sandbox was created; a build is scheduled where the deployment prebuilds images.',
-      },
-    }),
-    {
-      query: v2CreateSandboxContract.query,
-      body: documentedSchema(
-        v2CreateSandboxContract.body,
-        'CreateSandboxRequest',
-        'Create sandbox request',
-        'Name, language, and dependency set of a new sandbox.',
-        [
-          {
-            workspaceId: WORKSPACE_ID,
-            name: SANDBOX_EXAMPLE.name,
-            language: SANDBOX_EXAMPLE.language,
-            dependencies: SANDBOX_EXAMPLE.dependencies,
-            systemPackages: SANDBOX_EXAMPLE.systemPackages,
-          },
-        ]
-      ),
-      response: documentedSchema(
-        v2CreateSandboxContract.response.schema,
-        'CreateSandboxResponse',
-        'Create sandbox response',
-        'The created sandbox. `buildStatus` is `pending` while an image builds and `null` where nothing is built.',
-        [{ data: { ...SANDBOX_EXAMPLE, buildStatus: 'pending', builtAt: null } }]
-      ),
-    }
-  ),
-  defineOpenApiRoute(
-    v2GetSandboxContract,
-    resourceOperation('Sandboxes', {
-      applicationOperation: sandboxOperations.read,
-      operationId: 'getSandbox',
-      summary: 'Get Sandbox',
-      description:
-        'Get one sandbox by identifier, scoped to its workspace, including its current build state and any build failure.',
-      errors: RESOURCE_ERRORS,
-      success: { description: 'The sandbox.' },
-    }),
-    {
-      params: documentedSchema(
-        v2GetSandboxContract.params,
-        'GetSandboxParams',
-        'Get sandbox path parameters',
-        'Sandbox selected for retrieval.'
-      ),
-      query: documentedSchema(
-        v2GetSandboxContract.query,
-        'GetSandboxQuery',
-        'Get sandbox query',
-        'Workspace scope for the sandbox.'
-      ),
-      response: documentedSchema(
-        v2GetSandboxContract.response.schema,
-        'GetSandboxResponse',
-        'Get sandbox response',
-        'One sandbox.',
-        [{ data: SANDBOX_EXAMPLE }]
-      ),
-    }
-  ),
-  defineOpenApiRoute(
-    v2UpdateSandboxContract,
-    resourceOperation('Sandboxes', {
-      applicationOperation: sandboxOperations.update,
-      operationId: 'updateSandbox',
-      summary: 'Update Sandbox',
-      description: `Update a sandbox, preserving omitted fields and replacing supplied lists. Dependency changes may start a build; resending a failed specification retries its build. \`buildStatus: null\` means no build is required. Requires workspace admin access on Max or Enterprise. Creates and updates share a rate limit; respect \`Retry-After\`. ${WORKSPACE_API_KEY_DENIED}`,
-      errors: RESOURCE_CONFLICT_ERRORS,
-      success: { description: 'The updated sandbox.' },
-    }),
-    {
-      query: v2UpdateSandboxContract.query,
-      params: documentedSchema(
-        v2UpdateSandboxContract.params,
-        'UpdateSandboxParams',
-        'Update sandbox path parameters',
-        'Sandbox selected for update.'
-      ),
-      body: documentedSchema(
-        v2UpdateSandboxContract.body,
-        'UpdateSandboxRequest',
-        'Update sandbox request',
-        'Sandbox fields to change; at least one editable field is required.',
-        [{ workspaceId: WORKSPACE_ID, dependencies: ['pandas==2.2.2', 'requests', 'pyarrow'] }]
-      ),
-      response: documentedSchema(
-        v2UpdateSandboxContract.response.schema,
-        'UpdateSandboxResponse',
-        'Update sandbox response',
-        'The updated sandbox. `buildStatus` is `pending` while an image rebuilds and `null` where nothing is built.',
-        [
-          {
-            data: {
-              ...SANDBOX_EXAMPLE,
-              dependencies: ['pandas==2.2.2', 'requests', 'pyarrow'],
-              buildStatus: 'pending',
-              builtAt: null,
-            },
-          },
-        ]
-      ),
-    }
-  ),
-  defineOpenApiRoute(
-    v2DeleteSandboxContract,
-    resourceOperation('Sandboxes', {
-      applicationOperation: sandboxOperations.delete,
-      operationId: 'deleteSandbox',
-      summary: 'Delete Sandbox',
-      description: `Delete a sandbox. Function blocks using it fail until reconfigured. Requires workspace admin access on Max or Enterprise. ${WORKSPACE_API_KEY_DENIED}`,
-      errors: RESOURCE_ERRORS,
-      success: { description: 'The sandbox was deleted.' },
-    }),
-    {
-      params: documentedSchema(
-        v2DeleteSandboxContract.params,
-        'DeleteSandboxParams',
-        'Delete sandbox path parameters',
-        'Sandbox selected for deletion.'
-      ),
-      query: documentedSchema(
-        v2DeleteSandboxContract.query,
-        'DeleteSandboxQuery',
-        'Delete sandbox query',
-        'Workspace scope for the sandbox.'
-      ),
-      response: documentedSchema(
-        v2DeleteSandboxContract.response.schema,
-        'DeleteSandboxResponse',
-        'Delete sandbox response',
-        'Acknowledgement that the sandbox was deleted.',
-        [{ data: { id: SANDBOX_EXAMPLE.id, deleted: true } }]
-      ),
-    }
-  ),
-  defineOpenApiRoute(
     v2ListCredentialsContract,
     resourceOperation('Credentials', {
       applicationOperation: credentialOperations.listConnections,
@@ -2169,7 +1960,7 @@ export const resourcesOpenApiDocument = defineOpenApiDocument({
   info: {
     title: 'Sim API v2 — Resources',
     description:
-      'Version 2 of the Sim REST API for workspace metadata, members, MCP servers, skills, custom tools, sandboxes, credentials, write-only secrets, organization permission groups, and the block, tool, and connector-type catalogs.',
+      'Version 2 of the Sim REST API for workspace metadata, members, MCP servers, skills, custom tools, credentials, write-only secrets, organization permission groups, and the block, tool, and connector-type catalogs.',
     version: '2.0.0',
     contact: {
       name: 'Sim Support',
@@ -2215,11 +2006,6 @@ export const resourcesOpenApiDocument = defineOpenApiDocument({
     {
       name: 'Custom Tools',
       description: 'Create and manage code-backed tools that agents can call.',
-    },
-    {
-      name: 'Sandboxes',
-      description:
-        'Create and manage the reusable dependency sets that Function blocks execute against.',
     },
     {
       name: 'Credentials',

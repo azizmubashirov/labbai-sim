@@ -16,7 +16,6 @@ import {
   isReactScanEnabled,
 } from '@/lib/core/config/env-flags'
 import { ConsentProvider } from '@/app/_shell/consent/consent-provider'
-import { DesktopUpdateGate } from '@/app/_shell/desktop-update-gate'
 import { HydrationErrorHandler } from '@/app/_shell/hydration-error-handler'
 import { QueryProvider } from '@/app/_shell/providers/query-provider'
 import { SessionProvider } from '@/app/_shell/providers/session-provider'
@@ -97,16 +96,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           dangerouslySetInnerHTML={{
             __html: `
               (function () {
-                // The macOS desktop shell overlays native traffic lights on the
-                // workspace. Mark it before first paint so the sidebar reserves
-                // its inset title-bar lane without a post-hydration layout shift.
                 var collapsedSidebarWidth = 48;
-                try {
-                  if (window.simDesktop && /Mac/i.test(navigator.userAgent)) {
-                    document.documentElement.setAttribute('data-sim-desktop-title-bar', 'inset');
-                    collapsedSidebarWidth = 0;
-                  }
-                } catch (e) {}
 
                 // The organization surface (/o/...) shares the workspace chrome and
                 // needs the same variables set before first paint.
@@ -146,8 +136,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   }
 
                   // The expanded width is published unconditionally, even while
-                  // collapsed, because the desktop hover-peek renders the sidebar at
-                  // its restore width while --sidebar-width still reads collapsed.
+                  // collapsed, so expanding restores the persisted width.
                   var width = state && state.sidebarWidth;
                   var maxSidebarWidth = Math.max(224, Math.min(400, window.innerWidth * 0.3));
                   var expandedWidth =
@@ -257,7 +246,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className={`${season.variable} font-season`} suppressHydrationWarning>
         <HydrationErrorHandler />
-        <DesktopUpdateGate />
         <NuqsAdapter>
           {isHosted ? <ConsentProvider>{application}</ConsentProvider> : application}
         </NuqsAdapter>

@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
   Tooltip,
 } from '@sim/emcn'
-import { Lock, Plus, Sparkles } from '@sim/emcn/icons'
+import { Lock, Plus } from '@sim/emcn/icons'
 import type { ColumnDefinition } from '@/lib/table'
 import {
   type ColumnTypeOption,
@@ -32,7 +32,6 @@ interface ColumnDropdownProps {
   disabled: boolean
   onPickType: (type: ColumnDefinition['type']) => void
   onPickWorkflow: () => void
-  onPickEnrichment: () => void
   /** A schema lock disables the action and explains why on hover or focus. */
   blocked: boolean
 }
@@ -73,7 +72,7 @@ function ColumnTypeMenuItem({ option, onSelect }: ColumnTypeMenuItemProps) {
 
 /**
  * "+ New column" dropdown — the single entry point for creating a column.
- * Lists every column type plus "Workflow" and "Enrichments"; picking a type
+ * Lists every column type plus "Workflow"; picking a type
  * opens the right sidebar pre-seeded.
  */
 export function ColumnDropdown({
@@ -83,7 +82,6 @@ export function ColumnDropdown({
   disabled,
   onPickType,
   onPickWorkflow,
-  onPickEnrichment,
   blocked,
 }: ColumnDropdownProps) {
   const Icon = blocked ? Lock : Plus
@@ -139,10 +137,6 @@ export function ColumnDropdown({
               : () => onPickType(option.type as ColumnDefinition['type'])
           return <ColumnTypeMenuItem key={option.type} option={option} onSelect={onSelect} />
         })}
-        <DropdownMenuItem onSelect={onPickEnrichment}>
-          <Sparkles className='size-[14px] text-[var(--text-icon)]' />
-          Enrichments
-        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   )

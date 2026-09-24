@@ -69,7 +69,6 @@ export interface StreamLoopState {
   streamRequestId: string | undefined
   sawStreamError: boolean
   sawCompleteEvent: boolean
-  browserAgentRunIds: Set<string>
   scheduledTextFlushFrame: number | null
   /** Ephemeral Local Copilot status shown under the assistant message. */
   liveStatus: string | undefined
@@ -102,22 +101,6 @@ export interface StreamLoopDeps {
   addResource: (resource: MothershipResourceUpdate) => boolean
   removeResource: (resourceType: MothershipResourceType, resourceId: string) => void
   startClientWorkflowTool: (id: string, name: string, args: Record<string, unknown>) => void
-  startClientLocalFilesystemTool: (id: string, name: string, args: Record<string, unknown>) => void
-  startClientBrowserTool: (
-    id: string,
-    name: string,
-    args: Record<string, unknown>,
-    ts?: string
-  ) => void
-  startClientTerminalTool: (
-    id: string,
-    name: string,
-    args: Record<string, unknown>,
-    ts?: string
-  ) => void
-  startBrowserAgentRun: (runId: string) => void
-  endBrowserAgentRun: (runId: string) => void
-  clearBrowserAgentRuns: () => void
   upsertMothershipChatHistory: (
     chatId: string,
     updater: (current: MothershipChatHistory) => MothershipChatHistory
@@ -214,7 +197,6 @@ export function createStreamLoopContext(deps: StreamLoopDeps): StreamLoopContext
     streamRequestId: undefined,
     sawStreamError: false,
     sawCompleteEvent: false,
-    browserAgentRunIds: new Set(),
     scheduledTextFlushFrame: null,
     liveStatus: undefined,
     scheduledTextFlushTimer: null,

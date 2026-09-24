@@ -8,7 +8,6 @@ const mocks = vi.hoisted(() => ({
   save: vi.fn(),
   principal: vi.fn(),
   project: vi.fn(),
-  redact: vi.fn(),
   tokens: vi.fn(),
 }))
 vi.mock('@/lib/internal/principals/executor', () => ({
@@ -21,7 +20,6 @@ vi.mock('@/lib/memory/application/summaries', () => ({
 vi.mock('@/executor/utils/resolved-secret-content-projection', () => ({
   projectResolvedSecretModelContent: mocks.project,
 }))
-vi.mock('@/lib/logs/execution/pii-redaction', () => ({ redactObjectStrings: mocks.redact }))
 vi.mock('@/lib/memory/context-tokens', () => ({
   getConversationTokenCount: mocks.tokens,
 }))
@@ -112,9 +110,6 @@ describe('bounded derived conversation summaries', () => {
     mocks.save.mockResolvedValue(undefined)
     mocks.principal.mockResolvedValue({ kind: 'delegated' })
     mocks.project.mockImplementation((value: string) => ({ safe: true, value }))
-    mocks.redact.mockImplementation(async (value: string) =>
-      value.replaceAll('PRIVATE', '[redacted]')
-    )
     mocks.tokens.mockImplementation((text: string) => Math.ceil(text.length / 4))
   })
 
@@ -176,15 +171,14 @@ describe('bounded derived conversation summaries', () => {
     )
   })
 
-  it('projects and redacts cached summaries again under current policy', async () => {
+  it('projects cached summaries again under current policy', async () => {
     const test = fixture()
     await test.compact()({ maxSummaryTokens: 1600 })
     const cached = mocks.save.mock.calls.at(-1)![0].input
-    test.runtime.executionContext!.piiBlockOutputRedaction = {
-      enabled: true,
-      entityTypes: ['PERSON'],
-      language: 'en',
-    }
+    mocks.project.mockImplementation((value: string) => ({
+      safe: true,
+      value: value.replaceAll('PRIVATE', '[redacted]'),
+    }))
     test.runtime.resolvedSecretTraceRegistry = {} as NonNullable<
       ProviderRuntimeContext['resolvedSecretTraceRegistry']
     >

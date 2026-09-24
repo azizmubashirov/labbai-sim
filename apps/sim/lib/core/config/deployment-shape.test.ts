@@ -19,7 +19,6 @@ describe('resolveDeploymentShape', () => {
       isChatEnabled: false,
       isAzureConfigured: true,
       isSsoEnabled: true,
-      isSandboxesEnabled: true,
     })
 
     expect(resolveDeploymentShape()).toEqual({
@@ -34,8 +33,6 @@ describe('resolveDeploymentShape', () => {
         customBlocks: false,
         dataDrains: false,
         dataRetention: false,
-        inbox: true,
-        sandboxes: true,
         scim: false,
         sessionPolicies: true,
         sso: true,

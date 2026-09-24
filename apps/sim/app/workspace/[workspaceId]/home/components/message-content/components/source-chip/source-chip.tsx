@@ -6,7 +6,6 @@ import { faviconUrl } from '@/lib/core/utils/favicon'
 import { blockTypeToIconMap } from '@/lib/integrations/icon-mapping'
 import {
   externalLinkHostname,
-  handleExternalLinkClick,
   hideBrokenFavicon,
 } from '@/app/workspace/[workspaceId]/home/components/message-content/components/chat-content/external-link'
 import type { SourceTagData } from '@/app/workspace/[workspaceId]/home/components/message-content/components/special-tags'
@@ -62,7 +61,6 @@ export function SourceChip({ source }: SourceChipProps) {
           href={source.url}
           target='_blank'
           rel='noopener noreferrer'
-          onClick={(event) => handleExternalLinkClick(event, source.url)}
           className={cn(
             'not-prose inline-flex h-[20px] max-w-[220px] shrink-0 items-center gap-1 rounded-full px-1.5 align-middle text-[var(--text-body)] text-caption no-underline transition-colors',
             chipFilledFillTokens,

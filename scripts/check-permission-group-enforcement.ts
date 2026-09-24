@@ -50,7 +50,7 @@
  *  - A capability reachable only through a `permission-group-enforced:` comment
  *    is enforced by ASSERTION OF THE AUTHOR. This audit matches the comment
  *    text; it does not verify that anything below it gates. Today that is 18 of
- *    35 capabilities — among them `logs.cost`, `inbox.use`, `personal_api_key.use`
+ *    35 capabilities — among them `logs.cost`, `personal_api_key.use`
  *    and `copilot.tool_auto_approval` — so it is the majority of the registry,
  *    not a rounding error. {@link parseEnforcedAnnotations} records which cheap
  *    lookahead shapes were measured against the tree and why each is wrong more

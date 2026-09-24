@@ -20,9 +20,6 @@ vi.mock('@/lib/memory/application/agent-turns', () => ({
 vi.mock('@/lib/internal/principals/executor', () => ({
   createExecutorPrincipalFromExecutionContext: async () => ({}),
 }))
-vi.mock('@/lib/logs/execution/pii-redaction', () => ({
-  redactObjectStrings: async (value: unknown) => value,
-}))
 vi.mock('@/tools', () => ({ executeTool: mocks.execute }))
 
 import { encryptSecret } from '@/lib/core/security/encryption'

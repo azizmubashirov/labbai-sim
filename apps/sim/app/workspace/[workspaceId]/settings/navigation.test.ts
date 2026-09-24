@@ -22,9 +22,6 @@ describe('unified settings navigation', () => {
   it('keeps account, workspace, organization, and platform settings in one catalog', () => {
     expect(allNavigationItems.map(({ id, label, section }) => ({ id, label, section }))).toEqual([
       { id: 'general', label: 'General', section: 'account' },
-      { id: 'desktop', label: 'Desktop', section: 'account' },
-      { id: 'browser', label: 'Browser', section: 'account' },
-      { id: 'terminal', label: 'Terminal', section: 'account' },
       { id: 'requests', label: 'Requests', section: 'workspace' },
       { id: 'access-control', label: 'Permission groups', section: 'organization' },
       { id: 'audit-logs', label: 'Audit logs', section: 'organization' },
@@ -39,11 +36,7 @@ describe('unified settings navigation', () => {
       { id: 'mcp', label: 'MCP tools', section: 'workspace' },
       { id: 'apikeys', label: 'Sim API keys', section: 'workspace' },
       { id: 'workflow-mcp-servers', label: 'MCP servers', section: 'workspace' },
-      { id: 'byok', label: 'BYOK', section: 'workspace' },
-      { id: 'sandboxes', label: 'Sandboxes', section: 'workspace' },
-      { id: 'inbox', label: 'Sim Mailer', section: 'workspace' },
       { id: 'recently-deleted', label: 'Recently deleted', section: 'workspace' },
-      { id: 'self-host', label: 'Self hosting', section: 'platform' },
       { id: 'sso', label: 'Single sign-on', section: 'organization' },
       { id: 'security', label: 'Security', section: 'organization' },
       { id: 'data-retention', label: 'Data retention', section: 'organization' },
@@ -51,7 +44,6 @@ describe('unified settings navigation', () => {
       { id: 'whitelabeling', label: 'White-labeling', section: 'organization' },
       { id: 'custom-blocks', label: 'Custom blocks', section: 'workspace' },
       { id: 'admin', label: 'Admin', section: 'platform' },
-      { id: 'mothership', label: 'Mothership', section: 'platform' },
     ])
   })
 
@@ -62,13 +54,7 @@ describe('unified settings navigation', () => {
         .sort((left, right) => left.order - right.order)
         .map(({ id }) => id)
 
-    expect(idsForSection('account')).toEqual([
-      'general',
-      'billing',
-      'desktop',
-      'browser',
-      'terminal',
-    ])
+    expect(idsForSection('account')).toEqual(['general', 'billing'])
     expect(idsForSection('workspace')).toEqual([
       'teammates',
       'secrets',
@@ -76,11 +62,8 @@ describe('unified settings navigation', () => {
       'custom-blocks',
       'forks',
       'custom-tools',
-      'byok',
-      'inbox',
       'workflow-mcp-servers',
       'apikeys',
-      'sandboxes',
       'recently-deleted',
       'requests',
     ])
@@ -96,7 +79,7 @@ describe('unified settings navigation', () => {
       'data-retention',
       'data-drains',
     ])
-    expect(idsForSection('platform')).toEqual(['admin', 'mothership', 'self-host'])
+    expect(idsForSection('platform')).toEqual(['admin'])
   })
 
   it('derives every unified item from exactly one registry entry', () => {

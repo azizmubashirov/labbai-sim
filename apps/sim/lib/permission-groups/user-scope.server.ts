@@ -10,12 +10,12 @@ import {
  * that may or may not name a workspace.
  *
  * A workspace-scoped action is governed by the group targeting that workspace.
- * A user-global one — a personal API key, a CLI login with no workspace — falls
+ * A user-global one — a personal API key with no workspace — falls
  * back to the organization's default group rather than going ungoverned, which
  * would leave the narrower scope as the unguarded one.
  *
  * Shared so that fallback cannot drift between the surfaces that mint the same
- * credential: `/api/users/me/api-keys`, `/api/cli/auth/approve`. It restates no
+ * credential (`/api/users/me/api-keys`). It restates no
  * capability of its own — each caller names the one it enforces, and carries
  * the `permission-group-enforced:` annotation for it.
  *

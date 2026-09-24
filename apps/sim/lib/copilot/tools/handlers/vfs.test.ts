@@ -362,7 +362,7 @@ describe('vfs handlers oversize policy', () => {
 
   it('surfaces dynamic file read errors as failed tool calls', async () => {
     const vfs = makeVfs()
-    const error = 'Document compiler not configured (MOTHERSHIP_E2B_DOC_TEMPLATE_ID is unset)'
+    const error = 'Document render failed: compiler unavailable'
     vfs.readFileContent.mockResolvedValue({
       content: JSON.stringify({ ok: false, error }),
       totalLines: 1,
@@ -377,7 +377,7 @@ describe('vfs handlers oversize policy', () => {
 
   it('does not expose dynamic file read errors when provenance cannot be verified', async () => {
     const vfs = makeVfs()
-    const error = 'Document compiler not configured (MOTHERSHIP_E2B_DOC_TEMPLATE_ID is unset)'
+    const error = 'Document render failed: compiler unavailable'
     vfs.readFileContentWithProvenance.mockResolvedValue({
       value: {
         content: JSON.stringify({ ok: false, error }),

@@ -309,7 +309,7 @@ describe('POST /api/mothership/chats/[chatId]/fork', () => {
     expect(dbChainMockFns.values.mock.calls[0][0].title).toBe('Fork | Generate Logs')
   })
 
-  it('drops legacy browser and terminal rows while forking, since the desktop app owns them', async () => {
+  it('drops legacy resource rows of retired types while forking', async () => {
     dbChainMockFns.limit.mockResolvedValue([
       {
         ...parentRow,

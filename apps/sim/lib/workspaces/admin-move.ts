@@ -179,7 +179,7 @@ export interface WorkspaceMoveSourceImpact {
     direction: 'parent' | 'child'
   }>
   detachedPermissionGroups: Array<{ permissionGroupId: string; name: string }>
-  strippedRetentionRules: { piiRedactionRules: number; retentionOverrides: number }
+  strippedRetentionRules: { retentionOverrides: number }
   /** Retained collaborators whose source-org per-member cap stops applying. */
   retainedCollaboratorCaps: Array<{
     userId: string
@@ -878,7 +878,7 @@ async function collectSourceOrganizationImpact(
     return {
       unpublishedCustomBlocks: [],
       detachedPermissionGroups: [],
-      strippedRetentionRules: { piiRedactionRules: 0, retentionOverrides: 0 },
+      strippedRetentionRules: { retentionOverrides: 0 },
       retainedCollaboratorCaps: [],
       brandingChanges: false,
       truncated: null,
@@ -2817,7 +2817,7 @@ const EMPTY_SOURCE_IMPACT: WorkspaceMoveSourceImpact = {
   unpublishedCustomBlocks: [],
   blockingForkEdges: [],
   detachedPermissionGroups: [],
-  strippedRetentionRules: { piiRedactionRules: 0, retentionOverrides: 0 },
+  strippedRetentionRules: { retentionOverrides: 0 },
   retainedCollaboratorCaps: [],
   brandingChanges: false,
   truncated: null,

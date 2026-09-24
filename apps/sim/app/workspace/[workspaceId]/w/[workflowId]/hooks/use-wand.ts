@@ -89,14 +89,12 @@ export interface WandConfig {
  */
 interface WandContextParams {
   tableId?: string | null
-  sandboxId?: string | null
 }
 
 /** Drops the unset keys so an all-empty context is omitted from the request. */
 function buildWandContext(params?: WandContextParams): Record<string, string> | undefined {
   const context = filterUndefined({
     tableId: params?.tableId ?? undefined,
-    sandboxId: params?.sandboxId ?? undefined,
   })
   return Object.keys(context).length > 0 ? context : undefined
 }
@@ -337,7 +335,6 @@ export function useWand({
       onStreamStart,
       queryClient,
       contextParams?.tableId,
-      contextParams?.sandboxId,
       workflowId,
       workspaceId,
       navigateToSettings,

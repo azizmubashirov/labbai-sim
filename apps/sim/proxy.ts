@@ -6,7 +6,7 @@ import { SIM_MCP_ROUTE_PATH } from '@/lib/api/mcp/urls'
 import { APP_ENTRY_PATH, isAppSurfacePath } from '@/lib/navigation/paths'
 import { isOAuthAuthorizationCallback, resolveAuthRedirect } from '@/app/(auth)/auth-redirect'
 import { getEnv } from './lib/core/config/env'
-import { isAuthDisabled, isDev, isHosted } from './lib/core/config/env-flags'
+import { isAuthDisabled } from './lib/core/config/env-flags'
 import { generateRuntimeCSP } from './lib/core/security/csp'
 import { getClientIp } from './lib/core/utils/request'
 import { isNonCanonicalSimHost } from './lib/core/utils/urls'
@@ -238,25 +238,8 @@ function handleRootPathRedirects(
     return null
   }
 
-  if (!isHosted && !isDev) {
-    // Self-hosted production: Always redirect based on session.
-    if (hasActiveSession) {
-      return NextResponse.redirect(new URL(APP_ENTRY_PATH, request.url))
-    }
-    return NextResponse.redirect(new URL('/login', request.url))
-  }
-
-  // For root path, redirect authenticated users into the app
-  // Unless they have a 'home' query parameter (e.g., ?home)
-  // This allows intentional navigation to the homepage from anywhere in the app
-  if (hasActiveSession) {
-    const isBrowsingHome = url.searchParams.has('home')
-    if (!isBrowsingHome) {
-      return NextResponse.redirect(new URL(APP_ENTRY_PATH, request.url))
-    }
-  }
-
-  return null
+  // There is no marketing page: the root always forwards into the app or to sign-in.
+  return NextResponse.redirect(new URL(hasActiveSession ? APP_ENTRY_PATH : '/login', request.url))
 }
 
 /**
@@ -298,8 +281,7 @@ function handleSecurityFiltering(request: NextRequest): NextResponse | null {
   const { pathname } = request.nextUrl
   const isWebhookEndpoint =
     pathname.startsWith('/api/webhooks/trigger/') ||
-    pathname.startsWith('/api/webhooks/tiktok') ||
-    pathname.startsWith('/api/webhooks/agentmail')
+    pathname.startsWith('/api/webhooks/tiktok')
   const isMcpEndpoint = pathname.startsWith('/api/mcp/')
   const isMcpOauthDiscoveryEndpoint =
     pathname.startsWith('/.well-known/oauth-authorization-server') ||
@@ -443,9 +425,7 @@ function applyIndexingPolicy(request: NextRequest, response: NextResponse): Next
 
 export const config = {
   matcher: [
-    '/', // Root path for self-hosted redirect logic
-    '/terms', // Whitelabel terms redirect
-    '/privacy', // Whitelabel privacy redirect
+    '/', // Root path redirect
     '/w', // Legacy /w redirect
     '/w/:path*', // Legacy /w/* redirects
     '/workspace/:path*', // New workspace routes
@@ -457,6 +437,6 @@ export const config = {
     '/invite/:path*', // Match invitation routes
     '/api/:path*', // Runtime CORS
     // Catch-all for other pages, excluding static assets and public directories
-    '/((?!api/|api$|_next/static|_next/image|ingest|favicon.ico|logo/|landing/|static/|footer/|social/|enterprise/|favicon/|twitter/|robots.txt|sitemap.xml).*)',
+    '/((?!api/|api$|_next/static|_next/image|ingest|favicon.ico|logo/|static/|footer/|social/|enterprise/|favicon/|twitter/|robots.txt|sitemap.xml).*)',
   ],
 }

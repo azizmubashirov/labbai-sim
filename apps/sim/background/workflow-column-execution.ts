@@ -10,10 +10,7 @@ import { and, eq, isNull, or } from 'drizzle-orm'
 import {
   assertBillingAttributionSnapshot,
   type BillingAttributionSnapshot,
-  toBillingContext,
 } from '@/lib/billing/core/billing-attribution'
-import { checkExecutionUsageLimits } from '@/lib/billing/core/usage-gate-cache'
-import { checkAndBillPayerOverageThreshold } from '@/lib/billing/threshold-billing'
 import { isRetryableInfrastructureError } from '@/lib/core/errors/retryable-infrastructure'
 import {
   capExecutionTimeoutMs,
@@ -23,7 +20,6 @@ import {
   isTimeoutAbortReason,
   type TimeoutAbortController,
 } from '@/lib/core/execution-limits'
-import { withResourceOutboundScope } from '@/lib/core/network/resource-scope.server'
 import { RateLimiter } from '@/lib/core/rate-limiter/rate-limiter'
 import {
   registerManualExecutionAborter,
@@ -34,14 +30,10 @@ import { retryTableAdmission } from '@/lib/table/admission-retry'
 import { withCascadeLock } from '@/lib/table/cascade-lock'
 import { fillMissingColumns, mapInputValues, namedRowMapper } from '@/lib/table/cell-format'
 import { getColumnId } from '@/lib/table/column-keys'
-import { isEmptyCellValue, isExecCancelled } from '@/lib/table/deps'
+import { isExecCancelled } from '@/lib/table/deps'
 import { getMaxTableDispatchConcurrency } from '@/lib/table/dispatch-concurrency'
 import { appendTableEvent } from '@/lib/table/events'
-import {
-  createExactEmptyTableRowSecretProvenance,
-  createTableRowSecretProvenanceFromRegistry,
-  TableRowProvenanceReader,
-} from '@/lib/table/rows/secret-provenance'
+import { TableRowProvenanceReader } from '@/lib/table/rows/secret-provenance'
 import type {
   RowData,
   RowExecutionMetadata,
@@ -538,253 +530,17 @@ async function runWorkflowAndWriteTerminal(
         return true
       }
 
-      // Enrichment groups call a registry function directly instead of running a
-      // workflow, reusing the same pickup → run → terminal-write status flow. The
-      // `enrichmentId` guard ensures only true registry enrichments take this path
-      // — a group typed 'enrichment' without a registry id falls through to the
-      // workflow path rather than erroring.
+      // Registry enrichments were removed; a legacy group still bound to one
+      // fails its cell instead of running a workflow it does not have.
       if (group.type === 'enrichment' && group.enrichmentId) {
-        const { getEnrichment } = await import('@/enrichments/registry')
-        const { runEnrichment, skippedEnrichmentDetail } = await import('@/enrichments/run')
-        const enrichment = getEnrichment(group.enrichmentId)
-        // `tableRowExecutions.workflowId` is an opaque id for status; use the
-        // enrichment id for enrichment cells.
-        const statusId = group.enrichmentId ?? ''
-        if (!enrichment) {
-          await writeState({
-            status: 'error',
-            executionId,
-            jobId: null,
-            workflowId: statusId,
-            error: `Unknown enrichment "${group.enrichmentId ?? ''}"`,
-          })
-          return 'error'
-        }
-
-        const row = await getRowById(tableId, rowId, workspaceId)
-        if (!row) {
-          logger.warn(`Row ${rowId} vanished before enrichment`)
-          return 'error'
-        }
-
-        if (cancelledBeforeRun(row.executions?.[groupId])) return 'cancelled'
-
-        const enrichmentBillingAttribution = billingAttribution
-
-        /**
-         * Gate the exact workspace payer and member cap before hosted-key cost.
-         * A denial clears the cell pre-stamp and surfaces the upgrade state.
-         */
-        const usage = await checkExecutionUsageLimits(enrichmentBillingAttribution)
-        if (usage.isExceeded) {
-          logger.warn(
-            `Usage limit reached — halting enrichment (table=${tableId} row=${rowId} group=${groupId})`
-          )
-          const { updateRow } = await import('@/lib/table/rows/service')
-          await updateRow(
-            buildTableUsageLimitClear({ tableId, rowId, workspaceId, groupId, executionId }),
-            table,
-            requestId
-          ).catch((err) =>
-            logger.warn(`Failed to clear cell pre-stamp on usage limit`, {
-              error: toError(err).message,
-            })
-          )
-          let shouldEmit = true
-          if (dispatchId) {
-            const { completeDispatchIfActive } = await import('@/lib/table/dispatcher')
-            shouldEmit = await completeDispatchIfActive(dispatchId)
-          }
-          if (shouldEmit) {
-            await appendTableEvent({
-              kind: 'usageLimitReached',
-              tableId,
-              ...(dispatchId ? { dispatchId } : {}),
-              message:
-                usage.message ?? 'Usage limit exceeded. Please upgrade your plan to continue.',
-            })
-          }
-          return 'blocked'
-        }
-
-        const pickedUp = await markWorkflowGroupPickedUp(cellCtx, {
-          workflowId: statusId,
+        await writeState({
+          status: 'error',
+          executionId,
           jobId: null,
+          workflowId: group.enrichmentId,
+          error: 'Enrichments are not available',
         })
-        if (pickedUp === 'skipped') return 'error'
-
-        try {
-          // Map table columns → enrichment input ids (skip this group's own outputs).
-          // `columnName` holds a column id; the mapper resolves select ids to names.
-          const ownOutputColumns = new Set(group.outputs.map((o) => o.columnName))
-          const enrichmentInputMappings = (group.inputMappings ?? []).filter(
-            (mapping) => !ownOutputColumns.has(mapping.columnName)
-          )
-          const readProvenance = new TableRowProvenanceReader(
-            { userId: enrichmentBillingAttribution.actorUserId, workspaceId },
-            new Set(enrichmentInputMappings.map((mapping) => mapping.columnName))
-          )
-          const inputSource = await getRowSummaryById(tableId, rowId, workspaceId, readProvenance)
-          if (!inputSource) {
-            logger.warn(`Row ${rowId} vanished before enrichment input could be read`)
-            return 'error'
-          }
-          const enrichInputs = mapInputValues(
-            inputSource.data,
-            table.schema.columns,
-            enrichmentInputMappings
-          )
-
-          // Skip (don't error) rows missing a required input — common when a table
-          // is partially filled. Clear any prior output values so a stale result
-          // doesn't linger (and doesn't mark the group `completed`-and-filled, which
-          // would block the auto cascade from re-enriching once inputs return).
-          const isEmpty = isEmptyCellValue
-          const missingRequired = enrichment.inputs.some(
-            (i) => i.required && isEmpty(enrichInputs[i.id])
-          )
-          if (missingRequired) {
-            const clearPatch: RowData = {}
-            for (const out of group.outputs) {
-              if (!isEmpty(inputSource.data[out.columnName])) clearPatch[out.columnName] = ''
-            }
-            await writeState(
-              {
-                status: 'completed',
-                executionId,
-                jobId: null,
-                workflowId: statusId,
-                error: null,
-                enrichmentDetails: skippedEnrichmentDetail(enrichment),
-              },
-              clearPatch,
-              undefined,
-              createExactEmptyTableRowSecretProvenance(clearPatch)
-            )
-            return 'completed'
-          }
-
-          if (attemptSignal.aborted) {
-            await writeState({
-              ...buildTableAbortState({
-                executionId,
-                workflowId: statusId,
-                timedOut: timeoutController.isTimedOut(),
-                timeoutMs: timeoutController.timeoutMs,
-              }),
-              enrichmentDetails: skippedEnrichmentDetail(enrichment, { aborted: true }),
-            })
-            return 'error'
-          }
-          const inputProvenance = readProvenance.exportProvenance()
-          const enrichmentRegistry = new ResolvedSecretTraceRegistry([], inputProvenance.scope)
-          await enrichmentRegistry.importCrossingProvenance(inputProvenance, enrichInputs, {
-            trusted: true,
-          })
-          const { result, cost, detail } = await withResourceOutboundScope({ workspaceId }, () =>
-            runEnrichment(enrichment, enrichInputs, {
-              tableId,
-              rowId,
-              workspaceId,
-              /**
-               * The person who asked, not who pays. `triggeredByUserId` is an
-               * attribution: for a workspace-API-key run it names the workspace's
-               * billing owner, and running that bystander's tool denylist against
-               * an actorless request is wrong in both directions — it fails cells
-               * nobody meant to govern, and it skips the denylist for the person
-               * who actually triggered one. The governed subject is carried
-               * separately from the dispatch. `null` means no per-tool gate
-               * applies, which is the documented behavior for an actorless run —
-               * stated, because the field is required precisely so it cannot be
-               * skipped by omission.
-               */
-              userId: payload.capabilityGovernedUserId ?? null,
-              signal: attemptSignal,
-              resolvedSecretTraceRegistry: enrichmentRegistry,
-            })
-          )
-
-          // An abort during the cascade must not be recorded as a completed cell.
-          if (attemptSignal.aborted) {
-            await writeState({
-              ...buildTableAbortState({
-                executionId,
-                workflowId: statusId,
-                timedOut: timeoutController.isTimedOut(),
-                timeoutMs: timeoutController.timeoutMs,
-              }),
-              enrichmentDetails: detail,
-            })
-            return 'error'
-          }
-
-          /**
-           * Record the triggerer or system fallback as actor while charging the
-           * exact workspace payer. Billing failures do not fail a successful cell.
-           */
-          if (cost > 0) {
-            try {
-              const { recordUsage } = await import('@/lib/billing/core/usage-log')
-              await recordUsage({
-                userId: enrichmentBillingAttribution.actorUserId,
-                workspaceId,
-                executionId,
-                ...toBillingContext(enrichmentBillingAttribution),
-                entries: [
-                  {
-                    category: 'fixed',
-                    source: 'enrichment',
-                    description: enrichment.name,
-                    cost,
-                    sourceReference: `enrichment:${tableId}:${rowId}:${enrichment.id}`,
-                    metadata: { enrichmentId: enrichment.id, tableId, rowId },
-                  },
-                ],
-              })
-              await checkAndBillPayerOverageThreshold(enrichmentBillingAttribution.billingEntity)
-            } catch (billingErr) {
-              logger.error('Failed to record enrichment usage', {
-                enrichmentId: enrichment.id,
-                cost,
-                error: toError(billingErr).message,
-              })
-            }
-          }
-
-          // Write every output column: the result value when present, else clear
-          // it. A partial/empty result must blank the columns it didn't fill so a
-          // re-run that finds less than before doesn't leave stale values.
-          const dataPatch: RowData = {}
-          for (const out of group.outputs) {
-            if (!out.outputId) continue
-            const value = result[out.outputId]
-            dataPatch[out.columnName] =
-              value === undefined || value === null ? '' : (value as RowData[string])
-          }
-          await writeState(
-            {
-              status: 'completed',
-              executionId,
-              jobId: null,
-              workflowId: statusId,
-              error: null,
-              enrichmentDetails: detail,
-            },
-            dataPatch,
-            undefined,
-            createTableRowSecretProvenanceFromRegistry(dataPatch, enrichmentRegistry)
-          )
-          return 'completed'
-        } catch (err) {
-          await writeState({
-            status: 'error',
-            executionId,
-            jobId: null,
-            workflowId: statusId,
-            error: toError(err).message,
-          })
-          return 'error'
-        }
+        return 'error'
       }
 
       let progressWriter: ReturnType<typeof createWorkflowCellProgressWriter> | null = null

@@ -24,9 +24,6 @@ const ApiKeys = dynamic(() =>
     (m) => m.ApiKeys
   )
 )
-const BYOK = dynamic(() =>
-  import('@/app/workspace/[workspaceId]/settings/components/byok/byok').then((m) => m.BYOK)
-)
 const Forks = dynamic(() => import('@/ee/workspace-forking/components/forks').then((m) => m.Forks))
 const Secrets = dynamic(() =>
   import('@/app/workspace/[workspaceId]/settings/components/secrets/secrets').then((m) => m.Secrets)
@@ -36,36 +33,18 @@ const OrganizationConnectedAccounts = dynamic(() =>
     (m) => m.OrganizationConnectedAccounts
   )
 )
-const Sandboxes = dynamic(() =>
-  import('@/app/workspace/[workspaceId]/settings/components/sandboxes/sandboxes').then(
-    (m) => m.Sandboxes
-  )
-)
 const CustomTools = dynamic(() =>
   import('@/app/workspace/[workspaceId]/settings/components/custom-tools/custom-tools').then(
     (m) => m.CustomTools
   )
 )
-const Inbox = dynamic(() =>
-  import('@/app/workspace/[workspaceId]/settings/components/inbox/inbox').then((m) => m.Inbox)
-)
 const MCP = dynamic(() =>
   import('@/app/workspace/[workspaceId]/settings/components/mcp/mcp').then((m) => m.MCP)
-)
-const Mothership = dynamic(() =>
-  import('@/app/workspace/[workspaceId]/settings/components/mothership/mothership').then(
-    (m) => m.Mothership
-  )
 )
 const RecentlyDeleted = dynamic(() =>
   import(
     '@/app/workspace/[workspaceId]/settings/components/recently-deleted/recently-deleted'
   ).then((m) => m.RecentlyDeleted)
-)
-const SelfHost = dynamic(() =>
-  import('@/app/workspace/[workspaceId]/settings/components/self-host/self-host').then(
-    (m) => m.SelfHost
-  )
 )
 const Billing = dynamic(() =>
   import('@/app/workspace/[workspaceId]/settings/components/billing/billing').then((m) => m.Billing)
@@ -114,17 +93,6 @@ const OrganizationSecuritySettings = dynamic(() =>
 const UsageMonitoring = dynamic(() =>
   import('@/ee/organization-usage/components/usage-monitoring').then((m) => m.UsageMonitoring)
 )
-const Desktop = dynamic(() =>
-  import('@/app/workspace/[workspaceId]/settings/components/desktop/desktop').then((m) => m.Desktop)
-)
-const Browser = dynamic(() =>
-  import('@/app/workspace/[workspaceId]/settings/components/browser/browser').then((m) => m.Browser)
-)
-const Terminal = dynamic(() =>
-  import('@/app/workspace/[workspaceId]/settings/components/terminal/terminal').then(
-    (m) => m.Terminal
-  )
-)
 const WhitelabelingSettings = dynamic(() =>
   import('@/ee/whitelabeling/components/whitelabeling-settings').then(
     (m) => m.WhitelabelingSettings
@@ -159,9 +127,7 @@ function SettingsPageContent({ section }: SettingsPageProps) {
       ? 'general'
       : normalizedSection === 'admin' && !sessionLoading && !isAdminRole
         ? 'general'
-        : normalizedSection === 'mothership' && !sessionLoading && !isAdminRole
-          ? 'general'
-          : normalizedSection
+        : normalizedSection
   const organizationId = hostContext.hostOrganizationId
   const meta = getSettingsSectionMeta(effectiveSection)
 
@@ -176,9 +142,6 @@ function SettingsPageContent({ section }: SettingsPageProps) {
   return (
     <SettingsSectionProvider section={effectiveSection} meta={meta ?? undefined}>
       {effectiveSection === 'general' && <General />}
-      {effectiveSection === 'desktop' && <Desktop />}
-      {effectiveSection === 'browser' && <Browser />}
-      {effectiveSection === 'terminal' && <Terminal />}
       {effectiveSection === 'secrets' && <Secrets />}
       {effectiveSection === 'connected-accounts' && organizationId && (
         <OrganizationConnectedAccounts organizationId={organizationId} />
@@ -237,17 +200,12 @@ function SettingsPageContent({ section }: SettingsPageProps) {
       {effectiveSection === 'whitelabeling' && organizationId && (
         <WhitelabelingSettings organizationId={organizationId} />
       )}
-      {effectiveSection === 'byok' && <BYOK />}
-      {effectiveSection === 'sandboxes' && <Sandboxes />}
       {effectiveSection === 'mcp' && <MCP />}
       {effectiveSection === 'forks' && <Forks />}
       {effectiveSection === 'custom-tools' && <CustomTools />}
       {effectiveSection === 'workflow-mcp-servers' && <WorkflowMcpServers />}
-      {effectiveSection === 'inbox' && <Inbox />}
       {effectiveSection === 'recently-deleted' && <RecentlyDeleted />}
-      {effectiveSection === 'self-host' && <SelfHost />}
       {effectiveSection === 'admin' && <Admin />}
-      {effectiveSection === 'mothership' && <Mothership />}
     </SettingsSectionProvider>
   )
 }

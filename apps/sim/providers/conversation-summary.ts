@@ -3,7 +3,6 @@ import { createLogger } from '@sim/logger'
 import { isRecordLike } from '@sim/utils/object'
 import { truncate } from '@sim/utils/string'
 import { createExecutorPrincipalFromExecutionContext } from '@/lib/internal/principals/executor'
-import { redactObjectStrings } from '@/lib/logs/execution/pii-redaction'
 import { MEMORY_DELEGATION_AUDIENCE } from '@/lib/memory/application/authorization'
 import {
   readAgentMemorySummaryUseCase,
@@ -227,9 +226,7 @@ export function createAgentConversationCompactor(
       const projected = registry ? projectResolvedSecretModelContent(content, registry) : undefined
       if (projected && (!projected.safe || typeof projected.value !== 'string'))
         throw new Error('Summary could not be safely projected')
-      let safe = projected ? (projected.value as string) : content
-      const pii = execution.piiBlockOutputRedaction
-      if (pii?.enabled) safe = await redactObjectStrings(safe, { ...pii, onFailure: 'throw' })
+      const safe = projected ? (projected.value as string) : content
       if (!safe.trim() || safe.length > MAX_MEMORY_SUMMARY_CHARS)
         throw new Error('Summary exceeds its content limit')
       return safe

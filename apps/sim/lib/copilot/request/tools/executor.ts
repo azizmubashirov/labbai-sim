@@ -1,4 +1,3 @@
-import { browserToolRendererTimeoutMs, isCurrentBrowserToolName } from '@sim/browser-protocol'
 import { createLogger } from '@sim/logger'
 import { toError } from '@sim/utils/errors'
 import { isRecordLike } from '@sim/utils/object'
@@ -33,7 +32,6 @@ import {
   GenerateApiKey,
   GenerateAudio,
   GenerateImage,
-  GenerateVideo,
   LoadDeployment,
   ManageKnowledgeBase,
   Media,
@@ -229,7 +227,6 @@ const LONG_RUNNING_TOOL_IDS: ReadonlySet<string> = new Set([
   RunCode.id,
   GenerateImage.id,
   GenerateAudio.id,
-  GenerateVideo.id,
   Ffmpeg.id,
   Media.id,
   Search.id,
@@ -257,8 +254,7 @@ export function toolWatchdogTimeoutMs(toolName: string | undefined): number {
 
 /**
  * How long the resume gate may wait on one pending tool call. Permission
- * prompts receive the long-running budget. Browser calls share the renderer's
- * budget so authorization and native queueing cannot outlive the resume gate.
+ * prompts receive the long-running budget.
  */
 export function pendingToolWaitBudgetMs(
   toolCall:
@@ -266,9 +262,6 @@ export function pendingToolWaitBudgetMs(
     | undefined
 ): number {
   if (toolCall?.status === 'awaiting_approval') return TOOL_WATCHDOG_LONG_RUNNING_MS
-  if (toolCall?.name && isCurrentBrowserToolName(toolCall.name)) {
-    return browserToolRendererTimeoutMs(toolCall.name, toolCall.params)
-  }
   return toolWatchdogTimeoutMs(toolCall?.name)
 }
 

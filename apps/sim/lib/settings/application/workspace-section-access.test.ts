@@ -18,8 +18,6 @@ const mocks = vi.hoisted(() => ({
       customBlocks: false,
       dataDrains: false,
       dataRetention: false,
-      inbox: false,
-      sandboxes: false,
       sessionPolicies: false,
       sso: false,
       usageMonitoring: false,
@@ -56,7 +54,7 @@ vi.mock('@/components/settings/navigation', () => ({
     'custom-blocks': 'custom-blocks',
   },
   workspaceSectionUsesPermissionConfig: vi.fn((section: string) =>
-    ['secrets', 'api-keys', 'inbox', 'mcp', 'custom-tools'].includes(section)
+    ['secrets', 'api-keys', 'mcp', 'custom-tools'].includes(section)
   ),
   WORKSPACE_PERMISSION_CONFIG_KEYS: { secrets: 'hideSecretsTab' },
 }))
@@ -276,7 +274,7 @@ describe('authorizeWorkspaceSettingsSection', () => {
     expect(mocks.resolveWorkspaceNavigation).toHaveBeenCalledWith(
       expect.objectContaining({
         deployment: mocks.deploymentShape,
-        entitlements: expect.objectContaining({ inbox: true }),
+        entitlements: expect.objectContaining({ forks: false }),
       })
     )
 

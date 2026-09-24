@@ -10,7 +10,6 @@ import {
 import { createLogger } from '@sim/logger'
 import { toError } from '@sim/utils/errors'
 import { and, eq, inArray, isNull } from 'drizzle-orm'
-import { hasWorkspaceSandboxAccess } from '@/lib/billing/core/subscription'
 import { createCopilotWorkspaceContextFilePrincipal } from '@/lib/copilot/auth/file-delegation'
 import type { VfsSnapshotV1, VfsSnapshotV1Workflow } from '@/lib/copilot/generated/vfs-snapshot-v1'
 import {
@@ -23,7 +22,6 @@ import {
   getAccessibleEnvCredentials,
   getAccessibleOAuthCredentials,
 } from '@/lib/credentials/environment'
-import { listWorkspaceSandboxes } from '@/lib/execution/remote-sandbox/workspace-sandboxes'
 import { connectorIsLive } from '@/lib/knowledge/connectors/sync-lock'
 import { listCustomBlockSummariesForWorkspace } from '@/lib/workflows/custom-blocks/operations'
 import { listCustomTools } from '@/lib/workflows/custom-tools/operations'
@@ -84,14 +82,6 @@ export interface WorkspaceMdData {
   customBlocks?: Array<{ type: string; name: string; description?: string }>
   mcpServers?: Array<{ id: string; name: string; url?: string | null; enabled: boolean }>
   skills?: Array<{ id: string; name: string; description: string }>
-  sandboxes?: Array<{
-    id: string
-    name: string
-    language: string
-    dependencies: string[]
-    cliTools: string[]
-    systemPackages: string[]
-  }>
 }
 
 /**
@@ -298,18 +288,6 @@ export function buildWorkspaceMd(data: WorkspaceMdData): string {
     )
   }
 
-  if (data.sandboxes) {
-    if (data.sandboxes.length > 0) {
-      const lines = [...data.sandboxes].sort(byNameThenId).map((sandbox) => {
-        const path = `agent/sandboxes/${normalizeVfsSegment(sandbox.name)}.json`
-        return `- **${sandbox.name}** (${sandbox.id}) — ${sandbox.language}; ${sandbox.dependencies.length} dependencies, ${sandbox.systemPackages.length} system packages, ${sandbox.cliTools.length} managed CLIs — \`${path}\``
-      })
-      sections.push(`## Sim Sandboxes (${data.sandboxes.length})\n${lines.join('\n')}`)
-    } else {
-      sections.push('## Sim Sandboxes (0)\n(none)')
-    }
-  }
-
   return sections.join('\n\n')
 }
 
@@ -358,7 +336,6 @@ async function buildWorkspaceMdData(
       mcpServerRows,
       skillRows,
       customBlockSummaries,
-      sandboxResult,
     ] = await Promise.all([
       getUsersWithPermissions(workspaceId),
 
@@ -442,11 +419,6 @@ async function buildWorkspaceMdData(
       listSkillsForUser({ workspaceId, userId, includeBuiltins: false, workspaceAccess }),
 
       listCustomBlockSummariesForWorkspace(workspaceId),
-
-      hasWorkspaceSandboxAccess(workspaceId).then(async (entitled) => ({
-        entitled,
-        rows: entitled ? await listWorkspaceSandboxes(workspaceId) : [],
-      })),
     ])
 
     const kbIds = kbs.map((kb) => kb.id)
@@ -523,18 +495,6 @@ async function buildWorkspaceMdData(
       customBlocks: customBlockSummaries,
       mcpServers: mcpServerRows,
       skills: skillRows.map((s) => ({ id: s.id, name: s.name, description: s.description })),
-      ...(sandboxResult.entitled
-        ? {
-            sandboxes: sandboxResult.rows.map((sandbox) => ({
-              id: sandbox.id,
-              name: sandbox.name,
-              language: sandbox.language,
-              dependencies: sandbox.dependencies,
-              cliTools: sandbox.cliTools,
-              systemPackages: sandbox.systemPackages,
-            })),
-          }
-        : {}),
     }
   } catch (err) {
     logger.error('Failed to build workspace data', {
@@ -660,18 +620,6 @@ export function buildVfsSnapshot(data: WorkspaceMdData): VfsSnapshotV1 {
       name: s.name,
       ...(s.description ? { description: s.description } : {}),
     })),
-    ...(data.sandboxes
-      ? {
-          sandboxes: data.sandboxes.map((sandbox) => ({
-            id: sandbox.id,
-            name: sandbox.name,
-            language: sandbox.language,
-            dependencies: sandbox.dependencies,
-            systemPackages: sandbox.systemPackages,
-            cliTools: sandbox.cliTools,
-          })),
-        }
-      : {}),
   }
 }
 

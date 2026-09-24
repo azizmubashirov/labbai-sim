@@ -273,7 +273,7 @@ describe('WorkflowTypeTag colors', () => {
     expect(getWorkflowTypeRole('credential_group')).toBe('identity')
     expect(getWorkflowTypeRole('router_v2')).toBe('flow')
     expect(getWorkflowTypeRole('table')).toBe('records')
-    expect(getWorkflowTypeRole('a2a')).toBe('neutral')
+    expect(getWorkflowTypeRole('unknown_block')).toBe('neutral')
     expect(getWorkflowTypeRole('image_generator_v2')).toBe('generative')
     expect(getWorkflowTypeRole('knowledge')).toBe('knowledge')
     expect(getWorkflowTypeRole('start_trigger')).toBe('flow')

@@ -10,7 +10,6 @@ import { faviconUrl } from '@/lib/core/utils/favicon'
 import { findTermMatches, queryTerms } from '@/lib/knowledge/search/snippet'
 import {
   externalLinkHostname,
-  handleExternalLinkClick,
   hideBrokenFavicon,
 } from '@/app/workspace/[workspaceId]/home/components/message-content/components/chat-content/external-link'
 import {
@@ -164,7 +163,6 @@ export function SourceCard({ source, query, onSummarize, dense = false }: Source
           target='_blank'
           rel='noopener noreferrer'
           data-source-link=''
-          onClick={(event) => handleExternalLinkClick(event, source.url)}
           className='min-w-0 flex-1 text-[var(--text-primary)] text-sm no-underline underline-offset-2 hover:underline'
         >
           <OverflowText
@@ -192,7 +190,6 @@ export function SourceCard({ source, query, onSummarize, dense = false }: Source
           target='_blank'
           rel='noopener noreferrer'
           data-source-link=''
-          onClick={(event) => handleExternalLinkClick(event, source.url)}
           className='block min-w-0 text-[var(--text-primary)] text-sm no-underline underline-offset-2 hover:underline'
         >
           <OverflowText

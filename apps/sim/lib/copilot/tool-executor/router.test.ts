@@ -34,7 +34,6 @@ vi.mock('@/lib/copilot/tools/handlers/management/connect-slack-bot', stubHandler
 vi.mock('@/lib/copilot/tools/handlers/management/manage-credential', stubHandlerModule)
 vi.mock('@/lib/copilot/tools/handlers/management/manage-custom-tool', stubHandlerModule)
 vi.mock('@/lib/copilot/tools/handlers/management/manage-mcp-tool', stubHandlerModule)
-vi.mock('@/lib/copilot/tools/handlers/management/manage-sandbox', stubHandlerModule)
 vi.mock('@/lib/copilot/tools/handlers/management/manage-skill', stubHandlerModule)
 vi.mock('@/lib/copilot/tools/handlers/materialize-file', stubHandlerModule)
 vi.mock('@/lib/copilot/tools/handlers/oauth', stubHandlerModule)

@@ -64,7 +64,6 @@ import {
   resolveFallbackModelsLabel,
   resolveFilterFieldLabel,
   resolveFolderPathLabel,
-  resolveSandboxLabel,
   resolveSkillsLabel,
   resolveToolsLabel,
   resolveVariablesLabel,
@@ -112,7 +111,6 @@ import { useDeployWorkflow } from '@/hooks/queries/deployments'
 import { useDynamicSubBlockOptionDisplayName } from '@/hooks/queries/dynamic-subblock-options'
 import { useMcpToolServers, useMcpToolsQuery } from '@/hooks/queries/mcp'
 import { useCredentialName } from '@/hooks/queries/oauth/oauth-credentials'
-import { useSandboxes } from '@/hooks/queries/sandboxes'
 import { useReactivateSchedule, useScheduleInfo } from '@/hooks/queries/schedules'
 import { useSkills } from '@/hooks/queries/skills'
 import { useTablesList } from '@/hooks/queries/tables'
@@ -581,19 +579,6 @@ const SubBlockRow = memo(function SubBlockRow({
     [subBlock, rawValue]
   )
 
-  /**
-   * Hydrates the Function block's sandbox id to its name. Deliberately scoped to
-   * the sandbox row: this row is memoized per subblock, and the shared list query
-   * polls while a build is in flight, so subscribing unconditionally would
-   * re-render every row on the canvas on each poll tick.
-   */
-  const isSandboxField = subBlock?.id === 'sandboxId' && subBlock?.type === 'combobox'
-  const { data: sandboxData } = useSandboxes(isSandboxField ? workspaceId || undefined : undefined)
-  const sandboxDisplayValue = useMemo(
-    () => resolveSandboxLabel(subBlock, rawValue, sandboxData?.sandboxes ?? []),
-    [subBlock, rawValue, sandboxData]
-  )
-
   const folderPathDisplayValue = useMemo(
     () => resolveFolderPathLabel(subBlock, rawValue),
     [subBlock, rawValue]
@@ -613,7 +598,6 @@ const SubBlockRow = memo(function SubBlockRow({
     toolsDisplayValue ||
     skillsDisplayValue ||
     fallbackModelsDisplayValue ||
-    sandboxDisplayValue ||
     knowledgeBaseDisplayName ||
     workflowSelectionName ||
     mcpServerDisplayName ||

@@ -6,7 +6,6 @@ import {
   ACCOUNT_SETTINGS_ITEMS,
   ACCOUNT_SETTINGS_PATH_ALIASES,
   parseSettingsPathSection,
-  SELFHOST_SETTINGS_ITEMS,
 } from '@/components/settings/navigation'
 
 describe('standalone settings section resolution', () => {
@@ -17,16 +16,6 @@ describe('standalone settings section resolution', () => {
         items: ACCOUNT_SETTINGS_ITEMS,
         defaultSection: 'general',
         aliases: ACCOUNT_SETTINGS_PATH_ALIASES,
-      })
-    ).toBe('billing')
-  })
-
-  it('keeps Subscription active for the self-host billing route', () => {
-    expect(
-      parseSettingsPathSection({
-        path: '/selfhost/settings/billing',
-        items: SELFHOST_SETTINGS_ITEMS,
-        defaultSection: 'general',
       })
     ).toBe('billing')
   })

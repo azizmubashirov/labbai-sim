@@ -17,18 +17,6 @@ export interface PanelState {
   setHasHydrated: (hasHydrated: boolean) => void
 }
 
-export interface BrowserTextSelection {
-  text: string
-  url?: string
-  title?: string
-}
-
-export interface TerminalTextSelection {
-  text: string
-  startLine: number
-  endLine: number
-}
-
 export type ChatContext =
   | { kind: 'past_chat'; chatId: string; label: string }
   | { kind: 'workflow'; workflowId: string; label: string }
@@ -80,14 +68,6 @@ export type ChatContext =
   | { kind: 'folder'; folderId: string; label: string }
   | { kind: 'filefolder'; fileFolderId: string; label: string }
   | { kind: 'docs'; label: string }
-  /**
-   * A tab in the desktop browser or terminal panel, dragged into the input to
-   * say "this one". Resource tags remain live pointers; tags created from an
-   * explicit text selection additionally carry that immutable excerpt and its
-   * page/line metadata so the exact selection survives send and chat reload.
-   */
-  | { kind: 'browser_tab'; tabId: string; label: string; selection?: BrowserTextSelection }
-  | { kind: 'terminal_tab'; terminalId: string; label: string; selection?: TerminalTextSelection }
   | { kind: 'slash_command'; command: string; label: string }
   | { kind: 'integration'; blockType: string; label: string }
   | { kind: 'skill'; skillId: string; label: string }

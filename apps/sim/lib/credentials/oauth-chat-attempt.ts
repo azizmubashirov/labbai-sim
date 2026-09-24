@@ -9,7 +9,6 @@ export const OAUTH_CHAT_RETURN_TO_PARAM = 'returnTo'
 
 const OAUTH_CHAT_ATTEMPT_KEY_PREFIX = 'sim.oauth-chat-attempt.'
 const OAUTH_CHAT_LATEST_KEY_PREFIX = 'sim.oauth-chat-latest.'
-const ACTIVE_DESKTOP_ATTEMPT_KEY = 'sim.oauth-chat-active-desktop-attempt'
 export const OAUTH_CHAT_ATTEMPT_MAX_AGE_MS = 15 * 60 * 1000
 
 export type OAuthChatAttemptStatus = 'pending' | 'connected' | 'failed'
@@ -224,46 +223,6 @@ export function setOAuthChatAttemptStatus(
   const updated = { ...attempt, status }
   writeOAuthChatAttempt(updated)
   return updated
-}
-
-export function setActiveDesktopOAuthChatAttempt(attemptId: string): void {
-  if (typeof window === 'undefined') return
-  window.localStorage.setItem(ACTIVE_DESKTOP_ATTEMPT_KEY, attemptId)
-}
-
-export function clearActiveDesktopOAuthChatAttempt(attemptId: string): void {
-  if (typeof window === 'undefined') return
-  if (window.localStorage.getItem(ACTIVE_DESKTOP_ATTEMPT_KEY) === attemptId) {
-    window.localStorage.removeItem(ACTIVE_DESKTOP_ATTEMPT_KEY)
-  }
-}
-
-export function resolveActiveDesktopOAuthChatAttempt(
-  status: Extract<OAuthChatAttemptStatus, 'connected' | 'failed'>
-): OAuthChatAttempt | null {
-  if (typeof window === 'undefined') return null
-  const attemptId = window.localStorage.getItem(ACTIVE_DESKTOP_ATTEMPT_KEY)
-  if (!attemptId) return null
-  window.localStorage.removeItem(ACTIVE_DESKTOP_ATTEMPT_KEY)
-  return setOAuthChatAttemptStatus(attemptId, status)
-}
-
-/**
- * Resolves the exact chat attempt echoed by a current desktop shell. A null
- * correlation explicitly means an ordinary integrations-page flow and must
- * not consume a stale chat attempt. Only legacy shells omit the field, in
- * which case the former single-active-attempt behavior remains as a fallback.
- */
-export function resolveDesktopOAuthChatAttempt(
-  result: { chatAttemptId?: string | null },
-  status: Extract<OAuthChatAttemptStatus, 'connected' | 'failed'>
-): OAuthChatAttempt | null {
-  if (Object.hasOwn(result, 'chatAttemptId')) {
-    if (!result.chatAttemptId) return null
-    clearActiveDesktopOAuthChatAttempt(result.chatAttemptId)
-    return setOAuthChatAttemptStatus(result.chatAttemptId, status)
-  }
-  return resolveActiveDesktopOAuthChatAttempt(status)
 }
 
 function appendAttemptToReturnUrl(rawReturnUrl: string, attemptId: string): string {

@@ -7,10 +7,8 @@ import { FunctionBlock } from '@/blocks/blocks/function'
 
 describe('Function block file surface', () => {
   it('has no file configuration fields', () => {
-    // Files reach the sandbox by being referenced in code as
-    // <block.file.path> — the same way every other block output is referenced.
-    // A dedicated field would be a second way to say the same thing, and would
-    // need a home in the panel that the reference syntax does not.
+    // Files reach the code by being referenced as <block.file.base64> — the
+    // same way every other block output is referenced.
     const ids = FunctionBlock.subBlocks.map((subBlock) => subBlock.id)
 
     expect(ids).not.toContain('files')
@@ -20,8 +18,14 @@ describe('Function block file surface', () => {
     expect(FunctionBlock.inputs).not.toHaveProperty('collectOutputFiles')
   })
 
-  it('returns harvested files so downstream blocks can consume them', () => {
-    expect(FunctionBlock.outputs.files).toMatchObject({ type: 'file[]' })
+  it('is JavaScript-only with no language, sandbox, or files surface', () => {
+    const ids = FunctionBlock.subBlocks.map((subBlock) => subBlock.id)
+
+    expect(ids).not.toContain('language')
+    expect(ids).not.toContain('sandboxId')
+    expect(FunctionBlock.inputs).not.toHaveProperty('language')
+    expect(FunctionBlock.inputs).not.toHaveProperty('sandboxId')
+    expect(FunctionBlock.outputs).not.toHaveProperty('files')
   })
 
   it('offers path alongside base64 as a referenceable file property', () => {

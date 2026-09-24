@@ -35,7 +35,6 @@ describe('ColumnDropdown', () => {
           blocked
           onPickType={onPickType}
           onPickWorkflow={vi.fn()}
-          onPickEnrichment={vi.fn()}
         />
       )
     })
@@ -53,9 +52,7 @@ describe('ColumnDropdown', () => {
     expect(onPickType).not.toHaveBeenCalled()
   })
 
-  it('lists Enrichments as a regular entry after the column options', () => {
-    const onPickEnrichment = vi.fn()
-
+  it('lists exactly the column options', () => {
     act(() => {
       root.render(
         <ColumnDropdown
@@ -65,7 +62,6 @@ describe('ColumnDropdown', () => {
           disabled={false}
           onPickType={vi.fn()}
           onPickWorkflow={vi.fn()}
-          onPickEnrichment={onPickEnrichment}
           blocked={false}
         />
       )
@@ -77,13 +73,8 @@ describe('ColumnDropdown', () => {
     })
 
     const items = [...document.body.querySelectorAll<HTMLElement>('[role="menuitem"]')]
-    expect(items.map((item) => item.textContent)).toEqual([
-      ...COLUMN_TYPE_OPTIONS.map((option) => option.label),
-      'Enrichments',
-    ])
-    expect(document.body.querySelector('[role="separator"]')).toBeNull()
-
-    act(() => items.at(-1)?.click())
-    expect(onPickEnrichment).toHaveBeenCalledOnce()
+    expect(items.map((item) => item.textContent)).toEqual(
+      COLUMN_TYPE_OPTIONS.map((option) => option.label)
+    )
   })
 })

@@ -2,14 +2,11 @@
  * @vitest-environment jsdom
  */
 import { act } from 'react'
-import type { DesktopOAuthConnectResult } from '@sim/desktop-bridge'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
-  desktop: false,
-  onOAuthConnectComplete: vi.fn(),
   requestJson: vi.fn(),
   requireWorkspaceCredentialListResponse: vi.fn(),
   success: vi.fn(),
@@ -24,13 +21,6 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: mocks.replace }),
 }))
 vi.mock('@/lib/api/client/request', () => ({ requestJson: mocks.requestJson }))
-vi.mock('@/lib/desktop', () => ({
-  getDesktopBridge: () =>
-    mocks.desktop ? { onOAuthConnectComplete: mocks.onOAuthConnectComplete } : undefined,
-}))
-vi.mock('@/hooks/queries/oauth/oauth-connections', () => ({
-  oauthConnectionsKeys: { connections: () => ['oauthConnections'] },
-}))
 vi.mock('@/hooks/queries/utils/fetch-workspace-credentials', () => ({
   requireWorkspaceCredentialListResponse: mocks.requireWorkspaceCredentialListResponse,
 }))
@@ -46,11 +36,7 @@ import {
 } from '@/lib/credentials/client-state'
 import { oauthCredentialKeys, useOAuthCredentials } from '@/hooks/queries/oauth/oauth-credentials'
 import { useCredentialRefreshTriggers } from '@/hooks/use-credential-refresh-triggers'
-import {
-  useDesktopOAuthConnectListener,
-  useOAuthReturnForKBConnectors,
-  useOAuthReturnRouter,
-} from '@/hooks/use-oauth-return'
+import { useOAuthReturnForKBConnectors, useOAuthReturnRouter } from '@/hooks/use-oauth-return'
 
 const UPDATED_EVENT = 'oauth-credentials-updated'
 const EXISTING_CREDENTIAL = {
@@ -92,7 +78,6 @@ function Probe({
   connectorType = 'google_drive',
   onConnected,
 }: ProbeProps) {
-  useDesktopOAuthConnectListener()
   useOAuthReturnForKBConnectors(knowledgeBaseId, onConnected, connectorType)
   return null
 }
@@ -113,7 +98,6 @@ function SourceSettingsProbe({ connectorId }: { connectorId: string }) {
 let root: Root
 let container: HTMLDivElement
 let queryClient: QueryClient
-let completeDesktop: ((result: DesktopOAuthConnectResult) => void) | undefined
 
 async function render(props: ProbeProps) {
   await act(async () => {
@@ -127,17 +111,7 @@ async function render(props: ProbeProps) {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mocks.desktop = false
   mocks.params = { workspaceId: 'workspace-1' }
-  completeDesktop = undefined
-  mocks.onOAuthConnectComplete.mockImplementation(
-    (callback: (result: DesktopOAuthConnectResult) => void) => {
-      completeDesktop = callback
-      return () => {
-        completeDesktop = undefined
-      }
-    }
-  )
   mocks.requestJson.mockResolvedValue({})
   mocks.requireWorkspaceCredentialListResponse.mockReturnValue([
     EXISTING_CREDENTIAL,
@@ -396,49 +370,6 @@ describe('KB OAuth return account selection', () => {
     expect(onConnected).not.toHaveBeenCalled()
     expect(mocks.requestJson).not.toHaveBeenCalled()
     expect(readOAuthReturnContext()).toBeNull()
-  })
-
-  it('waits for desktop completion and selects its verified account on the mounted form', async () => {
-    mocks.desktop = true
-    const pending = context()
-    writeOAuthReturnContext(pending)
-    const onConnected = vi.fn()
-    await render({ onConnected })
-    expect(readOAuthReturnContext()).toEqual(pending)
-    expect(mocks.requestJson).not.toHaveBeenCalled()
-    await act(async () => completeDesktop?.({ ok: true }))
-    expect(onConnected).toHaveBeenCalledExactlyOnceWith('credential-new')
-    expect(readOAuthReturnContext()).toBeNull()
-  })
-
-  it.each(['failed', 'expired', 'unverified'])(
-    'does not select an account for %s desktop completion',
-    async (outcome) => {
-      mocks.desktop = true
-      const onConnected = vi.fn()
-      await render({ onConnected })
-      writeOAuthReturnContext({
-        ...context(),
-        ...(outcome === 'expired' && { requestedAt: Date.now() - 16 * 60 * 1000 }),
-      })
-      if (outcome === 'unverified') {
-        mocks.requireWorkspaceCredentialListResponse.mockReturnValue([EXISTING_CREDENTIAL])
-      }
-      await act(async () => completeDesktop?.({ ok: outcome !== 'failed' }))
-      expect(onConnected).not.toHaveBeenCalled()
-      expect(readOAuthReturnContext()).toBeNull()
-      if (outcome !== 'unverified') expect(mocks.requestJson).not.toHaveBeenCalled()
-    }
-  )
-
-  it('ignores completion for a source that the user has switched away from', async () => {
-    mocks.desktop = true
-    const onConnected = vi.fn()
-    await render({ onConnected })
-    writeOAuthReturnContext(context())
-    await render({ onConnected, connectorType: 'confluence' })
-    await act(async () => completeDesktop?.({ ok: true }))
-    expect(onConnected).not.toHaveBeenCalled()
   })
 
   it.each([

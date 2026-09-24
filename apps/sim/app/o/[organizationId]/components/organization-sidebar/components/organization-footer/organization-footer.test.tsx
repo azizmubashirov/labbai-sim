@@ -43,10 +43,6 @@ vi.mock('next/link', () => ({
   ),
 }))
 vi.mock('@/lib/auth/sign-out', () => ({ signOutAndRedirect: vi.fn() }))
-vi.mock('@/lib/desktop', () => ({ getDesktopUpdates: () => null }))
-vi.mock('@/hooks/use-desktop-update-state', () => ({
-  useDesktopUpdateState: () => ({ status: 'idle' }),
-}))
 vi.mock('@/hooks/queries/user-profile', () => ({
   useUserProfile: () => ({ data: { id: 'user-1', name: 'Ada', email: 'ada@example.com' } }),
 }))

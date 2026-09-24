@@ -120,7 +120,6 @@ vi.mock('@/hooks/use-member-enrollment', () => ({
   },
 }))
 vi.mock('@/hooks/use-oauth-return', () => ({
-  useDesktopOAuthConnectListener: () => undefined,
   useOAuthReturnRouter: () => undefined,
 }))
 

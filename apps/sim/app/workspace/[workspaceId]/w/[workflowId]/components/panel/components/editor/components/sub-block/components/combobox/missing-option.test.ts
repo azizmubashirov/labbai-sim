@@ -6,8 +6,8 @@ import { shouldClearMissingOption } from '@/app/workspace/[workspaceId]/w/[workf
 
 const BASE = {
   clearOnMissingOption: true,
-  missingOptionId: 'sandbox-deleted',
-  currentValue: 'sandbox-deleted',
+  missingOptionId: 'option-deleted',
+  currentValue: 'option-deleted',
   isPreview: false,
   disabled: false,
 }
@@ -15,16 +15,16 @@ const BASE = {
 describe('shouldClearMissingOption', () => {
   it('clears only the same value an authoritative lookup found missing', () => {
     expect(shouldClearMissingOption(BASE)).toBe(true)
-    expect(shouldClearMissingOption({ ...BASE, currentValue: 'sandbox-new' })).toBe(false)
+    expect(shouldClearMissingOption({ ...BASE, currentValue: 'option-new' })).toBe(false)
   })
 
-  it('does not clear on fetch failures, language mismatches, or expressions', () => {
+  it('does not clear on fetch failures or expressions', () => {
     expect(shouldClearMissingOption({ ...BASE, missingOptionId: null })).toBe(false)
     expect(
       shouldClearMissingOption({
         ...BASE,
         missingOptionId: null,
-        currentValue: '<Block.sandboxId>',
+        currentValue: '<Block.credentialId>',
       })
     ).toBe(false)
   })

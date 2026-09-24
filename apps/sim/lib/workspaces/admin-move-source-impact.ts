@@ -562,11 +562,8 @@ export async function findAttachedPermissionGroups(
 export function countRetentionRulesForWorkspace(
   settings: DataRetentionSettings | null | undefined,
   workspaceId: string
-): { piiRedactionRules: number; retentionOverrides: number } {
+): { retentionOverrides: number } {
   return {
-    piiRedactionRules: (settings?.piiRedaction?.rules ?? []).filter(
-      (rule) => rule.workspaceId === workspaceId
-    ).length,
     retentionOverrides: (settings?.retentionOverrides ?? []).filter(
       (override) => override.workspaceId === workspaceId
     ).length,
@@ -580,15 +577,9 @@ export function stripRetentionRulesForWorkspace(
 ): DataRetentionSettings | null {
   if (!settings) return null
   const counts = countRetentionRulesForWorkspace(settings, workspaceId)
-  if (counts.piiRedactionRules === 0 && counts.retentionOverrides === 0) return null
+  if (counts.retentionOverrides === 0) return null
 
   const next: DataRetentionSettings = { ...settings }
-  if (settings.piiRedaction?.rules) {
-    next.piiRedaction = {
-      ...settings.piiRedaction,
-      rules: settings.piiRedaction.rules.filter((rule) => rule.workspaceId !== workspaceId),
-    }
-  }
   if (settings.retentionOverrides) {
     next.retentionOverrides = settings.retentionOverrides.filter(
       (override) => override.workspaceId !== workspaceId

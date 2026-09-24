@@ -105,7 +105,6 @@ const adminDashboardWorkspaceSourceImpactSchema = z.object({
     .array(z.object({ permissionGroupId: z.string(), name: z.string() }))
     .max(500),
   strippedRetentionRules: z.object({
-    piiRedactionRules: z.number().int().min(0),
     retentionOverrides: z.number().int().min(0),
   }),
   retainedCollaboratorCaps: z

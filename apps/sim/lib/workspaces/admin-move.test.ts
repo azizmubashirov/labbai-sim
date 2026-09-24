@@ -165,10 +165,7 @@ vi.mock('@/lib/workflows/custom-blocks/operations', () => ({ deleteCustomBlock }
 vi.mock('@/lib/workspaces/admin-move-source-impact', () => ({
   cleanupSourceOrganizationArtifactsTx,
   collectWorkspaceCredentialSummary,
-  countRetentionRulesForWorkspace: vi.fn(() => ({
-    piiRedactionRules: 0,
-    retentionOverrides: 0,
-  })),
+  countRetentionRulesForWorkspace: vi.fn(() => ({ retentionOverrides: 0 })),
   findAttachedPermissionGroups: vi.fn(() => Promise.resolve([])),
   findCrossOrgForkEdges,
   findRetainedCollaboratorCaps: vi.fn(() => Promise.resolve([])),

@@ -85,7 +85,7 @@ describe('Microsoft Dataverse OAuth environment binding', () => {
       'https://contoso.crm4.dynamics.com/'
     )
     const relative = bindMicrosoftDataverseEnvironmentToOAuthCallback(
-      '/desktop/connect/complete?state=opaque',
+      '/oauth/connect/complete?state=opaque',
       'https://contoso.crm4.dynamics.com'
     )
 

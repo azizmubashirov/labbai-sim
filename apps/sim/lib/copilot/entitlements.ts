@@ -1,7 +1,6 @@
 import { createLogger } from '@sim/logger'
 import { getErrorMessage } from '@sim/utils/errors'
 import { LRUCache } from 'lru-cache'
-import { hasWorkspaceSandboxAccess } from '@/lib/billing/core/subscription'
 import { isCustomBlocksEligible } from '@/lib/workflows/custom-blocks/operations'
 import { getWorkspaceWithOwner } from '@/lib/workspaces/permissions/utils'
 
@@ -12,7 +11,6 @@ const logger = createLogger('CopilotEntitlements')
  * its `core.Entitlement*` constants to gate agent surfaces.
  */
 export const CUSTOM_BLOCKS_ENTITLEMENT = 'custom-blocks'
-export const SIM_SANDBOXES_ENTITLEMENT = 'sim-sandboxes'
 export const ORGANIZATION_CONTEXT_ENTITLEMENT = 'organization-context'
 
 /**
@@ -23,7 +21,7 @@ export const ORGANIZATION_CONTEXT_ENTITLEMENT = 'organization-context'
  *
  * Adding an entitlement:
  * 1. Add the kebab-case name and a fail-closed evaluator here. Every payload
- *    site (interactive chat, headless execute, inbox) picks it up automatically.
+ *    site (interactive chat, headless execute) picks it up automatically.
  * 2. Go repo: add the matching `Entitlement*` constant in `internal/core` and
  *    gate surfaces declaratively — `RequiredEntitlement` on tool definitions,
  *    `entitlement:` frontmatter on skills, a conditional section in
@@ -37,7 +35,6 @@ const ENTITLEMENT_EVALUATORS: Record<
   (workspaceId: string, userId?: string) => Promise<boolean>
 > = {
   [CUSTOM_BLOCKS_ENTITLEMENT]: isCustomBlocksEligible,
-  [SIM_SANDBOXES_ENTITLEMENT]: hasWorkspaceSandboxAccess,
   [ORGANIZATION_CONTEXT_ENTITLEMENT]: isOrganizationContextAvailable,
 }
 

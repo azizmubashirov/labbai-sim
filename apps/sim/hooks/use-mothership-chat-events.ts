@@ -3,7 +3,6 @@ import { createLogger } from '@sim/logger'
 import type { QueryClient } from '@tanstack/react-query'
 import { useQueryClient } from '@tanstack/react-query'
 import { getLiveAssistantMessageId } from '@/lib/copilot/chat/effective-transcript'
-import { suspendDesktopChatScopes } from '@/lib/desktop/chat-scope'
 import { createRotatingEventSource } from '@/lib/events/rotating-event-source'
 import {
   type MothershipChatHistory,
@@ -121,10 +120,6 @@ export function handleMothershipChatStatusEvent(
   queryClient.invalidateQueries({ queryKey: mothershipChatKeys.ownerLists(owner) })
   if (!payload.chatId) return
   if (payload.type === 'deleted') {
-    // A task may be deleted from another window, browser, or device. Stop its
-    // local native resources here too; relying only on this renderer's delete
-    // mutation would leave pages and PTYs running indefinitely.
-    void suspendDesktopChatScopes(payload.chatId)
     queryClient.removeQueries({ queryKey: mothershipChatKeys.detail(payload.chatId) })
     return
   }

@@ -14,8 +14,6 @@ import { EvaluatorBlockHandler } from '@/executor/handlers/evaluator/evaluator-h
 import { FunctionBlockHandler } from '@/executor/handlers/function/function-handler'
 import { GenericBlockHandler } from '@/executor/handlers/generic/generic-handler'
 import { HumanInTheLoopBlockHandler } from '@/executor/handlers/human-in-the-loop/human-in-the-loop-handler'
-import { MothershipBlockHandler } from '@/executor/handlers/mothership/mothership-handler'
-import { PiBlockHandler } from '@/executor/handlers/pi/pi-handler'
 import { ResponseBlockHandler } from '@/executor/handlers/response/response-handler'
 import { RouterBlockHandler } from '@/executor/handlers/router/router-handler'
 import { TriggerBlockHandler } from '@/executor/handlers/trigger/trigger-handler'
@@ -40,8 +38,6 @@ export function createBlockHandlers(): BlockHandler[] {
     new ResponseBlockHandler(),
     new HumanInTheLoopBlockHandler(),
     new AgentBlockHandler(),
-    new MothershipBlockHandler(),
-    new PiBlockHandler(),
     new VariablesBlockHandler(),
     new WorkflowBlockHandler(),
     new WaitBlockHandler(),

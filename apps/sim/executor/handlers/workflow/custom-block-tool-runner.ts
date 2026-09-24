@@ -4,7 +4,6 @@ import { getErrorMessage } from '@sim/utils/errors'
 import { generateId } from '@sim/utils/id'
 import { isPlainRecord, isRecordLike } from '@sim/utils/object'
 import type { BillingAttributionSnapshot } from '@/lib/billing/core/billing-attribution'
-import type { PiiBlockOutputRedaction } from '@/executor/execution/types'
 import { WorkflowBlockHandler } from '@/executor/handlers/workflow/workflow-handler'
 import type { ExecutionContext, ExecutorDelegationOrigin } from '@/executor/types'
 import { projectResolvedSecretDiagnosticContent } from '@/executor/utils/resolved-secret-content-projection'
@@ -57,12 +56,6 @@ interface CustomBlockToolParams {
  * while every other caller must forward the invoking run's map or the child
  * resolves `{{VAR}}` to the literal reference string. Silent omission is exactly
  * how the workflow-as-agent-tool path shipped with an empty map.
- *
- * `piiBlockOutputRedaction` stays optional because `undefined` is its correct
- * value rather than a wrong identity: most tenants have no policy at all, and the
- * custom-block branch omits it deliberately — that child runs cross-workspace
- * under the publisher's identity, so the consumer's redaction rules would be the
- * wrong tenant's, exactly as the consumer's env would be.
  * Keep in sync with `WorkflowBlockHandler.executeCore`.
  */
 export function buildCustomBlockExecutionContext(
@@ -74,8 +67,6 @@ export function buildCustomBlockExecutionContext(
     resolvedSecretTraceRegistry?: ResolvedSecretTraceRegistry
     executorDelegationOrigin?: ExecutorDelegationOrigin
     principal?: WorkflowExecutionPrincipal
-    /** The invoking run's in-flight block-output redaction policy. */
-    piiBlockOutputRedaction?: PiiBlockOutputRedaction
   }
 ): ExecutionContext {
   // Prefer the invoking agent run's ids so correlation and cancellation both
@@ -97,7 +88,6 @@ export function buildCustomBlockExecutionContext(
     abortSignal: options.abortSignal,
     resolvedSecretTraceRegistry: options.resolvedSecretTraceRegistry,
     environmentVariables: options.environmentVariables,
-    piiBlockOutputRedaction: options.piiBlockOutputRedaction,
     blockStates: new Map(),
     executedBlocks: new Set(),
     blockLogs: [],

@@ -36,9 +36,6 @@ vi.mock('@/lib/internal/principals/executor', () => ({
 vi.mock('@/lib/core/security/encryption', () => ({
   decryptSecret: async (value: string) => ({ decrypted: value.replace('cipher-', 'secret-') }),
 }))
-vi.mock('@/lib/logs/execution/pii-redaction', () => ({
-  redactObjectStrings: async (value: unknown) => value,
-}))
 vi.mock('@/lib/tokenization/accurate', () => ({
   getAccurateTokenCount: (text: string) => text.length,
 }))

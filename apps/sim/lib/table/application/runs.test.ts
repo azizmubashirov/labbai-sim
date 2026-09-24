@@ -137,49 +137,16 @@ describe('table run application use cases', () => {
     mockTranslatePredicate.mockReturnValue({ all: [] })
   })
 
-  it('canonically validates row and group before enrichment dispatch', async () => {
-    const result = await startTableRun.execute({
-      principal: PRINCIPAL,
-      input: {
-        kind: 'row_enrichment',
-        tableId: TABLE.id,
-        assertedWorkspaceId: TABLE.workspaceId,
-        rowId: 'row-1',
-        groupId: 'group-1',
-        requestId: 'request-1',
-      },
-    })
-
-    expect(mockGetRowById).toHaveBeenCalledWith(TABLE.id, 'row-1', TABLE.workspaceId)
-    expect(mockRunWorkflowColumn).toHaveBeenCalledWith({
-      tableId: TABLE.id,
-      workspaceId: TABLE.workspaceId,
-      groupIds: ['group-1'],
-      rowIds: ['row-1'],
-      mode: 'all',
-      requestId: 'request-1',
-      triggeredByUserId: PRINCIPAL.userId,
-      capabilityGovernedUserId: PRINCIPAL.userId,
-    })
-    expect(result.dispatchId).toBe('dispatch-1')
-    expect(mockSignalRowsChanged).toHaveBeenCalledWith(TABLE.id)
-  })
-
-  /**
-   * A workspace key names no human, so its run is ungoverned. The meter still
-   * needs someone, and attribution answers with the workspace billed account —
-   * a bystander whose tool denylist must not reach the run's cells. The two
-   * subjects are carried separately precisely so this case can differ.
-   */
   it('carries the billed account as the meter but nobody as the gate for a workspace key', async () => {
     await startTableRun.execute({
       principal: { kind: 'workspace_api_key', workspaceId: TABLE.workspaceId, keyId: 'key-1' },
       input: {
-        kind: 'row_enrichment',
+        kind: 'selection',
         tableId: TABLE.id,
         assertedWorkspaceId: TABLE.workspaceId,
-        rowId: 'row-1',
-        groupId: 'group-1',
+        groupIds: ['group-1'],
+        rowIds: ['row-1'],
+        mode: 'all',
         requestId: 'request-1',
       },
     })
@@ -190,34 +157,6 @@ describe('table run application use cases', () => {
         capabilityGovernedUserId: null,
       })
     )
-  })
-
-  it('rejects missing canonical groups and rows without dispatching', async () => {
-    await expect(
-      startTableRun.execute({
-        principal: PRINCIPAL,
-        input: {
-          kind: 'row_enrichment',
-          tableId: TABLE.id,
-          rowId: 'row-1',
-          groupId: 'missing-group',
-        },
-      })
-    ).rejects.toMatchObject({ code: 'not_found' })
-
-    mockGetRowById.mockResolvedValueOnce(null)
-    await expect(
-      startTableRun.execute({
-        principal: PRINCIPAL,
-        input: {
-          kind: 'row_enrichment',
-          tableId: TABLE.id,
-          rowId: 'missing-row',
-          groupId: 'group-1',
-        },
-      })
-    ).rejects.toMatchObject({ code: 'not_found' })
-    expect(mockRunWorkflowColumn).not.toHaveBeenCalled()
   })
 
   it('bounds explicit row selections before dispatch', async () => {

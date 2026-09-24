@@ -5,7 +5,6 @@ import { executeCopilotTableUseCase } from '@/lib/copilot/application/execute-ta
 import { executeCopilotResolveWorkflowOutputs } from '@/lib/copilot/application/execute-workflow-use-case'
 import {
   executeCopilotAddWorkflowTableGroupOutput,
-  executeCopilotCreateTableEnrichmentGroup,
   executeCopilotCreateTableFromWorkspaceFile,
   executeCopilotCreateWorkflowTableGroup,
   executeCopilotDeleteTables,
@@ -669,7 +668,7 @@ export const userTableServerTool: BaseServerTool<UserTableArgs, UserTableResult>
           if (result.kind === 'background') {
             return {
               success: true,
-              message: `Started background update of ${result.affectedCount} matching rows (job ${result.jobId}). Rows update in the background — query_rows to check progress. Note: background updates don't auto-recompute workflow/enrichment columns; use run_column afterward if needed.`,
+              message: `Started background update of ${result.affectedCount} matching rows (job ${result.jobId}). Rows update in the background — query_rows to check progress. Note: background updates don't auto-recompute workflow columns; use run_column afterward if needed.`,
               data: { jobId: result.jobId, affectedCount: result.affectedCount },
             }
           }
@@ -1500,61 +1499,6 @@ export const userTableServerTool: BaseServerTool<UserTableArgs, UserTableResult>
             success: true,
             message: `Cancelled ${cancelled} run(s)`,
             data: { cancelled },
-          }
-        }
-
-        case 'list_enrichments': {
-          const { ALL_ENRICHMENTS } = await import('@/enrichments/registry')
-          const enrichments = ALL_ENRICHMENTS.map((e) => ({
-            id: e.id,
-            name: e.name,
-            description: e.description,
-            inputs: e.inputs.map((i) => ({
-              id: i.id,
-              name: i.name,
-              type: i.type,
-              required: i.required ?? false,
-            })),
-            outputs: e.outputs.map((o) => ({ id: o.id, name: o.name, type: o.type })),
-          }))
-          return {
-            success: true,
-            message: `${enrichments.length} enrichment(s) available`,
-            data: { enrichments },
-          }
-        }
-
-        case 'add_enrichment': {
-          if (!args.tableId) return { success: false, message: 'Table ID is required' }
-          if (!workspaceId) return { success: false, message: 'Workspace ID is required' }
-          const enrichmentId = args.enrichmentId as string | undefined
-          if (!enrichmentId) {
-            return { success: false, message: 'enrichmentId is required for add_enrichment' }
-          }
-          const rawMappings = args.inputMappings as
-            | Array<{ inputName: string; columnName: string }>
-            | undefined
-          const autoRun = args.autoRun === true
-          assertNotAborted()
-          const { table: updated, group } = await executeCopilotCreateTableEnrichmentGroup(
-            context,
-            {
-              tableId: args.tableId,
-              workspaceId,
-              enrichmentId,
-              inputMappings: Array.isArray(rawMappings) ? rawMappings : undefined,
-              outputColumnNames: (args.outputColumnNames ?? {}) as Record<string, string>,
-              dependencies: args.dependencies as WorkflowGroupDependencies | undefined,
-              name: args.name as string | undefined,
-              autoRun,
-            }
-          )
-          return {
-            success: true,
-            message: `Added enrichment "${group.name}" with ${group.outputs.length} output column(s)${
-              autoRun ? ' (auto-run enabled)' : ' (staged — use run_column to fire rows)'
-            }`,
-            data: { groupId: group.id, schema: updated.schema },
           }
         }
 

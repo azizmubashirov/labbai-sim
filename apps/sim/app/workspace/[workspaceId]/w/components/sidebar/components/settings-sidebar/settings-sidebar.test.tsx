@@ -36,11 +36,6 @@ vi.mock('@/lib/core/config/deployment-shape', () => ({
   useDeploymentShape: () => hostContext.deployment,
   getDeploymentShape: () => deployment,
 }))
-vi.mock('@/lib/desktop', () => ({
-  hasDesktopSettings: () => false,
-  hasBrowserAgent: () => false,
-  hasTerminal: () => false,
-}))
 vi.mock('@/app/workspace/[workspaceId]/providers/workspace-host-provider', () => ({
   useWorkspaceHostContext: () => hostContext,
 }))
@@ -55,9 +50,6 @@ vi.mock('@/ee/workspace-forking/hooks/use-forking-available', () => ({
 }))
 vi.mock('@/hooks/queries/general-settings', () => ({
   useGeneralSettings: () => ({ data: { superUserModeEnabled: false } }),
-}))
-vi.mock('@/hooks/queries/inbox', () => ({
-  useInboxConfig: () => ({ data: { entitled: true } }),
 }))
 vi.mock('@/hooks/use-permission-config', () => ({
   usePermissionConfig: () => ({ config: {} }),
@@ -89,8 +81,6 @@ const deployment: DeploymentShape = {
     customBlocks: true,
     dataDrains: true,
     dataRetention: true,
-    inbox: true,
-    sandboxes: true,
     scim: true,
     sessionPolicies: true,
     sso: true,

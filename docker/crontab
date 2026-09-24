@@ -1,9 +1,5 @@
 # Background jobs for the Docker Compose deployment.
 #
-# These mirror helm/sim/values.yaml `cronjobs.jobs` one-for-one — same paths,
-# same schedules — so Compose and Kubernetes deployments behave identically.
-# Keep the two in sync when adding or changing a job.
-#
 # Every endpoint authenticates with CRON_SECRET as a bearer token and is a GET.
 # The application does its own overlap prevention (advisory locks / SKIP LOCKED),
 # so the scheduler only has to fire on time.
@@ -61,12 +57,6 @@ SHELL=/bin/sh
 
 # Billing cycle close: final overage collection + per-period tracker reset for elapsed periods
 0 */6 * * * curl -fsS -m 120 -o /dev/null -H "Authorization: Bearer $CRON_SECRET" "$SIM_URL/api/cron/billing-cycle-close"
-
-# Reclaims sandbox images
-30 4 * * * curl -fsS -m 300 -o /dev/null -H "Authorization: Bearer $CRON_SECRET" "$SIM_URL/api/cron/cleanup-sandbox-images"
-
-# Inbox entitlement reconciliation
-0 3 * * * curl -fsS -m 120 -o /dev/null -H "Authorization: Bearer $CRON_SECRET" "$SIM_URL/api/cron/reconcile-inbox-entitlement"
 
 # Billing-seat reconciliation. Only meaningful with billing enabled; harmless
 # otherwise, and kept so the job set matches the Helm chart exactly.

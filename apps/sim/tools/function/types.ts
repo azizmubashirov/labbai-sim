@@ -43,8 +43,6 @@ export interface CodeExecutionInput {
    * sandbox without a trip through the workspace.
    */
   files?: UserFile[]
-  /** Workspace sandbox whose dependency set this execution runs against. */
-  sandboxId?: string
   /**
    * Which workspace secrets the code may read. Unset and `'all'` both mean every
    * secret, resolved at execution so ones added later are included.

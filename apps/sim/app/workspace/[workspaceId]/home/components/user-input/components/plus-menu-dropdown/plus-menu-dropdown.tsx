@@ -24,17 +24,12 @@ import type { PlusMenuHandle } from '@/app/workspace/[workspaceId]/home/componen
 import {
   buildMentionPreview,
   resourceMentionMatches,
-  withBrowserTabMentions,
   withFolderMentions,
-  withTerminalTabMentions,
 } from '@/app/workspace/[workspaceId]/home/components/user-input/components/plus-menu-dropdown/resource-mention-items'
 import type {
   MothershipResource,
   MothershipResourceType,
 } from '@/app/workspace/[workspaceId]/home/types'
-import { useSettledTerminalCommands } from '@/hooks/use-settled-terminal-commands'
-import { useBrowserSessionStore } from '@/stores/browser-session/store'
-import { useCopilotTerminalStore } from '@/stores/copilot-terminal/store'
 
 /**
  * The `@` list is shorter than the emcn menu default (420px, sized for right-click
@@ -55,8 +50,6 @@ const MENTION_MAX_HEIGHT_CLASS = 'max-h-[min(280px,var(--radix-popper-available-
  * (`ADD_RESOURCE_EXCLUDED_TYPES` in `resource-tabs`).
  */
 const MENTION_ONLY_RESOURCE_TYPES = new Set<MothershipResourceType>(['integration'])
-const EMPTY_BROWSER_TABS = [] as const
-const EMPTY_TERMINAL_TABS = [] as const
 
 interface PlusMenuDropdownProps {
   workspaceId: string
@@ -88,16 +81,6 @@ export const PlusMenuDropdown = React.memo(
     const [activeIndex, setActiveIndex] = useState(0)
     const searchRef = useRef<HTMLInputElement>(null)
     const contentRef = useRef<HTMLDivElement>(null)
-    const browserTabs = useBrowserSessionStore((state) => {
-      const scopeId = state.activeScopeId
-      return scopeId ? (state.sessions[scopeId]?.tabs ?? EMPTY_BROWSER_TABS) : EMPTY_BROWSER_TABS
-    })
-    const terminalTabs = useCopilotTerminalStore((state) => {
-      const scopeId = state.activeScopeId
-      return scopeId
-        ? (state.sessions[scopeId]?.tabs.tabs ?? EMPTY_TERMINAL_TABS)
-        : EMPTY_TERMINAL_TABS
-    })
 
     // Gated so an idle chat surface never fetches the workspace lists.
     const {
@@ -124,26 +107,11 @@ export const PlusMenuDropdown = React.memo(
       setOpen(false)
     }, [])
 
-    const settledCommands = useSettledTerminalCommands(terminalTabs)
     const visibleResources = useMemo(() => {
-      const resources = withTerminalTabMentions(
-        withBrowserTabMentions(
-          withFolderMentions(availableResources, structureFolders),
-          browserTabs
-        ),
-        terminalTabs,
-        settledCommands
-      )
+      const resources = withFolderMentions(availableResources, structureFolders)
       if (isMention) return resources
       return resources.filter(({ type }) => !MENTION_ONLY_RESOURCE_TYPES.has(type))
-    }, [
-      availableResources,
-      structureFolders,
-      browserTabs,
-      isMention,
-      settledCommands,
-      terminalTabs,
-    ])
+    }, [availableResources, structureFolders, isMention])
 
     const treeSections = useResourceTreeSections({
       groups: availableResources,

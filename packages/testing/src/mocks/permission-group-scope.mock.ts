@@ -21,7 +21,7 @@ import { vi } from 'vitest'
  *
  * permissionGroupScopeMockFns.mockResolvePermissionGroupConfig.mockResolvedValue({
  *   ...DEFAULT_PERMISSION_GROUP_CONFIG,
- *   hideInboxTab: true,
+ *   hideFilesTab: true,
  * })
  * ```
  */

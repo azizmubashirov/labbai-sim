@@ -5,7 +5,6 @@ import { loggerMock } from '@sim/testing'
 import { DrizzleQueryError } from 'drizzle-orm/errors'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { clearLargeValueCacheForTests } from '@/lib/execution/payloads/cache'
-import { createLargeArrayManifest } from '@/lib/execution/payloads/large-array-manifest'
 import { isLargeArrayManifest } from '@/lib/execution/payloads/large-array-manifest-metadata'
 import { isLargeValueRef } from '@/lib/execution/payloads/large-value-ref'
 import { projectTraceSpansForSecrets } from '@/lib/logs/execution/trace-secret-projection'
@@ -27,10 +26,9 @@ const blockExecutorBaseLogger =
   loggerMock.createLogger.mock.results[blockExecutorLoggerCallIndex]?.value
 if (!blockExecutorBaseLogger) throw new Error('BlockExecutor logger mock was not initialized')
 
-const { mockUploadFile, mockDownloadFile, mockMaskBatch } = vi.hoisted(() => ({
+const { mockUploadFile, mockDownloadFile } = vi.hoisted(() => ({
   mockUploadFile: vi.fn(),
   mockDownloadFile: vi.fn(),
-  mockMaskBatch: vi.fn(),
 }))
 
 vi.mock('@/ee/access-control/utils/permission-check', () => ({
@@ -43,18 +41,6 @@ vi.mock('@/lib/uploads', () => ({
     downloadFile: mockDownloadFile,
   },
 }))
-
-vi.mock('@/lib/guardrails/mask-client', () => ({
-  maskPIIBatchViaHttp: mockMaskBatch,
-}))
-
-vi.mock('@/lib/logs/execution/pii-redaction', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/lib/logs/execution/pii-redaction')>()
-  return {
-    ...actual,
-    redactObjectStrings: vi.fn(actual.redactObjectStrings),
-  }
-})
 
 function createBlock(): SerializedBlock {
   return {
@@ -135,55 +121,6 @@ describe('BlockExecutor', () => {
     await Promise.all(blocks.map((block) => executor.execute(context, createNode(block), block)))
     expect(contexts[0]).not.toBe(contexts[1])
     expect(context.mcpBlockId).toBeUndefined()
-  })
-
-  it('redacts an authorized prior-execution manifest returned by a block under the current execution', async () => {
-    const items = [{ email: 'alice@example.com', count: 7 }]
-    const manifest = await createLargeArrayManifest(items, {
-      workspaceId: 'workspace-1',
-      workflowId: 'workflow-1',
-      executionId: 'source-execution',
-    })
-    clearLargeValueCacheForTests()
-    mockUploadFile.mockClear()
-    mockDownloadFile.mockResolvedValue(Buffer.from(JSON.stringify(items)))
-    mockMaskBatch.mockImplementation(async (texts: string[]) =>
-      texts.map((text) => text.replaceAll('alice@example.com', '<EMAIL_ADDRESS>'))
-    )
-    const block = createBlock()
-    const workflow: SerializedWorkflow = {
-      version: '1',
-      blocks: [block],
-      connections: [],
-      loops: {},
-      parallels: {},
-    }
-    const state = new ExecutionState()
-    const resolver = new VariableResolver(workflow, {}, state)
-    const handler: BlockHandler = {
-      canHandle: () => true,
-      execute: async () => ({ result: manifest }),
-    }
-    const executor = new BlockExecutor([handler], resolver, {}, state)
-    const ctx = createContext(state)
-    ctx.largeValueExecutionIds = ['source-execution']
-    ctx.piiBlockOutputRedaction = { enabled: true, entityTypes: ['EMAIL_ADDRESS'], language: 'en' }
-
-    await executor.execute(ctx, createNode(block), block)
-
-    expect(state.getBlockOutput(block.id)?.result).toMatchObject({
-      preview: [{ email: '<EMAIL_ADDRESS>', count: 7 }],
-      chunks: [{ ref: { executionId: 'execution-1' } }],
-    })
-    expect(mockDownloadFile).toHaveBeenCalledWith(
-      expect.objectContaining({ key: manifest.chunks[0].ref.key })
-    )
-    expect(mockUploadFile).toHaveBeenCalledWith(
-      expect.objectContaining({
-        customKey: expect.stringContaining('execution/workspace-1/workflow-1/execution-1/'),
-        file: Buffer.from(JSON.stringify([{ email: '<EMAIL_ADDRESS>', count: 7 }])),
-      })
-    )
   })
 
   it('persists function output arrays as manifests in execution state', async () => {
@@ -651,8 +588,8 @@ describe('BlockExecutor', () => {
   it('uses a handler-narrowed registry for output provenance and parent commit', async () => {
     const block: SerializedBlock = {
       ...createBlock(),
-      metadata: { id: BlockType.MOTHERSHIP, name: 'Sim Chat' },
-      config: { tool: BlockType.MOTHERSHIP, params: { selector: 'x' } },
+      metadata: { id: 'custom_secret_block', name: 'Custom Block' },
+      config: { tool: 'custom_secret_block', params: { selector: 'x' } },
     }
     const workflow: SerializedWorkflow = {
       version: '1',
@@ -703,8 +640,8 @@ describe('BlockExecutor', () => {
   it('uses a handler-narrowed registry when execution fails after private input settlement', async () => {
     const block: SerializedBlock = {
       ...createBlock(),
-      metadata: { id: BlockType.MOTHERSHIP, name: 'Sim Chat' },
-      config: { tool: BlockType.MOTHERSHIP, params: { selector: 'x' } },
+      metadata: { id: 'custom_secret_block', name: 'Custom Block' },
+      config: { tool: 'custom_secret_block', params: { selector: 'x' } },
     }
     const workflow: SerializedWorkflow = {
       version: '1',
@@ -920,12 +857,12 @@ describe('BlockExecutor', () => {
     expect(output).not.toEqual({ content: '' })
   })
 
-  it('keeps Sim Chat secret policy in runtime inputs and out of trace inputs', async () => {
+  it('keeps block secret policy in runtime inputs and out of trace inputs', async () => {
     const block = createBlock()
-    block.id = 'mothership-block-1'
-    block.metadata = { id: BlockType.MOTHERSHIP, name: 'Sim Chat' }
+    block.id = 'secret-block-1'
+    block.metadata = { id: 'custom_secret_block', name: 'Custom Block' }
     block.config = {
-      tool: BlockType.MOTHERSHIP,
+      tool: 'custom_secret_block',
       params: {
         prompt: 'Run the task',
         secretScope: 'selected',
@@ -1767,41 +1704,5 @@ describe('BlockExecutor streaming pump', () => {
     const output = state.getBlockOutput(block.id)
     expect(output?.error).toBeTruthy()
     expect(output?.content).toBe('partial before timeout')
-  })
-
-  it('with PII redaction: no live forward and strips thinking from traces', async () => {
-    const { redactObjectStrings } = await import('@/lib/logs/execution/pii-redaction')
-    vi.mocked(redactObjectStrings).mockImplementation(async (value) => {
-      if (typeof value === 'string') {
-        return `[masked]${value}` as never
-      }
-      // Object walk is exercised elsewhere; keep streaming-stage string mask as-is.
-      return value as never
-    })
-
-    const handler = createAgentEventsStreamingHandler({
-      events: [
-        { type: 'thinking_delta', text: 'secret thought' },
-        { type: 'text_delta', text: 'alice@example.com said hi', turn: 'final' },
-      ],
-      attachThinkingOnDrain: 'secret thought',
-    })
-    const { executor, block, state } = createExecutor(handler)
-    const ctx = createContext(state)
-    const onStream = vi.fn()
-    ctx.onStream = onStream
-    ctx.piiBlockOutputRedaction = {
-      enabled: true,
-      entityTypes: ['EMAIL_ADDRESS'],
-      language: 'en',
-    }
-
-    await executor.execute(ctx, createNode(block), block)
-
-    expect(onStream).not.toHaveBeenCalled()
-    expect(state.getBlockOutput(block.id)?.content).toBe('[masked]alice@example.com said hi')
-    expect(
-      state.getBlockOutput(block.id)?.providerTiming?.timeSegments?.[0]?.thinkingContent
-    ).toBeUndefined()
   })
 })

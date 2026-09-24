@@ -45,13 +45,6 @@ import { useSidebarStore } from '@/stores/sidebar/store'
 
 const logger = createLogger('OrganizationSidebar')
 
-/**
- * Opts a control out of the desktop shell's window-drag region. The header row is
- * draggable chrome, so anything clickable inside it has to say so or the click is
- * swallowed by the drag handler.
- */
-const DRAG_EXEMPT_CLASS = '[-webkit-app-region:no-drag]'
-
 interface OrganizationChatsProps
   extends Omit<ComponentProps<typeof ChatsSection>, 'chats' | 'isLoading'> {
   organizationId: string
@@ -67,14 +60,12 @@ function OrganizationChats({ organizationId, ...props }: OrganizationChatsProps)
 /**
  * The organization surface's rail: the same chrome as the workspace sidebar —
  * header row, pinned nav block, a divided scroll region of sections, and the
- * pinned footer — hosted by the same `WorkspaceChrome`, so collapse, resize, and
- * the desktop hover-peek all behave identically. Collapse and peek state come from
- * the chrome through {@link useSidebarChrome}.
+ * pinned footer — hosted by the same `WorkspaceChrome`, so collapse and resize
+ * behave identically. Collapse state comes from the chrome through
+ * {@link useSidebarChrome}.
  */
 export const OrganizationSidebar = memo(function OrganizationSidebar() {
-  const { isCollapsed: railCollapsed, isPeeking } = useSidebarChrome()
-  /** The peek card always renders the expanded layout, whatever the rail's state. */
-  const isCollapsed = railCollapsed && !isPeeking
+  const { isCollapsed } = useSidebarChrome()
 
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const scrollContentRef = useRef<HTMLDivElement>(null)
@@ -167,20 +158,7 @@ export const OrganizationSidebar = memo(function OrganizationSidebar() {
         aria-label='Organization sidebar'
       >
         <div className='flex h-full flex-col'>
-          {/* The peek card already sits below the lane; reserving it again doubles the offset. */}
-          {!isPeeking && (
-            <div
-              aria-hidden
-              className='desktop-window-drag-region desktop-workspace-window-drag-region h-[var(--desktop-title-bar-height)]'
-            />
-          )}
-          <div
-            className={cn(
-              'relative flex shrink-0 items-center px-2 pt-2',
-              !isPeeking &&
-                '[[data-sim-desktop-title-bar=inset]_&]:pt-[var(--desktop-title-bar-height)]'
-            )}
-          >
+          <div className='relative flex shrink-0 items-center px-2 pt-2'>
             <OrganizationHeader
               organization={organization}
               canEditLogo={viewer.isAdmin}
@@ -192,9 +170,7 @@ export const OrganizationSidebar = memo(function OrganizationSidebar() {
               inert={isCollapsed}
               className={cn(
                 'flex h-[30px] items-center gap-[1px] overflow-hidden',
-                isCollapsed
-                  ? 'w-0 opacity-0'
-                  : 'w-[32px] [[data-sim-desktop-title-bar=inset]_&]:w-0'
+                isCollapsed ? 'w-0 opacity-0' : 'w-[32px]'
               )}
             >
               <SidebarTooltip
@@ -208,7 +184,6 @@ export const OrganizationSidebar = memo(function OrganizationSidebar() {
                   aria-label='Collapse sidebar'
                   onClick={toggleCollapsed}
                   tabIndex={isCollapsed ? -1 : undefined}
-                  className={cn(DRAG_EXEMPT_CLASS, '[[data-sim-desktop-title-bar=inset]_&]:hidden')}
                 />
               </SidebarTooltip>
             </div>
@@ -301,23 +276,19 @@ export const OrganizationSidebar = memo(function OrganizationSidebar() {
 
       <HelpModal open={isHelpModalOpen} onOpenChange={setIsHelpModalOpen} />
 
-      {/* Not on the peek card: the resize hook writes an inline `--sidebar-width` that
-          out-specifies the `[data-peek]` rule, stranding the card at a stale width. */}
-      {!isPeeking && (
-        <div
-          className={cn(
-            'absolute top-0 right-0 bottom-0 z-20 w-[8px] translate-x-1/2',
-            isCollapsed ? 'cursor-e-resize' : 'cursor-ew-resize'
-          )}
-          onPointerDown={isCollapsed ? undefined : handlePointerDown}
-          onClick={isCollapsed ? toggleCollapsed : undefined}
-          onKeyDown={handleEdgeKeyDown}
-          role={isCollapsed ? 'button' : 'separator'}
-          tabIndex={0}
-          aria-orientation={isCollapsed ? undefined : 'vertical'}
-          aria-label={isCollapsed ? 'Expand sidebar' : 'Resize sidebar'}
-        />
-      )}
+      <div
+        className={cn(
+          'absolute top-0 right-0 bottom-0 z-20 w-[8px] translate-x-1/2',
+          isCollapsed ? 'cursor-e-resize' : 'cursor-ew-resize'
+        )}
+        onPointerDown={isCollapsed ? undefined : handlePointerDown}
+        onClick={isCollapsed ? toggleCollapsed : undefined}
+        onKeyDown={handleEdgeKeyDown}
+        role={isCollapsed ? 'button' : 'separator'}
+        tabIndex={0}
+        aria-orientation={isCollapsed ? undefined : 'vertical'}
+        aria-label={isCollapsed ? 'Expand sidebar' : 'Resize sidebar'}
+      />
     </div>
   )
 })

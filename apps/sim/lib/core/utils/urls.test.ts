@@ -68,8 +68,8 @@ describe('getBaseUrl', () => {
         key === 'NEXT_PUBLIC_APP_URL' ? configured : undefined
       )
       expect(getBaseUrl()).toBe('https://app.example.com')
-      expect(new URL(`${getBaseUrl()}/desktop/connect/complete`).pathname).toBe(
-        '/desktop/connect/complete'
+      expect(new URL(`${getBaseUrl()}/oauth/connect/complete`).pathname).toBe(
+        '/oauth/connect/complete'
       )
     }
   })

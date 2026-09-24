@@ -61,15 +61,12 @@ const INDIRECT_ZOD_ROUTES = new Set([
   // there is no input to validate and its only response is the fixed v2 error
   // envelope.
   'apps/sim/app/api/v2/[[...segments]]/route.ts',
-  'apps/sim/app/api/demo-requests/route.ts',
   // Input-less session-bound GET: nothing to validate; response is
   // contract-typed via `satisfies InvitationDetails` in the route.
   // Public updater feed: input-less GET, session-less, returns YAML (not JSON),
   // so it can't be JSON-contract-bound. Wrapped in withRouteHandler.
-  'apps/sim/app/api/desktop/update/latest-mac.yml/route.ts',
   // Public updater download redirect: input-less GET, session-less, whose only
   // response is a 302 to a GitHub release asset. Wrapped in withRouteHandler.
-  'apps/sim/app/api/desktop/update/download/route.ts',
   'apps/sim/app/api/invitations/route.ts',
   'apps/sim/app/api/logs/export/route.ts',
   'apps/sim/app/api/tools/docusign/route.ts',
@@ -89,7 +86,6 @@ const INDIRECT_ZOD_ROUTES = new Set([
   'apps/sim/app/api/auth/oauth/connections/route.ts',
   'apps/sim/app/api/auth/providers/route.ts',
   'apps/sim/app/api/auth/socket-token/route.ts',
-  'apps/sim/app/api/desktop/auth/handoff/route.ts',
   'apps/sim/app/api/workspaces/invitations/route.ts',
   // Internal cron entry point that authenticates via `Authorization: Bearer
   // CRON_SECRET` and ignores query/body. The boundary contract is "no
@@ -109,12 +105,10 @@ const INDIRECT_ZOD_ROUTES = new Set([
   'apps/sim/app/api/cron/cleanup-soft-deletes/route.ts',
   'apps/sim/app/api/cron/cleanup-table-row-ttl/route.ts',
   'apps/sim/app/api/cron/cleanup-stale-executions/route.ts',
-  'apps/sim/app/api/cron/cleanup-sandbox-images/route.ts',
   'apps/sim/app/api/cron/cleanup-oauth-tokens/route.ts',
   'apps/sim/app/api/cron/renew-subscriptions/route.ts',
   'apps/sim/app/api/cron/billing-cycle-close/route.ts',
   'apps/sim/app/api/cron/reconcile-billing-seats/route.ts',
-  'apps/sim/app/api/cron/reconcile-inbox-entitlement/route.ts',
   'apps/sim/app/api/cron/run-data-drains/route.ts',
   // Returns immediately after Trigger.dev accepts the asynchronous dispatcher task.
   'apps/sim/app/api/cron/workspace-file-search-dispatch/route.ts',

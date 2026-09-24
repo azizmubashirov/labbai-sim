@@ -37,8 +37,6 @@ import {
 import { resolveActiveWorkflowApplicationContext } from '@/lib/workflows/application/context'
 import type { ResolveWorkflowOutputsResult } from '@/lib/workflows/application/resolve-workflow-outputs'
 import { loadResolvedDeployedWorkflowOutputs } from '@/lib/workflows/application/resolve-workflow-outputs'
-import { getEnrichment } from '@/enrichments/registry'
-import type { EnrichmentConfig } from '@/enrichments/types'
 
 const logger = createLogger('TableGroupApplication')
 
@@ -122,36 +120,9 @@ function validateRequestedOutputs(
   )
 }
 
-/** Resolves the registry enrichment a group is bound to, refusing an unknown id. */
-function requireEnrichment(enrichmentId: string | undefined): EnrichmentConfig {
-  const enrichment = getEnrichment(enrichmentId)
-  if (!enrichment) {
-    throw new OrchestrationError(
-      'validation',
-      `Unknown enrichment "${enrichmentId ?? ''}". Call list_enrichments to see available ids.`
-    )
-  }
-  return enrichment
-}
-
-/**
- * Refuses an output id the enrichment registry does not define. A run fills a
- * cell by reading `result[outputId]`, so a coordinate carrying an unknown — or
- * absent — output id names a column no run can ever write.
- */
-function requireKnownEnrichmentOutputIds(
-  enrichment: EnrichmentConfig,
-  outputIds: Array<string | undefined>
-): void {
-  const known = new Set(enrichment.outputs.map((output) => output.id))
-  for (const outputId of outputIds) {
-    if (!outputId || !known.has(outputId)) {
-      throw new OrchestrationError(
-        'validation',
-        `Enrichment "${enrichment.name}" has no output "${outputId ?? ''}"`
-      )
-    }
-  }
+/** Registry enrichments were removed; a group bound to one is refused. */
+function rejectRegistryEnrichment(): never {
+  throw new OrchestrationError('validation', 'Enrichments are not available')
 }
 
 function workflowOutputColumnType(
@@ -266,10 +237,7 @@ export const createTableGroupUseCase = defineAuthorizedTableUseCase({
         input.group.workflowId
       )
     } else if (input.group.enrichmentId) {
-      requireKnownEnrichmentOutputIds(
-        requireEnrichment(input.group.enrichmentId),
-        input.group.outputs.map((output) => output.outputId)
-      )
+      rejectRegistryEnrichment()
     }
     const outputNames = new Set(input.group.outputs.map((output) => output.columnName))
     const orphan = input.outputColumns.find((column) => !outputNames.has(column.name))
@@ -472,157 +440,6 @@ export const createWorkflowTableGroup = defineAuthorizedTableUseCase({
   },
 })
 
-export interface CreateTableEnrichmentGroupInput extends TableGroupInput {
-  enrichmentId: string
-  inputMappings?: Array<{ inputName: string; columnName: string }>
-  outputColumnNames?: Record<string, string>
-  dependencies?: WorkflowGroupDependencies
-  name?: string
-  autoRun?: boolean
-}
-
-/** Creates an enrichment group from the code-defined enrichment registry. */
-export const createTableEnrichmentGroup = defineAuthorizedTableUseCase({
-  operation: tableOperations.createGroup,
-  resolveContext: ({ input }: { input: CreateTableEnrichmentGroupInput }) =>
-    resolveActiveTableContext({
-      tableId: input.tableId,
-      assertedWorkspaceId: input.workspaceId,
-    }),
-  async execute({ principal, input, context }) {
-    requireBoundedGroupItems(input.inputMappings, 'Enrichment input mappings')
-    if (Object.keys(input.outputColumnNames ?? {}).length > TABLE_LIMITS.MAX_COLUMNS_PER_TABLE) {
-      throw new OrchestrationError(
-        'validation',
-        `Enrichment output names cannot exceed ${TABLE_LIMITS.MAX_COLUMNS_PER_TABLE} entries`
-      )
-    }
-    const enrichment = requireEnrichment(input.enrichmentId)
-
-    const enrichmentInputIds = new Set(
-      enrichment.inputs.map((enrichmentInput) => enrichmentInput.id)
-    )
-    const mappingByInput = new Map<string, string>()
-    for (const mapping of input.inputMappings ?? []) {
-      if (!enrichmentInputIds.has(mapping.inputName)) {
-        throw new OrchestrationError(
-          'validation',
-          `Enrichment "${enrichment.name}" has no input "${mapping.inputName}"`
-        )
-      }
-      if (mappingByInput.has(mapping.inputName)) {
-        throw new OrchestrationError(
-          'validation',
-          `Enrichment input "${mapping.inputName}" cannot be mapped more than once`
-        )
-      }
-      mappingByInput.set(mapping.inputName, mapping.columnName)
-    }
-    requireKnownEnrichmentOutputIds(enrichment, Object.keys(input.outputColumnNames ?? {}))
-    const existingColumns = new Set(context.table.schema.columns.map((column) => column.name))
-    for (const enrichmentInput of enrichment.inputs) {
-      const mapped = mappingByInput.get(enrichmentInput.id)
-      if (enrichmentInput.required && !mapped) {
-        throw new OrchestrationError(
-          'validation',
-          `Enrichment "${enrichment.name}" requires input "${enrichmentInput.id}" to be mapped to a column`
-        )
-      }
-      if (mapped && !existingColumns.has(mapped)) {
-        throw new OrchestrationError(
-          'validation',
-          `Mapped column "${mapped}" for input "${enrichmentInput.id}" does not exist on table ${context.tableId}`
-        )
-      }
-    }
-
-    const inputMappings: WorkflowGroupInputMapping[] = enrichment.inputs
-      .filter((enrichmentInput) => mappingByInput.has(enrichmentInput.id))
-      .map((enrichmentInput) => ({
-        inputName: enrichmentInput.id,
-        columnName: mappingByInput.get(enrichmentInput.id) as string,
-      }))
-    const taken = new Set(context.table.schema.columns.map((column) => column.name))
-    const groupId = generateId()
-    const outputs: WorkflowGroupOutput[] = []
-    const outputColumns: ColumnDefinition[] = []
-    for (const output of enrichment.outputs) {
-      const desired = (input.outputColumnNames?.[output.id] ?? '').trim() || output.name
-      const columnName = deriveOutputColumnName(desired, taken)
-      taken.add(columnName)
-      outputs.push({ blockId: '', path: '', outputId: output.id, columnName })
-      outputColumns.push({
-        name: columnName,
-        type: output.type,
-        required: false,
-        unique: false,
-        workflowGroupId: groupId,
-      })
-    }
-
-    const name = input.name ?? enrichment.name
-    const group: WorkflowGroup = {
-      id: groupId,
-      workflowId: '',
-      enrichmentId: input.enrichmentId,
-      name,
-      type: 'enrichment',
-      dependencies: input.dependencies ?? { columns: inputMappings.map((item) => item.columnName) },
-      outputs,
-      inputMappings,
-      autoRun: input.autoRun ?? false,
-    }
-    const actorUserId = attributedUserId(principal, context.billedAccountUserId)
-    const capabilityGovernedUserId = capabilityGovernedPrincipalUserId(principal)
-    const table = await addWorkflowGroup(
-      {
-        tableId: context.tableId,
-        workspaceId: context.workspaceId,
-        group,
-        outputColumns,
-        autoRun: input.autoRun ?? false,
-        suppressAutoRunDispatch: true,
-        actorUserId,
-        capabilityGovernedUserId,
-      },
-      generateRequestId()
-    )
-    return {
-      table,
-      group: groupFromTable(table, groupId),
-      actorUserId,
-      capabilityGovernedUserId,
-    }
-  },
-  projectAudit({ result }) {
-    return {
-      action: AuditAction.TABLE_UPDATED,
-      resourceType: AuditResourceType.TABLE,
-      resourceId: result.table.id,
-      resourceName: result.table.name,
-      description: `Added enrichment "${result.group.name ?? result.group.id}" to table "${result.table.name}"`,
-      metadata: {
-        op: 'add_enrichment',
-        groupId: result.group.id,
-        enrichmentId: result.group.enrichmentId,
-      },
-    }
-  },
-  afterSuccess({ input, context, result }) {
-    signalTableSchemaChanged(context.tableId)
-    if (input.autoRun === true) {
-      dispatchGroupAutoRun({
-        tableId: context.tableId,
-        workspaceId: context.workspaceId,
-        groupId: result.group.id,
-        actorUserId: result.actorUserId,
-        capabilityGovernedUserId: result.capabilityGovernedUserId,
-        label: 'table-enrichment-group-create-auto-run',
-      })
-    }
-  },
-})
-
 export interface UpdateTableGroupInput
   extends TableGroupInput,
     Omit<
@@ -706,12 +523,7 @@ export const updateTableGroupUseCase = defineAuthorizedTableUseCase({
       const addedOutputs = input.outputs.filter(
         (output) => !boundOutputKeys.has(`${output.columnName}::${output.outputId ?? ''}`)
       )
-      if (addedOutputs.length > 0) {
-        requireKnownEnrichmentOutputIds(
-          requireEnrichment(previousGroup?.enrichmentId),
-          addedOutputs.map((output) => output.outputId)
-        )
-      }
+      if (addedOutputs.length > 0) rejectRegistryEnrichment()
     }
     /**
      * `mappingUpdates` repoints a column at a new `(blockId, path)` — coordinates

@@ -4,18 +4,11 @@
  */
 
 import {
-  isImmutableDaytonaSnapshotRef,
-  isImmutableE2BTemplateRef,
-  isValidSandboxReleaseGeneration,
-} from '@sim/utils/sandbox-references'
-import {
   ENTERPRISE_FEATURE_LEGACY_DEFAULTS,
   type EnterpriseFeature,
   resolveEnterpriseEntitlement,
-  resolveSandboxFeatureAvailability,
 } from './enterprise-entitlements'
 import { env, envBoolean, envNumber, getEnv, isFalsy, isTruthy } from './env'
-import { hasEnvCapabilityValue, inspectCapability, SANDBOX_CAPABILITY } from './env-capabilities'
 
 /**
  * Is the application running in production mode
@@ -387,29 +380,6 @@ export const isOrganizationsEnabled =
   isAccessControlEnabled
 
 /**
- * Is inbox (Sim Mailer) enabled
- */
-export const isInboxEnabled = enterpriseFeatureEnabled(
-  'inbox',
-  env.INBOX_ENABLED,
-  'NEXT_PUBLIC_INBOX_ENABLED'
-)
-
-/**
- * Whether deployment configuration entitles custom Function sandboxes.
- *
- * With billing enabled this is an explicit plan-gate override. Without billing,
- * either the Enterprise master switch or the Sandbox-specific server/client pair
- * enables the feature. Provider readiness is applied separately by
- * {@link isSandboxesEnabled} so entitlement can never advertise a missing runtime.
- */
-export const isSandboxDeploymentEntitled = enterpriseFeatureEnabled(
-  'sandboxes',
-  env.SANDBOXES_ENABLED,
-  'NEXT_PUBLIC_SANDBOXES_ENABLED'
-)
-
-/**
  * Is whitelabeling enabled
  */
 export const isWhitelabelingEnabled = enterpriseFeatureEnabled(
@@ -477,98 +447,14 @@ export const isForkingEnabled = enterpriseFeatureEnabled(
 )
 
 /**
- * The selected remote sandbox provider (`SANDBOX_PROVIDER`), defaulting to E2B.
- * Availability below is derived from THIS provider's credentials, so a
- * Daytona-only deployment (E2B unset) still enables remote execution.
+ * Remote code sandboxes (E2B / Daytona) were removed: Function blocks run
+ * JavaScript in the local isolated-vm, and document compilation stays on the
+ * JavaScript path. These stay exported as constant `false` so the dormant
+ * remote-sandbox code paths keep compiling and never activate.
  */
-const sandboxProvider = inspectCapability(SANDBOX_CAPABILITY, env).providerId
-
-/**
- * Whether remote code/shell execution is available with the selected provider.
- *
- * Both providers require their credential and dedicated Function base. The old
- * Mothership shell template/snapshot names are intentionally not fallbacks: a
- * deployment must build and configure the Function-owned image before exposing
- * the runtime.
- *
- * The browser cannot inspect provider credentials, so
- * `NEXT_PUBLIC_SANDBOXES_ENABLED` is its readiness projection. Set the public
- * value only after this server-side check succeeds; `npx sim-setup doctor`
- * reports mismatches in either direction.
- */
-export const isRemoteSandboxEnabled =
-  sandboxProvider === 'daytona'
-    ? hasEnvCapabilityValue(env, 'DAYTONA_API_KEY') &&
-      Boolean(
-        env.DAYTONA_FUNCTION_SNAPSHOT_ID &&
-          isImmutableDaytonaSnapshotRef(env.DAYTONA_FUNCTION_SNAPSHOT_ID)
-      )
-    : sandboxProvider === 'e2b'
-      ? isTruthy(env.E2B_ENABLED) &&
-        hasEnvCapabilityValue(env, 'E2B_API_KEY') &&
-        Boolean(
-          env.E2B_FUNCTION_TEMPLATE_ID && isImmutableE2BTemplateRef(env.E2B_FUNCTION_TEMPLATE_ID)
-        ) &&
-        Boolean(
-          env.E2B_FUNCTION_TEMPLATE_GENERATION &&
-            isValidSandboxReleaseGeneration(env.E2B_FUNCTION_TEMPLATE_GENERATION)
-        )
-      : false
-
-/**
- * Whether the complete custom-Sandbox feature is available on this deployment.
- *
- * Billing supplies hosted entitlement, while billing-free deployments require
- * the Enterprise pair or the Sandbox-specific pair. Both modes additionally
- * require a configured remote Function provider. The public flag projects that
- * provider readiness into the browser; the server always verifies credentials
- * and the immutable Function base directly.
- */
-export const isSandboxesEnabled = resolveSandboxFeatureAvailability({
-  billingEnabled: isBillingEnabled,
-  deploymentEntitled: isSandboxDeploymentEntitled,
-  remoteProviderEnabled:
-    typeof window === 'undefined'
-      ? isRemoteSandboxEnabled
-      : isTruthy(getEnv('NEXT_PUBLIC_SANDBOXES_ENABLED')),
-})
-
-/**
- * Whether the selected provider can serve Mothership's own code image.
- * This is intentionally independent of {@link isRemoteSandboxEnabled}: the
- * Function and Mothership images have separate release and rollout lifecycles.
- */
-export const isMothershipSandboxEnabled =
-  sandboxProvider === 'daytona'
-    ? hasEnvCapabilityValue(env, 'DAYTONA_API_KEY') &&
-      hasEnvCapabilityValue(env, 'DAYTONA_SHELL_SNAPSHOT_ID')
-    : sandboxProvider === 'e2b'
-      ? isTruthy(env.E2B_ENABLED) &&
-        hasEnvCapabilityValue(env, 'E2B_API_KEY') &&
-        hasEnvCapabilityValue(env, 'MOTHERSHIP_E2B_TEMPLATE_ID')
-      : false
-
-/**
- * Whether the document-generation sandbox is available with the selected
- * provider — its credential AND its dedicated doc image (E2B doc template, or
- * Daytona doc snapshot).
- *
- * When true, ALL four formats compile in the doc sandbox: pptx/docx via Node
- * (pptxgenjs/docx + react-icons/sharp icons), pdf/xlsx via Python
- * (reportlab/openpyxl). When false, compilation stays on the JavaScript
- * (isolated-vm) path, byte-identical to its prior behavior (and xlsx is
- * unavailable). Drives both the Sim compile backend and the `docCompiler` flag
- * sent to the copilot file subagent so the agent's output and compiler agree.
- */
-export const isDocSandboxEnabled =
-  sandboxProvider === 'daytona'
-    ? hasEnvCapabilityValue(env, 'DAYTONA_API_KEY') &&
-      hasEnvCapabilityValue(env, 'DAYTONA_DOC_SNAPSHOT_ID')
-    : sandboxProvider === 'e2b'
-      ? isTruthy(env.E2B_ENABLED) &&
-        hasEnvCapabilityValue(env, 'E2B_API_KEY') &&
-        hasEnvCapabilityValue(env, 'MOTHERSHIP_E2B_DOC_TEMPLATE_ID')
-      : false
+export const isRemoteSandboxEnabled = false as boolean
+export const isMothershipSandboxEnabled = false as boolean
+export const isDocSandboxEnabled = false as boolean
 
 /**
  * Whether Ollama is configured (OLLAMA_URL is set).

@@ -8,7 +8,6 @@ import type {
   ExecutionCallbacks,
   IterationContext,
   ParentIteration,
-  PiiBlockOutputRedaction,
   SerializableExecutionState,
 } from '@/executor/execution/types'
 import type {
@@ -435,8 +434,6 @@ export interface ExecutionContext {
   isDeployedContext?: boolean
   enforceCredentialAccess?: boolean
   copilotToolExecution?: boolean
-  /** In-flight block-output PII redaction policy (resolved `blockOutputs` stage). */
-  piiBlockOutputRedaction?: PiiBlockOutputRedaction
 
   /**
    * Per-run memo of permission config loads, keyed by subject and workspace. A Map so the per-block

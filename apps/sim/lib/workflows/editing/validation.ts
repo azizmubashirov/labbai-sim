@@ -40,7 +40,6 @@ import {
   isKnownModelId,
   suggestModelIdsForUnknownModel,
 } from '@/providers/models'
-import { isPiByokOnlyMode } from '@/providers/pi-providers'
 import { getTool } from '@/tools/utils'
 import {
   TRIGGER_ROUTING_FIELD,
@@ -1575,11 +1574,6 @@ export async function preValidateCredentialInputs(
 
   /**
    * Check if apiKey should be filtered for a block with the given model.
-   *
-   * The Pi Coding Agent in Create PR mode is exempt: it hands the model key to
-   * a sandbox, so Sim never covers it with a hosted key and the block needs the
-   * user's own key even for hosted models. Its other modes keep the model
-   * client in Sim and follow the normal rule.
    */
   function collectHostedApiKeyInput(
     inputs: Record<string, unknown>,
@@ -1590,7 +1584,6 @@ export async function preValidateCredentialInputs(
     nestedBlockId?: string
   ) {
     if (!hostedModelsLower || !inputs.apiKey) return
-    if (blockType === BlockType.PI && isPiByokOnlyMode(toolParams.mode)) return
     const modelValue = toolParams.model
     if (!modelValue || typeof modelValue !== 'string') return
 

@@ -20,15 +20,10 @@ const mocks = vi.hoisted(() => ({
   workspaceCredentials: vi.fn(),
   personalEnvironment: vi.fn(),
   continue: vi.fn(),
-  openExternal: vi.fn(),
-  desktop: false,
   error: null as Error | null,
 }))
 
 vi.mock('next/navigation', () => ({ useParams: () => ({ workspaceId: 'workspace-1' }) }))
-vi.mock('@/lib/desktop', () => ({
-  getDesktopBridge: () => (mocks.desktop ? { openExternal: mocks.openExternal } : null),
-}))
 vi.mock('@/lib/auth/auth-client', () => ({ useSession: () => ({ data: null }) }))
 vi.mock('@/app/workspace/[workspaceId]/providers/workspace-permissions-provider', () => ({
   useUserPermissionsContext: () => ({ canEdit: mocks.canEdit }),
@@ -141,9 +136,7 @@ beforeEach(() => {
   mocks.startPending = false
   mocks.canEdit = false
   mocks.error = null
-  mocks.desktop = false
   mocks.refetch.mockImplementation(async () => ({ isSuccess: true, data: mocks.rows }))
-  mocks.openExternal.mockResolvedValue(true)
   mocks.start.mockImplementation((_body, callbacks) =>
     callbacks.onSuccess({
       providerId: 'slack',
@@ -349,32 +342,6 @@ describe('Assistant credential card', () => {
       refetchInterval: false,
     })
     expect(popup.close).toHaveBeenCalled()
-  })
-
-  it('opens OAuth in the system browser on desktop and allows a deliberate retry', async () => {
-    mocks.desktop = true
-    await render()
-    await click('Connect Slack')
-    expect(window.open).not.toHaveBeenCalled()
-    expect(mocks.openExternal).toHaveBeenCalledWith(
-      'https://slack.com/oauth/v2/authorize?state=trusted-state'
-    )
-    await click('Waiting for Slack connection…')
-    expect(mocks.start).toHaveBeenCalledTimes(2)
-    expect(mocks.openExternal).toHaveBeenCalledTimes(2)
-  })
-
-  it('does not allow a desktop retry while the start request is still pending', async () => {
-    mocks.desktop = true
-    mocks.start.mockImplementation(() => {
-      mocks.startPending = true
-    })
-    await render()
-    await click('Connect Slack')
-    await render()
-    await click('Waiting for Slack connection…')
-    expect(mocks.start).toHaveBeenCalledOnce()
-    expect(mocks.openExternal).not.toHaveBeenCalled()
   })
 
   it('focuses the live web popup and starts a fresh attempt once its handle is closed', async () => {

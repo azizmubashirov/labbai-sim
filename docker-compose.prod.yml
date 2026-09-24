@@ -130,10 +130,10 @@ services:
       timeout: 5s
       retries: 5
 
-  # Runs the background jobs the Helm chart schedules as Kubernetes CronJobs:
+  # Runs the background jobs:
   # scheduled workflows, polling triggers, connector syncs, the transactional
   # outbox, subscription renewal, and data drains. Without it none of those run.
-  # Schedules live in docker/crontab and mirror helm/sim/values.yaml cronjobs.jobs.
+  # Schedules live in docker/crontab.
   cron:
     # Deliberately NOT pinned to SIM_VERSION: the scheduler only makes HTTP calls
     # and shares no database schema with the app, so it does not need to move in

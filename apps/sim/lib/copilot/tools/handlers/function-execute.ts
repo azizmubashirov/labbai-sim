@@ -1,7 +1,6 @@
 import type { Principal } from '@sim/auth/principal'
 import { createLogger } from '@sim/logger'
 import { omit } from '@sim/utils/object'
-import { hasWorkspaceSandboxAccess } from '@/lib/billing/core/subscription'
 import { resolveCopilotFilePrincipal } from '@/lib/copilot/auth/file-delegation'
 import { applySecretMountPolicy } from '@/lib/copilot/secret-mount-policy'
 import type { ToolExecutionContext, ToolExecutionResult } from '@/lib/copilot/tool-executor/types'
@@ -17,7 +16,6 @@ import {
   MOUNTED_WORKSPACE_FILES_PROVENANCE_KEY,
   PRIVATE_SECRET_PROVENANCE_FIELD,
 } from '@/lib/execution/private-tool-metadata'
-import { MAX_PLAN_REQUIRED } from '@/lib/execution/remote-sandbox/entitlement'
 import type { SandboxFile } from '@/lib/execution/remote-sandbox/types'
 import {
   createSandboxMountBudget,
@@ -530,7 +528,10 @@ export async function executeFunctionExecute(
       )
     }
   }
+  // `sandboxId` named a workspace Sim sandbox; those were removed, so a stale
+  // selection is dropped rather than forwarded to the executor.
   const enrichedParams = omit(params, [
+    'sandboxId',
     'sandboxProfile',
     'internalSandboxProfile',
     PRIVATE_SECRET_PROVENANCE_FIELD,
@@ -544,18 +545,6 @@ export async function executeFunctionExecute(
     const raw = enrichedParams.timeout
     const ms = raw <= 600 ? raw * 1000 : raw
     enrichedParams.timeout = Math.min(Math.max(ms, 1000), 300_000)
-  }
-  if (params.sandboxId !== undefined) {
-    if (typeof params.sandboxId !== 'string' || !params.sandboxId.trim()) {
-      throw new Error('sandboxId must be a non-empty Sim sandbox id')
-    }
-    if (!context.workspaceId) {
-      throw new Error('A workspace is required to select a Sim sandbox')
-    }
-    if (!(await hasWorkspaceSandboxAccess(context.workspaceId))) {
-      throw new Error(MAX_PLAN_REQUIRED)
-    }
-    enrichedParams.sandboxId = params.sandboxId.trim()
   }
   const requestedNames = applySecretMountPolicy(
     await extractCodeSecretNames(params.code, params.language),

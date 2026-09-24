@@ -2656,7 +2656,6 @@ export async function executeFunctionRequest(
 
       logger.info(`[${requestId}] E2B shell execution`, {
         enabled: remoteSandboxEnabled,
-        hasApiKey: Boolean(process.env.E2B_API_KEY),
         envVarCount: Object.keys(shellEnvs).length,
       })
 
@@ -2763,7 +2762,6 @@ export async function executeFunctionRequest(
     if (useRemoteSandbox) {
       logger.info(`[${requestId}] E2B status`, {
         enabled: remoteSandboxEnabled,
-        hasApiKey: Boolean(process.env.E2B_API_KEY),
         language: lang,
       })
       if (lang === CodeLanguage.JavaScript) {

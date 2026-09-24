@@ -59,7 +59,6 @@ import {
   deleteTableViewContract,
   deleteWorkflowGroupContract,
   findTableRowsContract,
-  getEnrichmentDetailContract,
   getTableContract,
   type InsertTableRowBodyInput,
   listActiveDispatchesContract,
@@ -94,7 +93,6 @@ import type { V2TableImportSource, V2TableImportTarget } from '@/lib/api/contrac
 import { buildUpgradeHref } from '@/lib/billing/upgrade-reasons'
 import type {
   CsvHeaderMapping,
-  EnrichmentRunDetail,
   RowData,
   RowExecutionMetadata,
   RowExecutions,
@@ -349,44 +347,6 @@ async function fetchTableRunState(tableId: string, signal?: AbortSignal): Promis
     runningByRowId: response.data.runningByRowId,
     hasRunning: response.data.hasRunning,
   }
-}
-
-async function fetchEnrichmentDetail(
-  tableId: string,
-  rowId: string,
-  groupId: string,
-  signal?: AbortSignal
-): Promise<EnrichmentRunDetail | null> {
-  const response = await requestJson(getEnrichmentDetailContract, {
-    params: { tableId, rowId, groupId },
-    signal,
-  })
-  return response.data.detail
-}
-
-/**
- * Enrichment cascade breakdown for one cell, fetched on demand when the
- * enrichment details panel opens. Kept off the hot grid read — only queried
- * while `enabled` (panel open with a selected row + group).
- *
- * `staleTime: 0` so reopening the panel always refetches: a cell can be re-run
- * between opens (the run writes new `enrichmentDetails` in the background with no
- * client invalidation), and the panel is opened on demand, so a fresh fetch per
- * open keeps the cascade in sync without a cached stale run.
- */
-export function useEnrichmentDetail(
-  tableId: string,
-  rowId: string | null,
-  groupId: string | null,
-  options?: { enabled?: boolean }
-) {
-  return useQuery({
-    queryKey: tableKeys.enrichmentDetail(tableId, rowId ?? '', groupId ?? ''),
-    queryFn: ({ signal }) =>
-      fetchEnrichmentDetail(tableId, rowId as string, groupId as string, signal),
-    enabled: Boolean(tableId && rowId && groupId) && (options?.enabled ?? true),
-    staleTime: 0,
-  })
 }
 
 /** Count groups flipped to in-flight (`pending`) by an optimistic schedule that

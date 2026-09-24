@@ -6,7 +6,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   artifact: vi.fn(),
   history: vi.fn(),
-  redact: vi.fn(),
   prefix: vi.fn(),
 }))
 vi.mock('@/lib/memory/retrieval-prefix', () => ({ readMemoryRetrievalPrefix: mocks.prefix }))
@@ -16,7 +15,6 @@ vi.mock('@/lib/memory/artifacts', () => ({
 }))
 vi.mock('@/lib/memory/artifact-handle', () => ({ getMemoryArtifactHandle: () => 'b'.repeat(64) }))
 vi.mock('@/lib/memory/conversation-store', () => ({ readConversationItems: mocks.history }))
-vi.mock('@/lib/logs/execution/pii-redaction', () => ({ redactObjectStrings: mocks.redact }))
 
 import { EXACT_EMPTY_DURABLE_SECRET_PROVENANCE } from '@/lib/execution/durable-secret-provenance'
 import {
@@ -61,7 +59,6 @@ describe('bounded model memory retrieval', () => {
     mocks.artifact.mockResolvedValue(resultArtifact({ visible: 'Retained result details' }))
     mocks.history.mockResolvedValue({ items: [] })
     mocks.prefix.mockResolvedValue({ status: 'missing' })
-    mocks.redact.mockImplementation(async (value: unknown) => value)
   })
 
   it('returns model-safe result fields and never private replay/native/provenance fields', async () => {
@@ -117,22 +114,6 @@ describe('bounded model memory retrieval', () => {
     await expect(
       retrieveMemory({ ...input, projection: { resolvedSecretTraceRegistry: registry } })
     ).rejects.toThrow('unavailable for safe retrieval')
-  })
-
-  it('applies current PII policy before returning output and propagates masking failures', async () => {
-    mocks.artifact.mockResolvedValue(resultArtifact({ email: 'person@example.com' }))
-    mocks.redact.mockResolvedValueOnce({ success: true, output: { email: '[EMAIL]' } })
-    const projection = {
-      piiBlockOutputRedaction: { enabled: true, entityTypes: ['EMAIL_ADDRESS'] },
-    }
-    const result = await retrieveMemory({ ...input, projection })
-    expect(result.text).not.toContain('person@example.com')
-    expect(mocks.redact).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ onFailure: 'throw' })
-    )
-    mocks.redact.mockRejectedValueOnce(new Error('masking unavailable'))
-    await expect(retrieveMemory({ ...input, projection })).rejects.toThrow('masking unavailable')
   })
 
   it('paginates large multilingual artifacts without gaps and within the UTF-8 byte limit', async () => {

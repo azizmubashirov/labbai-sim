@@ -8,7 +8,6 @@ import {
   Ffmpeg,
   GenerateAudio,
   GenerateImage,
-  GenerateVideo,
   ManageCredential,
   ManageCustomTool,
   ManageKnowledgeBase,
@@ -26,7 +25,6 @@ import {
 import { getBlocksMetadataServerTool } from '@/lib/copilot/tools/server/blocks/get-blocks-metadata-tool'
 import { getTriggerBlocksServerTool } from '@/lib/copilot/tools/server/blocks/get-trigger-blocks'
 import { searchDocsServerTool } from '@/lib/copilot/tools/server/docs/search-docs'
-import { enrichmentRunServerTool } from '@/lib/copilot/tools/server/enrichment/enrichment-run'
 import { createFileServerTool } from '@/lib/copilot/tools/server/files/create-file'
 import { downloadToWorkspaceFileServerTool } from '@/lib/copilot/tools/server/files/download-to-workspace-file'
 import { editContentServerTool } from '@/lib/copilot/tools/server/files/edit-content'
@@ -51,12 +49,10 @@ import {
 } from '@/lib/copilot/tools/server/knowledge/workspace-search'
 import { ffmpegServerTool } from '@/lib/copilot/tools/server/media/ffmpeg'
 import { generateAudioServerTool } from '@/lib/copilot/tools/server/media/generate-audio'
-import { generateVideoServerTool } from '@/lib/copilot/tools/server/media/generate-video'
 import { searchOnlineServerTool } from '@/lib/copilot/tools/server/other/search-online'
 import { queryUserTableServerTool } from '@/lib/copilot/tools/server/table/query-user-table'
 import { tableAutomationsServerTool } from '@/lib/copilot/tools/server/table/table-automations'
 import { tableColumnsServerTool } from '@/lib/copilot/tools/server/table/table-columns'
-import { tableEnrichmentsServerTool } from '@/lib/copilot/tools/server/table/table-enrichments'
 import { tableManageServerTool } from '@/lib/copilot/tools/server/table/table-manage'
 import { tableRowsServerTool } from '@/lib/copilot/tools/server/table/table-rows'
 import { tableViewsServerTool } from '@/lib/copilot/tools/server/table/table-views'
@@ -138,7 +134,6 @@ const WRITE_ACTIONS: Record<string, string[]> = {
     'delete_workflow_group_output',
     'run_column',
     'cancel_table_runs',
-    'add_enrichment',
   ],
   [ManageCustomTool.id]: ['add', 'edit', 'delete'],
   [ManageMcpConnection.id]: ['add', 'edit', 'delete'],
@@ -155,11 +150,8 @@ const WRITE_ACTIONS: Record<string, string[]> = {
   move_file_folder: ['*'],
   [DownloadFile.id]: ['*'],
   [GenerateImage.id]: ['generate'],
-  [GenerateVideo.id]: ['generate'],
   [GenerateAudio.id]: ['generate'],
   [Ffmpeg.id]: ['*'],
-  // Paid external-provider lookups (hosted-key cost), like the media tools.
-  [enrichmentRunServerTool.name]: ['*'],
 }
 
 function isWriteAction(toolName: string, action: string | undefined): boolean {
@@ -184,14 +176,12 @@ const baseServerToolRegistry: Record<string, BaseServerTool> = {
   [searchKnowledgeBaseServerTool.name]: searchKnowledgeBaseServerTool,
   [searchWorkspaceServerTool.name]: searchWorkspaceServerTool,
   [readDocumentServerTool.name]: readDocumentServerTool,
-  [enrichmentRunServerTool.name]: enrichmentRunServerTool,
   [userTableServerTool.name]: userTableServerTool,
   [queryUserTableServerTool.name]: queryUserTableServerTool,
   [tableManageServerTool.name]: tableManageServerTool,
   [tableRowsServerTool.name]: tableRowsServerTool,
   [tableColumnsServerTool.name]: tableColumnsServerTool,
   [tableAutomationsServerTool.name]: tableAutomationsServerTool,
-  [tableEnrichmentsServerTool.name]: tableEnrichmentsServerTool,
   [tableViewsServerTool.name]: tableViewsServerTool,
   [workspaceFileServerTool.name]: workspaceFileServerTool,
   [editContentServerTool.name]: editContentServerTool,
@@ -206,7 +196,6 @@ const baseServerToolRegistry: Record<string, BaseServerTool> = {
   [downloadToWorkspaceFileServerTool.name]: downloadToWorkspaceFileServerTool,
   [extractDocAssetsServerTool.name]: extractDocAssetsServerTool,
   [generateImageServerTool.name]: generateImageServerTool,
-  [generateVideoServerTool.name]: generateVideoServerTool,
   [generateAudioServerTool.name]: generateAudioServerTool,
   [ffmpegServerTool.name]: ffmpegServerTool,
 }

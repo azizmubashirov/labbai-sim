@@ -12,7 +12,6 @@ vi.mock('@/lib/copilot/tools/server/table/user-table', () => ({
 
 import { tableAutomationsServerTool } from '@/lib/copilot/tools/server/table/table-automations'
 import { tableColumnsServerTool } from '@/lib/copilot/tools/server/table/table-columns'
-import { tableEnrichmentsServerTool } from '@/lib/copilot/tools/server/table/table-enrichments'
 import { tableManageServerTool } from '@/lib/copilot/tools/server/table/table-manage'
 import { tableRowsServerTool } from '@/lib/copilot/tools/server/table/table-rows'
 
@@ -31,8 +30,7 @@ describe('split table tools', () => {
     { tool: tableManageServerTool, own: 'create', foreign: 'insert_row' },
     { tool: tableRowsServerTool, own: 'batch_update_rows', foreign: 'add_column' },
     { tool: tableColumnsServerTool, own: 'update_column', foreign: 'create' },
-    { tool: tableAutomationsServerTool, own: 'run_column', foreign: 'add_enrichment' },
-    { tool: tableEnrichmentsServerTool, own: 'add_enrichment', foreign: 'run_column' },
+    { tool: tableAutomationsServerTool, own: 'run_column', foreign: 'create' },
   ] as const
 
   it.each(cases)(

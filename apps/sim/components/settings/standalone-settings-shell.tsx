@@ -7,10 +7,7 @@ import {
   ACCOUNT_SETTINGS_ITEMS,
   ACCOUNT_SETTINGS_PATH_ALIASES,
   getAccountSettingsHref,
-  getSelfHostSettingsHref,
   parseSettingsPathSection,
-  SELFHOST_SETTINGS_GROUPS,
-  SELFHOST_SETTINGS_ITEMS,
   SETTINGS_PLANE_CHROME,
 } from '@/components/settings/navigation'
 import { SettingsHeaderProvider, SettingsHeaderShell } from '@/components/settings/settings-header'
@@ -22,74 +19,42 @@ import { useDeploymentShape } from '@/lib/core/config/deployment-shape'
 import { useSeedDeploymentShape } from '@/hooks/use-seed-deployment-shape'
 import { SIDEBAR_WIDTH } from '@/stores/constants'
 
-interface StandaloneSettingsShellBaseProps {
+interface StandaloneSettingsShellProps {
   children: ReactNode
   /** The server-resolved deployment shape, seeded before the sidebar and sections read it. */
   deployment: DeploymentShape
-}
-
-interface AccountSettingsShellProps extends StandaloneSettingsShellBaseProps {
   plane: 'account'
   isSuperUser?: boolean
 }
-
-interface SelfHostSettingsShellProps extends StandaloneSettingsShellBaseProps {
-  plane: 'selfhost'
-}
-
-type StandaloneSettingsShellProps = AccountSettingsShellProps | SelfHostSettingsShellProps
 
 export function StandaloneSettingsShell(props: StandaloneSettingsShellProps) {
   const { children, plane } = props
   useSeedDeploymentShape(props.deployment)
   useSettingsBeforeUnload()
   const pathname = usePathname()
-  const { hosted, billingEnabled } = useDeploymentShape()
-  const isSuperUser = plane === 'account' ? (props.isSuperUser ?? false) : false
+  const { billingEnabled } = useDeploymentShape()
+  const isSuperUser = props.isSuperUser ?? false
 
   const accountItems = ACCOUNT_SETTINGS_ITEMS.filter((item) => {
     if (item.id === 'billing' && !billingEnabled) return false
-    if ((item.id === 'admin' || item.id === 'mothership') && !isSuperUser) return false
+    if (item.id === 'admin' && !isSuperUser) return false
     return true
   })
-  const selfHostItems = SELFHOST_SETTINGS_ITEMS.filter((item) => {
-    if (item.id === 'billing' && !billingEnabled) return false
-    // Chat keys are issued by the managed service, so there are none to list on
-    // a self-hosted deployment — useCopilotKeys is `enabled: hosted` for the
-    // same reason. Self-hosters manage their keys on sim.ai.
-    if (item.id === 'chat-keys' && !hosted) return false
-    return true
-  })
-  const selfHostSection = parseSettingsPathSection({
-    path: pathname,
-    items: SELFHOST_SETTINGS_ITEMS,
-    defaultSection: 'general',
-  })
-  const accountSection = parseSettingsPathSection({
+  const activeSection = parseSettingsPathSection({
     path: pathname,
     items: ACCOUNT_SETTINGS_ITEMS,
     defaultSection: 'general',
     aliases: ACCOUNT_SETTINGS_PATH_ALIASES,
   })
-  const activeSection = plane === 'account' ? accountSection : selfHostSection
-  const sidebar =
-    plane === 'account' ? (
-      <SettingsSidebar
-        activeSection={accountSection}
-        plane={plane}
-        groups={ACCOUNT_SETTINGS_GROUPS}
-        hrefForSection={getAccountSettingsHref}
-        items={accountItems}
-      />
-    ) : (
-      <SettingsSidebar
-        activeSection={selfHostSection}
-        plane={plane}
-        groups={SELFHOST_SETTINGS_GROUPS}
-        hrefForSection={getSelfHostSettingsHref}
-        items={selfHostItems}
-      />
-    )
+  const sidebar = (
+    <SettingsSidebar
+      activeSection={activeSection}
+      plane={plane}
+      groups={ACCOUNT_SETTINGS_GROUPS}
+      hrefForSection={getAccountSettingsHref}
+      items={accountItems}
+    />
+  )
 
   return (
     <div className='flex h-screen w-full overflow-hidden bg-[var(--surface-1)]'>

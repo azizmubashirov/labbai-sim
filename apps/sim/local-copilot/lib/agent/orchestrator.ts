@@ -303,16 +303,13 @@ export async function* runLocalCopilotAgent(
     ...(params.contexts?.length ? { contexts: params.contexts } : {}),
     ...(params.fileAttachments?.length ? { fileAttachments: params.fileAttachments } : {}),
   })
-  const snapshotSandboxEntitled =
-    params.workspaceSnapshot?.sandboxes !== undefined ? true : undefined
   if (params.workspaceSnapshot?.skills?.length) {
     promptPrefetch.startSkills(
       params.workspaceSnapshot.skills.map((skill) => ({
         id: skill.id,
         name: skill.name,
         description: skill.description ?? '',
-      })),
-      snapshotSandboxEntitled
+      }))
     )
   }
   const earlySessionMemoryPromise = params.priorMessages?.length
@@ -352,9 +349,7 @@ export async function* runLocalCopilotAgent(
     throw error
   }
 
-  const contextSandboxEntitled =
-    structuredContext.vfsSnapshot?.sandboxes !== undefined ? true : undefined
-  promptPrefetch.startSkills(structuredContext.skills, contextSandboxEntitled)
+  promptPrefetch.startSkills(structuredContext.skills)
   timing.mark('contextReady')
 
   logger.info('Arena Copilot context built', {

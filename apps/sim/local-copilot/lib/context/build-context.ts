@@ -12,7 +12,6 @@ import { getAllBlocks } from '@/blocks/registry'
 import type { BlockConfig } from '@/blocks/types'
 import { getLocalCopilotConfig, isSelfHostedDeployment } from '@/local-copilot/lib/config'
 import { buildContextPromptPayload } from '@/local-copilot/lib/context/context-budget'
-import { getLocalCopilotE2bCapabilities } from '@/local-copilot/lib/context/e2b-capabilities'
 import {
   loadWorkspaceIntegrations,
   mapSnapshotToWorkspaceIntegrations,
@@ -335,7 +334,6 @@ export async function buildLocalCopilotContext(
     connectedIntegrations: integrations.connectedIntegrations,
     envVariables: integrations.envVariables,
     hostedKeysAvailable: integrations.hostedKeysAvailable,
-    e2b: getLocalCopilotE2bCapabilities(),
   }
 
   const resourceContext = {

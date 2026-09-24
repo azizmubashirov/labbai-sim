@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Operation } from './generate-v2-cli-api'
+import type { Operation } from './v2-operations'
 import {
   classifyOperation,
   render,

@@ -17,7 +17,6 @@ import {
   requireCapability,
   requireOAuthClientCapability,
   resolveOAuthClientCapabilityId,
-  SANDBOX_CAPABILITY,
   STORAGE_CAPABILITY,
   validateCapabilityFieldInput,
   wireFallback,
@@ -65,8 +64,6 @@ const READY_EMAIL_VALUES = {
 } as const
 
 const EMAIL_PROVIDER_ORDER = ['resend', 'ses', 'smtp', 'azure', 'gmail'] as const
-const E2B_FUNCTION_TEMPLATE_ID = 'sim-function:00000000-0000-4000-8000-000000000001'
-const DAYTONA_FUNCTION_SNAPSHOT_ID = '00000000-0000-4000-8000-000000000002'
 
 function storageValues({
   azure,
@@ -584,101 +581,6 @@ describe('env capabilities', () => {
     })
   })
 
-  describe('sandbox selection', () => {
-    it('inspects the legacy E2B default without throwing but requires runtime configuration', () => {
-      const inspection = inspectCapability(SANDBOX_CAPABILITY, {})
-      expect(inspection).toMatchObject({
-        providerId: 'e2b',
-        error: null,
-      })
-      expect(() => requireCapability(SANDBOX_CAPABILITY, {})).toThrow(/E2B_API_KEY/)
-    })
-
-    it('requires E2B credentials and an immutable Function base when E2B is selected', () => {
-      expect(
-        requireCapability(SANDBOX_CAPABILITY, {
-          E2B_ENABLED: 'true',
-          E2B_API_KEY: 'e2b-key',
-          E2B_FUNCTION_TEMPLATE_ID,
-          E2B_FUNCTION_TEMPLATE_GENERATION: '1',
-        }).providerId
-      ).toBe('e2b')
-      expect(() =>
-        requireCapability(SANDBOX_CAPABILITY, {
-          SANDBOX_PROVIDER: 'e2b',
-          E2B_ENABLED: 'false',
-        })
-      ).toThrow(/E2B_API_KEY/)
-      expect(() =>
-        requireCapability(SANDBOX_CAPABILITY, {
-          SANDBOX_PROVIDER: 'e2b',
-          E2B_ENABLED: 'false',
-          E2B_API_KEY: 'e2b-key',
-          E2B_FUNCTION_TEMPLATE_ID,
-          E2B_FUNCTION_TEMPLATE_GENERATION: '1',
-        })
-      ).toThrow(/E2B_ENABLED must be enabled/)
-      expect(() =>
-        requireCapability(SANDBOX_CAPABILITY, {
-          E2B_ENABLED: 'true',
-          E2B_API_KEY: 'e2b-key',
-          E2B_FUNCTION_TEMPLATE_ID: 'sim-function:latest',
-          E2B_FUNCTION_TEMPLATE_GENERATION: '1',
-        })
-      ).toThrow(/immutable E2B build reference/)
-      expect(() =>
-        requireCapability(SANDBOX_CAPABILITY, {
-          E2B_ENABLED: 'true',
-          E2B_API_KEY: 'e2b-key',
-          E2B_FUNCTION_TEMPLATE_ID,
-          E2B_FUNCTION_TEMPLATE_GENERATION: '0',
-        })
-      ).toThrow(/positive safe integer release generation/)
-      const disabled = inspectCapability(SANDBOX_CAPABILITY, {
-        SANDBOX_PROVIDER: 'e2b',
-        E2B_ENABLED: 'false',
-      })
-      expect(disabled).toMatchObject({ providerId: 'e2b', error: null })
-      expect(disabled.providers.find((provider) => provider.id === 'e2b')).toMatchObject({
-        active: false,
-        state: 'absent',
-      })
-    })
-
-    it('requires Daytona credentials and an immutable Function snapshot', () => {
-      expect(
-        requireCapability(SANDBOX_CAPABILITY, {
-          SANDBOX_PROVIDER: 'daytona',
-          DAYTONA_API_KEY: 'daytona-key',
-          DAYTONA_FUNCTION_SNAPSHOT_ID,
-        }).providerId
-      ).toBe('daytona')
-      expect(() =>
-        requireCapability(SANDBOX_CAPABILITY, {
-          SANDBOX_PROVIDER: 'daytona',
-          DAYTONA_API_KEY: 'daytona-key',
-        })
-      ).toThrow(/DAYTONA_FUNCTION_SNAPSHOT_ID/)
-      expect(() =>
-        requireCapability(SANDBOX_CAPABILITY, {
-          SANDBOX_PROVIDER: 'daytona',
-          DAYTONA_API_KEY: 'daytona-key',
-          DAYTONA_FUNCTION_SNAPSHOT_ID: 'mothership-shell:v1',
-        })
-      ).toThrow(/immutable Daytona snapshot ID/)
-    })
-
-    it('reports an unknown sandbox selector without throwing during inspection', () => {
-      expect(inspectCapability(SANDBOX_CAPABILITY, { SANDBOX_PROVIDER: 'unknown' })).toMatchObject({
-        providerId: null,
-        error: expect.any(EnvCapabilityConfigurationError),
-      })
-      expect(() => requireCapability(SANDBOX_CAPABILITY, { SANDBOX_PROVIDER: 'unknown' })).toThrow(
-        /Unknown SANDBOX_PROVIDER/
-      )
-    })
-  })
-
   describe('jobs and cache selection', () => {
     it('uses database jobs unless Trigger.dev is enabled and configured', () => {
       expect(requireCapability(ASYNC_JOBS_CAPABILITY, {}).providerId).toBe('database')
@@ -764,10 +666,6 @@ describe('env capabilities', () => {
     it('tracks setup-owned options as deployment configuration', () => {
       expect(DEPLOYMENT_CONFIGURATION_KEYS).toEqual(
         expect.arrayContaining([
-          'DAYTONA_FUNCTION_SNAPSHOT_ID',
-          'E2B_FUNCTION_TEMPLATE_ID',
-          'E2B_FUNCTION_TEMPLATE_GENERATION',
-          'NEXT_PUBLIC_SANDBOXES_ENABLED',
           'S3_FORCE_PATH_STYLE',
           'STORAGE_PROVIDER',
           'OCR_PROVIDER',

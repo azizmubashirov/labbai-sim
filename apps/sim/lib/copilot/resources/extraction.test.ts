@@ -110,7 +110,6 @@ describe('extractResourcesFromToolResult', () => {
   })
 
   it.each([
-    ['generate_video', 'ad-clip.mp4'],
     ['generate_audio', 'voiceover.mp3'],
     ['ffmpeg', 'final-ad.mp4'],
   ])('auto-opens the generated file from %s results', (toolName, fileName) => {

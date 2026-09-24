@@ -5,10 +5,6 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('@/lib/browser-agent/open-in-panel', () => ({
-  shouldOpenInBrowserPanel: () => false,
-  openInBrowserPanel: vi.fn(),
-}))
 vi.mock('@/lib/integrations/icon-mapping', () => ({
   blockTypeToIconMap: { confluence_v2: () => <svg data-brand='confluence' /> },
 }))

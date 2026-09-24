@@ -11,7 +11,6 @@ const mocks = vi.hoisted(() => ({
   addOutput: vi.fn(),
   audit: vi.fn(),
   deleteOutput: vi.fn(),
-  getEnrichment: vi.fn(),
   loadWorkflowOutputs: vi.fn(),
   resolveContext: vi.fn(),
   resolvePermission: vi.fn(),
@@ -37,7 +36,6 @@ vi.mock('@sim/platform-authz/workspace', () => ({
   resolveEffectiveWorkspacePermission: mocks.resolvePermission,
 }))
 vi.mock('@sim/utils/id', () => ({ generateId: () => 'generated-id' }))
-vi.mock('@/enrichments/registry', () => ({ getEnrichment: mocks.getEnrichment }))
 vi.mock('@/lib/core/utils/background', () => ({
   runDetached: (label: string, work: () => Promise<unknown>) => {
     mocks.runDetached(label)
@@ -75,10 +73,8 @@ vi.mock('@/lib/workflows/application/resolve-workflow-outputs', () => ({
   loadResolvedDeployedWorkflowOutputs: mocks.loadWorkflowOutputs,
 }))
 
-import { v2WorkflowGroupSchema } from '@/lib/api/contracts/v2/tables'
 import {
   addWorkflowTableGroupOutput,
-  createTableEnrichmentGroup,
   createTableGroupUseCase,
   createWorkflowTableGroup,
   deleteTableGroupOutputUseCase,
@@ -187,15 +183,6 @@ function useEnrichmentTable(): void {
     allowPersonalApiKeys: true,
     billedAccountUserId: 'billing-owner-1',
   })
-  mocks.getEnrichment.mockReturnValue({
-    id: 'company-domain',
-    name: 'Company Domain',
-    inputs: [{ id: 'company', name: 'Company', type: 'string', required: true }],
-    outputs: [
-      { id: 'domain', name: 'domain', type: 'string' },
-      { id: 'company_name', name: 'company name', type: 'string' },
-    ],
-  })
   mocks.updateGroup.mockImplementation(async (input) => ({
     ...enrichmentTable,
     schema: {
@@ -240,12 +227,6 @@ describe('workflow and enrichment Table application commands', () => {
         ...(input.autoRun !== undefined ? { autoRun: input.autoRun } : {}),
       })
     )
-    mocks.getEnrichment.mockReturnValue({
-      id: 'company-domain',
-      name: 'Company Domain',
-      inputs: [{ id: 'company', name: 'Company', type: 'string', required: true }],
-      outputs: [{ id: 'domain', name: 'domain', type: 'string' }],
-    })
   })
 
   it('owns workflow resolution plus group and column construction', async () => {
@@ -386,33 +367,6 @@ describe('workflow and enrichment Table application commands', () => {
     expect(mocks.signal).not.toHaveBeenCalled()
   })
 
-  it('stores an empty workflowId for a public enrichment group that omits it', async () => {
-    const result = await createTableGroupUseCase.execute({
-      principal,
-      input: {
-        tableId: table.id,
-        workspaceId: table.workspaceId,
-        group: {
-          type: 'enrichment',
-          enrichmentId: 'company-domain',
-          name: 'Company Domain',
-          outputs: [{ blockId: '', path: '', outputId: 'domain', columnName: 'domain' }],
-        },
-        outputColumns: [{ name: 'domain', type: 'string' }],
-      },
-    })
-
-    expect(mocks.resolveWorkflowContext).not.toHaveBeenCalled()
-    expect(mocks.addGroup).toHaveBeenCalledWith(
-      expect.objectContaining({
-        group: expect.objectContaining({ id: 'generated-id', workflowId: '' }),
-      }),
-      'request-1'
-    )
-    expect(result.group.workflowId).toBe('')
-    expect(v2WorkflowGroupSchema.safeParse(result.group).success).toBe(true)
-  })
-
   it('preserves the internal create contract for an invalid related workflow', async () => {
     mocks.resolveWorkflowContext.mockRejectedValueOnce(
       new OrchestrationError('not_found', 'Workflow not found')
@@ -438,9 +392,7 @@ describe('workflow and enrichment Table application commands', () => {
     expect(mocks.audit).not.toHaveBeenCalled()
   })
 
-  it('refuses a created enrichment group whose enrichment id the registry does not define', async () => {
-    mocks.getEnrichment.mockReturnValue(undefined)
-
+  it('refuses creating a group bound to a registry enrichment', async () => {
     await expect(
       createTableGroupUseCase.execute({
         principal,
@@ -449,65 +401,16 @@ describe('workflow and enrichment Table application commands', () => {
           workspaceId: table.workspaceId,
           group: {
             type: 'enrichment',
-            enrichmentId: 'no-such-enrichment',
-            outputs: [{ blockId: '', path: '', columnName: 'domain' }],
+            enrichmentId: 'company-domain',
+            outputs: [{ blockId: '', path: '', outputId: 'domain', columnName: 'domain' }],
           },
           outputColumns: [{ name: 'domain', type: 'string' }],
         },
       })
-    ).rejects.toMatchObject({
-      code: 'validation',
-      message: expect.stringContaining('Unknown enrichment "no-such-enrichment"'),
-    })
+    ).rejects.toMatchObject({ code: 'validation', message: 'Enrichments are not available' })
 
     expect(mocks.addGroup).not.toHaveBeenCalled()
     expect(mocks.audit).not.toHaveBeenCalled()
-  })
-
-  it('refuses a created enrichment output the registry does not define', async () => {
-    await expect(
-      createTableGroupUseCase.execute({
-        principal,
-        input: {
-          tableId: table.id,
-          workspaceId: table.workspaceId,
-          group: {
-            type: 'enrichment',
-            enrichmentId: 'company-domain',
-            outputs: [{ blockId: '', path: '', outputId: 'nosuch', columnName: 'bogus' }],
-          },
-          outputColumns: [{ name: 'bogus', type: 'string' }],
-        },
-      })
-    ).rejects.toMatchObject({
-      code: 'validation',
-      message: 'Enrichment "Company Domain" has no output "nosuch"',
-    })
-
-    expect(mocks.addGroup).not.toHaveBeenCalled()
-  })
-
-  it('refuses a created enrichment output that carries no output id', async () => {
-    await expect(
-      createTableGroupUseCase.execute({
-        principal,
-        input: {
-          tableId: table.id,
-          workspaceId: table.workspaceId,
-          group: {
-            type: 'enrichment',
-            enrichmentId: 'company-domain',
-            outputs: [{ blockId: '', path: '', columnName: 'domain' }],
-          },
-          outputColumns: [{ name: 'domain', type: 'string' }],
-        },
-      })
-    ).rejects.toMatchObject({
-      code: 'validation',
-      message: 'Enrichment "Company Domain" has no output ""',
-    })
-
-    expect(mocks.addGroup).not.toHaveBeenCalled()
   })
 
   it('refuses a created workflow group output coordinate the workflow cannot produce', async () => {
@@ -574,7 +477,6 @@ describe('workflow and enrichment Table application commands', () => {
       },
     })
 
-    expect(mocks.getEnrichment).not.toHaveBeenCalled()
     expect(result.group.workflowId).toBe('workflow-1')
   })
 
@@ -624,34 +526,7 @@ describe('workflow and enrichment Table application commands', () => {
     )
   })
 
-  it('extends an enrichment group with a registry output without resolving a workflow', async () => {
-    useEnrichmentTable()
-
-    await updateTableGroupUseCase.execute({
-      principal,
-      input: {
-        tableId: table.id,
-        workspaceId: table.workspaceId,
-        groupId: enrichmentGroup.id,
-        outputs: [
-          ...enrichmentGroup.outputs,
-          { blockId: '', path: '', outputId: 'company_name', columnName: 'zz_z' },
-        ],
-        newOutputColumns: [{ name: 'zz_z', type: 'string' }],
-      },
-    })
-
-    expect(mocks.resolveWorkflowContext).not.toHaveBeenCalled()
-    expect(mocks.updateGroup).toHaveBeenCalledWith(
-      expect.objectContaining({
-        groupId: enrichmentGroup.id,
-        newOutputColumns: [{ name: 'zz_z', type: 'string', workflowGroupId: enrichmentGroup.id }],
-      }),
-      'request-1'
-    )
-  })
-
-  it('refuses an enrichment output the registry does not define', async () => {
+  it('refuses extending an enrichment group with a new output', async () => {
     useEnrichmentTable()
 
     await expect(
@@ -663,39 +538,14 @@ describe('workflow and enrichment Table application commands', () => {
           groupId: enrichmentGroup.id,
           outputs: [
             ...enrichmentGroup.outputs,
-            { blockId: '', path: '', outputId: 'invented', columnName: 'zz_z' },
+            { blockId: '', path: '', outputId: 'company_name', columnName: 'zz_z' },
           ],
           newOutputColumns: [{ name: 'zz_z', type: 'string' }],
         },
       })
-    ).rejects.toMatchObject({
-      code: 'validation',
-      message: 'Enrichment "Company Domain" has no output "invented"',
-    })
+    ).rejects.toMatchObject({ code: 'validation', message: 'Enrichments are not available' })
 
-    expect(mocks.updateGroup).not.toHaveBeenCalled()
-    expect(mocks.audit).not.toHaveBeenCalled()
-  })
-
-  it('refuses an enrichment output coordinate that carries no registry output id', async () => {
-    useEnrichmentTable()
-
-    await expect(
-      updateTableGroupUseCase.execute({
-        principal,
-        input: {
-          tableId: table.id,
-          workspaceId: table.workspaceId,
-          groupId: enrichmentGroup.id,
-          outputs: [...enrichmentGroup.outputs, { blockId: '', path: 'name', columnName: 'zz_z' }],
-          newOutputColumns: [{ name: 'zz_z', type: 'string' }],
-        },
-      })
-    ).rejects.toMatchObject({
-      code: 'validation',
-      message: 'Enrichment "Company Domain" has no output ""',
-    })
-
+    expect(mocks.resolveWorkflowContext).not.toHaveBeenCalled()
     expect(mocks.updateGroup).not.toHaveBeenCalled()
   })
 
@@ -713,7 +563,6 @@ describe('workflow and enrichment Table application commands', () => {
       },
     })
 
-    expect(mocks.getEnrichment).not.toHaveBeenCalled()
     expect(mocks.updateGroup).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'Renamed enrichment' }),
       'request-1'
@@ -866,7 +715,6 @@ describe('workflow and enrichment Table application commands', () => {
       workflowId: 'workflow-1',
       assertedWorkspaceId: 'workspace-1',
     })
-    expect(mocks.getEnrichment).not.toHaveBeenCalled()
     expect(mocks.updateGroup).toHaveBeenCalledWith(
       expect.objectContaining({
         newOutputColumns: [{ name: 'score', type: 'number', workflowGroupId: group.id }],
@@ -1138,49 +986,6 @@ describe('workflow and enrichment Table application commands', () => {
     expect(mocks.addOutput).not.toHaveBeenCalled()
     expect(mocks.audit).not.toHaveBeenCalled()
     expect(mocks.signal).not.toHaveBeenCalled()
-  })
-
-  it('validates enrichment mappings before constructing the group', async () => {
-    await expect(
-      createTableEnrichmentGroup.execute({
-        principal,
-        input: {
-          tableId: table.id,
-          workspaceId: table.workspaceId,
-          enrichmentId: 'company-domain',
-        },
-      })
-    ).rejects.toMatchObject({ code: 'validation' })
-    expect(mocks.addGroup).not.toHaveBeenCalled()
-
-    const result = await createTableEnrichmentGroup.execute({
-      principal,
-      input: {
-        tableId: table.id,
-        workspaceId: table.workspaceId,
-        enrichmentId: 'company-domain',
-        inputMappings: [{ inputName: 'company', columnName: 'name' }],
-      },
-    })
-
-    expect(mocks.addGroup).toHaveBeenCalledWith(
-      expect.objectContaining({
-        group: expect.objectContaining({
-          id: 'generated-id',
-          enrichmentId: 'company-domain',
-          inputMappings: [{ inputName: 'company', columnName: 'name' }],
-          dependencies: { columns: ['name'] },
-          outputs: [{ blockId: '', path: '', outputId: 'domain', columnName: 'domain' }],
-        }),
-        outputColumns: [
-          expect.objectContaining({ name: 'domain', workflowGroupId: 'generated-id' }),
-        ],
-      }),
-      'request-1'
-    )
-    expect(result.group.enrichmentId).toBe('company-domain')
-    expect(mocks.audit).toHaveBeenCalledTimes(1)
-    expect(mocks.signal).toHaveBeenCalledWith(table.id)
   })
 
   it('deletes an output with authoritative audit and schema effects', async () => {

@@ -32,7 +32,6 @@ import {
 import type { RunLimit, RunMode } from '@/lib/api/contracts/tables'
 import type { SortDirection, WorkflowGroupType } from '@/lib/table'
 import { HeaderLabel } from '@/app/workspace/[workspaceId]/tables/[tableId]/components/table-grid/headers/header-label'
-import { getEnrichment } from '@/enrichments/registry'
 import type { WorkflowMetadata } from '@/stores/workflows/registry/types'
 import { SELECTION_TINT_BG } from '../constants'
 import type { DisplayColumn } from '../types'
@@ -310,11 +309,9 @@ export function ColumnOptionsMenu({
 interface WorkflowGroupMetaCellProps {
   workflowId: string
   groupId: string
-  /** When `'enrichment'`, the cell shows the enrichment's name + icon instead
-   *  of a backing workflow's skeleton icon + name. */
+  /** When `'enrichment'`, the cell shows the persisted group name instead
+   *  of the backing workflow's name. */
   groupType?: WorkflowGroupType
-  /** Registry id for enrichment groups (resolves name/icon fallback). */
-  enrichmentId?: string
   /** Persisted group name (the enrichment name at creation). */
   groupName?: string
   size: number
@@ -373,7 +370,6 @@ export function WorkflowGroupMetaCell({
   workflowId,
   groupId,
   groupType,
-  enrichmentId,
   groupName,
   size,
   startColIndex,
@@ -405,11 +401,9 @@ export function WorkflowGroupMetaCell({
   onPinToggle,
 }: WorkflowGroupMetaCellProps) {
   const isEnrichment = groupType === 'enrichment'
-  const enrichment = isEnrichment ? getEnrichment(enrichmentId) : undefined
-  const EnrichmentIcon = enrichment?.icon
   const wf = workflows?.find((w) => w.id === workflowId)
   const name = isEnrichment
-    ? (groupName ?? enrichment?.name ?? 'Enrichment')
+    ? (groupName ?? 'Enrichment')
     : (wf?.name ?? 'Workflow')
 
   const [optionsMenuOpen, setOptionsMenuOpen] = useState(false)
@@ -541,11 +535,7 @@ export function WorkflowGroupMetaCell({
         />
       )}
       <div className='flex h-[18px] min-w-0 items-center gap-1.5'>
-        {isEnrichment && EnrichmentIcon ? (
-          <EnrichmentIcon className='size-[12px] shrink-0 text-[var(--text-icon)]' />
-        ) : (
-          <Workflow className='size-[12px] shrink-0 text-[var(--text-icon)]' />
-        )}
+        <Workflow className='size-[12px] shrink-0 text-[var(--text-icon)]' />
         <HeaderLabel label={name} className='text-[var(--text-secondary)] text-xs' />
         {onRunColumn && (
           <DropdownMenu open={runMenuOpen} onOpenChange={setRunMenuOpen}>

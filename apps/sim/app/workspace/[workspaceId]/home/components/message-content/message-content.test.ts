@@ -900,27 +900,6 @@ describe('parseBlocks main activity controls', () => {
           timestamp: 1,
         },
         mainText('A permission decision is pending.'),
-        {
-          type: 'tool_call',
-          toolCall: {
-            id: 'handoff',
-            name: 'terminal',
-            status: 'executing',
-            params: { operation: 'handoff' },
-          },
-          timestamp: 2,
-        },
-        {
-          type: 'tool_call',
-          toolCall: {
-            id: 'answered-takeover',
-            name: 'browser_request_takeover',
-            status: 'success',
-            params: { reason: 'Choose a result.' },
-            result: { success: true, output: { userInstruction: 'Open the second result.' } },
-          },
-          timestamp: 2,
-        },
         mainToolCall('older', 'grep'),
         mainText('Checking another source.'),
         {
@@ -939,8 +918,6 @@ describe('parseBlocks main activity controls', () => {
 
       expect(visibleTools(blocks).map((tool) => tool.id)).toEqual([
         'permission',
-        'handoff',
-        'answered-takeover',
         'older',
         'latest',
       ])
@@ -951,8 +928,6 @@ describe('parseBlocks main activity controls', () => {
       )
       expect(visibleTools(completed).map((tool) => tool.id)).toEqual([
         'permission',
-        'handoff',
-        'answered-takeover',
         'older',
         'latest',
       ])

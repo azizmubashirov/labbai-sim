@@ -244,8 +244,7 @@ export const auth = betterAuth({
   baseURL: getBaseUrl(),
   // Where Better Auth sends OAuth callbacks that fail before the flow state is
   // parsed — most commonly a provider-side Cancel/Deny. Without this it
-  // defaults to a nonexistent `/error` (a 404 dead-end), which strands the
-  // desktop sign-in/connect handoffs since their loopback is never pinged.
+  // defaults to a nonexistent `/error` (a 404 dead-end).
   onAPIError: { errorURL: `${getBaseUrl()}/oauth-error` },
   trustedOrigins: [
     getBaseUrl(),
@@ -261,8 +260,8 @@ export const auth = betterAuth({
       // so this is the window in which a revoked, expired, or signed-out session
       // still authenticates. Anything longer is an un-revocable credential — at
       // 24h a sign-out on one device left every other surface looking signed in
-      // for a day while every database-backed check (socket handshakes, the
-      // desktop handoff) failed against a row that no longer existed. The
+      // for a day while every database-backed check (socket handshakes) failed
+      // against a row that no longer existed. The
       // `version` below only covers org-wide invalidation, so this TTL remains
       // the only bound on per-device sign-out latency.
       maxAge: 5 * 60, // 5 minutes in seconds
@@ -1197,9 +1196,7 @@ export const auth = betterAuth({
        * token points at — so an unredeemed token is a bearer credential for that session
        * until it expires, and its lifetime is the only thing bounding that. Nothing here
        * needs a long one: the socket handshake mints a fresh token inside the Socket.IO
-       * `auth` callback and sends it in that same attempt, and the desktop handoff writes its
-       * own row with its own expiry, which `/one-time-token/verify` reads off the row rather
-       * than from this option (see lib/auth/desktop-handoff.ts).
+       * `auth` callback and sends it in that same attempt.
        */
       expiresIn: 2,
     }),

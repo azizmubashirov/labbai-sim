@@ -1,4 +1,3 @@
-import type { BrowserKnownSession } from '@sim/browser-protocol'
 import { createLogger } from '@sim/logger'
 import { isPermissionType, permissionSatisfies } from '@sim/platform-authz/predicates'
 import { toError } from '@sim/utils/errors'
@@ -70,17 +69,6 @@ interface BuildPayloadParams {
     email?: string
     timezone?: string
   }
-  desktopLocalFilesystem?: boolean
-  browser?: boolean
-  terminalCapable?: boolean
-  terminals?: Array<{
-    id: string
-    cwd?: string
-    running?: string
-    interactive?: boolean
-    active?: boolean
-  }>
-  browserSessions?: BrowserKnownSession[]
 }
 
 export interface ToolSchema {
@@ -437,22 +425,6 @@ export async function buildCopilotRequestPayload(
     // Tell the copilot file subagent which document toolchain to write. Emitted
     // only in Python mode so the JS path sends no new field (Go defaults to js).
     ...(isDocSandboxEnabled ? { docCompiler: 'python' } : {}),
-    ...(!params.organizationId &&
-    ((!isAssistant && params.desktopLocalFilesystem) || params.browser || params.terminalCapable)
-      ? {
-          desktopCapabilities: {
-            ...(!isAssistant && params.desktopLocalFilesystem ? { localFilesystem: true } : {}),
-            ...(params.browser ? { browser: true } : {}),
-            ...(params.terminalCapable ? { terminal: true } : {}),
-            ...(params.terminalCapable && params.terminals?.length
-              ? { terminals: params.terminals }
-              : {}),
-            ...(params.browser && params.browserSessions?.length
-              ? { browserSessions: params.browserSessions }
-              : {}),
-          },
-        }
-      : {}),
     isHosted,
   }
 }

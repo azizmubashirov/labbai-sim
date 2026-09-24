@@ -105,7 +105,7 @@ describe('QuickBooks OAuth callback', () => {
     const state = createQuickBooksOAuthState({
       userId: 'user-1',
       draftId: 'draft-1',
-      returnUrl: 'https://sim.test/desktop/connect/complete?state=handoff',
+      returnUrl: 'https://sim.test/oauth/connect/complete?state=handoff',
     })
     const response = await GET(
       callbackRequest(
@@ -118,7 +118,7 @@ describe('QuickBooks OAuth callback', () => {
     )
 
     expect(response.headers.get('location')).toBe(
-      'https://sim.test/desktop/connect/complete?state=handoff&error=quickbooks_callback_error'
+      'https://sim.test/oauth/connect/complete?state=handoff&error=quickbooks_callback_error'
     )
   })
 

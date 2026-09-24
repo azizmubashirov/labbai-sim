@@ -3,7 +3,6 @@
 import { useCallback, useRef, useState } from 'react'
 import { toast } from '@sim/emcn'
 import { diffWordsWithSpace } from 'diff'
-import { getDesktopBridge } from '@/lib/desktop'
 import { type SpeechToTextError, useSpeechToText } from '@/hooks/use-speech-to-text'
 
 interface UseVoiceInputProps {
@@ -88,28 +87,12 @@ export function useVoiceInput({
 
   function handleSpeechError(error: SpeechToTextError) {
     if (error === 'microphone-blocked') {
-      const desktopBridge = getDesktopBridge()
-      if (desktopBridge) {
-        const { openMicrophoneSettings } = desktopBridge
-        toast.error(
-          'Microphone access is blocked. Allow Sim to use the microphone in your system privacy settings.',
-          openMicrophoneSettings
-            ? {
-                action: {
-                  label: 'Open Settings',
-                  onClick: () => void openMicrophoneSettings(),
-                },
-              }
-            : undefined
-        )
-      } else {
-        toast.error('Microphone access is blocked. Allow it for this site and try again.', {
-          action: {
-            label: 'Show steps',
-            onClick: () => setPermissionHelpOpen(true),
-          },
-        })
-      }
+      toast.error('Microphone access is blocked. Allow it for this site and try again.', {
+        action: {
+          label: 'Show steps',
+          onClick: () => setPermissionHelpOpen(true),
+        },
+      })
       return
     }
     if (error === 'microphone-unavailable') {

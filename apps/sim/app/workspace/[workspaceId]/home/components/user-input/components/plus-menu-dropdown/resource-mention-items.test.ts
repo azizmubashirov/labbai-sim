@@ -4,102 +4,8 @@ import { byResourceMenuOrder } from '@/app/workspace/[workspaceId]/home/componen
 import {
   buildMentionPreview,
   resourceMentionMatches,
-  withBrowserTabMentions,
   withFolderMentions,
-  withTerminalTabMentions,
 } from '@/app/workspace/[workspaceId]/home/components/user-input/components/plus-menu-dropdown/resource-mention-items'
-
-const groups = [
-  { type: 'workflow' as const, items: [{ id: 'wf-1', name: 'Deploy' }] },
-  {
-    type: 'browser' as const,
-    items: [{ id: 'browser', name: 'Browser' }],
-  },
-  {
-    type: 'terminal' as const,
-    items: [{ id: 'terminal', name: 'Terminal' }],
-  },
-]
-
-describe('withBrowserTabMentions', () => {
-  it('drops the Browser launcher when no page is open', () => {
-    const result = withBrowserTabMentions(groups, [])
-
-    expect(result.find((group) => group.type === 'browser')?.items).toEqual([])
-    expect(result.find((group) => group.type === 'workflow')).toBe(groups[0])
-  })
-
-  it('offers every live page as its own Browser mention', () => {
-    const result = withBrowserTabMentions(groups, [
-      {
-        tabId: 'browser-1',
-        title: 'Sim Docs',
-        url: 'https://docs.sim.ai',
-        loading: false,
-        active: true,
-      },
-      {
-        tabId: 'browser-2',
-        title: '',
-        url: 'https://github.com/simstudioai/sim',
-        loading: false,
-        active: false,
-      },
-    ])
-
-    expect(result.find((group) => group.type === 'browser')?.items).toEqual([
-      { id: 'browser-1', name: 'Sim Docs', mentionFamily: 'Browser' },
-      { id: 'browser-2', name: 'github.com', mentionFamily: 'Browser' },
-    ])
-  })
-
-  it('keeps specific tabs discoverable by either their title or resource family', () => {
-    const tab = { id: 'browser-1', name: 'Sim Docs', mentionFamily: 'Browser' }
-
-    expect(resourceMentionMatches(tab, 'docs')).toBe(true)
-    expect(resourceMentionMatches(tab, 'browser')).toBe(true)
-    expect(resourceMentionMatches(tab, 'terminal')).toBe(false)
-  })
-})
-
-describe('withTerminalTabMentions', () => {
-  it('drops the Terminal launcher when no shell is open', () => {
-    const result = withTerminalTabMentions(groups, [], new Set())
-
-    expect(result.find((group) => group.type === 'terminal')?.items).toEqual([])
-    expect(result.find((group) => group.type === 'workflow')).toBe(groups[0])
-  })
-
-  it('offers every live shell as its own Terminal mention, named like the strip', () => {
-    const result = withTerminalTabMentions(
-      groups,
-      [
-        {
-          terminalId: 'terminal-1',
-          title: 'sim',
-          cwd: '/code/sim',
-          running: 'bun run build',
-          interactive: false,
-          active: true,
-        },
-        {
-          terminalId: 'terminal-2',
-          title: 'sim',
-          cwd: '/tmp/sim',
-          running: null,
-          interactive: false,
-          active: false,
-        },
-      ],
-      new Set(['terminal-1'])
-    )
-
-    expect(result.find((group) => group.type === 'terminal')?.items).toEqual([
-      { id: 'terminal:terminal-1', name: 'bun run build', mentionFamily: 'Terminal' },
-      { id: 'terminal:terminal-2', name: 'sim', mentionFamily: 'Terminal' },
-    ])
-  })
-})
 
 describe('buildMentionPreview', () => {
   const item = (id: string): AvailableItem => ({ id, name: id })
@@ -157,10 +63,9 @@ describe('byResourceMenuOrder', () => {
       { type: 'task', items: [{ id: 'chat-1', name: 'Glean migration' }] },
       { type: 'log', items: [{ id: 'log-1', name: 'Glean' }] },
       { type: 'workflow', items: [{ id: 'workflow-1', name: 'Glean' }] },
-      { type: 'browser', items: [{ id: 'browser', name: 'Browser' }] },
     ].sort(byResourceMenuOrder)
 
-    expect(ordered.map((group) => group.type)).toEqual(['task', 'workflow', 'log', 'browser'])
+    expect(ordered.map((group) => group.type)).toEqual(['task', 'workflow', 'log'])
   })
 })
 

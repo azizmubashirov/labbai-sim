@@ -4,11 +4,9 @@ import { db } from '@sim/db'
 import { createLogger } from '@sim/logger'
 import { toError } from '@sim/utils/errors'
 import type { BlockState, WorkflowState } from '@sim/workflow-types/workflow'
-import { hasWorkspaceSandboxAccess } from '@/lib/billing/core/subscription'
-import { ForbiddenOperationError, principalAuditSource } from '@/lib/core/application'
+import { principalAuditSource } from '@/lib/core/application'
 import { getBlockVisibility } from '@/lib/core/config/block-visibility'
 import { OrchestrationError } from '@/lib/core/orchestration/types'
-import { MAX_PLAN_REQUIRED } from '@/lib/execution/remote-sandbox/entitlement'
 import { resolvePermissionGroupConfig } from '@/lib/permission-groups/config-scope.server'
 import { notifyWorkflowUpdated } from '@/lib/realtime/notify'
 import { defineAuthorizedWorkflowUseCase } from '@/lib/workflows/application/authorized-workflow-use-case'
@@ -37,7 +35,6 @@ import {
 import { applyOperationsToWorkflowState } from '@/lib/workflows/editing/engine'
 import type { WorkflowLintReport } from '@/lib/workflows/editing/lint'
 import { buildWorkflowLintReport } from '@/lib/workflows/editing/lint-report'
-import { operationsReferenceSimSandbox } from '@/lib/workflows/editing/sandbox-projection'
 import {
   type EditWorkflowOperation,
   isDeferredSkippedItem,
@@ -257,13 +254,6 @@ export const applyWorkflowOperations = defineAuthorizedWorkflowUseCase({
       throw new OrchestrationError('validation', 'operations cannot be empty')
     }
     await requireMutableWorkflow(context.workflowId)
-
-    if (
-      operationsReferenceSimSandbox(input.operations) &&
-      !(await hasWorkspaceSandboxAccess(context.workspaceId))
-    ) {
-      throw new ForbiddenOperationError('WORKSPACE_PLAN_CAPABILITY_REQUIRED', MAX_PLAN_REQUIRED)
-    }
 
     const attribution = resolvePrincipalAttribution(principal, {
       workspaceBillingOwnerUserId: context.billedAccountUserId,

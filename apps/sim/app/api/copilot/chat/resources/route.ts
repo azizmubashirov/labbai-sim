@@ -214,10 +214,8 @@ export const DELETE = withRouteHandler(async (req: NextRequest) => {
         const existing = sanitizeChatResources(
           Array.isArray(chat.resources) ? (chat.resources as ChatResource[]) : []
         )
-        const removeAllOfType = resourceType === 'browser' || resourceType === 'terminal'
         const next = existing.filter(
-          (resource) =>
-            resource.type !== resourceType || (!removeAllOfType && resource.id !== resourceId)
+          (resource) => resource.type !== resourceType || resource.id !== resourceId
         )
 
         await tx

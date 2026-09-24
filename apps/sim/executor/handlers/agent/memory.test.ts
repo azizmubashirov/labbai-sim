@@ -1,17 +1,12 @@
 import { loggerMock, queueTableRows, resetDbChainMock, schemaMock } from '@sim/testing'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { mockDecryptSecret, mockRedactObjectStrings } = vi.hoisted(() => ({
+const { mockDecryptSecret } = vi.hoisted(() => ({
   mockDecryptSecret: vi.fn(),
-  mockRedactObjectStrings: vi.fn(async (value: unknown) => value),
 }))
 
 vi.mock('@/lib/core/security/encryption', () => ({
   decryptSecret: mockDecryptSecret,
-}))
-
-vi.mock('@/lib/logs/execution/pii-redaction', () => ({
-  redactObjectStrings: mockRedactObjectStrings,
 }))
 
 import { OrchestrationError } from '@/lib/core/orchestration/types'
@@ -491,27 +486,6 @@ describe('Memory', () => {
       memoryType: 'conversation' as const,
       conversationId: 'conversation-1',
     }
-
-    it('does not reinterpret dormant catalog values as secret-bearing memory', async () => {
-      const registry = new ResolvedSecretTraceRegistry([
-        { name: 'TOKEN', plaintext: 'secret-value', encryptedValue: 'ciphertext' },
-      ])
-      mockRedactObjectStrings.mockImplementationOnce(async (content: unknown) => {
-        expect(content).toBe('Bearer secret-value')
-        return content
-      })
-
-      const result = await (memoryService as any).maskContentForStorage(
-        {
-          ...createContext(registry),
-          piiBlockOutputRedaction: { enabled: true, entityTypes: [] },
-        },
-        { role: 'user', content: 'Bearer secret-value' }
-      )
-
-      expect(result.content).toBe('Bearer secret-value')
-      expect(mockRedactObjectStrings).toHaveBeenCalledOnce()
-    })
 
     it('persists raw memory with unknown lineage when provenance is unavailable', async () => {
       const registry = new ResolvedSecretTraceRegistry()

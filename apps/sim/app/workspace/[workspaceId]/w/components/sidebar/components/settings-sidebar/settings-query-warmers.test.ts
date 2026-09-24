@@ -56,8 +56,6 @@ describe('settings query warmers', () => {
 
   it('does not warm broad settings data', () => {
     expect(warmSettingsSectionQuery(queryClient, personalContext, 'apikeys')).toBe(false)
-    expect(warmSettingsSectionQuery(queryClient, personalContext, 'sandboxes')).toBe(false)
-    expect(warmSettingsSectionQuery(queryClient, personalContext, 'byok')).toBe(false)
     expect(warmSettingsSectionQuery(queryClient, personalContext, 'mcp')).toBe(false)
     expect(warmSettingsSectionQuery(queryClient, personalContext, 'workflow-mcp-servers')).toBe(
       false

@@ -183,13 +183,6 @@ import {
   v2UpdatePermissionGroupContract,
 } from '@/lib/api/contracts/v2/permission-groups'
 import {
-  v2CreateSandboxContract,
-  v2DeleteSandboxContract,
-  v2GetSandboxContract,
-  v2ListSandboxesContract,
-  v2UpdateSandboxContract,
-} from '@/lib/api/contracts/v2/sandboxes'
-import {
   v2DeleteSecretContract,
   v2ListSecretsContract,
   v2SetSecretContract,
@@ -230,7 +223,6 @@ import {
   v2DeleteTableRowsContract,
   v2DeleteTableViewContract,
   v2DeleteWorkflowGroupContract,
-  v2GetRowEnrichmentContract,
   v2GetTableContract,
   v2GetTableDispatchContract,
   v2GetTableExportContract,
@@ -249,7 +241,6 @@ import {
   v2RelocateTableFolderContract,
   v2RestoreTableContract,
   v2RestoreTableFolderContract,
-  v2RunRowEnrichmentContract,
   v2SearchTableRowsContract,
   v2TableExportDownloadContract,
   v2UpdateRowsByFilterContract,
@@ -729,14 +720,6 @@ export const V2_MCP_OPERATIONS = {
         (route) => route.POST
       ),
   },
-  createSandbox: {
-    contract: v2CreateSandboxContract,
-    summary: 'Create Sandbox',
-    description:
-      'Create a uniquely named dependency environment. If a build is needed, track readiness with `buildStatus`; null means no build is required. Invalid dependencies return `400` with field details. Requires workspace admin access on Max or Enterprise. Creates and updates share a rate limit; respect `Retry-After`. Workspace API keys return `403`; use a personal API key or scoped OAuth token.\n\nOAuth scope: `api:write`.',
-    workspaceKeyUnsupported: true,
-    handler: () => import('@/app/api/v2/sandboxes/route').then((route) => route.POST),
-  },
   createServiceAccountCredential: {
     contract: v2CreateServiceAccountCredentialContract,
     summary: 'Create Service-Account Credential',
@@ -978,14 +961,6 @@ export const V2_MCP_OPERATIONS = {
       import('@/app/api/v2/organizations/[organizationId]/permission-groups/[groupId]/route').then(
         (route) => route.DELETE
       ),
-  },
-  deleteSandbox: {
-    contract: v2DeleteSandboxContract,
-    summary: 'Delete Sandbox',
-    description:
-      'Delete a sandbox. Function blocks using it fail until reconfigured. Requires workspace admin access on Max or Enterprise. Workspace API keys return `403`; use a personal API key or scoped OAuth token.\n\nOAuth scope: `api:write`.',
-    workspaceKeyUnsupported: true,
-    handler: () => import('@/app/api/v2/sandboxes/[sandboxId]/route').then((route) => route.DELETE),
   },
   deleteSecret: {
     contract: v2DeleteSecretContract,
@@ -1393,23 +1368,6 @@ export const V2_MCP_OPERATIONS = {
       import('@/app/api/v2/organizations/[organizationId]/permission-groups/[groupId]/route').then(
         (route) => route.GET
       ),
-  },
-  getRowEnrichment: {
-    contract: v2GetRowEnrichmentContract,
-    summary: 'Get Enrichment Run Detail',
-    description:
-      "Get an enrichment cell's provider attempts, statuses, hosted-key costs, durations, and matching provider. Null means no run detail was recorded; `404` means the table, row, or group does not exist.\n\nOAuth scope: `api:read`.",
-    handler: () =>
-      import('@/app/api/v2/tables/[tableId]/rows/[rowId]/enrichment/[groupId]/route').then(
-        (route) => route.GET
-      ),
-  },
-  getSandbox: {
-    contract: v2GetSandboxContract,
-    summary: 'Get Sandbox',
-    description:
-      'Get one sandbox by identifier, scoped to its workspace, including its current build state and any build failure.\n\nOAuth scope: `api:read`.',
-    handler: () => import('@/app/api/v2/sandboxes/[sandboxId]/route').then((route) => route.GET),
   },
   getSelector: {
     contract: v2GetSelectorContract,
@@ -1907,13 +1865,6 @@ export const V2_MCP_OPERATIONS = {
       import('@/app/api/v2/organizations/[organizationId]/permission-groups/route').then(
         (route) => route.GET
       ),
-  },
-  listSandboxes: {
-    contract: v2ListSandboxesContract,
-    summary: 'List Sandboxes',
-    description:
-      'List reusable dependency environments for Function blocks, including language packages, managed CLIs, and system packages. Sandboxes remain visible after a plan downgrade.\n\nOAuth scope: `api:read`.',
-    handler: () => import('@/app/api/v2/sandboxes/route').then((route) => route.GET),
   },
   listSecrets: {
     contract: v2ListSecretsContract,
@@ -2425,16 +2376,6 @@ export const V2_MCP_OPERATIONS = {
         (route) => route.POST
       ),
   },
-  runRowEnrichment: {
-    contract: v2RunRowEnrichmentContract,
-    summary: 'Run Enrichment For One Row',
-    description:
-      'Start one workflow or enrichment group for a table row. Poll Get Run Dispatch using the returned `dispatchId`. A null `dispatchId` means no dispatch is available to poll; check row outcomes with `includeRunState`.\n\nOAuth scope: `api:write`.',
-    handler: () =>
-      import('@/app/api/v2/tables/[tableId]/rows/[rowId]/enrichment/[groupId]/route').then(
-        (route) => route.POST
-      ),
-  },
   searchFileContent: {
     contract: v2SearchFileContentContract,
     summary: 'Search File Content',
@@ -2667,14 +2608,6 @@ export const V2_MCP_OPERATIONS = {
     description:
       'Apply the same partial data patch to every row matching a non-empty predicate.\n\nOAuth scope: `api:write`.',
     handler: () => import('@/app/api/v2/tables/[tableId]/rows/route').then((route) => route.PATCH),
-  },
-  updateSandbox: {
-    contract: v2UpdateSandboxContract,
-    summary: 'Update Sandbox',
-    description:
-      'Update a sandbox, preserving omitted fields and replacing supplied lists. Dependency changes may start a build; resending a failed specification retries its build. `buildStatus: null` means no build is required. Requires workspace admin access on Max or Enterprise. Creates and updates share a rate limit; respect `Retry-After`. Workspace API keys return `403`; use a personal API key or scoped OAuth token.\n\nOAuth scope: `api:write`.',
-    workspaceKeyUnsupported: true,
-    handler: () => import('@/app/api/v2/sandboxes/[sandboxId]/route').then((route) => route.PATCH),
   },
   updateSkill: {
     contract: v2UpdateSkillContract,

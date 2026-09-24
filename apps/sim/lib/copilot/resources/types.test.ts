@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import { addCopilotChatResourceBodySchema } from '@/lib/api/contracts/copilot'
 import {
   isAddressableResource,
-  isDesktopOnlyResource,
   isEphemeralResource,
   type MothershipResource,
   MothershipResourceType,
@@ -18,11 +17,6 @@ function resource(overrides: Partial<MothershipResource> = {}): MothershipResour
 }
 
 describe('isEphemeralResource', () => {
-  it('keeps browser and terminal tabs client-only because the desktop app restores them', () => {
-    expect(isEphemeralResource(resource({ type: 'browser', id: '3', title: 'Slack' }))).toBe(true)
-    expect(isEphemeralResource(resource({ type: 'terminal', id: '3', title: 'sim' }))).toBe(true)
-  })
-
   it('keeps synthetic panels client-only', () => {
     expect(isEphemeralResource(resource({ type: 'generic', id: 'results' }))).toBe(true)
     expect(isEphemeralResource(resource({ type: 'file', id: 'streaming-file' }))).toBe(true)
@@ -30,43 +24,6 @@ describe('isEphemeralResource', () => {
 
   it('treats an unrecognized type as ephemeral rather than trying a doomed write', () => {
     expect(isEphemeralResource(resource({ type: 'nonsense' as MothershipResourceType }))).toBe(true)
-  })
-})
-
-describe('isDesktopOnlyResource', () => {
-  it('marks the panels that need the desktop bridge', () => {
-    expect(isDesktopOnlyResource(resource({ type: 'browser' }))).toBe(true)
-    expect(isDesktopOnlyResource(resource({ type: 'terminal' }))).toBe(true)
-  })
-
-  it('leaves ordinary workspace resources alone', () => {
-    expect(isDesktopOnlyResource(resource({ type: 'workflow' }))).toBe(false)
-    expect(isDesktopOnlyResource(resource({ type: 'file' }))).toBe(false)
-  })
-})
-
-describe('desktop session resource identity', () => {
-  it('drops stored browser rows, which older clients persisted per page or as one panel', () => {
-    expect(
-      sanitizeChatResources([
-        resource({
-          type: 'browser',
-          id: 'browser-session:slack-tab',
-          title: 'mship-todo (Channel) - sim - Slack',
-        }),
-        resource({ type: 'browser', id: 'browser-session', title: 'Browser' }),
-        resource({ type: 'file', id: 'file-1', title: 'report.csv' }),
-      ])
-    ).toEqual([{ type: 'file', id: 'file-1', title: 'report.csv' }])
-  })
-
-  it('drops stored terminal rows the same way', () => {
-    expect(
-      sanitizeChatResources([
-        resource({ type: 'terminal', id: 'terminal-session', title: 'Terminal' }),
-        resource({ type: 'file', id: 'file-1', title: 'report.csv' }),
-      ])
-    ).toEqual([{ type: 'file', id: 'file-1', title: 'report.csv' }])
   })
 })
 

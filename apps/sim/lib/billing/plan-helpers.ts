@@ -35,7 +35,7 @@ export function isPro(plan: string | null | undefined): boolean {
  *
  * Tier-only — subscription status and billing-blocked state are the caller's
  * responsibility. This is the single definition of "Max" in the codebase: the
- * server feature gates (inbox, live sync, sandboxes), the client
+ * server feature gates (live sync), the client
  * `hasUsableMaxAccess` derivation, and the personal-workspace cap all route
  * through it, so a Max-gated surface can never render unlocked against a server
  * that will refuse it.

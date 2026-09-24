@@ -13,16 +13,10 @@ import {
 import type { ToolCallItemProps } from '@/app/workspace/[workspaceId]/home/components/message-content/components/agent-group/tool-call-item'
 import type { ToolCallData, ToolCallStatus } from '@/app/workspace/[workspaceId]/home/types'
 
-vi.mock('@/lib/browser-agent/transport', () => ({
-  isBrowserAgentAvailable: () => true,
-}))
-
 vi.mock(
   '@/app/workspace/[workspaceId]/home/components/message-content/components/special-tags',
   () => ({
     CredentialDisplay: ({ data }: { data: Array<{ name?: string }> }) => data[0]?.name ?? '',
-    BrowserTakeoverQuestion: ({ reason, answer }: { reason?: string; answer?: string }) =>
-      createElement('div', { 'data-takeover-answer': 'true' }, `${reason}: ${answer}`),
   })
 )
 
@@ -53,20 +47,6 @@ function group(items: AgentGroupItem[], isDelegating = false): AgentGroupItem {
       items,
       isDelegating,
       isOpen: true,
-    },
-  }
-}
-
-function browserTakeover(reason: string): Extract<AgentGroupItem, { type: 'tool' }> {
-  toolSeq += 1
-  return {
-    type: 'tool',
-    data: {
-      id: `takeover-${toolSeq}`,
-      toolName: 'browser_request_takeover',
-      displayTitle: `Waiting for you: ${reason}`,
-      status: 'executing',
-      params: { reason },
     },
   }
 }
@@ -121,7 +101,7 @@ describe('AgentGroup inline main activity', () => {
     vi.useRealTimers()
   })
 
-  it.each(['mothership', 'workflow', 'browser'])(
+  it.each(['mothership', 'workflow'])(
     'shows one model-described action without a redundant %s disclosure',
     (agentName) => {
       act(() =>
@@ -289,7 +269,7 @@ describe('AgentGroup inline main activity', () => {
         type: 'tool',
         data: {
           id: 'third',
-          toolName: 'terminal_run',
+          toolName: 'run_code',
           displayTitle: 'Running checks',
           status: 'executing',
         },
@@ -383,7 +363,7 @@ describe('AgentGroup inline main activity', () => {
     }
   })
 
-  it.each(['browser', 'workflow', 'research', 'deploy', 'file', 'table'])(
+  it.each(['workflow', 'research', 'deploy', 'file', 'table'])(
     'summarizes and expands the full %s activity history',
     (agentName) => {
       const items: AgentGroupItem[] = [
@@ -393,13 +373,7 @@ describe('AgentGroup inline main activity', () => {
         },
         {
           type: 'tool',
-          data: {
-            id: 'run',
-            toolName: 'terminal',
-            displayTitle: 'Running checks',
-            status: 'success',
-            params: { operation: 'run' },
-          },
+          data: { id: 'run', toolName: 'grep', displayTitle: 'Searching files', status: 'success' },
         },
       ]
       act(() =>
@@ -414,8 +388,8 @@ describe('AgentGroup inline main activity', () => {
         )
       )
       const header = container.querySelector<HTMLElement>('[role="button"]')
-      expect(header?.textContent).toBe('Read files, ran commands')
-      expect(header).toHaveAccessibleName('Read files, ran commands')
+      expect(header?.textContent).toBe('Read files, searched files')
+      expect(header).toHaveAccessibleName('Read files, searched files')
       expect(container.querySelectorAll('[data-tool-call-id]')).toHaveLength(0)
       act(() => header?.click())
       expect(
@@ -428,95 +402,7 @@ describe('AgentGroup inline main activity', () => {
     }
   )
 
-  it('reveals a nested terminal handoff through collapsed ancestors', () => {
-    act(() =>
-      root.render(
-        createElement(AgentGroupView, {
-          agentName: 'workflow',
-          agentLabel: 'Workflow',
-          isLaneOpen: true,
-          isStreaming: true,
-          items: [
-            group([
-              {
-                type: 'tool',
-                data: {
-                  id: 'handoff',
-                  toolName: 'terminal',
-                  displayTitle: 'Finish signing in',
-                  status: 'executing',
-                  params: { operation: 'handoff' },
-                },
-              },
-            ]),
-          ],
-          ToolCallComponent: ({ toolCallId, displayTitle, renderStatus }: ToolCallItemProps) => {
-            const status = createElement('div', { 'data-tool-call-id': toolCallId }, displayTitle)
-            return renderStatus
-              ? renderStatus({
-                  label: displayTitle,
-                  activeLabel: displayTitle,
-                  isActive: true,
-                  icon: createElement('svg', { 'data-tool-call-id': toolCallId }),
-                })
-              : status
-          },
-        })
-      )
-    )
-    const headers = Array.from(container.querySelectorAll<HTMLElement>('[role="button"]'))
-    expect(headers).toHaveLength(2)
-    expect(headers.every((header) => header.getAttribute('aria-expanded') === 'true')).toBe(true)
-    act(() => headers[0].click())
-    expect(headers[0].getAttribute('aria-expanded')).toBe('true')
-    expect(
-      container.querySelector('[data-tool-call-id="handoff"]')?.closest('[data-state="closed"]')
-    ).toBeNull()
-  })
-
-  it('keeps a browser question and answer after the main agent resumes tool activity', () => {
-    const takeover = browserTakeover('Choose a result.')
-    const items: AgentGroupItem[] = [
-      {
-        ...takeover,
-        data: {
-          ...takeover.data,
-          status: 'success',
-          result: { success: true, output: { userInstruction: 'Open the second result.' } },
-        },
-      },
-      {
-        type: 'tool',
-        data: {
-          id: 'resumed',
-          toolName: 'grep',
-          displayTitle: 'Searching files',
-          status: 'success',
-        },
-      },
-    ]
-
-    act(() => {
-      root.render(
-        createElement(AgentGroup, {
-          agentName: 'mothership',
-          agentLabel: 'Sim',
-          items,
-          isStreaming: false,
-        })
-      )
-    })
-
-    expect(container.querySelector('[data-takeover-answer="true"]')?.textContent).toBe(
-      'Choose a result.: Open the second result.'
-    )
-    expect(container.textContent).toContain('Searched files')
-    expect(
-      container.querySelector('[data-takeover-answer="true"]')?.closest('[data-state]')
-    ).toBeNull()
-  })
-
-  it('keeps pending permissions and terminal handoffs visible when newer tools arrive', () => {
+  it('keeps pending permissions visible when newer tools arrive', () => {
     const items: AgentGroupItem[] = [
       {
         type: 'tool',
@@ -525,16 +411,6 @@ describe('AgentGroup inline main activity', () => {
           toolName: 'grep',
           displayTitle: 'Allow search',
           status: 'awaiting_approval',
-        },
-      },
-      {
-        type: 'tool',
-        data: {
-          id: 'handoff',
-          toolName: 'terminal',
-          displayTitle: 'Finish signing in',
-          status: 'executing',
-          params: { operation: 'handoff' },
         },
       },
       {
@@ -582,144 +458,10 @@ describe('AgentGroup inline main activity', () => {
       Array.from(container.querySelectorAll('[data-tool-call-id]'), (row) =>
         row.getAttribute('data-tool-call-id')
       )
-    ).toEqual(['permission', 'handoff', 'latest'])
+    ).toEqual(['permission', 'latest'])
     expect(
       container.querySelector('[data-tool-call-id="permission"]')?.closest('[data-state]')
     ).toBeNull()
-    expect(
-      container.querySelector('[data-tool-call-id="handoff"]')?.closest('[data-state]')
-    ).toBeNull()
-  })
-})
-
-describe('AgentGroup browser takeover', () => {
-  it('collapses the browser log and renders the question outside its viewport', () => {
-    ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
-    const container = document.createElement('div')
-    const root = createRoot(container)
-    const reason = 'Please pick a match in the draw.'
-
-    act(() => {
-      root.render(
-        createElement(AgentGroup, {
-          agentName: 'browser',
-          agentLabel: 'Browser Agent',
-          items: [tool('success'), browserTakeover(reason)],
-          isStreaming: true,
-          isLaneOpen: true,
-        })
-      )
-    })
-
-    const collapsedLog = container.querySelector('[data-state="closed"]')
-    const liftedQuestion = Array.from(container.querySelectorAll('.animate-stream-fade-in')).find(
-      (element) => element.textContent === reason
-    )
-    expect(collapsedLog).not.toBeNull()
-    expect(liftedQuestion).toBeDefined()
-    expect(collapsedLog?.contains(liftedQuestion ?? null)).toBe(false)
-
-    const header = Array.from(container.querySelectorAll<HTMLElement>('[role="button"]')).find(
-      (button) => button.hasAttribute('aria-expanded')
-    )
-    act(() => header?.click())
-    expect(container.querySelector('[data-state="open"]')).not.toBeNull()
-    expect(liftedQuestion?.textContent).toBe(reason)
-
-    act(() => root.unmount())
-  })
-
-  it('clears a stale question when the lane closes or a newer tool starts', () => {
-    ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
-    const container = document.createElement('div')
-    const root = createRoot(container)
-    const reason = 'Please finish in the browser.'
-    const takeover = browserTakeover(reason)
-
-    act(() => {
-      root.render(
-        createElement(AgentGroup, {
-          agentName: 'browser',
-          agentLabel: 'Browser Agent',
-          items: [takeover, tool('executing')],
-          isStreaming: true,
-          isLaneOpen: true,
-        })
-      )
-    })
-    expect(container.querySelector('.animate-stream-fade-in')).toBeNull()
-
-    act(() => {
-      root.render(
-        createElement(AgentGroup, {
-          agentName: 'browser',
-          agentLabel: 'Browser Agent',
-          items: [takeover],
-          isStreaming: false,
-          isLaneOpen: false,
-        })
-      )
-    })
-    expect(container.querySelector('.animate-stream-fade-in')).toBeNull()
-
-    act(() => root.unmount())
-  })
-
-  it('moves the answered question back inside the resumed browser agent', () => {
-    ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
-    const container = document.createElement('div')
-    const root = createRoot(container)
-    const reason = 'Pick a match from the draw.'
-    const takeover = browserTakeover(reason)
-
-    act(() => {
-      root.render(
-        createElement(AgentGroup, {
-          agentName: 'browser',
-          agentLabel: 'Browser Agent',
-          items: [takeover],
-          isStreaming: true,
-          isLaneOpen: true,
-        })
-      )
-    })
-    expect(container.querySelector('.animate-stream-fade-in')).not.toBeNull()
-
-    const completedTakeover: AgentGroupItem = {
-      type: 'tool',
-      data: {
-        ...takeover.data,
-        status: 'success',
-        result: { success: true, output: { userInstruction: 'Open the second match' } },
-      },
-    }
-    act(() => {
-      root.render(
-        createElement(AgentGroup, {
-          agentName: 'browser',
-          agentLabel: 'Browser Agent',
-          items: [completedTakeover],
-          isStreaming: true,
-          isLaneOpen: true,
-        })
-      )
-    })
-
-    expect(container.querySelector('.animate-stream-fade-in')).toBeNull()
-    // Groups never auto-expand: the answered question lives inside the
-    // collapsed log until the user opens it manually.
-    const headerToggle = container.querySelector('[role="button"][class*="group/agent"]')
-    expect(headerToggle).not.toBeNull()
-    act(() => {
-      headerToggle?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    })
-    const resumedLog = container.querySelector('[data-state="open"]')
-    const answeredQuestion = container.querySelector('[data-takeover-answer="true"]')
-    expect(answeredQuestion?.textContent).toContain(reason)
-    expect(answeredQuestion?.textContent).toContain('Open the second match')
-    expect(resumedLog?.contains(answeredQuestion)).toBe(true)
-
-    act(() => root.unmount())
   })
 })
 

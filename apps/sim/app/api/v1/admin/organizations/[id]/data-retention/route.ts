@@ -2,14 +2,14 @@
  * PATCH /api/v1/admin/organizations/[id]/data-retention
  *
  * Set an organization's data-retention settings without going through the
- * settings UI, so a self-hosted deployment can provision retention windows and
- * PII redaction rules from its own configuration management.
+ * settings UI, so a self-hosted deployment can provision retention windows
+ * from its own configuration management.
  *
  * Retention windows only take effect once the cleanup pass is enabled — set
  * `DATA_RETENTION_ENABLED` (or `ENTERPRISE_ENABLED`) when billing is off.
  *
  * Body: any subset of `logRetentionHours`, `softDeleteRetentionHours`,
- * `taskCleanupHours`, `fileVersionRetentionHours`, `piiRedaction`, `retentionOverrides`.
+ * `taskCleanupHours`, `fileVersionRetentionHours`, `retentionOverrides`.
  * Omitted keys keep their current value; `null` means "forever" for an hours field.
  *
  * Response: AdminSingleResponse<{ success, organizationId }>
@@ -81,23 +81,18 @@ export const PATCH = withRouteHandler(
         merged.fileVersionRetentionHours = body.fileVersionRetentionHours
       }
 
-      if (body.piiRedaction !== undefined) {
-        merged.piiRedaction = body.piiRedaction
-      }
-
       if (body.retentionOverrides !== undefined) {
         merged.retentionOverrides = body.retentionOverrides
       }
 
       /**
-       * Same ownership check the settings UI applies. Neither `workspaceId`
-       * field is a foreign key, so without it the Admin API could persist an
+       * Same ownership check the settings UI applies. `workspaceId` is not a
+       * foreign key, so without it the Admin API could persist an
        * override naming another organization's workspace.
        */
       const foreignTargetsReason = await getForeignWorkspaceTargetsReason({
         organizationId,
         retentionOverrides: body.retentionOverrides,
-        piiRedaction: body.piiRedaction,
       })
       if (foreignTargetsReason) {
         return badRequestResponse(foreignTargetsReason)

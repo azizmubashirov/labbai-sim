@@ -7,7 +7,6 @@ import {
   Database,
   File as FileIcon,
   Folder as FolderIcon,
-  Globe,
   Library,
   Table as TableIcon,
   Task,
@@ -16,9 +15,6 @@ import {
 } from '@sim/emcn/icons'
 import type { QueryClient } from '@tanstack/react-query'
 import { getDocumentIcon } from '@/components/icons/document-icons'
-import { terminalIdFromResourceId } from '@/lib/terminal/resource-id'
-import { BrowserTabIcon } from '@/app/workspace/[workspaceId]/home/components/mothership-view/components/resource-registry/browser-tab-icon'
-import { TerminalTabIcon } from '@/app/workspace/[workspaceId]/home/components/mothership-view/components/resource-registry/terminal-tab-icon'
 import type {
   MothershipResource,
   MothershipResourceType,
@@ -42,12 +38,7 @@ export interface ResourceTypeConfig {
   type: MothershipResourceType
   label: string
   icon: ElementType
-  /** `desktopScopeId` names the desktop browser scope a browser tab belongs to. */
-  renderTabIcon: (
-    resource: MothershipResource,
-    className: string,
-    desktopScopeId?: string
-  ) => ReactNode
+  renderTabIcon: (resource: MothershipResource, className: string) => ReactNode
   renderDropdownItem: (props: DropdownItemRenderProps) => ReactNode
   /**
    * How many of this family's candidates an unfiltered `@` list shows, overriding
@@ -237,28 +228,6 @@ export const RESOURCE_REGISTRY: Record<MothershipResourceType, ResourceTypeConfi
     ),
     renderDropdownItem: (props) => <IntegrationDropdownItem {...props} />,
   },
-  browser: {
-    type: 'browser',
-    label: 'Browser',
-    icon: Globe,
-    renderTabIcon: (resource, className, desktopScopeId) => (
-      <BrowserTabIcon tabId={resource.id} scopeId={desktopScopeId} className={className} />
-    ),
-    renderDropdownItem: (props) => <IconDropdownItem {...props} icon={Globe} />,
-  },
-  terminal: {
-    type: 'terminal',
-    label: 'Terminal',
-    icon: TerminalWindow,
-    renderTabIcon: (resource, className, desktopScopeId) => (
-      <TerminalTabIcon
-        terminalId={terminalIdFromResourceId(resource.id)}
-        scopeId={desktopScopeId}
-        className={className}
-      />
-    ),
-    renderDropdownItem: (props) => <IconDropdownItem {...props} icon={TerminalWindow} />,
-  },
 } as const
 
 /**
@@ -270,9 +239,8 @@ export const MENTION_PREVIEW_DEFAULT_LIMIT = 5
 
 /**
  * Top-down order for every menu that lists resource families, mirroring the
- * workspace sidebar so a user reads the same sequence in both places. The two
- * desktop-only panels trail the workspace resources, matching where they surface
- * in the app. `folder`/`filefolder` never render as their own entry — they feed
+ * workspace sidebar so a user reads the same sequence in both places.
+ * `folder`/`filefolder` never render as their own entry — they feed
  * their family's folder tree — but are ordered beside it so a menu that ever does
  * surface them lands in the right place.
  */
@@ -286,8 +254,6 @@ export const RESOURCE_MENU_ORDER: readonly MothershipResourceType[] = [
   'workflow',
   'log',
   'folder',
-  'browser',
-  'terminal',
   'generic',
 ]
 
@@ -350,17 +316,6 @@ const RESOURCE_INVALIDATORS: Record<
    * invalidate when one is added.
    */
   integration: () => {},
-  /**
-   * The browser panel hosts the desktop app's natively embedded browser view
-   * (in-memory page state, no server-backed query), so there is nothing to
-   * invalidate.
-   */
-  browser: () => {},
-  /**
-   * The terminal panel is backed by a live PTY in the desktop app, not a
-   * server-backed query, so there is nothing to invalidate.
-   */
-  terminal: () => {},
 }
 
 /**

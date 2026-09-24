@@ -13,7 +13,6 @@ import { ianaTimezoneSchema } from '@/lib/api/contracts/user'
 import { PRIVATE_SECRET_PROVENANCE_FIELD } from '@/lib/execution/private-tool-metadata'
 import type {
   CsvHeaderMapping,
-  EnrichmentRunDetail,
   Filter,
   Predicate,
   PredicateNode,
@@ -1490,29 +1489,6 @@ export const deleteTableRowContract = defineRouteContract({
     ),
   },
 })
-
-export const enrichmentDetailParamsSchema = tableRowParamsSchema.extend({
-  groupId: z.string().min(1),
-})
-
-/**
- * Per-(row, group) enrichment cascade breakdown. Modeled as a domain object so
- * the `EnrichmentRunDetail` TS type stays the single source of truth (matching
- * `tableRowSchema` / `tableDefinitionSchema`). `null` when the cell has no
- * recorded run or the run predates this feature.
- */
-export const getEnrichmentDetailContract = defineRouteContract({
-  method: 'GET',
-  path: '/api/table/[tableId]/rows/[rowId]/enrichment/[groupId]',
-  params: enrichmentDetailParamsSchema,
-  response: {
-    mode: 'json',
-    schema: successResponseSchema(
-      z.object({ detail: domainObjectSchema<EnrichmentRunDetail>().nullable() })
-    ),
-  },
-})
-export type GetEnrichmentDetailResponse = ContractJsonResponse<typeof getEnrichmentDetailContract>
 
 export const deleteTableRowsContract = defineRouteContract({
   method: 'DELETE',

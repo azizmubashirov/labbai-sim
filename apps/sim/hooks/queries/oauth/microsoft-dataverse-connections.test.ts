@@ -6,8 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createRoot, type Root } from 'react-dom/client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { mockBeginOAuthConnect, mockLink } = vi.hoisted(() => ({
-  mockBeginOAuthConnect: vi.fn(),
+const { mockLink } = vi.hoisted(() => ({
   mockLink: vi.fn(),
 }))
 
@@ -15,18 +14,9 @@ vi.mock('@/lib/auth/auth-client', () => ({
   client: { oauth2: { link: mockLink } },
 }))
 
-vi.mock('@/lib/desktop', () => ({
-  getDesktopBridge: () =>
-    mockBeginOAuthConnect.mock.calls.length >= 0 &&
-    mockBeginOAuthConnect.getMockName() === 'desktop'
-      ? { beginOAuthConnect: mockBeginOAuthConnect }
-      : null,
-}))
-
 import { getMicrosoftDataverseRequiredScope } from '@/lib/oauth/microsoft-dataverse'
 import {
   assertMicrosoftDataverseReconnectAvailable,
-  assertMicrosoftDataverseWebOAuthAvailable,
   buildMicrosoftDataverseOAuthLinkRequest,
   useConnectMicrosoftDataverseOAuthService,
   useMicrosoftDataverseCredentialBinding,
@@ -66,7 +56,6 @@ function renderHookWithClient<T>(useHook: () => T): {
 describe('Microsoft Dataverse OAuth connections', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockBeginOAuthConnect.mockName('web')
     mockLink.mockResolvedValue({ data: {}, error: null })
   })
 
@@ -141,7 +130,7 @@ describe('Microsoft Dataverse OAuth connections', () => {
     hook.unmount()
   })
 
-  it('rejects invalid environments and desktop initiation before linking', async () => {
+  it('rejects invalid environments before linking', async () => {
     const webHook = renderHookWithClient(useConnectMicrosoftDataverseOAuthService)
     await expect(
       webHook.result().mutateAsync({
@@ -150,18 +139,7 @@ describe('Microsoft Dataverse OAuth connections', () => {
       })
     ).rejects.toThrow('supported public-cloud Microsoft Dynamics host')
     webHook.unmount()
-
-    mockBeginOAuthConnect.mockName('desktop')
-    expect(() => assertMicrosoftDataverseWebOAuthAvailable()).toThrow('Sim web app')
-    const desktopHook = renderHookWithClient(useConnectMicrosoftDataverseOAuthService)
-    await expect(
-      desktopHook.result().mutateAsync({
-        callbackURL: 'https://sim.test/workflow',
-        environmentUrl: 'https://contoso.crm.dynamics.com',
-      })
-    ).rejects.toThrow('Sim web app')
     expect(mockLink).not.toHaveBeenCalled()
-    desktopHook.unmount()
   })
 
   it('fails every reconnect precondition before the caller creates a draft', () => {
@@ -178,13 +156,6 @@ describe('Microsoft Dataverse OAuth connections', () => {
       })
     ).toThrow('invalid environment binding')
 
-    mockBeginOAuthConnect.mockName('desktop')
-    expect(() =>
-      assertMicrosoftDataverseReconnectAvailable({
-        bindingState: 'bound',
-        credentialQueryFailed: false,
-      })
-    ).toThrow('Sim web app')
     expect(() =>
       assertMicrosoftDataverseReconnectAvailable({
         bindingState: 'legacy',

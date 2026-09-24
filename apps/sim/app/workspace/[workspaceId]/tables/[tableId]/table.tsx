@@ -20,7 +20,6 @@ import type {
   TablePredicate,
   TableRow as TableRowType,
   TableViewConfig,
-  WorkflowGroup,
 } from '@/lib/table'
 import { getColumnId } from '@/lib/table/column-keys'
 import { withCellValueFilter } from '@/lib/table/query-builder/cell-filter'
@@ -76,8 +75,6 @@ import {
   ColumnConfigSidebar,
   ColumnDropdown,
   ColumnsMenu,
-  EnrichmentDetails,
-  EnrichmentsSidebar,
   LockSettingsModal,
   RowModal,
   RunStatusControl,
@@ -138,31 +135,23 @@ interface TableProps {
 type SlideoutState =
   | { kind: 'none' }
   | { kind: 'column'; config: ColumnConfig }
-  | { kind: 'enrichments'; editGroup?: WorkflowGroup }
   | { kind: 'workflow'; config: WorkflowConfig }
   | { kind: 'execution'; executionId: string }
-  | { kind: 'enrichment-details'; rowId: string; groupId: string }
 
 type SlideoutAction =
   | { type: 'OPEN_COLUMN'; config: ColumnConfig }
-  | { type: 'OPEN_ENRICHMENTS'; editGroup?: WorkflowGroup }
   | { type: 'OPEN_WORKFLOW'; config: WorkflowConfig }
   | { type: 'OPEN_EXECUTION'; executionId: string }
-  | { type: 'OPEN_ENRICHMENT_DETAILS'; rowId: string; groupId: string }
   | { type: 'CLOSE' }
 
 function slideoutReducer(_state: SlideoutState, action: SlideoutAction): SlideoutState {
   switch (action.type) {
     case 'OPEN_COLUMN':
       return { kind: 'column', config: action.config }
-    case 'OPEN_ENRICHMENTS':
-      return { kind: 'enrichments', editGroup: action.editGroup }
     case 'OPEN_WORKFLOW':
       return { kind: 'workflow', config: action.config }
     case 'OPEN_EXECUTION':
       return { kind: 'execution', executionId: action.executionId }
-    case 'OPEN_ENRICHMENT_DETAILS':
-      return { kind: 'enrichment-details', rowId: action.rowId, groupId: action.groupId }
     case 'CLOSE':
       return { kind: 'none' }
   }
@@ -287,17 +276,8 @@ export function Table({
   const onOpenWorkflowConfig = useCallback((config: WorkflowConfig) => {
     dispatch({ type: 'OPEN_WORKFLOW', config })
   }, [])
-  const onOpenEnrichments = useCallback(() => {
-    dispatch({ type: 'OPEN_ENRICHMENTS' })
-  }, [])
-  const onOpenEnrichmentConfig = useCallback((editGroup: WorkflowGroup) => {
-    dispatch({ type: 'OPEN_ENRICHMENTS', editGroup })
-  }, [])
   const onOpenExecutionDetails = useCallback((executionId: string) => {
     dispatch({ type: 'OPEN_EXECUTION', executionId })
-  }, [])
-  const onOpenEnrichmentDetails = useCallback((rowId: string, groupId: string) => {
-    dispatch({ type: 'OPEN_ENRICHMENT_DETAILS', rowId, groupId })
   }, [])
   const onCloseSlideout = () => dispatch({ type: 'CLOSE' })
   const onOpenRowModal = (row: TableRowType) => setEditingRow(row)
@@ -1443,15 +1423,14 @@ export function Table({
       blocked={!canMutateSchema}
       onPickType={handleAddColumnOfType}
       onPickWorkflow={handleAddWorkflowColumn}
-      onPickEnrichment={onOpenEnrichments}
     />
   ) : null
 
   const logPanelWidth = useLogDetailsUIStore((state) => state.panelWidth)
   const sidebarReservedPx =
-    slideout.kind === 'column' || slideout.kind === 'workflow' || slideout.kind === 'enrichments'
+    slideout.kind === 'column' || slideout.kind === 'workflow'
       ? COLUMN_SIDEBAR_WIDTH
-      : slideout.kind === 'execution' || slideout.kind === 'enrichment-details'
+      : slideout.kind === 'execution'
         ? logPanelWidth
         : 0
 
@@ -1478,10 +1457,6 @@ export function Table({
   const columnConfig = slideout.kind === 'column' ? slideout.config : null
   const workflowConfig = slideout.kind === 'workflow' ? slideout.config : null
   const executionId = slideout.kind === 'execution' ? slideout.executionId : null
-  const enrichmentDetailsTarget = slideout.kind === 'enrichment-details' ? slideout : null
-  const enrichmentDetailsGroupName =
-    enrichmentDetailsTarget &&
-    tableWorkflowGroups.find((g) => g.id === enrichmentDetailsTarget.groupId)?.name
   // Fetch the workflow log when the execution-details slideout is open. Reuses
   // the logs page's <LogDetails> directly — no intermediate wrapper needed for
   // a one-line query forward.
@@ -1611,10 +1586,7 @@ export function Table({
         emitCellSelection={emitCellSelection}
         onOpenColumnConfig={onOpenColumnConfig}
         onOpenWorkflowConfig={onOpenWorkflowConfig}
-        onOpenEnrichments={onOpenEnrichments}
-        onOpenEnrichmentConfig={onOpenEnrichmentConfig}
         onOpenExecutionDetails={onOpenExecutionDetails}
-        onOpenEnrichmentDetails={onOpenEnrichmentDetails}
         onOpenRowModal={onOpenRowModal}
         onOpenAddRowModal={onOpenAddRowModal}
         onRequestDeleteRows={onRequestDeleteRows}
@@ -1699,12 +1671,7 @@ export function Table({
                   const id = selection.singleWorkflowCell?.executionId
                   if (id) onOpenExecutionDetails(id)
                 }
-              : selection.singleWorkflowCell?.canViewEnrichment
-                ? () => {
-                    const cell = selection.singleWorkflowCell
-                    if (cell) onOpenEnrichmentDetails(cell.rowId, cell.groupId)
-                  }
-                : undefined
+              : undefined
           }
         />
       )}
@@ -1728,14 +1695,6 @@ export function Table({
             : 'You don’t have permission to change columns.'
         }
       />
-      <EnrichmentsSidebar
-        open={slideout.kind === 'enrichments'}
-        onClose={onCloseSlideout}
-        allColumns={columns}
-        workspaceId={workspaceId}
-        tableId={tableId}
-        editGroup={slideout.kind === 'enrichments' ? slideout.editGroup : undefined}
-      />
       <WorkflowSidebar
         config={workflowConfig}
         onClose={onCloseSlideout}
@@ -1749,14 +1708,6 @@ export function Table({
       <LogDetails
         log={executionLog ?? null}
         isOpen={Boolean(executionId)}
-        onClose={onCloseSlideout}
-      />
-      <EnrichmentDetails
-        tableId={tableId}
-        rowId={enrichmentDetailsTarget?.rowId ?? null}
-        groupId={enrichmentDetailsTarget?.groupId ?? null}
-        groupName={enrichmentDetailsGroupName ?? undefined}
-        isOpen={Boolean(enrichmentDetailsTarget)}
         onClose={onCloseSlideout}
       />
       {tableData && (

@@ -2,11 +2,9 @@ import type { ReactNode } from 'react'
 import {
   Database,
   Folder as FolderIcon,
-  Globe,
   Library,
   Table as TableIcon,
   Task,
-  TerminalWindow,
   Workflow,
 } from '@sim/emcn/icons'
 import { AgentSkillsIcon, McpIcon } from '@/components/icons'
@@ -54,14 +52,6 @@ function renderIntegrationTile({ context, className }: RenderIconArgs): ReactNod
  * without an icon.
  */
 export const CHAT_CONTEXT_KIND_REGISTRY: Record<ChatContextKind, ChatContextKindConfig> = {
-  browser_tab: {
-    label: 'Browser tab',
-    renderIcon: ({ className }) => <Globe className={className} />,
-  },
-  terminal_tab: {
-    label: 'Terminal',
-    renderIcon: ({ className }) => <TerminalWindow className={className} />,
-  },
   workflow: { label: 'Workflow', renderIcon: renderWorkflowIcon },
   current_workflow: { label: 'Current workflow', renderIcon: renderWorkflowIcon },
   workflow_block: { label: 'Block', renderIcon: renderWorkflowIcon },

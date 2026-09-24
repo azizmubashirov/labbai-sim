@@ -371,7 +371,6 @@ export function buildContextPromptPayload(
       connectedIntegrations: context.connectedIntegrations,
       envVariables: slimInventory ? undefined : context.envVariables,
       hostedKeysAvailable: context.hostedKeysAvailable,
-      e2b: context.e2b,
       guidance: slimInventory
         ? 'Workspace inventory lives in the Workspace snapshot system block (delta/unchanged mode). Prefer that over inventing resource lists.'
         : context.guidance,

@@ -5,7 +5,6 @@ import { Chip, OverflowText, SimWordmark } from '@sim/emcn'
 import { Download } from '@sim/emcn/icons'
 import Link from 'next/link'
 import type { WorkspaceFileRecord } from '@/lib/uploads/contexts/workspace'
-import { DesktopTitleBarLane } from '@/app/_shell/desktop-title-bar'
 import { buildProvenance } from '@/app/f/[token]/utils'
 import { FileViewer } from '@/app/workspace/[workspaceId]/files/components/file-viewer'
 import { useBrandConfig } from '@/ee/whitelabeling'
@@ -65,8 +64,7 @@ export function PublicFileView({
   )
 
   return (
-    <div className='light desktop-title-bar-page flex h-screen flex-col overflow-hidden bg-[var(--bg)]'>
-      <DesktopTitleBarLane />
+    <div className='light flex h-screen flex-col overflow-hidden bg-[var(--bg)]'>
       <header className='z-10 flex shrink-0 items-center justify-between gap-4 border-[var(--border)] border-b bg-[var(--bg)] px-4 py-3'>
         <div className='flex min-w-0 items-center gap-3'>
           {!brand.logoUrl && (

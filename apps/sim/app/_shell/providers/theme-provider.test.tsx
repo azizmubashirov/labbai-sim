@@ -61,53 +61,10 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe('ThemeProvider theme stores', () => {
-  it('renders the landing light for a signed-in user whose app theme is system', () => {
-    localStorage.setItem('sim-theme', 'system')
-    expect(render('/')).toContain('light')
-  })
-
-  it('honours a theme chosen from the landing footer', () => {
-    localStorage.setItem('sim-theme', 'system')
-    localStorage.setItem('sim-landing-theme', 'dark')
-    expect(render('/workflows')).toContain('dark')
-  })
-
-  it('keeps the workspace on the account-synced store', () => {
-    localStorage.setItem('sim-landing-theme', 'light')
-    localStorage.setItem('sim-theme', 'system')
-    expect(render('/workspace/ws-1/home')).toContain('dark')
-  })
-
-  it('still forces light on the auth shell regardless of either store', () => {
+describe('ThemeProvider theme store', () => {
+  it('still forces light on the auth shell regardless of the stored theme', () => {
     localStorage.setItem('sim-theme', 'dark')
-    localStorage.setItem('sim-landing-theme', 'dark')
     expect(render('/login')).toContain('light')
-  })
-
-  it.each(['/', '/blog', '/customers/example'])(
-    'keeps %s light when account settings resolve dark',
-    (pathname) => {
-      localStorage.setItem('sim-theme', 'dark')
-      const classes = render(pathname)
-      expect(classes).toContain('light')
-
-      act(() => syncThemeToNextThemes('dark'))
-
-      expect(classes).toContain('light')
-      expect(classes).not.toContain('dark')
-    }
-  )
-
-  it('preserves the landing footer choice when account settings change', () => {
-    localStorage.setItem('sim-landing-theme', 'dark')
-    const classes = render('/workflows')
-
-    act(() => syncThemeToNextThemes('light'))
-
-    expect(classes).toContain('dark')
-    expect(localStorage.getItem('sim-landing-theme')).toBe('dark')
-    expect(localStorage.getItem('sim-theme')).toBe('light')
   })
 
   it('preserves the forced auth theme when account settings resolve', () => {

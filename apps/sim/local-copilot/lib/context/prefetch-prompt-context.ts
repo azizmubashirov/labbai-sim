@@ -1,4 +1,3 @@
-import { hasWorkspaceSandboxAccess } from '@/lib/billing/core/subscription'
 import {
   type CopilotChatConfig,
   loadCopilotChatConfig,
@@ -37,7 +36,7 @@ export interface PromptContextPrefetch {
    * tool list so `load_user_skill` matches the catalog (replacing the early
    * provisional tools resolve).
    */
-  startSkills: (skills: LocalCopilotSkillSummary[] | undefined, sandboxEntitled?: boolean) => void
+  startSkills: (skills: LocalCopilotSkillSummary[] | undefined) => void
   /** Awaits tools / user turn / chat config / skills (once started). */
   settle: () => Promise<SettledPromptContextPrefetch>
 }
@@ -47,7 +46,7 @@ export interface PromptContextPrefetch {
  * overlaps spend-gate / session-memory work (and specialist TTFT when present).
  *
  * Chat config is loaded once and reused for both snapshot deltas and task state.
- * Sandbox entitlement + a provisional tool list start immediately; tools are
+ * A provisional tool list starts immediately; tools are
  * refreshed when skill summaries arrive so the skill tool is not missing.
  */
 export function startPromptContextPrefetch(
@@ -62,32 +61,24 @@ export function startPromptContextPrefetch(
   const chatConfigPromise: Promise<CopilotChatConfig | null> = input.chatId
     ? loadCopilotChatConfig(input.chatId, input.userId).catch(() => null)
     : Promise.resolve(null)
-  const sandboxPromise = hasWorkspaceSandboxAccess(input.workspaceId).catch(() => false)
 
   let skillsPromise: Promise<Awaited<ReturnType<typeof loadRelevantSkillGuidance>>> | null = null
   let toolsPromise: Promise<LocalCopilotToolDefinition[]> | null = null
   let toolsHaveSkillCatalog = false
 
   const resolveTools = (
-    skills: LocalCopilotSkillSummary[] | undefined,
-    sandboxEntitled?: boolean
-  ): Promise<LocalCopilotToolDefinition[]> => {
-    const entitledPromise =
-      sandboxEntitled !== undefined ? Promise.resolve(sandboxEntitled) : sandboxPromise
-    return entitledPromise.then((entitled) =>
-      resolveLocalCopilotTools(input.workspaceId, {
-        ...(skills !== undefined ? { skills } : {}),
-        sandboxEntitled: entitled,
-      })
-    )
-  }
+    skills: LocalCopilotSkillSummary[] | undefined
+  ): Promise<LocalCopilotToolDefinition[]> =>
+    resolveLocalCopilotTools(input.workspaceId, {
+      ...(skills !== undefined ? { skills } : {}),
+    })
 
   // Provisional tools (no skill catalog yet) — overlaps context build. Replaced
   // when startSkills provides summaries, or settle falls back to a DB skills query.
   toolsPromise = resolveTools([])
 
   return {
-    startSkills(skills, sandboxEntitled) {
+    startSkills(skills) {
       if (!skillsPromise) {
         skillsPromise = loadRelevantSkillGuidance({
           skills,
@@ -95,7 +86,7 @@ export function startPromptContextPrefetch(
         })
       }
       toolsHaveSkillCatalog = true
-      toolsPromise = resolveTools(skills ?? [], sandboxEntitled)
+      toolsPromise = resolveTools(skills ?? [])
     },
     async settle() {
       if (!skillsPromise) {

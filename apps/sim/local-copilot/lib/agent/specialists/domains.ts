@@ -69,12 +69,9 @@ export const ALWAYS_ON_TOOL_NAMES = new Set<string>([
   'load_user_skill',
   'explain_error',
   'user_memory',
-  // Sandbox compute — available on every intent so complex analysis / transforms
+  // Code execution — available on every intent so complex analysis / transforms
   // can call function_execute without waiting for agent|file|research classification.
-  // manage_sandbox is still dropped in resolveLocalCopilotTools when the workspace
-  // has no sandbox entitlement.
   'function_execute',
-  'manage_sandbox',
 ])
 
 const WORKFLOW_TOOLS = [
@@ -144,7 +141,7 @@ const AUTH_TOOLS = [
 ] as const
 
 const KNOWLEDGE_TOOLS = ['knowledge_base', 'materialize_file'] as const
-const TABLE_TOOLS = ['user_table', 'enrichment_run', 'materialize_file'] as const
+const TABLE_TOOLS = ['user_table', 'materialize_file'] as const
 
 const SCHEDULED_TASK_TOOLS = [
   'manage_scheduled_task',
@@ -161,7 +158,6 @@ const AGENT_TOOLS = [
   'manage_custom_tool',
   'load_user_skill',
   'function_execute',
-  'manage_sandbox',
   'get_available_integrations',
   'get_platform_actions',
   'list_workspace_mcp_servers',
@@ -177,14 +173,13 @@ const RESEARCH_TOOLS = [
   'search_docs',
   'search_documentation',
   'function_execute',
-  'manage_sandbox',
   'user_memory',
   'read',
   'glob',
   'grep',
 ] as const
 
-const MEDIA_TOOLS = ['generate_image', 'generate_audio', 'generate_video', 'ffmpeg'] as const
+const MEDIA_TOOLS = ['generate_image', 'generate_audio', 'ffmpeg'] as const
 
 const FILE_TOOLS = [
   'share_file',
@@ -198,7 +193,6 @@ const FILE_TOOLS = [
   'materialize_file',
   'edit_content',
   'function_execute',
-  'manage_sandbox',
   'delete_file',
   'rename_file',
   'move_file',
@@ -341,11 +335,11 @@ export function domainSystemHint(domain: LocalCopilotSpecialistDomain): string {
     case 'knowledge':
       return 'Query, create, and ingest knowledge bases (knowledge_base get / list / query / create / add_file).'
     case 'table':
-      return 'Create and manage tables, rows, schemas, and enrichments (user_table).'
+      return 'Create and manage tables, rows, and schemas (user_table).'
     case 'scheduled_task':
       return 'Focus on scheduled tasks (create/list/update/complete/logs).'
     case 'agent':
-      return 'Focus on integration tools, MCP tools, skills, function_execute, and manage_sandbox.'
+      return 'Focus on integration tools, MCP tools, skills, and function_execute.'
     case 'research':
       return 'Focus on research. For ANY real-world factual or current question, call a live search tool FIRST (exa_answer via invoke_integration_tool, or search_online) before answering — never answer from training memory alone. When the question is about a workspace file, glob/read/grep that exact VFS path — do not open a similarly named file. Use search_documentation only for Sim product questions.'
     case 'media':

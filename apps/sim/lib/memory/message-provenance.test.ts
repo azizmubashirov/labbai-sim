@@ -15,9 +15,6 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@sim/logger', () => ({ createLogger: () => mocks.logger }))
 vi.mock('@/lib/core/security/encryption', () => ({ decryptSecret: mocks.decrypt }))
-vi.mock('@/lib/logs/execution/pii-redaction', () => ({
-  redactObjectStrings: vi.fn(async (value: unknown) => value),
-}))
 vi.mock('@/lib/tokenization/accurate', () => ({
   getAccurateTokenCount: (text: string) => text.length,
 }))

@@ -829,17 +829,6 @@ export function remapToolBlockResources(
     if (opts.registeredReferencesOnly && !authoritative) continue
     if (getToolParamOverrideKind(paramId)) continue
     const definition = getWorkflowSearchSubBlockResourceDefinition(config)
-    if (config.selectorKey === 'workspace.sandboxes' && !gates.isDormantMember(paramId)) {
-      const value = params[paramId]
-      if (typeof value === 'string' && value && !isReference(value) && !isEnvVarReference(value)) {
-        const target = opts.resolve('sandbox', value, ['params', paramId])
-        opts.record?.('sandbox', value, target != null, ['params', paramId])
-        if (target !== value) {
-          setParam(paramId, target ?? '')
-          remappedParamIds.add(paramId)
-        }
-      }
-    }
     if (!definition) continue
     // Belt-and-braces: the params helper already returns only each pair's ACTIVE member, but a
     // dormant member slipping through must never remap - in advanced mode the shared
@@ -1288,31 +1277,6 @@ export function remapForkSubBlocks(
       unregistered || annotationOnly || dormant || gates.isConditionHidden(subBlockKey)
     if (dormant && isNonEmptyValue(value)) {
       value = ''
-    }
-
-    if (
-      config?.selectorKey === 'workspace.sandboxes' &&
-      typeof value === 'string' &&
-      value &&
-      !isReference(value) &&
-      !isEnvVarReference(value) &&
-      !verbatimManual
-    ) {
-      const target = resolveField('sandbox', value)
-      if (!detectionSkipped)
-        recordReference(
-          `sandbox:${value}`,
-          {
-            kind: 'sandbox',
-            sourceId: value,
-            blockId: context?.blockId,
-            blockName: context?.blockName,
-            subBlockKey,
-            required: true,
-          },
-          target != null
-        )
-      value = target ?? ''
     }
 
     if (definition && forkKind && subBlockType && !verbatimManual) {

@@ -129,7 +129,7 @@ describe('SettingsHeaderShell action routing', () => {
   })
 
   it('stays correctly bound when a conditional action shifts every index', () => {
-    // Sandboxes: Discard only exists while dirty, so Delete moves 2 -> 1.
+    // Discard only exists while dirty, so Delete moves 2 -> 1.
     const onSave = vi.fn()
     const onDelete = vi.fn()
 

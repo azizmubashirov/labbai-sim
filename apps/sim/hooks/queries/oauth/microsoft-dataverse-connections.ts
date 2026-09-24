@@ -3,7 +3,6 @@ import { getErrorMessage } from '@sim/utils/errors'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { client } from '@/lib/auth/auth-client'
 import { OAUTH_CREDENTIAL_DRAFT_CALLBACK_PARAM } from '@/lib/credentials/draft-constants'
-import { getDesktopBridge } from '@/lib/desktop'
 import {
   bindMicrosoftDataverseEnvironmentToOAuthCallback,
   extractMicrosoftDataverseEnvironmentUrl,
@@ -47,13 +46,6 @@ export function buildMicrosoftDataverseOAuthLinkRequest({
   }
 }
 
-/** Fails before a credential draft is created when this web-only flow cannot start. */
-export function assertMicrosoftDataverseWebOAuthAvailable(): void {
-  if (getDesktopBridge()?.beginOAuthConnect) {
-    throw new Error('Microsoft Dataverse connections must currently be created in the Sim web app.')
-  }
-}
-
 interface AssertMicrosoftDataverseReconnectAvailableParams {
   bindingState: MicrosoftDataverseCredentialBindingState
   credentialQueryFailed: boolean
@@ -73,7 +65,6 @@ export function assertMicrosoftDataverseReconnectAvailable({
       'This Dataverse credential has an invalid environment binding and cannot be reconnected in place.'
     )
   }
-  if (bindingState === 'bound') assertMicrosoftDataverseWebOAuthAvailable()
 }
 
 export function useConnectMicrosoftDataverseOAuthService() {
@@ -81,7 +72,6 @@ export function useConnectMicrosoftDataverseOAuthService() {
 
   return useMutation({
     mutationFn: async (params: ConnectMicrosoftDataverseOAuthParams) => {
-      assertMicrosoftDataverseWebOAuthAvailable()
       const request = buildMicrosoftDataverseOAuthLinkRequest(params)
 
       const result = await client.oauth2.link(request)

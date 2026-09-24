@@ -16,7 +16,6 @@ import {
   selectPreferredModelBoundFileInputPaths,
 } from '@/lib/uploads/utils/model-input'
 import { ResolvedSecretTraceRegistry } from '@/executor/utils/resolved-secret-trace-registry'
-import { a2aSendMessageTool } from '@/tools/a2a/send_message'
 import { projectToolModelInputParams } from '@/tools/request-transport'
 import { visionTool } from '@/tools/vision/tool'
 
@@ -178,24 +177,6 @@ describe('model-bound file input selection', () => {
 
     expect(selectModelVisibleFileNames(original)).toEqual([{}])
     expect(applyProjectedModelVisibleFileNames(original, [{}])).toEqual(original)
-  })
-
-  it('preserves an optional undefined file name through operation input projection', () => {
-    const projected = projectToolModelInputParams(
-      a2aSendMessageTool,
-      {
-        agentUrl: 'https://agent.example',
-        message: 'Summarize the attachment',
-        files: [{ key: 'workspace/ws-1/report.pdf', name: undefined }],
-      },
-      new ResolvedSecretTraceRegistry()
-    )
-
-    expect(a2aSendMessageTool.operation.input(projected)).toEqual({
-      agentUrl: 'https://agent.example',
-      message: 'Summarize the attachment',
-      files: [{ key: 'workspace/ws-1/report.pdf' }],
-    })
   })
 })
 

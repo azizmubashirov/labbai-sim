@@ -38,7 +38,6 @@ import {
 import { withBrandIcon } from '@/blocks/brand-icon'
 import { useCreateCredentialDraft } from '@/hooks/queries/credentials'
 import {
-  assertMicrosoftDataverseWebOAuthAvailable,
   useConnectMicrosoftDataverseOAuthService,
 } from '@/hooks/queries/oauth/microsoft-dataverse-connections'
 import { useConnectOAuthService } from '@/hooks/queries/oauth/oauth-connections'
@@ -329,7 +328,6 @@ export function ConnectOAuthModal(props: ConnectOAuthModalProps) {
     try {
       const environmentUrl = dataverseEnvironmentForm.validate()
       if (dataverseEnvironmentForm.enabled && !environmentUrl) return
-      if (environmentUrl) assertMicrosoftDataverseWebOAuthAvailable()
 
       let connectorType: string | undefined
       let draftId: string | undefined

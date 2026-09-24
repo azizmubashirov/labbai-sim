@@ -22,19 +22,13 @@ import {
   OAUTH_CHAT_ATTEMPT_MAX_AGE_MS,
   OAUTH_CHAT_ATTEMPT_PARAM,
   readOAuthChatAttempt,
-  resolveDesktopOAuthChatAttempt,
   setOAuthChatAttemptStatus,
 } from '@/lib/credentials/oauth-chat-attempt'
-import { getDesktopBridge } from '@/lib/desktop'
 import { organizationRoutes } from '@/lib/navigation/paths'
 import { stripMicrosoftDataverseEnvironmentFromOAuthCallback } from '@/lib/oauth/microsoft-dataverse'
 import { searchSetupAccessParam } from '@/lib/sim-search/search-params'
 import { organizationSearchSetupPath } from '@/lib/sim-search/setup-navigation'
-import { oauthConnectionsKeys } from '@/hooks/queries/oauth/oauth-connections'
-import {
-  organizationCredentialKeys,
-  workspaceCredentialKeys,
-} from '@/hooks/queries/utils/credential-keys'
+import { workspaceCredentialKeys } from '@/hooks/queries/utils/credential-keys'
 import { requireWorkspaceCredentialListResponse } from '@/hooks/queries/utils/fetch-workspace-credentials'
 import { SETTINGS_RETURN_URL_KEY } from '@/hooks/use-settings-navigation'
 
@@ -298,8 +292,7 @@ export function useOAuthReturnRouter() {
     if (!ctx) return
     // A chip return carries its own verdict and toast. Any return context still
     // sitting here belongs to an earlier, abandoned modal connect — consume it
-    // so it cannot double-toast now or attach to a later completion, the same
-    // discard useDesktopOAuthConnectListener does.
+    // so it cannot double-toast now or attach to a later completion.
     if (isChatAttemptReturn) {
       consumeOAuthReturnContext()
       return
@@ -419,7 +412,7 @@ export function useOAuthReturnForWorkflow(workflowId: string) {
 }
 
 /**
- * Restores the connected account after a web return or desktop completion.
+ * Restores the connected account after a web return.
  */
 export function useOAuthReturnForKBConnectors(
   knowledgeBaseId: string | undefined,
@@ -460,29 +453,27 @@ export function useOAuthReturnForKBConnectors(
     }
     window.addEventListener(OAUTH_CREDENTIAL_UPDATED_EVENT, handleCredentialUpdate)
 
-    if (!getDesktopBridge()?.onOAuthConnectComplete) {
-      clearDataverseOAuthEnvironmentParam()
-      const ctx = readOAuthReturnContext()
-      if (
-        ctx?.origin === 'kb-connectors' &&
-        ctx.knowledgeBaseId === knowledgeBaseId &&
-        ctx.workspaceId === workspaceId &&
-        ctx.organizationId === organizationId &&
-        (!connectorId || ctx.connectorId === connectorId) &&
-        (!connectorType || ctx.connectorType === connectorType)
-      ) {
-        consumeOAuthReturnContext()
-        if (Date.now() - ctx.requestedAt <= CONTEXT_MAX_AGE_MS) {
-          const callbackError = consumeOAuthCallbackError(ctx)
-          if (callbackError) {
-            showOAuthResultMessage(callbackError)
-          } else {
-            void (async () => {
-              const message = await resolveOAuthMessage(ctx)
-              showOAuthResultMessage(message)
-              dispatchCredentialUpdate(ctx, message)
-            })()
-          }
+    clearDataverseOAuthEnvironmentParam()
+    const ctx = readOAuthReturnContext()
+    if (
+      ctx?.origin === 'kb-connectors' &&
+      ctx.knowledgeBaseId === knowledgeBaseId &&
+      ctx.workspaceId === workspaceId &&
+      ctx.organizationId === organizationId &&
+      (!connectorId || ctx.connectorId === connectorId) &&
+      (!connectorType || ctx.connectorType === connectorType)
+    ) {
+      consumeOAuthReturnContext()
+      if (Date.now() - ctx.requestedAt <= CONTEXT_MAX_AGE_MS) {
+        const callbackError = consumeOAuthCallbackError(ctx)
+        if (callbackError) {
+          showOAuthResultMessage(callbackError)
+        } else {
+          void (async () => {
+            const message = await resolveOAuthMessage(ctx)
+            showOAuthResultMessage(message)
+            dispatchCredentialUpdate(ctx, message)
+          })()
         }
       }
     }
@@ -491,57 +482,4 @@ export function useOAuthReturnForKBConnectors(
       window.removeEventListener(OAUTH_CREDENTIAL_UPDATED_EVENT, handleCredentialUpdate)
     }
   }, [knowledgeBaseId, onConnected, connectorType, workspaceId, organizationId, connectorId])
-}
-
-/**
- * Desktop-app counterpart of the post-OAuth routers above. In the desktop
- * app the whole OAuth flow runs in the system browser (see
- * useConnectOAuthService), so the app never navigates: completion arrives as
- * a bridge push when the browser bounces the desktop's loopback. The app is
- * already refocused by then — this refreshes the credential caches and shows
- * the same connected toast the web flow gets. Mounted once per workspace; a
- * no-op outside the desktop app.
- */
-export function useDesktopOAuthConnectListener() {
-  const queryClient = useQueryClient()
-
-  useEffect(() => {
-    const bridge = getDesktopBridge()
-    if (!bridge?.onOAuthConnectComplete) return
-
-    return bridge.onOAuthConnectComplete((result) => {
-      void queryClient.invalidateQueries({
-        queryKey: oauthConnectionsKeys.connections(),
-      })
-      void queryClient.invalidateQueries({
-        queryKey: workspaceCredentialKeys.all,
-      })
-      void queryClient.invalidateQueries({ queryKey: organizationCredentialKeys.lists() })
-
-      // The app stays open across interleaved connect flows, so an abandoned
-      // modal-connect can leave a stale context that would attach to a later
-      // (e.g. chip) completion and show the wrong provider's message. Discard
-      // anything older than the same window the web routers use, mirroring
-      // their freshness check.
-      const rawCtx = readOAuthReturnContext()
-      if (rawCtx) consumeOAuthReturnContext()
-      const ctx = rawCtx && Date.now() - rawCtx.requestedAt <= CONTEXT_MAX_AGE_MS ? rawCtx : null
-      const chatAttempt = resolveDesktopOAuthChatAttempt(result, result.ok ? 'connected' : 'failed')
-
-      if (!result.ok) {
-        toast.error('The account connection didn’t finish. Try connecting again.')
-        return
-      }
-      if (chatAttempt) dispatchCredentialUpdate(chatAttempt)
-      if (ctx) {
-        void (async () => {
-          const message = await resolveOAuthMessage(ctx)
-          showOAuthResultMessage(message)
-          dispatchCredentialUpdate(ctx, message)
-        })()
-        return
-      }
-      toast.success('Credential connected successfully.')
-    })
-  }, [queryClient])
 }

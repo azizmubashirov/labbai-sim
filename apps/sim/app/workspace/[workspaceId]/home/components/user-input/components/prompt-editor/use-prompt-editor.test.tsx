@@ -255,10 +255,9 @@ describe('usePromptEditor context insertion', () => {
       return 1
     })
     const context = {
-      kind: 'terminal_tab',
-      terminalId: 'terminal-1',
-      label: 'Terminal (L9-11)',
-      selection: { text: 'selected output', startLine: 9, endLine: 11 },
+      kind: 'workflow',
+      workflowId: 'wf-1',
+      label: 'Deploy',
     } satisfies ChatContext
     const { result, textarea, unmount } = renderPromptEditor({
       workspaceId: 'ws-1',
@@ -270,7 +269,7 @@ describe('usePromptEditor context insertion', () => {
       result().insertContext(context)
     })
 
-    expect(result().value).toBe('Explain this @Terminal (L9-11) ')
+    expect(result().value).toBe('Explain this @Deploy ')
     expect(result().contexts).toEqual([context])
     expect(onContextAdd).toHaveBeenCalledWith(context)
 
@@ -350,22 +349,20 @@ describe('usePromptEditor context insertion', () => {
     unmount()
   })
 
-  it('suffixes duplicate visible labels so two browser selections coexist', () => {
+  it('suffixes duplicate visible labels so two same-named contexts coexist', () => {
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
       callback(0)
       return 1
     })
     const first = {
-      kind: 'browser_tab',
-      tabId: 'tab-1',
-      label: 'Browser · Example page title',
-      selection: { text: 'first selection', url: 'https://example.com' },
+      kind: 'workflow',
+      workflowId: 'wf-1',
+      label: 'Deploy',
     } satisfies ChatContext
     const second = {
-      kind: 'browser_tab',
-      tabId: 'tab-1',
-      label: 'Browser · Another page title',
-      selection: { text: 'second selection', url: 'https://example.com' },
+      kind: 'workflow',
+      workflowId: 'wf-2',
+      label: 'Deploy',
     } satisfies ChatContext
     const { result, textarea, unmount } = renderPromptEditor({
       workspaceId: 'ws-1',
@@ -378,22 +375,19 @@ describe('usePromptEditor context insertion', () => {
       result().insertContext(second)
     })
 
-    expect(result().value).toBe('@Browser @Browser (1) ')
-    expect(result().contexts).toEqual([
-      { ...first, label: 'Browser' },
-      { ...second, label: 'Browser (1)' },
-    ])
+    expect(result().value).toBe('@Deploy @Deploy (1) ')
+    expect(result().contexts).toEqual([first, { ...second, label: 'Deploy (1)' }])
 
     let contextsAtSubmit: ChatContext[] = []
     act(() => {
-      typeInto(textarea, '@Browser (1) ')
+      typeInto(textarea, '@Deploy (1) ')
       result().handleInputChange({
         target: textarea,
         currentTarget: textarea,
       } as unknown as React.ChangeEvent<HTMLTextAreaElement>)
       contextsAtSubmit = result().getActiveContexts()
     })
-    expect(contextsAtSubmit).toEqual([{ ...second, label: 'Browser (1)' }])
+    expect(contextsAtSubmit).toEqual([{ ...second, label: 'Deploy (1)' }])
 
     unmount()
   })
@@ -404,10 +398,9 @@ describe('usePromptEditor context insertion', () => {
       return 1
     })
     const context = {
-      kind: 'browser_tab',
-      tabId: 'tab-1',
-      label: 'Browser',
-      selection: { text: 'selected text', url: 'https://example.com' },
+      kind: 'workflow',
+      workflowId: 'wf-1',
+      label: 'Deploy',
     } satisfies ChatContext
     const { result, textarea, unmount } = renderPromptEditor({
       workspaceId: 'ws-1',

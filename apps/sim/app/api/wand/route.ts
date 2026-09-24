@@ -20,7 +20,6 @@ import { env } from '@/lib/core/config/env'
 import { getCostMultiplier, isBillingEnabled } from '@/lib/core/config/env-flags'
 import { generateRequestId } from '@/lib/core/utils/request'
 import { withRouteHandler } from '@/lib/core/utils/with-route-handler'
-import { enrichSandboxCapabilities } from '@/lib/execution/remote-sandbox/wand-enricher'
 import { enrichTableSchema } from '@/lib/table/llm/wand'
 import { verifyWorkspaceMembership } from '@/app/api/workflows/utils'
 import { extractResponseText, parseResponsesUsage } from '@/providers/openai/utils'
@@ -83,8 +82,6 @@ Use this context to calculate relative dates like "yesterday", "last week", "beg
   },
 
   'table-schema': enrichTableSchema,
-  /** JavaScript, Python, and Shell swap prompt text while retaining sandbox enrichment. */
-  'javascript-function-body': enrichSandboxCapabilities,
 }
 
 async function updateUserStatsForWand(

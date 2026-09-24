@@ -3,11 +3,10 @@ import { createExecutionContext } from '@sim/testing'
 import { isRecordLike } from '@sim/utils/object'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { open, save, flag, redact, storeArtifact, readArtifact, executeTool } = vi.hoisted(() => ({
+const { open, save, flag, storeArtifact, readArtifact, executeTool } = vi.hoisted(() => ({
   open: vi.fn(),
   save: vi.fn(),
   flag: vi.fn(),
-  redact: vi.fn(),
   storeArtifact: vi.fn(),
   readArtifact: vi.fn(),
   executeTool: vi.fn(),
@@ -23,7 +22,6 @@ vi.mock('@/lib/memory/application/agent-turns', () => ({
 vi.mock('@/lib/internal/principals/executor', () => ({
   createExecutorPrincipalFromExecutionContext: vi.fn(async () => ({})),
 }))
-vi.mock('@/lib/logs/execution/pii-redaction', () => ({ redactObjectStrings: redact }))
 vi.mock('@/tools', () => ({ executeTool }))
 
 import { openAgentTurnSession } from '@/lib/memory/agent-turn-session'
@@ -66,16 +64,6 @@ function step() {
   }
 }
 
-function redactFixture(value: unknown): unknown {
-  if (typeof value === 'string') return value.replaceAll('person@example.test', '[EMAIL]')
-  if (Array.isArray(value)) return value.map(redactFixture)
-  if (isRecordLike(value))
-    return Object.fromEntries(
-      Object.entries(value).map(([key, child]) => [key, redactFixture(child)])
-    )
-  return value
-}
-
 const artifacts = createJournalArtifactFixture()
 
 describe('durable Agent session', () => {
@@ -94,7 +82,6 @@ describe('durable Agent session', () => {
     save.mockImplementation(async ({ input: request }) => ({
       revision: request.expectedRevision + 1,
     }))
-    redact.mockImplementation(async (value) => value)
   })
 
   it('keeps retry state in memory when storage is unavailable and never claims a save', async () => {
@@ -179,26 +166,26 @@ describe('durable Agent session', () => {
     })
   })
 
-  it('projects secrets and PII before the atomic final write', async () => {
+  it('projects secrets before the atomic final write', async () => {
     const request = input()
     request.ctx.resolvedSecretTraceRegistry = new ResolvedSecretTraceRegistry([
       { name: 'TOKEN', plaintext: 'private-key-value', encryptedValue: 'ciphertext' },
     ])
     request.ctx.resolvedSecretTraceRegistry.recordResolved('TOKEN', 'private-key-value')
-    request.ctx.piiBlockOutputRedaction = { enabled: true, entityTypes: ['EMAIL_ADDRESS'] }
-    redact.mockImplementation(async (value) => redactFixture(value))
     const session = await openAgentTurnSession(request)
 
     await session!.finalize('private-key-value person@example.test', 'model-a')
 
     expect(save).toHaveBeenCalledTimes(1)
     const requestSave = save.mock.calls[0][0].input
-    expect(requestSave.items[0].data).toEqual({ role: 'assistant', content: '{{TOKEN}} [EMAIL]' })
+    expect(requestSave.items[0].data).toEqual({
+      role: 'assistant',
+      content: '{{TOKEN}} person@example.test',
+    })
     expect(await artifacts.inspect(requestSave.encryptedState)).toMatchObject({
-      state: { final: { content: '{{TOKEN}} [EMAIL]', model: 'model-a' } },
+      state: { final: { content: '{{TOKEN}} person@example.test', model: 'model-a' } },
     })
     expect(JSON.stringify(requestSave.items)).not.toContain('private-key-value')
-    expect(JSON.stringify(requestSave.items)).not.toContain('person@example.test')
   })
 
   it.each(['', '   '])(
@@ -215,24 +202,14 @@ describe('durable Agent session', () => {
     }
   )
 
-  it.each(['oversized', 'pii-unavailable'])(
-    'does not persist an unsafe final answer (%s)',
-    async (failure) => {
-      const request = input()
-      request.ctx.piiBlockOutputRedaction = { enabled: true, entityTypes: ['EMAIL_ADDRESS'] }
-      if (failure === 'pii-unavailable')
-        redact.mockRejectedValue(new Error('PII service unavailable'))
-      const session = await openAgentTurnSession(request)
-      await expect(
-        session!.finalize(
-          failure === 'oversized' ? 'x'.repeat(100 * 1024 + 1) : 'person@example.test',
-          'model-a'
-        )
-      ).resolves.toBeUndefined()
-      expect(save).not.toHaveBeenCalled()
-      expect(session!.getFinalResponse()).toBeUndefined()
-    }
-  )
+  it('does not persist an unsafe final answer (oversized)', async () => {
+    const session = await openAgentTurnSession(input())
+    await expect(
+      session!.finalize('x'.repeat(100 * 1024 + 1), 'model-a')
+    ).resolves.toBeUndefined()
+    expect(save).not.toHaveBeenCalled()
+    expect(session!.getFinalResponse()).toBeUndefined()
+  })
 
   it('degrades an unavailable atomic final write without a separate plain-message write', async () => {
     save.mockRejectedValue(new Error('database unavailable'))
@@ -278,25 +255,6 @@ describe('durable Agent session', () => {
     expect(getNativeConversationMessage(messages[0], 'bedrock')).toMatchObject({
       content: [{ reasoningContent: { redactedContent: new Uint8Array([1, 2, 3]) } }],
     })
-  })
-
-  it('redacts arguments and results and omits private native state under PII policy', async () => {
-    const request = input()
-    request.ctx.piiBlockOutputRedaction = { enabled: true, entityTypes: ['EMAIL_ADDRESS'] }
-    redact.mockImplementation(async (value) => redactFixture(value))
-    const session = await openAgentTurnSession(request)
-    await session!.captureStep(step())
-    const response = { success: true, output: { email: 'person@example.test' } }
-    await session!.recordToolResult({
-      invocationId: session!.getPendingCalls()[0].invocationId,
-      rawResponse: response,
-      modelResponse: response,
-    })
-    const messages = session!.getMessages('openai', 'model-a', 'binding-a')
-    expect(JSON.stringify(messages)).not.toContain('person@example.test')
-    expect(getNativeConversationMessage(messages[0], 'responses')).toBeUndefined()
-    const item = save.mock.calls.at(-1)![0].input.items[0]
-    expect(JSON.stringify(item)).not.toContain('person@example.test')
   })
 
   it('stops new checkpoint writes after a CAS conflict while preserving completed in-memory results', async () => {
@@ -362,41 +320,6 @@ describe('durable Agent session', () => {
       (await session!.getReplayResult(result.invocationId))?.rawResponse.output
     ).toHaveProperty('memoryArtifact')
     expect(session!.getPendingCalls()).toEqual([])
-  })
-
-  it('redacts PII before creating a large-result preview', async () => {
-    storeArtifact.mockResolvedValue({
-      ref: {
-        __simLargeValueRef: true,
-        version: 1,
-        id: 'lv_abcdefghijkl',
-        kind: 'object',
-        size: 200000,
-        key: 'execution/workspace-1/workflow-1/execution-1/large-value-lv_abcdefghijkl.json',
-      },
-      preview: 'Retained in conversation storage',
-    })
-    const request = input()
-    request.ctx.piiBlockOutputRedaction = { enabled: true, entityTypes: ['EMAIL_ADDRESS'] }
-    redact.mockImplementation(async (value) => redactFixture(value))
-    const session = await openAgentTurnSession(request)
-    await session!.captureStep(step())
-    const response = {
-      success: true,
-      output: { email: 'person@example.test', text: 'x'.repeat(120000) },
-    }
-    await session!.recordToolResult({
-      invocationId: session!.getPendingCalls()[0].invocationId,
-      rawResponse: response,
-      modelResponse: response,
-    })
-    expect(storeArtifact).toHaveBeenCalledTimes(2)
-    const messages = JSON.stringify(session!.getMessages('openai', 'model-a', 'binding-a'))
-    expect(messages).toContain('[EMAIL]')
-    expect(messages).not.toContain('person@example.test')
-    expect(JSON.stringify(save.mock.calls.at(-1)![0].input.items)).not.toContain(
-      'person@example.test'
-    )
   })
 
   it.each([

@@ -255,9 +255,6 @@ describe('ExecutionLogger', () => {
       queueTableRows(workflowExecutionLogs, [runningLog])
       queueTableRows(workflowExecutionLogs, [cancelledLog])
       dbChainMockFns.returning.mockResolvedValueOnce([])
-      vi.spyOn(logger as any, 'applyPiiRedaction').mockImplementation(
-        async (_workspaceId: unknown, payload: unknown) => payload
-      )
       vi.spyOn(logger as any, 'recordExecutionUsage').mockResolvedValue(0)
 
       const result = await logger.completeWorkflowExecution({
@@ -302,13 +299,8 @@ describe('ExecutionLogger', () => {
 
     /**
      * Drives a real completion and returns the `execution_data` actually written.
-     * `redactedState` stands in for the PII pass, which either hands back a
-     * redacted state or none at all.
      */
-    async function completeAndReadWrite(params: {
-      executionState?: SerializableExecutionState
-      redactedState?: SerializableExecutionState
-    }) {
+    async function completeAndReadWrite(params: { executionState?: SerializableExecutionState }) {
       const startedAt = new Date('2026-08-11T00:00:00.000Z')
       queueTableRows(workflowExecutionLogs, [
         {
@@ -331,15 +323,8 @@ describe('ExecutionLogger', () => {
         { id: 'log-1', executionData: {}, startedAt, createdAt: startedAt },
       ])
       const internals = logger as unknown as {
-        applyPiiRedaction: (workspaceId: string, payload: Record<string, unknown>) => unknown
         recordExecutionUsage: () => Promise<number>
       }
-      vi.spyOn(internals, 'applyPiiRedaction').mockImplementation(
-        async (_workspaceId: string, payload: Record<string, unknown>) =>
-          Object.hasOwn(params, 'redactedState')
-            ? { ...payload, executionState: params.redactedState }
-            : payload
-      )
       vi.spyOn(internals, 'recordExecutionUsage').mockResolvedValue(0)
 
       await logger.completeWorkflowExecution({
@@ -371,16 +356,12 @@ describe('ExecutionLogger', () => {
      * Compaction drops `executionState`, so the run provenance has to reach the
      * row independently of it or truncated runs render as an empty trace.
      */
-    test.each([
-      ['redaction preserves the state', EMPTY_STATE],
-      ['redaction drops the state entirely', undefined],
-    ])('lifts run provenance onto the top-level key when %s', async (_case, redactedState) => {
+    test('lifts run provenance onto the top-level key', async () => {
       const written = await completeAndReadWrite({
         executionState: {
           ...EMPTY_STATE,
           resolvedSecretTraceProvenance: RUN_PROVENANCE,
         } as unknown as SerializableExecutionState,
-        redactedState: redactedState as SerializableExecutionState | undefined,
       })
 
       expect(written?.resolvedSecretTraceProvenance).toEqual(RUN_PROVENANCE)
@@ -493,56 +474,6 @@ describe('ExecutionLogger', () => {
       })
 
       expect(completedData.billingAttribution).toEqual(billingAttribution)
-    })
-
-    test('preserves server-only lifecycle metadata after execution-state PII masking', () => {
-      const loggerInstance = new ExecutionLogger() as unknown as {
-        preservePrivateExecutionStateMetadata(
-          redactedState: SerializableExecutionState | undefined,
-          originalState: SerializableExecutionState | undefined
-        ): SerializableExecutionState | undefined
-      }
-      const provenance = {
-        version: 1 as const,
-        complete: true,
-        entries: [{ name: 'API_SECRET', encryptedValue: 'enc:original-ciphertext' }],
-      }
-      const trustedLargeValueAccess = {
-        executionIds: ['execution-1'],
-        largeValueKeys: ['execution/workspace-1/workflow-1/execution-1/value.json'],
-        fileKeys: ['workspace-1/file-1'],
-      }
-      const originalState: SerializableExecutionState = {
-        blockStates: {},
-        executedBlocks: [],
-        blockLogs: [],
-        decisions: { router: {}, condition: {} },
-        completedLoops: [],
-        activeExecutionPath: [],
-        resolvedSecretTraceProvenance: provenance,
-        trustedLargeValueAccess,
-      }
-      const redactedState: SerializableExecutionState = {
-        ...originalState,
-        resolvedSecretTraceProvenance: {
-          ...provenance,
-          entries: [{ name: 'API_SECRET', encryptedValue: '[MASKED]' }],
-        },
-        trustedLargeValueAccess: {
-          executionIds: [],
-          largeValueKeys: [],
-          fileKeys: [],
-        },
-      }
-
-      const preserved = loggerInstance.preservePrivateExecutionStateMetadata(
-        redactedState,
-        originalState
-      )
-
-      expect(preserved?.resolvedSecretTraceProvenance).toBe(provenance)
-      expect(preserved?.trustedLargeValueAccess).toBe(trustedLargeValueAccess)
-      expect(preserved?.blockStates).toEqual(redactedState.blockStates)
     })
 
     test('summarizes oversized execution data before storage', () => {

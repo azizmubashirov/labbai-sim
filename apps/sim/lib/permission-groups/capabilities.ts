@@ -23,7 +23,6 @@ export const CAPABILITY_IDS = [
   'knowledge.use',
   'tables.use',
   'files.use',
-  'inbox.use',
   'copilot.use',
   'secrets.manage',
   'api_keys.manage',
@@ -56,7 +55,6 @@ export const CAPABILITY_IDS = [
   'oauth_apps.use',
   'triggers.webhook',
   'copilot.tool_auto_approval',
-  'sandboxes.use',
   'knowledge.export',
 ] as const
 
@@ -158,13 +156,6 @@ export const CAPABILITY_RULES = {
     detailCode: 'PERMISSION_GROUP_CAPABILITY_BLOCKED',
     describe: 'The Files module',
     deniedBy: (config) => config.hideFilesTab,
-  },
-  'inbox.use': {
-    kind: 'static',
-    configKeys: ['hideInboxTab'],
-    detailCode: 'PERMISSION_GROUP_CAPABILITY_BLOCKED',
-    describe: 'The inbox',
-    deniedBy: (config) => config.hideInboxTab,
   },
   'copilot.use': {
     kind: 'static',
@@ -415,13 +406,6 @@ export const CAPABILITY_RULES = {
     detailCode: 'PERMISSION_GROUP_CAPABILITY_BLOCKED',
     describe: 'Silencing a tool confirmation',
     deniedBy: (config) => config.disableToolAutoApproval,
-  },
-  'sandboxes.use': {
-    kind: 'static',
-    configKeys: ['hideSandboxesTab'],
-    detailCode: 'PERMISSION_GROUP_CAPABILITY_BLOCKED',
-    describe: 'The Sandboxes module',
-    deniedBy: (config) => config.hideSandboxesTab,
   },
   /** Subsumes `knowledge.use` for the same reason as `knowledge.create`. */
   'knowledge.export': {

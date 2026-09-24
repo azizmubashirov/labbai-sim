@@ -6,7 +6,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const {
   mockGenerateContent,
   mockGenerateFalAudio,
-  mockGenerateFalVideo,
   mockIsOpaqueWorkspaceFileEgressSafe,
   mockResolveWorkspaceFileReference,
   mockReadWorkspaceFileContent,
@@ -14,7 +13,6 @@ const {
 } = vi.hoisted(() => ({
   mockGenerateContent: vi.fn(),
   mockGenerateFalAudio: vi.fn(),
-  mockGenerateFalVideo: vi.fn(),
   mockIsOpaqueWorkspaceFileEgressSafe: vi.fn(),
   mockResolveWorkspaceFileReference: vi.fn(),
   mockReadWorkspaceFileContent: vi.fn(),
@@ -31,7 +29,6 @@ vi.mock('@/lib/copilot/vfs/resource-writer', () => ({
   writeCopilotWorkspaceFileByPath: mockWriteWorkspaceFileByPath,
 }))
 vi.mock('@/lib/media/falai-audio', () => ({ generateFalAudio: mockGenerateFalAudio }))
-vi.mock('@/lib/media/falai-video', () => ({ generateFalVideo: mockGenerateFalVideo }))
 vi.mock('@/lib/workspace-files/application/resolve-workspace-file-reference', () => ({
   resolveWorkspaceFileReference: mockResolveWorkspaceFileReference,
 }))
@@ -47,7 +44,6 @@ vi.mock('@/lib/uploads/contexts/workspace/workspace-file-secret-provenance', () 
 import type { ServerToolContext } from '@/lib/copilot/tools/server/base-tool'
 import { generateImageServerTool } from '@/lib/copilot/tools/server/image/generate-image'
 import { generateAudioServerTool } from '@/lib/copilot/tools/server/media/generate-audio'
-import { generateVideoServerTool } from '@/lib/copilot/tools/server/media/generate-video'
 import { ResolvedSecretTraceRegistry } from '@/executor/utils/resolved-secret-trace-registry'
 
 const file = {
@@ -99,12 +95,6 @@ describe('Mothership media model boundaries', () => {
         { content: { parts: [{ inlineData: { data: 'aW1hZ2U=', mimeType: 'image/png' } }] } },
       ],
     })
-    mockGenerateFalVideo.mockResolvedValue({
-      buffer: Buffer.from('video'),
-      contentType: 'video/mp4',
-      model: 'veo-3.1-fast',
-      cost: { costDollars: 0.1 },
-    })
     mockGenerateFalAudio.mockResolvedValue({
       buffer: Buffer.from('audio'),
       contentType: 'audio/mpeg',
@@ -130,25 +120,6 @@ describe('Mothership media model boundaries', () => {
     )
     expect(JSON.stringify(mockGenerateContent.mock.calls[0]?.[0])).toContain('private prompt')
     expect(JSON.stringify(mockGenerateContent.mock.calls[0]?.[0])).not.toContain('{{PROMPT}}')
-  })
-
-  it('preserves video prompt fields that merely collide with ambient secret plaintext', async () => {
-    const context = contextWithSecrets([
-      { name: 'PROMPT', plaintext: 'private prompt' },
-      { name: 'NEGATIVE', plaintext: 'private negative prompt' },
-    ])
-
-    await generateVideoServerTool.execute(
-      { prompt: 'private prompt', negativePrompt: 'private negative prompt' },
-      context
-    )
-
-    expect(mockGenerateFalVideo).toHaveBeenCalledWith(
-      expect.objectContaining({
-        prompt: 'private prompt',
-        negativePrompt: 'private negative prompt',
-      })
-    )
   })
 
   it('preserves audio prompt fields that merely collide with ambient secret plaintext', async () => {
@@ -177,14 +148,6 @@ describe('Mothership media model boundaries', () => {
         ),
     ],
     [
-      'video',
-      () =>
-        generateVideoServerTool.execute(
-          { prompt: 'safe', inputs: { files: [{ path: 'files/reference.png' }] } },
-          contextWithSecrets([])
-        ),
-    ],
-    [
       'audio',
       () =>
         generateAudioServerTool.execute(
@@ -206,7 +169,6 @@ describe('Mothership media model boundaries', () => {
 
       expect(mockReadWorkspaceFileContent).not.toHaveBeenCalled()
       expect(mockGenerateContent).not.toHaveBeenCalled()
-      expect(mockGenerateFalVideo).not.toHaveBeenCalled()
       expect(mockGenerateFalAudio).not.toHaveBeenCalled()
     }
   )

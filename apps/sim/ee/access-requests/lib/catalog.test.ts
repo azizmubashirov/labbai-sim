@@ -29,10 +29,8 @@ vi.mock('@/lib/core/config/env-flags', () => ({
   getBlacklistedProvidersFromEnv: mocks.blacklistedProviders,
   isHosted: true,
   isChatEnabled: false,
-  isInboxEnabled: true,
   isInvitationsDisabled: true,
   isPublicApiDisabled: true,
-  isSandboxesEnabled: false,
   isSsoEnabled: false,
 }))
 vi.mock('@/lib/core/utils/urls', () => ({ isOllamaUrlConfigured: () => false }))

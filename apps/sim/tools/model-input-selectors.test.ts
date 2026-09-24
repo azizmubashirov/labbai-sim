@@ -2,7 +2,6 @@
  * @vitest-environment node
  */
 import { describe, expect, it } from 'vitest'
-import { a2aSendMessageTool } from '@/tools/a2a/send_message'
 import { agentphoneCreateCallTool } from '@/tools/agentphone/create_call'
 import { airweaveSearchTool } from '@/tools/airweave/search'
 import { brightDataDiscoverTool } from '@/tools/brightdata/discover'
@@ -70,11 +69,6 @@ describe('model-facing integration selectors', () => {
     [addFollowupV2Tool, { followupPromptText: 'continue' }, { followupPromptText: 'continue' }],
     [devinCreateSessionTool, { prompt: 'fix it' }, { prompt: 'fix it' }],
     [devinSendMessageTool, { message: 'retry' }, { message: 'retry' }],
-    [
-      a2aSendMessageTool,
-      { message: 'hello', data: { request: 'details' } },
-      { message: 'hello', data: { request: 'details' } },
-    ],
     [
       exaAgentTool,
       { query: 'research', outputSchema: { type: 'object' }, systemPrompt: 'be concise' },

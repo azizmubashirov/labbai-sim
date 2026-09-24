@@ -69,7 +69,7 @@ const DOMAIN_PATTERNS: DomainPattern[] = [
   {
     domain: 'table',
     weight: 3,
-    patterns: [/\b(table|spreadsheet|rows?|enrichment|enrich\s+rows?)\b/i],
+    patterns: [/\b(table|spreadsheet|rows?)\b/i],
   },
   {
     domain: 'auth',

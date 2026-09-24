@@ -1,5 +1,4 @@
 import { createLogger } from '@sim/logger'
-import { TERMINAL_TOOL_NAME } from '@sim/terminal-protocol'
 import { getErrorMessage } from '@sim/utils/errors'
 import type { AsyncCompletionSignal } from '@/lib/copilot/async-runs/lifecycle'
 import { ORCHESTRATION_TIMEOUT_MS } from '@/lib/copilot/constants'
@@ -29,19 +28,6 @@ import type {
 import { getToolEntry, toolRequiresApproval } from '@/lib/copilot/tool-executor'
 
 const logger = createLogger('CopilotToolPermissionGate')
-
-/**
- * Whether a `terminal` call is one worth stopping for.
- *
- * The catalog's approval flag is per tool, but the terminal tool covers both
- * running commands and merely looking at the screen. Only running one is
- * consequential; gating `read` or `list` would put a card in front of the user
- * every time the agent glanced at a terminal, which trains them to click
- * through the ones that matter.
- */
-function terminalOperationNeedsApproval(args: Record<string, unknown> | undefined): boolean {
-  return args?.operation === 'run'
-}
 
 /**
  * A human can take as long as they like to answer, so the wait is bounded only
@@ -80,7 +66,6 @@ export function toolCallNeedsApproval(
 
   if (!frameRequestsApproval) {
     if (!toolRequiresApproval(toolName)) return false
-    if (toolName === TERMINAL_TOOL_NAME && !terminalOperationNeedsApproval(args)) return false
     // A go-routed tool executes inside mothership and never reaches Sim's
     // dispatch, so there is nothing here to hold. Stamping the frame anyway
     // would draw a card for work that already happened, with no waiter behind

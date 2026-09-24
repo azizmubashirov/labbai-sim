@@ -66,10 +66,8 @@ async function authorizeWorkspaceSection(
     permissionConfig: accessControl?.config ?? {},
     deployment,
     entitlements: {
-      inbox: true,
       customBlocks: customBlocksAvailable,
       forks: forksAvailable,
-      sandboxes: true,
     },
   }
   if (resolveWorkspaceNavigation(navigationOptions).some((item) => item.id === section)) {

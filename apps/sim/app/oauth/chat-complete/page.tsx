@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { DesktopHandoffShell } from '@/app/desktop/components/desktop-handoff-shell'
+import { MessageShell } from '@/app/_shell/message-shell'
 import { ChatCompleteHandoff } from '@/app/oauth/chat-complete/chat-complete-handoff'
 
 export const metadata: Metadata = {
@@ -14,15 +14,14 @@ export const metadata: Metadata = {
  * second copy of the app.
  *
  * Shown for a few hundred milliseconds in a popup, or briefly in the original
- * tab when the popup was blocked, so it wears the same handoff frame as the
- * other minimal-chrome gates (the 404, the desktop connect screens) rather
- * than styling of its own.
+ * tab when the popup was blocked, so it wears the same minimal frame as the
+ * other status gates (the 404) rather than styling of its own.
  */
 export default function ChatCompletePage() {
   return (
     <>
       <ChatCompleteHandoff />
-      <DesktopHandoffShell title='Finishing the connection' description='Returning you to Sim.' />
+      <MessageShell title='Finishing the connection' description='Returning you to Sim.' />
     </>
   )
 }

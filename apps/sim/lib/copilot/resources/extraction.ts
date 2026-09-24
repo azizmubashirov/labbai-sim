@@ -7,7 +7,6 @@ import {
   Ffmpeg,
   GenerateAudio,
   GenerateImage,
-  GenerateVideo,
   Knowledge,
   ManageKnowledgeBase,
   PrepareFileEdit,
@@ -33,7 +32,6 @@ const RESOURCE_TOOL_NAMES: Set<string> = new Set([
   ManageKnowledgeBase.id,
   Knowledge.id,
   GenerateImage.id,
-  GenerateVideo.id,
   GenerateAudio.id,
   Ffmpeg.id,
 ])
@@ -148,7 +146,6 @@ export function extractResourcesFromToolResult(
 
     case DownloadFile.id:
     case GenerateImage.id:
-    case GenerateVideo.id:
     case GenerateAudio.id:
     case Ffmpeg.id: {
       // ffmpeg's probe op writes no file (no fileId) → no resource/auto-open.

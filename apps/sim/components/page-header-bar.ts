@@ -1,18 +1,11 @@
 /**
  * Top padding for a bar sitting at the very top of the workspace content pane.
  *
- * Folds in `--workspace-content-title-bar-inset`, the height that pane must leave
- * clear for the desktop shell's inset title bar. That variable is `0px` everywhere
- * except the macOS desktop app with the sidebar collapsed — the one arrangement where
- * the pane, rather than the sidebar, sits beneath the traffic lights and the sidebar
- * expander. Without it a top bar draws underneath both, which hides its controls and
- * can leave them unclickable.
- *
  * Compose this rather than writing `pt-[8.5px]`: the app has two top-bar geometries
- * ({@link PAGE_HEADER_BAR} and the `Resource` header's bordered variant), and the lane
- * math has to stay identical across them.
+ * ({@link PAGE_HEADER_BAR} and the `Resource` header's bordered variant), and the
+ * padding has to stay identical across them.
  */
-export const TITLE_BAR_LANE_PT = 'pt-[calc(8.5px+var(--workspace-content-title-bar-inset))]'
+export const TITLE_BAR_LANE_PT = 'pt-[8.5px]'
 
 /**
  * The top-of-page header bar worn by the surfaces that put a back chip, tab switcher,

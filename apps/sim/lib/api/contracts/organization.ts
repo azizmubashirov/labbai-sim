@@ -1,8 +1,6 @@
 import { z } from 'zod'
 import {
   organizationRoleSchema,
-  type PiiRedactionSettings,
-  piiRedactionSettingsSchema,
   retentionOverridesSchema,
   workspaceIdSchema,
 } from '@/lib/api/contracts/primitives'
@@ -67,14 +65,11 @@ const organizationDataRetentionHoursSchema = z
   .nullable()
   .optional()
 
-export type { PiiRedactionSettings }
-
 export const updateOrganizationDataRetentionBodySchema = z.object({
   logRetentionHours: organizationDataRetentionHoursSchema,
   softDeleteRetentionHours: organizationDataRetentionHoursSchema,
   taskCleanupHours: organizationDataRetentionHoursSchema,
   fileVersionRetentionHours: organizationDataRetentionHoursSchema,
-  piiRedaction: piiRedactionSettingsSchema.optional(),
   retentionOverrides: retentionOverridesSchema.optional(),
 })
 
@@ -87,7 +82,6 @@ const organizationRetentionValuesSchema = z.object({
   softDeleteRetentionHours: z.number().int().nullable(),
   taskCleanupHours: z.number().int().nullable(),
   fileVersionRetentionHours: z.number().int().nullable(),
-  piiRedaction: piiRedactionSettingsSchema.nullable(),
   retentionOverrides: retentionOverridesSchema.nullable(),
 })
 
