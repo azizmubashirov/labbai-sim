@@ -9,7 +9,8 @@ const { mockRecordLocalCopilotTurnUsage, mockChatCompletionStream } = vi.hoisted
   mockChatCompletionStream: vi.fn(),
 }))
 
-vi.mock('@/local-copilot/lib/billing/record-turn-usage', () => ({
+vi.mock('@/local-copilot/lib/billing/record-turn-usage', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   recordLocalCopilotTurnUsage: mockRecordLocalCopilotTurnUsage,
 }))
 
@@ -39,7 +40,8 @@ vi.mock('@/local-copilot/lib/providers/registry', () => {
   }
 })
 
-vi.mock('@/local-copilot/lib/billing/resolve-spend-cap', () => ({
+vi.mock('@/local-copilot/lib/billing/resolve-spend-cap', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   resolveLocalCopilotSpendCap: vi.fn().mockResolvedValue({
     isExceeded: false,
     currentUsage: 0,
@@ -47,7 +49,8 @@ vi.mock('@/local-copilot/lib/billing/resolve-spend-cap', () => ({
   }),
 }))
 
-vi.mock('@/local-copilot/lib/context/build-context', () => ({
+vi.mock('@/local-copilot/lib/context/build-context', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   buildLocalCopilotContext: vi.fn().mockResolvedValue({
     workspaceWorkflows: [],
     availableBlocks: [],
@@ -65,12 +68,14 @@ vi.mock('@/local-copilot/lib/context/context-budget', async (importOriginal) => 
   resolveWorkflowContextDetail: () => 'summary',
 }))
 
-vi.mock('@/local-copilot/lib/tools/definitions', () => ({
+vi.mock('@/local-copilot/lib/tools/definitions', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   LOCAL_COPILOT_TOOLS: [],
   resolveLocalCopilotTools: vi.fn().mockResolvedValue([]),
 }))
 
-vi.mock('@/local-copilot/lib/agent/specialists/classify', () => ({
+vi.mock('@/local-copilot/lib/agent/specialists/classify', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   classifyLocalCopilotIntent: () => ({
     primary: 'general',
     secondary: [],
@@ -80,27 +85,31 @@ vi.mock('@/local-copilot/lib/agent/specialists/classify', () => ({
   specialistPassDomain: () => null,
 }))
 
-vi.mock('@/local-copilot/lib/agent/specialists/domains', () => ({
+vi.mock('@/local-copilot/lib/agent/specialists/domains', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   domainSystemHint: () => '',
   filterToolsByNames: (tools: unknown[]) => tools,
   toolNamesForIntent: () => null,
 }))
 
-vi.mock('@/local-copilot/lib/agent/specialists/parallel-subagents', () => ({
+vi.mock('@/local-copilot/lib/agent/specialists/parallel-subagents', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   runParallelSubagents: async function* () {
     yield* []
     return { findings: '', results: [], events: [] }
   },
 }))
 
-vi.mock('@/local-copilot/lib/agent/specialists/specialist-pass', () => ({
+vi.mock('@/local-copilot/lib/agent/specialists/specialist-pass', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   runSpecialistPass: async function* () {
     yield* []
     return { domain: 'research', findings: '', toolRoundCount: 0, events: [] }
   },
 }))
 
-vi.mock('@/local-copilot/lib/user-turn-content', () => ({
+vi.mock('@/local-copilot/lib/user-turn-content', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   buildLocalCopilotUserTurn: vi.fn().mockResolvedValue({
     role: 'user',
     content: 'hello',
@@ -108,15 +117,18 @@ vi.mock('@/local-copilot/lib/user-turn-content', () => ({
   getLocalCopilotUserTurnText: () => 'hello',
 }))
 
-vi.mock('@/local-copilot/lib/diagnostics', () => ({
+vi.mock('@/local-copilot/lib/diagnostics', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   getLocalCopilotMemorySnapshot: () => ({}),
 }))
 
-vi.mock('@/local-copilot/lib/agent/engagement-status', () => ({
+vi.mock('@/local-copilot/lib/agent/engagement-status', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   generateEngagementStatusMessages: vi.fn().mockResolvedValue(undefined),
 }))
 
-vi.mock('@/providers/utils', () => ({
+vi.mock('@/providers/utils', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   calculateCost: () => ({ input: 0.001, output: 0.002, total: 0.003 }),
 }))
 
