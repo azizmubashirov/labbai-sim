@@ -1,8 +1,9 @@
 # Labbai test stack (147.93.62.159). Ports bound to 127.0.0.1 only — reach via SSH tunnel.
+# Images are built by .github/workflows/build-images.yml and pulled from GHCR.
 name: labbai
 services:
   simstudio:
-    image: labbai/simstudio:test
+    image: ghcr.io/azizmubashirov/labbai-sim-simstudio:${LABBAI_TAG:-latest}
     build:
       context: .
       dockerfile: docker/app.Dockerfile
@@ -24,7 +25,7 @@ services:
     deploy: {resources: {limits: {memory: 3G}}}
 
   realtime:
-    image: labbai/realtime:test
+    image: ghcr.io/azizmubashirov/labbai-sim-realtime:${LABBAI_TAG:-latest}
     build: {context: ., dockerfile: docker/realtime.Dockerfile}
     env_file: .env
     restart: unless-stopped
@@ -42,7 +43,7 @@ services:
   # One-shot: journal migrations, then sync the rest of schema.ts (Arena keeps
   # several migrations outside the drizzle journal).
   migrations:
-    image: labbai/migrations:test
+    image: ghcr.io/azizmubashirov/labbai-sim-migrations:${LABBAI_TAG:-latest}
     build: {context: ., dockerfile: docker/db.Dockerfile}
     environment:
       - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/simstudio

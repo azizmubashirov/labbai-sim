@@ -31,6 +31,12 @@ function toOpenAiTools(tools: ChatCompletionRequest['tools']) {
   }))
 }
 
+/** True for OpenAI models that take `max_completion_tokens` and a fixed temperature. */
+export function isOpenAiReasoningModel(provider: string, model: string): boolean {
+  if (provider !== 'openai' && provider !== 'azure-openai') return false
+  return /^(gpt-5|gpt-6|o\d)/i.test(model.trim())
+}
+
 export function createOpenAiCompatibleProvider(config: LocalCopilotConfig): LocalCopilotProvider {
   const baseUrl = resolveBaseUrl(config)
 
@@ -65,8 +71,14 @@ export function createOpenAiCompatibleProvider(config: LocalCopilotConfig): Loca
         tool_choice: request.tools?.length ? 'auto' : undefined,
         stream: true,
         stream_options: { include_usage: true },
-        temperature: request.temperature ?? 0.2,
-        max_tokens: request.maxTokens ?? 4096,
+        // OpenAI reasoning models (gpt-5+, o-series) reject `max_tokens` and any
+        // non-default temperature; their budget also covers hidden reasoning tokens.
+        ...(isOpenAiReasoningModel(config.provider, request.model || config.model)
+          ? { max_completion_tokens: Math.max(request.maxTokens ?? 0, 32768) }
+          : {
+              temperature: request.temperature ?? 0.2,
+              max_tokens: request.maxTokens ?? 4096,
+            }),
         // OpenAI automatic prompt caching: stable key improves prefix reuse across turns.
         ...(config.provider === 'openai'
           ? { prompt_cache_key: `local-copilot:${request.model || config.model}` }
