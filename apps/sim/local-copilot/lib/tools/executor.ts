@@ -80,6 +80,31 @@ const logger = createLogger('LocalCopilotToolExecutor')
 
 let handlersRegistered = false
 
+/**
+ * Workspace access check plus the viewer's permission-group log projection —
+ * what new Sim's logs use cases apply before reading `readLogs`/`readLogDetail`.
+ * Returns null when the user cannot read the workspace.
+ */
+async function resolveLocalCopilotLogProjection(
+  userId: string,
+  workspaceId: string
+): Promise<{ hideTraceSpans: boolean; hideCostInfo: boolean } | null> {
+  const [{ getUserEntityPermissions }, { resolveActiveWorkspaceApplicationContext }, projection] =
+    await Promise.all([
+      import('@/lib/workspaces/permissions/utils'),
+      import('@/lib/workspaces/application/workspace-context'),
+      import('@/lib/logs/log-projection'),
+    ])
+  const permission = await getUserEntityPermissions(userId, 'workspace', workspaceId)
+  if (!permission) return null
+  const workspace = await resolveActiveWorkspaceApplicationContext(workspaceId)
+  return projection.resolveLogFieldProjection(
+    userId,
+    workspaceId,
+    workspace.workspaceOrganizationId
+  )
+}
+
 async function ensureHandlersReady() {
   if (handlersRegistered) return
   const loadStartedAt = Date.now()
@@ -1025,7 +1050,7 @@ async function executeLocalCopilotToolInner(
       })
 
       const { formatWorkflowLintMessage, hasWorkflowLintIssues, lintEditedWorkflowState } =
-        await import('@/lib/copilot/tools/server/workflow/edit-workflow/lint')
+        await import('@/lib/workflows/editing/lint')
       const workflowLint = lintEditedWorkflowState({
         blocks: state.blocks ?? {},
         edges: state.edges ?? [],
@@ -1070,18 +1095,26 @@ async function executeLocalCopilotToolInner(
     case 'get_execution_logs': {
       const limit = typeof args.limit === 'number' ? args.limit : 10
       const executionId = typeof args.executionId === 'string' ? args.executionId : undefined
-      const { listLogs } = await import('@/lib/logs/list-logs')
-      const logs = await listLogs(
-        {
+      const projection = await resolveLocalCopilotLogProjection(ctx.userId, ctx.workspaceId)
+      if (!projection) {
+        const error = 'Workspace not found or access denied'
+        return { toolName, success: false, error, result: { success: false, error } }
+      }
+      const [{ listLogsQuerySchema }, { readLogs }] = await Promise.all([
+        import('@/lib/api/contracts/logs'),
+        import('@/lib/logs/list-logs'),
+      ])
+      const logs = await readLogs({
+        ...listLogsQuerySchema.parse({
           workspaceId: ctx.workspaceId,
           ...(ctx.workflowId ? { workflowIds: ctx.workflowId } : {}),
           limit,
-          executionId,
+          ...(executionId ? { executionId } : {}),
           sortBy: 'date',
           sortOrder: 'desc',
-        },
-        ctx.userId
-      )
+        }),
+        hideCostInfo: projection.hideCostInfo,
+      })
       return { toolName, success: true, result: logs }
     }
 
@@ -1098,13 +1131,17 @@ async function executeLocalCopilotToolInner(
 
       let logDetail = null
       if (executionId) {
-        const { fetchLogDetail } = await import('@/lib/logs/fetch-log-detail')
-        logDetail = await fetchLogDetail({
-          userId: ctx.userId,
-          workspaceId: ctx.workspaceId,
-          lookupColumn: 'executionId',
-          lookupValue: executionId,
-        })
+        const projection = await resolveLocalCopilotLogProjection(ctx.userId, ctx.workspaceId)
+        if (projection) {
+          const { readLogDetail } = await import('@/lib/logs/fetch-log-detail')
+          logDetail = await readLogDetail({
+            viewerUserId: ctx.userId,
+            workspaceId: ctx.workspaceId,
+            lookupColumn: 'executionId',
+            lookupValue: executionId,
+            ...projection,
+          })
+        }
       }
 
       return {

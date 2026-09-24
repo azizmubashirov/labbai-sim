@@ -53,8 +53,8 @@ export function localFileBodyContent(
 }
 
 /**
- * File ids from Arena Copilot file tools, including `edit_content` which the
- * shared extractor does not treat as a resource tool.
+ * File ids from Local Copilot file tools (`create_file`, `edit_content`), which
+ * new Sim's shared extractor no longer treats as resource tools.
  */
 export function extractLocalFileChatResources(
   toolName: string,
@@ -63,7 +63,7 @@ export function extractLocalFileChatResources(
 ): MothershipResource[] {
   const extracted = extractResourcesFromToolResult(toolName, params, output)
   if (extracted.length > 0) return extracted
-  if (toolName !== 'edit_content') return []
+  if (!FILE_BODY_TOOL_NAMES.has(toolName)) return []
 
   const result = toRecord(output)
   const data = toRecord(result.data)

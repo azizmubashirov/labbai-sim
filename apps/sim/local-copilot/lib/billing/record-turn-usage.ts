@@ -75,21 +75,17 @@ export async function recordLocalCopilotTurnUsage(
 
     const billingContext = toBillingContext(attribution)
 
+    // New Sim's ledger has no chat/run/actor columns; keep them in entry metadata.
     await recordUsage({
       userId: attribution.actorUserId,
       workspaceId: attribution.workspaceId,
-      ...billingContext,
-      workflowId: params.workflowId,
-      chatId: params.chatId,
-      runId: params.runId,
-      executionActor: params.executionActor ?? {
-        actorUserId: params.userId,
-        actorType: 'user',
+      billingEntity: billingContext.billingEntity,
+      billingPeriod: {
+        start: billingContext.billingPeriod.start,
+        end: billingContext.billingPeriod.end,
       },
-      parentExecutionId: params.parentExecutionId,
-      rootExecutionId: params.rootExecutionId ?? params.parentExecutionId,
-      triggeringChatId: params.triggeringChatId ?? params.chatId,
-      triggeringRunId: params.triggeringRunId ?? params.runId,
+      workflowId: params.workflowId,
+      ...(params.parentExecutionId ? { executionId: params.parentExecutionId } : {}),
       entries: params.summary.components.map((component) => {
         const eventKey = buildLocalCopilotComponentEventKey({
           turnEventKey,
@@ -107,12 +103,16 @@ export async function recordLocalCopilotTurnUsage(
             backend: 'local',
             ...(component.inputTokens != null ? { inputTokens: component.inputTokens } : {}),
             ...(component.outputTokens != null ? { outputTokens: component.outputTokens } : {}),
+            ...(component.provider ? { provider: component.provider } : {}),
+            ...(component.vendor ? { vendor: component.vendor } : {}),
+            ...(component.toolId ? { toolId: component.toolId } : {}),
+            ...(params.chatId ? { chatId: params.chatId } : {}),
+            ...(params.runId ? { runId: params.runId } : {}),
+            actorUserId: params.executionActor?.actorUserId ?? params.userId,
+            ...(params.rootExecutionId ? { rootExecutionId: params.rootExecutionId } : {}),
+            ...(params.triggeringChatId ? { triggeringChatId: params.triggeringChatId } : {}),
+            ...(params.triggeringRunId ? { triggeringRunId: params.triggeringRunId } : {}),
           },
-          ...(component.provider ? { provider: component.provider } : {}),
-          ...(component.vendor ? { vendor: component.vendor } : {}),
-          ...(component.toolId ? { toolId: component.toolId } : {}),
-          ...(params.chatId ? { chatId: params.chatId } : {}),
-          ...(params.runId ? { runId: params.runId } : {}),
         }
       }),
     })

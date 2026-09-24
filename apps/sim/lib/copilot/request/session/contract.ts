@@ -109,8 +109,11 @@ export interface SyntheticFilePreviewEventEnvelope {
 
 /** Local Copilot ephemeral chat status — not part of the Go mothership OpenAPI contract. */
 export const LOCAL_STATUS_PHASE = 'agent_live_status' as const
+/** Run-payload discriminant so upstream narrowing on `payload.kind` keeps working. */
+export const LOCAL_STATUS_KIND = 'local_status' as const
 
 export interface SyntheticLocalStatusPayload {
+  kind: typeof LOCAL_STATUS_KIND
   message: string
   statusPhase: typeof LOCAL_STATUS_PHASE
   toolCallId?: string
@@ -445,6 +448,7 @@ function isSyntheticLocalStatusEnvelopeBase(value: unknown): value is Omit<
 function isSyntheticLocalStatusPayload(value: unknown): value is SyntheticLocalStatusPayload {
   return (
     isRecordLike(value) &&
+    value.kind === LOCAL_STATUS_KIND &&
     value.statusPhase === LOCAL_STATUS_PHASE &&
     typeof value.message === 'string' &&
     value.message.trim().length > 0 &&

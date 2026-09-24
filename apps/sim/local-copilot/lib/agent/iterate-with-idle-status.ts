@@ -121,8 +121,10 @@ export async function* iterateWithIdleStatus<T>(options: {
 
       if (winner.side === 'ai') {
         aiConsumed = true
-        if (!pendingAiBatch || pendingAiBatch.length === 0) continue
-        messages = pendingAiBatch
+        // Assigned in the enrich callback, so control-flow narrowing sees only `null`.
+        const aiBatch = pendingAiBatch as string[] | null
+        if (!aiBatch || aiBatch.length === 0) continue
+        messages = aiBatch
         index = 0
         gapController.abort()
         yield { type: 'status', message: messages[index % messages.length]! }

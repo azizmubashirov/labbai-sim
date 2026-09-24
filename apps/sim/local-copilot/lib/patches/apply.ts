@@ -1,5 +1,5 @@
 import { db } from '@sim/db'
-import { localCopilotPatches } from '@sim/db/schema'
+import { localCopilotPatches, workflow } from '@sim/db/schema'
 import { createLogger } from '@sim/logger'
 import type { WorkflowState } from '@sim/workflow-types/workflow'
 import { eq } from 'drizzle-orm'
@@ -75,7 +75,22 @@ export async function applyWorkflowPatch(params: ApplyPatchParams): Promise<Appl
   }
 
   const nextState = applyPatchOperations(currentState, patch)
-  await saveWorkflowToNormalizedTables(workflowId, nextState)
+  let governanceWorkspaceId = workspaceId ?? null
+  if (!governanceWorkspaceId) {
+    const [row] = await db
+      .select({ workspaceId: workflow.workspaceId })
+      .from(workflow)
+      .where(eq(workflow.id, workflowId))
+      .limit(1)
+    governanceWorkspaceId = row?.workspaceId ?? null
+  }
+  const saveResult = await saveWorkflowToNormalizedTables(workflowId, nextState, {
+    workspaceId: governanceWorkspaceId,
+    subjectUserId: userId,
+  })
+  if (!saveResult.success) {
+    return { success: false, errors: [saveResult.error ?? 'Failed to save workflow'] }
+  }
 
   await db
     .update(localCopilotPatches)

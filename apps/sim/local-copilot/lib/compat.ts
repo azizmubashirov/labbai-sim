@@ -2,7 +2,11 @@
  * Catalog and Bedrock helpers the local copilot relied on in Arena's fork of Sim.
  * Upstream Sim v0.8.59 does not export them, so they live next to their only caller.
  */
-import { PROVIDER_DEFINITIONS } from '@/providers/models'
+import {
+  getModelCapabilities,
+  PROVIDER_DEFINITIONS,
+  supportsTemperature,
+} from '@/providers/models'
 
 function matchesCatalogModelId(candidate: string, catalogId: string): boolean {
   const normalizedCandidate = candidate.toLowerCase()

@@ -12,7 +12,9 @@ import {
 } from '@/local-copilot/integration/file-turn-persist'
 
 const OFFICE_FILE_EXTENSION = /\.(pptx|docx|pdf)$/i
-const WORKSPACE_FILE_PREVIEW_NAME = 'workspace_file' as const
+/** New Sim keys file preview sessions by `prepare_file_edit`. */
+const WORKSPACE_FILE_PREVIEW_NAME = 'prepare_file_edit' as const
+const WORKSPACE_FILE_TOOL_NAMES = new Set(['workspace_file', 'prepare_file_edit'])
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   return isRecordLike(value) ? (value as Record<string, unknown>) : undefined
@@ -23,7 +25,9 @@ function previewSessionToolCallId(event: StreamEvent, fallback: string): string 
   return parent && parent.length > 0 ? parent : fallback
 }
 
-function withFileBodyOnContent(argumentsValue: unknown): unknown {
+function withFileBodyOnContent(
+  argumentsValue: Record<string, unknown> | undefined
+): Record<string, unknown> | undefined {
   const args = asRecord(argumentsValue)
   if (!args) return argumentsValue
   if (typeof args.content === 'string' && args.content.length > 0) return argumentsValue
@@ -33,38 +37,43 @@ function withFileBodyOnContent(argumentsValue: unknown): unknown {
 }
 
 /**
- * The shared preview adapter keys sessions by `workspace_file`'s own call id.
- * Arena File Agent span start uses the specialist id, so rewrite the preview
+ * The shared preview adapter keys sessions by the file-edit tool's own call id.
+ * The Local File Agent span start uses the specialist id, so rewrite the preview
  * input (not the client tool frame) to that parent id. Also copy body aliases
  * onto `content` so the adapter's `args.content` path sees the write.
  */
 export function adaptLocalFilePreviewStreamEvent(event: StreamEvent): StreamEvent {
-  if (!isToolCallStreamEvent(event) && !isToolResultStreamEvent(event)) {
-    return event
-  }
-
-  const toolName = event.payload.toolName
-  let payload = event.payload
-
-  if (isToolCallStreamEvent(event) && (toolName === 'edit_content' || toolName === 'create_file')) {
-    const nextArguments = withFileBodyOnContent(payload.arguments)
-    if (nextArguments !== payload.arguments) {
-      payload = { ...payload, arguments: nextArguments }
-    }
-  }
-
-  if (toolName === 'workspace_file') {
-    const frameId = payload.toolCallId
-    if (frameId) {
-      const sessionId = previewSessionToolCallId(event, frameId)
-      if (sessionId !== frameId) {
-        payload = { ...payload, toolCallId: sessionId }
+  if (isToolCallStreamEvent(event)) {
+    const toolName = event.payload.toolName
+    let payload = event.payload
+    if (toolName === 'edit_content' || toolName === 'create_file') {
+      const nextArguments = withFileBodyOnContent(payload.arguments)
+      if (nextArguments !== payload.arguments) {
+        payload = { ...payload, arguments: nextArguments }
       }
     }
+    if (WORKSPACE_FILE_TOOL_NAMES.has(toolName)) {
+      payload = withPreviewSessionToolCallId(event, payload)
+    }
+    return payload === event.payload ? event : { ...event, payload }
   }
 
-  if (payload === event.payload) return event
-  return { ...event, payload }
+  if (isToolResultStreamEvent(event) && WORKSPACE_FILE_TOOL_NAMES.has(event.payload.toolName)) {
+    const payload = withPreviewSessionToolCallId(event, event.payload)
+    return payload === event.payload ? event : { ...event, payload }
+  }
+
+  return event
+}
+
+function withPreviewSessionToolCallId<T extends { toolCallId: string }>(
+  event: StreamEvent,
+  payload: T
+): T {
+  const frameId = payload.toolCallId
+  if (!frameId) return payload
+  const sessionId = previewSessionToolCallId(event, frameId)
+  return sessionId === frameId ? payload : { ...payload, toolCallId: sessionId }
 }
 
 function createFilePreviewMeta(argumentsValue: unknown):

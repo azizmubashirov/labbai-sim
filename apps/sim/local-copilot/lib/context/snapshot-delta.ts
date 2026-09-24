@@ -212,7 +212,8 @@ function toItemRecords(
     case 'skills':
       return (snapshot.skills ?? []) as unknown as Array<Record<string, unknown>>
     case 'jobs':
-      return (snapshot.jobs ?? []) as unknown as Array<Record<string, unknown>>
+      // New Sim's VFS snapshot has no `jobs`; older snapshots may still carry it.
+      return ((snapshot as { jobs?: unknown[] }).jobs ?? []) as Array<Record<string, unknown>>
     case 'integrations':
       return (snapshot.integrations ?? []) as unknown as Array<Record<string, unknown>>
     case 'mcpServers':

@@ -1187,7 +1187,13 @@ export async function* runLocalCopilotAgent(
     const specialistCalls = orderedToolCalls.filter((call) => isSpecialistTool(call.name))
     const specialistOutcomes = new Map<
       string,
-      { success: boolean; findings: string; error?: string; output: unknown }
+      {
+        success: boolean
+        findings: string
+        error?: string
+        output: unknown
+        pendingFollowUps?: MandatoryFollowUp[]
+      }
     >()
 
     if (specialistCalls.length > 0) {
@@ -1220,6 +1226,9 @@ export async function* runLocalCopilotAgent(
           success: outcome.success,
           findings: outcome.findings,
           ...(outcome.error ? { error: outcome.error } : {}),
+          ...(outcome.result?.pendingFollowUps?.length
+            ? { pendingFollowUps: outcome.result.pendingFollowUps }
+            : {}),
           output: {
             success: outcome.success,
             message: outcome.findings,
@@ -1303,7 +1312,7 @@ export async function* runLocalCopilotAgent(
         const formattedToolResult = formatToolResultForLlm(call.name, outcome.output, {
           artifactStore: toolCtx.artifactStore,
         })
-        for (const followUp of outcome.result?.pendingFollowUps ?? []) {
+        for (const followUp of outcome.pendingFollowUps ?? []) {
           pendingFollowUps = [
             ...pendingFollowUps.filter((item) => item.id !== followUp.id),
             followUp,

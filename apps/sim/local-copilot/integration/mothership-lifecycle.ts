@@ -27,6 +27,7 @@ import type { CopilotLifecycleOptions } from '@/lib/copilot/request/lifecycle/ru
 import {
   isSubagentSpanStreamEvent,
   isToolCallStreamEvent,
+  LOCAL_STATUS_KIND,
   LOCAL_STATUS_PHASE,
 } from '@/lib/copilot/request/session'
 import { handleResourceSideEffects } from '@/lib/copilot/request/tools/resources'
@@ -222,6 +223,7 @@ async function dispatchLocalCopilotEvent(
     const statusEvent: StreamEvent = {
       type: 'run',
       payload: {
+        kind: LOCAL_STATUS_KIND,
         statusPhase: LOCAL_STATUS_PHASE,
         message: event.message,
         ...(event.toolCallId ? { toolCallId: event.toolCallId } : {}),
@@ -422,6 +424,7 @@ async function dispatchLocalCopilotEvent(
     await options.onEvent?.({
       type: 'run',
       payload: {
+        kind: LOCAL_STATUS_KIND,
         statusPhase: LOCAL_STATUS_PHASE,
         message: formatUxPhaseStatus(event.phase),
       },
@@ -450,6 +453,7 @@ async function dispatchLocalCopilotEvent(
     await options.onEvent?.({
       type: 'run',
       payload: {
+        kind: LOCAL_STATUS_KIND,
         statusPhase: LOCAL_STATUS_PHASE,
         message: `Verified ${event.record.toolName}: ${event.record.status}`,
         toolCallId: event.record.toolCallId,
@@ -750,7 +754,6 @@ export async function runLocalCopilotMothershipLifecycle(
           : MothershipStreamV1CompletionStatus.complete
 
     const billingModel = turnUsage?.model || getLocalCopilotConfig().model
-    context.billingModel = billingModel
     context.completionStatus = status
 
     logger.info('Arena Copilot mothership lifecycle finished', {

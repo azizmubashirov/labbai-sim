@@ -229,24 +229,27 @@ export function parseSummarizerSessionMemory(
  * Enforces array length and notes size caps.
  */
 export function clampSessionMemory(memory: SessionMemory): SessionMemory {
+  // Rows written by older builds can miss newer fields; treat them as empty.
+  const tail = <T>(items: T[] | undefined, max: number): T[] => (items ?? []).slice(-max)
+  const entities: Partial<SessionMemory['entities']> = memory.entities ?? {}
   return {
     ...memory,
-    goals: memory.goals.slice(-8),
-    decisions: memory.decisions.slice(-8),
-    constraints: memory.constraints.slice(-12),
-    activeDirective: truncate(memory.activeDirective, 280, ''),
+    goals: tail(memory.goals, 8),
+    decisions: tail(memory.decisions, 8),
+    constraints: tail(memory.constraints, 12),
+    activeDirective: truncate(memory.activeDirective ?? '', 280, ''),
     entities: {
-      workflows: memory.entities.workflows.slice(-8),
-      blocks: memory.entities.blocks.slice(-8),
-      files: memory.entities.files.slice(-8),
-      runs: memory.entities.runs.slice(-8),
+      workflows: tail(entities.workflows, 8),
+      blocks: tail(entities.blocks, 8),
+      files: tail(entities.files, 8),
+      runs: tail(entities.runs, 8),
     },
-    progress: memory.progress.slice(-8),
-    openQuestions: memory.openQuestions.slice(-8),
-    approvals: memory.approvals.slice(-8),
-    failures: memory.failures.slice(-8),
-    verification: memory.verification.slice(-8),
-    notes: truncate(memory.notes, SESSION_MEMORY_NOTES_MAX_CHARS, ''),
+    progress: tail(memory.progress, 8),
+    openQuestions: tail(memory.openQuestions, 8),
+    approvals: tail(memory.approvals, 8),
+    failures: tail(memory.failures, 8),
+    verification: tail(memory.verification, 8),
+    notes: truncate(memory.notes ?? '', SESSION_MEMORY_NOTES_MAX_CHARS, ''),
   }
 }
 

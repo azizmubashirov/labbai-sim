@@ -1,3 +1,6 @@
+import { db } from '@sim/db'
+import { account, credential } from '@sim/db/schema'
+import { eq, inArray } from 'drizzle-orm'
 import {
   getHubSpotSharedAccountOptionIds,
   mergeOAuthIntegrationPresence,
@@ -37,6 +40,20 @@ export function mapSnapshotToWorkspaceIntegrations(
 }
 
 /**
+ * Credential id → owning user id, via the linked OAuth account. New Sim's
+ * accessible-credential rows no longer carry the owner.
+ */
+async function loadCredentialOwnerIds(credentialIds: string[]): Promise<Map<string, string>> {
+  if (credentialIds.length === 0) return new Map()
+  const rows = await db
+    .select({ id: credential.id, ownerUserId: account.userId })
+    .from(credential)
+    .innerJoin(account, eq(credential.accountId, account.id))
+    .where(inArray(credential.id, credentialIds))
+  return new Map(rows.map((row) => [row.id, row.ownerUserId]))
+}
+
+/**
  * Loads OAuth connections and configured env key names for Arena Copilot context.
  * Secret values are never returned — only key names and credential metadata.
  */
@@ -50,6 +67,10 @@ export async function loadWorkspaceIntegrations(
     getEffectiveDecryptedEnv(userId, workspaceId),
   ])
 
+  const ownerIds = await loadCredentialOwnerIds(oauthRows.map((row) => row.id)).catch(
+    () => new Map<string, string>()
+  )
+
   const envKeysFromCredentials = envCredentialRows
     .map((row) => row.envKey)
     .filter((key): key is string => Boolean(key?.trim()))
@@ -61,12 +82,12 @@ export async function loadWorkspaceIntegrations(
   const envVariables = [...new Set([...envKeysFromCredentials, ...envKeysFromRuntime])].sort()
 
   const connectedIntegrations = mergeOAuthIntegrationPresence(
-    oauthRows.map((credential) => ({
-      id: credential.id,
-      providerId: credential.providerId,
-      displayName: credential.displayName,
-      role: credential.role,
-      isOwn: credential.ownerUserId === userId,
+    oauthRows.map((row) => ({
+      id: row.id,
+      providerId: row.providerId,
+      displayName: row.displayName,
+      role: row.role,
+      isOwn: ownerIds.get(row.id) === userId,
     })),
     envKeysFromCredentials,
     getHubSpotSharedAccountOptionIds()

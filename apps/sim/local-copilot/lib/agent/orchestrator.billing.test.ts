@@ -13,19 +13,37 @@ vi.mock('@/local-copilot/lib/billing/record-turn-usage', () => ({
   recordLocalCopilotTurnUsage: mockRecordLocalCopilotTurnUsage,
 }))
 
-vi.mock('@/local-copilot/lib/config', () => ({
-  getLocalCopilotConfig: () => ({
+vi.mock('@/local-copilot/lib/config', () => {
+  const config = {
     enabled: true,
     provider: 'anthropic',
     model: 'claude-sonnet-4-6',
     apiKey: 'test-key',
-  }),
-}))
+  }
+  return {
+    getLocalCopilotConfig: () => config,
+    buildLocalCopilotConfigForCatalog: () => config,
+    assertLocalCopilotEnabled: () => undefined,
+    isLocalCopilotEngagementStatusEnabled: () => false,
+  }
+})
 
-vi.mock('@/local-copilot/lib/providers/registry', () => ({
-  getLocalCopilotProvider: () => ({
+vi.mock('@/local-copilot/lib/providers/registry', () => {
+  const provider = {
     id: 'anthropic',
     chatCompletionStream: mockChatCompletionStream,
+  }
+  return {
+    getLocalCopilotProvider: () => provider,
+    createLocalCopilotProvider: () => provider,
+  }
+})
+
+vi.mock('@/local-copilot/lib/billing/resolve-spend-cap', () => ({
+  resolveLocalCopilotSpendCap: vi.fn().mockResolvedValue({
+    isExceeded: false,
+    currentUsage: 0,
+    limit: Number.POSITIVE_INFINITY,
   }),
 }))
 

@@ -544,7 +544,7 @@ export function formatToolResultForLlm(
   if (options?.artifactStore && toolName !== LOAD_COPILOT_ARTIFACT_TOOL_NAME) {
     const offload = maybeOffloadToolResult(toolName, sanitized, options.artifactStore)
     if (offload.offloaded) {
-      return compactStringifyForLlm(copyFollowUpFields(sanitized, offload.stub))
+      return compactStringifyForLlm(copyFollowUpFields(sanitized, { ...offload.stub }))
     }
   }
 

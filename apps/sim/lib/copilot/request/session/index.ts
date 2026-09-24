@@ -52,6 +52,7 @@ export {
   isToolArgsDeltaStreamEvent,
   isToolCallStreamEvent,
   isToolResultStreamEvent,
+  LOCAL_STATUS_KIND,
   LOCAL_STATUS_PHASE,
   parsePersistedStreamEventEnvelope,
   parsePersistedStreamEventEnvelopeJson,
