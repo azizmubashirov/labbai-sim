@@ -62,6 +62,36 @@ Strong: `openai/gpt-5.5`, `anthropic/claude-sonnet` · Fast: `openai/gpt-5-mini`
 `google/gemini-flash` · Cheap bulk: Workers AI (Llama/Qwen) ·
 Embeddings: `openai/text-embedding-3-small`.
 
+## Build (new, after cleanup)
+
+- **Chats (customer inbox)** — native section inside Labbai: every customer thread from
+  Telegram / WhatsApp / Instagram (via Sim channel triggers) stored as a conversation,
+  Telegram-like list + thread view, operator reply from the UI, per-conversation
+  AI on/off (when off, the agent workflow skips that customer). Copilot-built channel
+  agents feed this section automatically.
+- **Credits** — Sim's ledger (`usage_log`, dollars stored, 200 credits = $1) with our
+  markup via `COST_MULTIPLIER`; Click / Payme top-ups instead of Stripe.
+- **Cloudflare AI Gateway provider** for Agent blocks + copilot (`cf-aig-authorization`
+  header); needs Account ID, Gateway ID, API token in server `.env`.
+- **Pipedream MCP** for OAuth apps we don't register ourselves.
+- **Branding** — Labbai name, logo, colors, emails; UZ / RU interface.
+- Own integrations: amoCRM, Bitrix24, Exely.
+
+## Open issues found in testing
+
+- Google OAuth (Sheets/Drive/…): self-host needs our own Google OAuth client
+  (`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`), or Pipedream.
+- Secrets pasted into chat during testing (an OpenAI key, a Telegram bot token) must be
+  rotated by the owner.
+- Local copilot file writes use the `workspace_file` tool name; the new Sim file preview
+  listens for `prepare_file_edit` — verify live preview manually.
+- `DEFAULT_LOCAL_COPILOT_MODEL` is a Claude id; chats created without a picker choice
+  (inbox, API) may resolve to Anthropic — point it at the Cloudflare/OpenAI default.
+- Cloud mothership tool execution depends on `executor: 'client'` frames — irrelevant
+  once the cloud path is removed.
+- Test server `147.93.62.159` (`/root/labbai`, tunnel `localhost:3300`) still runs the old
+  Arena build; the new Sim + copilot image needs a fresh DB volume (`labbai_pg_v2`).
+
 ## Order of work
 
 Each step is its own commit, verified by CI (type check + tests) before the next:
