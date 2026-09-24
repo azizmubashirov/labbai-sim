@@ -35,7 +35,9 @@ jobs:
           bun-version: 1.4.1
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: |
+          set -o pipefail
+          bun install --frozen-lockfile 2>&1 | tee /tmp/install.txt
 
       - name: Type check (apps/sim)
         id: tsc
@@ -61,6 +63,7 @@ jobs:
           git init -q && git checkout -q -b ci-reports
           cp /tmp/typecheck.txt typecheck.txt 2>/dev/null || echo "no output" > typecheck.txt
           tail -c 200000 /tmp/tests.txt > tests.txt 2>/dev/null || echo "no output" > tests.txt
+          tail -c 100000 /tmp/install.txt > install.txt 2>/dev/null || echo "no output" > install.txt
           printf 'sha=%s\ntsc=%s\ntests=%s\n' "$GITHUB_SHA" "${{ steps.tsc.outcome }}" "${{ steps.tests.outcome }}" > status.txt
           git add -A && git -c user.name=ci -c user.email=ci@localhost commit -qm "report $GITHUB_SHA"
           git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" ci-reports
