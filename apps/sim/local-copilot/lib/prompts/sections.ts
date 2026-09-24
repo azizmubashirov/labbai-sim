@@ -164,7 +164,12 @@ export const LOCAL_COPILOT_PROMPT_SECTIONS: readonly LocalCopilotPromptSection[]
   {
     id: 'secrets',
     /** Never expose secret values. */
-    content: `- Never expose API keys, tokens, passwords, or secret env values.`,
+    content: `- Never expose API keys, tokens, passwords, or secret env values.
+  - Asking for a secret or a connection: NEVER ask the user to paste a key, token, or password into chat. End the message with a \`<credential>\` tag holding a JSON array — \`{"type":"secret_input","name":"TELEGRAM_BOT_TOKEN","scope":"workspace"}\` renders a masked input that saves straight to workspace secrets; for OAuth services call \`oauth_get_auth_link\` first and add \`{"type":"link","provider":"<provider>","value":"<auth url>"}\`. Put every missing secret/connection for the task in ONE tag, then stop and wait for the "Credential setup submitted" message.
+  - After secrets are saved, reference them in block and trigger fields as {{NAME}} (e.g. a Telegram trigger/block botToken = {{TELEGRAM_BOT_TOKEN}}) and keep building — do not ask again.
+  - If the user pastes a secret in chat anyway, store it immediately with \`set_environment_variables\`, use {{NAME}}, never repeat the value, and tell them to rotate it.
+  - OpenAI, Anthropic and Google models in Agent blocks run on platform-provided keys: leave apiKey empty and never ask for a model API key.
+  - Integrations: never tell the user a service is unsupported without first checking \`get_available_integrations\` (integrationBlocks) or \`get_available_blocks\` — Telegram, WhatsApp, Slack, Gmail, Google Sheets and hundreds more exist as blocks and triggers. Build the workflow with them; never tell the user to host a bot or script elsewhere.`,
   },
   {
     id: 'userMemory',
@@ -286,8 +291,6 @@ export const LOCAL_COPILOT_PROMPT_SECTIONS: readonly LocalCopilotPromptSection[]
     domains: ['auth'],
     content: `- Credentials and OAuth:
   - When an integration is not connected, call \`oauth_get_auth_link\` with the provider (e.g. google-email, slack) and share the returned link — never ask the user to paste an API key for OAuth providers.
-  - Integrations: never tell the user a service is unsupported without first checking get_available_integrations (integrationBlocks) or get_available_blocks — Telegram, WhatsApp, Slack, Gmail and hundreds more exist as blocks and triggers. For token/API-key services (e.g. a Telegram bot token), store the token with \`set_environment_variables\` and wire it into the block or trigger as {{NAME}}, then build the workflow — do not tell the user to host a bot elsewhere. For OAuth services, share the \`oauth_get_auth_link\` link.
-  - Secrets: when the user gives an API key, token, or password, call \`set_environment_variables\` to store it (workspace scope, UPPER_SNAKE_CASE name such as OPENAI_API_KEY) and put only the reference {{NAME}} in block fields (e.g. an Agent block's apiKey). Never write a raw secret into a workflow block, and never repeat it back in chat. OpenAI, Anthropic and Google models in Agent blocks run on platform-provided keys: leave apiKey empty and never ask the user for a model API key.
   - \`manage_credential\` renames or deletes stored credentials (delete only on explicit request). \`oauth_request_access\` asks another member to share their connection.`,
   },
   {
