@@ -1,7 +1,7 @@
 'use client'
 
 import { Button, Chip, ChipTextarea, cn } from '@sim/emcn'
-import { Bug, MessageSquarePlus, Sparkles, Trash2 } from 'lucide-react'
+import { Bug, Plus as MessageSquarePlus, Sparkles, Trash as Trash2 } from '@sim/emcn/icons'
 import { ChatContent } from '@/app/workspace/[workspaceId]/home/components/message-content/components/chat-content'
 import { PatchPreview } from '@/local-copilot/components/patch-preview'
 import { SessionMemoryInspector } from '@/local-copilot/components/session-memory-inspector'

@@ -145,7 +145,7 @@ async function canOpenOrganizationSection(
 export async function authorizeWorkspaceSettingsSection(
   input: AuthorizeWorkspaceSettingsSectionInput
 ): Promise<WorkspaceSettingsSectionAccess> {
-  const requiresPlatformAdmin = input.section === 'admin' || input.section === 'mothership'
+  const requiresPlatformAdmin = input.section === 'admin'
   const [access, viewerIsPlatformAdmin] = await Promise.all([
     checkWorkspaceAccess(input.workspaceId, input.userId),
     requiresPlatformAdmin ? isPlatformAdmin(input.userId) : Promise.resolve(false),

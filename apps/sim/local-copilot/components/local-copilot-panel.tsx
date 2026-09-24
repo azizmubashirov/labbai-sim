@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Button, cn } from '@sim/emcn'
-import { X } from 'lucide-react'
+import { X } from '@sim/emcn/icons'
 import { LocalCopilotChat } from '@/local-copilot/components/local-copilot-chat'
 import { useLocalCopilot, useLocalCopilotConfig } from '@/local-copilot/hooks/use-local-copilot'
 

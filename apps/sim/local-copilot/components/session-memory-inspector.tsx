@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Chip, ChipModal, ChipModalBody, ChipModalFooter, ChipModalHeader, cn } from '@sim/emcn'
-import { Brain } from 'lucide-react'
+import { Brain } from '@sim/emcn/icons'
 import type { LocalCopilotSessionMemoryResponse } from '@/local-copilot/contracts/local-copilot'
 import { useLocalCopilotSessionMemory } from '@/local-copilot/hooks/use-local-copilot'
 
