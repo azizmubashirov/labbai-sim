@@ -5,11 +5,6 @@ CREATE TYPE "public"."local_copilot_audit_status" AS ENUM('success', 'failure', 
 --> statement-breakpoint
 CREATE TYPE "public"."local_copilot_default_model" AS ENUM('openai', 'claude', 'gemini-2.5-pro', 'gemini-3.1-pro', 'bedrock-claude-opus-5', 'bedrock-claude-sonnet-5', 'bedrock-claude-opus-4-8', 'bedrock-claude-opus-4-6', 'bedrock-claude-sonnet-4-6', 'bedrock-zai-glm-5', 'bedrock-nemotron-super-3-120b', 'bedrock-mistral-large-3', 'bedrock-llama-3.3-70b', 'bedrock-deepseek-v3.2', 'gemini-3.8-flash', 'vertex-gemini-3.8-flash');
 --> statement-breakpoint
-\restrict lxN9oRSRbg2Am06frM23t8HrXa21r3xUIwGirOBQfGF7CUG1ankZwdhKq7FBIyH
-
-
-SET statement_timeout = 0;
---> statement-breakpoint
 CREATE TABLE public.local_copilot_audit_logs (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     user_id text NOT NULL,
@@ -209,8 +204,6 @@ ALTER TABLE ONLY public.local_copilot_user_memory
 --> statement-breakpoint
 ALTER TABLE ONLY public.local_copilot_user_memory
     ADD CONSTRAINT local_copilot_user_memory_workspace_id_workspace_id_fk FOREIGN KEY (workspace_id) REFERENCES public.workspace(id) ON DELETE CASCADE;
---> statement-breakpoint
-\unrestrict lxN9oRSRbg2Am06frM23t8HrXa21r3xUIwGirOBQfGF7CUG1ankZwdhKq7FBIyH;
 --> statement-breakpoint
 CREATE OR REPLACE FUNCTION insert_local_copilot_user_access()
 RETURNS TRIGGER AS $$
