@@ -417,20 +417,12 @@ export const isMothershipSandboxEnabled = false as boolean
 export const isDocSandboxEnabled = false as boolean
 
 /**
- * Whether Ollama is configured (OLLAMA_URL is set).
- * When true, models that are not in the static cloud model list and have no
- * slash-prefixed provider namespace are assumed to be Ollama models
- * and do not require an API key.
+ * Labbai: there are no Azure OpenAI / Azure Anthropic models — every LLM call goes
+ * to the OpenAI API directly. Kept as a constant `false` because the
+ * deployment shape (`azureConfigured`) still carries the field;
+ * `NEXT_PUBLIC_AZURE_CONFIGURED` is no longer read.
  */
-export const isOllamaConfigured = Boolean(env.OLLAMA_URL)
-
-/**
- * Whether Azure OpenAI / Azure Anthropic credentials are pre-configured at the server level
- * (via AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_ANTHROPIC_ENDPOINT, etc.).
- * When true, the endpoint, API key, and API version fields are hidden in the Agent block UI.
- * Set NEXT_PUBLIC_AZURE_CONFIGURED=true in self-hosted deployments on Azure.
- */
-export const isAzureConfigured = isTruthy(getEnv('NEXT_PUBLIC_AZURE_CONFIGURED'))
+export const isAzureConfigured = false as boolean
 
 /**
  * Whether a Cohere API key is pre-configured server-side for the Knowledge block reranker
@@ -441,18 +433,19 @@ export const isAzureConfigured = isTruthy(getEnv('NEXT_PUBLIC_AZURE_CONFIGURED')
 export const isCohereConfigured = isTruthy(getEnv('NEXT_PUBLIC_COHERE_CONFIGURED'))
 
 /**
- * Labbai: LLM providers whose keys the platform supplies on a self-hosted deployment
- * (OPENAI_API_KEY / ANTHROPIC_API_KEY / GEMINI_API_KEY, or their _1.._3 pools).
- * Agent blocks on these providers hide the API key field and resolve workspace
- * BYOK first, then the server key — the self-hosted equivalent of hosted Sim keys.
- * Comma-separated provider ids, e.g. `openai,anthropic,google`.
+ * Labbai: LLM providers whose credentials the platform supplies server-side.
+ * Blocks on these providers never show an API key field. `openai` (the only LLM
+ * provider) is always included: its key (`OPENAI_API_KEY`) lives in the server
+ * env. `NEXT_PUBLIC_PLATFORM_LLM_PROVIDERS` is still read (comma-separated
+ * provider ids) so a deployment can list more.
  */
-export const platformLlmProviders: ReadonlySet<string> = new Set(
-  (getEnv('NEXT_PUBLIC_PLATFORM_LLM_PROVIDERS') ?? '')
+export const platformLlmProviders: ReadonlySet<string> = new Set([
+  'openai',
+  ...(getEnv('NEXT_PUBLIC_PLATFORM_LLM_PROVIDERS') ?? '')
     .split(',')
     .map((id) => id.trim().toLowerCase())
-    .filter(Boolean)
-)
+    .filter(Boolean),
+])
 
 /**
  * Are invitations disabled globally

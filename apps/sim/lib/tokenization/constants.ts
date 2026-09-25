@@ -5,86 +5,12 @@
 import type { ProviderTokenizationConfig } from '@/lib/tokenization/types'
 
 export const TOKENIZATION_CONFIG = {
+  /** Labbai: OpenAI is the only LLM provider; any other id uses `fallback`. */
   providers: {
     openai: {
       avgCharsPerToken: 4,
       confidence: 'high',
       supportedMethods: ['heuristic', 'fallback'],
-    },
-    'azure-openai': {
-      avgCharsPerToken: 4,
-      confidence: 'high',
-      supportedMethods: ['heuristic', 'fallback'],
-    },
-    anthropic: {
-      avgCharsPerToken: 4.5,
-      confidence: 'high',
-      supportedMethods: ['heuristic', 'fallback'],
-    },
-    'azure-anthropic': {
-      avgCharsPerToken: 4.5,
-      confidence: 'high',
-      supportedMethods: ['heuristic', 'fallback'],
-    },
-    google: {
-      avgCharsPerToken: 5,
-      confidence: 'medium',
-      supportedMethods: ['heuristic', 'fallback'],
-    },
-    deepseek: {
-      avgCharsPerToken: 4,
-      confidence: 'medium',
-      supportedMethods: ['heuristic', 'fallback'],
-    },
-    xai: {
-      avgCharsPerToken: 4,
-      confidence: 'medium',
-      supportedMethods: ['heuristic', 'fallback'],
-    },
-    cerebras: {
-      avgCharsPerToken: 4,
-      confidence: 'medium',
-      supportedMethods: ['heuristic', 'fallback'],
-    },
-    mistral: {
-      avgCharsPerToken: 4,
-      confidence: 'medium',
-      supportedMethods: ['heuristic', 'fallback'],
-    },
-    groq: {
-      avgCharsPerToken: 4,
-      confidence: 'medium',
-      supportedMethods: ['heuristic', 'fallback'],
-    },
-    sakana: {
-      avgCharsPerToken: 4,
-      confidence: 'medium',
-      supportedMethods: ['heuristic', 'fallback'],
-    },
-    nvidia: {
-      avgCharsPerToken: 4,
-      confidence: 'medium',
-      supportedMethods: ['heuristic', 'fallback'],
-    },
-    meta: {
-      avgCharsPerToken: 4,
-      confidence: 'medium',
-      supportedMethods: ['heuristic', 'fallback'],
-    },
-    zai: {
-      avgCharsPerToken: 4,
-      confidence: 'medium',
-      supportedMethods: ['heuristic', 'fallback'],
-    },
-    kimi: {
-      avgCharsPerToken: 4,
-      confidence: 'medium',
-      supportedMethods: ['heuristic', 'fallback'],
-    },
-    ollama: {
-      avgCharsPerToken: 4,
-      confidence: 'low',
-      supportedMethods: ['fallback'],
     },
   } satisfies Record<string, ProviderTokenizationConfig>,
 
@@ -95,7 +21,7 @@ export const TOKENIZATION_CONFIG = {
   } satisfies ProviderTokenizationConfig,
 
   defaults: {
-    model: 'gpt-4o',
+    model: 'gpt-5-mini',
     provider: 'openai',
   },
 } as const

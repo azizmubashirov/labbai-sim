@@ -2,7 +2,6 @@ import { createLogger } from '@sim/logger'
 import { toError } from '@sim/utils/errors'
 import { generateShortId } from '@sim/utils/id'
 import { omit } from '@sim/utils/object'
-import { isHosted as isHostedDeployment } from '@/lib/core/config/env-flags'
 import { isIntegrationDeploymentAvailableForVisibility } from '@/lib/integrations/availability.server'
 import { mcpOperationPolicySchema } from '@/lib/mcp/operation-policy'
 import { MCP_SERVER_ADVANCED_TOOL_TYPE } from '@/lib/mcp/shared'
@@ -35,7 +34,6 @@ import { getModelOptions } from '@/blocks/utils'
 import { overlayVisibility } from '@/blocks/visibility/context'
 import { BlockType, EDGE, normalizeName } from '@/executor/constants'
 import {
-  isAutoModel,
   isCustomModelId,
   isKnownModelId,
   suggestModelIdsForUnknownModel,
@@ -389,7 +387,7 @@ function validateAgentSkillEntry(item: any, index: number): string | null {
 /**
  * Validates one fallback-model row. Returns an error string or null when valid.
  *
- * Refuses rather than repairs: an unknown model, sim-auto, or a raw key is an
+ * Refuses rather than repairs: an unknown model or a raw key is an
  * authoring mistake the caller must see. A missing React-key `id` is the one
  * thing filled in, since it carries no meaning.
  */
@@ -401,9 +399,6 @@ function validateFallbackModelEntry(item: any, index: number): string | null {
   const model = typeof item.model === 'string' ? item.model.trim() : ''
   if (model === '') {
     return `${where} is missing a string "model"`
-  }
-  if (isAutoModel(model)) {
-    return `${where}: sim-auto cannot be a fallback model; it already routes and falls back on its own`
   }
   if (!isKnownModelId(model) && !isCustomModelId(model)) {
     const suggestions = suggestModelIdsForUnknownModel(model)
@@ -783,12 +778,6 @@ export function validateValueForSubBlockType(
       if (usesProviderCatalog) {
         const stringValue = typeof value === 'string' ? value : String(value)
         const trimmed = stringValue.trim()
-        // sim-auto is a valid model value on hosted Sim only (mirrors the
-        // options array the agent reads: it is absent from self-hosted
-        // snapshots, so writes of it there are rejected as unknown).
-        if (trimmed !== '' && isAutoModel(trimmed) && isHostedDeployment) {
-          return { valid: true, value: trimmed.toLowerCase() }
-        }
         if (trimmed !== '' && !isKnownModelId(trimmed) && !isCustomModelId(trimmed)) {
           const suggestions = suggestModelIdsForUnknownModel(trimmed)
           const suggestionText =
@@ -800,7 +789,7 @@ export function validateValueForSubBlockType(
               blockType,
               field: fieldName,
               value,
-              error: `Unknown model id "${trimmed}" for block "${blockType}". Read components/blocks/${blockType}.json (the model.options array) for valid ids; prefer entries with recommended: true and avoid deprecated: true. For user-configured models, use a supported provider namespace, e.g. "azure/my-deployment", "azure-anthropic/my-deployment", "bedrock/my-inference-profile", "vertex/my-model", "ollama/llama3.1:8b", or "openrouter/provider/model".${suggestionText}`,
+              error: `Unknown model id "${trimmed}" for block "${blockType}". Read components/blocks/${blockType}.json (the model.options array) for valid ids; prefer entries with recommended: true and avoid deprecated: true.${suggestionText}`,
             },
           }
         }

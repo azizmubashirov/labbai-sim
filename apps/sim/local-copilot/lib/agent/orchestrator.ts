@@ -63,7 +63,6 @@ import {
   compactChatHistory,
   estimateChatMessagesTokens,
   estimateToolDefinitionTokens,
-  LOCAL_COPILOT_BEDROCK_WORKFLOW_FULL_STATE_TOKEN_BUDGET,
   LOCAL_COPILOT_WORKFLOW_FULL_STATE_TOKEN_BUDGET,
   resolveLocalCopilotMaxOutputTokens,
   resolveLocalCopilotPromptTokenBudget,
@@ -453,10 +452,7 @@ export async function* runLocalCopilotAgent(
   const historyMessages = historyMicrocompact.messages
 
   const tokenCountModel = resolveLocalCopilotTokenCountModel(config.model, config.provider)
-  const workflowFullStateTokenBudget =
-    config.provider === 'bedrock'
-      ? LOCAL_COPILOT_BEDROCK_WORKFLOW_FULL_STATE_TOKEN_BUDGET
-      : LOCAL_COPILOT_WORKFLOW_FULL_STATE_TOKEN_BUDGET
+  const workflowFullStateTokenBudget = LOCAL_COPILOT_WORKFLOW_FULL_STATE_TOKEN_BUDGET
   const workflowDetail = resolveWorkflowContextDetail(
     structuredContext,
     workflowFullStateTokenBudget,
@@ -912,21 +908,20 @@ export async function* runLocalCopilotAgent(
       id: string
       name: string
       arguments: string
-      thoughtSignature?: string
     }> = []
     let roundInputTokens = 0
     let roundOutputTokens = 0
     let roundCacheReadTokens: number | undefined
     let roundCacheCreationTokens: number | undefined
 
-    // Keep tools attached even for `final_only` — Bedrock rejects requests that
-    // omit toolConfig once history already has toolUse/toolResult blocks.
+    // Keep tools attached even for `final_only` — some OpenAI-compatible endpoints
+    // reject requests that omit tools once history has tool calls.
     const roundTools = resolvePostBuildRoundTools(postBuildToolMode, tools)
 
     // Stream user-facing prose live for real replies. Hold bridging narration when
     // tools are available, and stop emitting once a tool_call arrives — otherwise
     // each tool batch opens a repeated "Arena Copilot >" mothership header.
-    // `final_only` still attaches tools for Bedrock but expects a text reply.
+    // `final_only` still attaches tools but expects a text reply.
     const contentBeforeRound = streamedUserFacingText
     const textStreamer = createAssistantRoundTextStreamer({
       toolsAvailable: roundTools.length > 0 && postBuildToolMode !== 'final_only',
@@ -1150,7 +1145,7 @@ export async function* runLocalCopilotAgent(
       break
     }
 
-    // Post-build text round still attaches tools for Bedrock; discard any calls.
+    // Post-build text round still attaches tools; discard any calls.
     if (postBuildToolMode === 'final_only') {
       logger.info('Arena Copilot discarding post-build tool calls', {
         round,
@@ -2129,7 +2124,7 @@ export async function* runLocalCopilotAgent(
 
   if (stagnationStopMessage) {
     // One more model round with the stagnation system nudge. Keep tools attached
-    // — Bedrock requires toolConfig when history already has tool content.
+    // — some providers require tools when history already has tool content.
     // If the model stays silent, surface the stop message directly.
     const priorAssistantChars = assistantText.length
     for await (const event of iterateWithIdleStatus({

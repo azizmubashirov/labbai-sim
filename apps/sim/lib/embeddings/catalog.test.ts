@@ -8,7 +8,7 @@ import {
   getEmbeddingModelInfo,
   getKbEligibleModels,
   getKbEmbeddingDimensions,
-  getModelsForProvider,
+  normalizeEmbeddingModelId,
   hasApproximateTokenCount,
   KB_EMBEDDING_STORAGE_DIMENSIONS,
   resolveDimensions,
@@ -34,11 +34,7 @@ describe('embedding catalog', () => {
   it('offers the native size among the Matryoshka options, largest first', () => {
     for (const [modelId, info] of Object.entries(EMBEDDING_MODELS)) {
       if (!info.supportedDimensions) continue
-      /**
-       * The native size must be selectable — it is what the block pre-selects —
-       * but need not lead the list: codestral-embed defaults to 1536 and tops
-       * out at 3072, so its options straddle the default.
-       */
+      // The native size must be selectable — it is what the block pre-selects.
       expect(
         info.supportedDimensions.includes(info.nativeDimensions),
         `${modelId} does not offer its native size`
@@ -70,46 +66,37 @@ describe('embedding catalog', () => {
     }
   })
 
-  it('resolves an ollama-prefixed model to every storable width', () => {
-    const info = getEmbeddingModelInfo('ollama/nomic-embed-text')
-    expect(info.provider).toBe('ollama')
-    expect(getKbEmbeddingDimensions(info)).toEqual([...KB_EMBEDDING_STORAGE_DIMENSIONS])
-    expect(findEmbeddingModelInfo('ollama/')).toBeUndefined()
-  })
-
-  it('keeps the KB-eligible set to the three models knowledge bases already index with', () => {
+  it('keeps the KB-eligible set to the one OpenAI model knowledge bases index with', () => {
     // Widening this set changes which models KB_EMBEDDING_MODEL accepts, so it
-    // is a deliberate decision rather than a side effect of adding a provider.
-    expect(getKbEligibleModels().sort()).toEqual([
-      'gemini-embedding-001',
-      'text-embedding-3-large',
-      'text-embedding-3-small',
-    ])
+    // is a deliberate decision rather than a side effect of adding a model.
+    expect(getKbEligibleModels()).toEqual(['text-embedding-3-small'])
   })
 
-  it('groups models under the provider that actually serves them', () => {
-    expect(getModelsForProvider('gemini')).toEqual(['gemini-embedding-001'])
-    expect(getModelsForProvider('cohere')).toEqual(['embed-v4.0'])
-    expect(getModelsForProvider('mistral')).toEqual(['mistral-embed', 'codestral-embed'])
+  it('resolves the openai/-prefixed spelling to the same entry', () => {
+    expect(normalizeEmbeddingModelId('openai/text-embedding-3-small')).toBe(
+      'text-embedding-3-small'
+    )
+    expect(findEmbeddingModelInfo('openai/text-embedding-3-small')).toBe(
+      EMBEDDING_MODELS['text-embedding-3-small']
+    )
+    expect(findEmbeddingModelInfo('gemini-embedding-001')).toBeUndefined()
+    expect(findEmbeddingModelInfo('ollama/nomic-embed-text')).toBeUndefined()
   })
 })
 
 describe('resolveDimensions', () => {
-  const gemini = EMBEDDING_MODELS['gemini-embedding-001']
-  const ada = EMBEDDING_MODELS['text-embedding-ada-002']
+  const small = EMBEDDING_MODELS['text-embedding-3-small']
 
   it('falls back to native when nothing is requested', () => {
-    expect(resolveDimensions(gemini)).toBe(3072)
-    expect(resolveDimensions(ada)).toBe(1536)
+    expect(resolveDimensions(small)).toBe(1536)
   })
 
   it('accepts a supported reduction', () => {
-    expect(resolveDimensions(gemini, 768)).toBe(768)
+    expect(resolveDimensions(small, 768)).toBe(768)
   })
 
   it('rejects an unsupported size and names what is allowed', () => {
-    expect(() => resolveDimensions(gemini, 999)).toThrow(/does not support 999/)
-    expect(() => resolveDimensions(ada, 256)).toThrow(/does not support 256/)
+    expect(() => resolveDimensions(small, 999)).toThrow(/does not support 999/)
   })
 })
 
@@ -121,14 +108,9 @@ describe('resolveDimensions', () => {
  * which is strictly worse than the visible rejection it would guard against.
  */
 describe('hasApproximateTokenCount', () => {
-  it('is false only for tiktoken-native models', () => {
+  it('is false for every catalogued (tiktoken-native OpenAI) model', () => {
     for (const [id, info] of Object.entries(EMBEDDING_MODELS)) {
-      expect(hasApproximateTokenCount(info), id).toBe(info.tokenizerProvider !== 'openai')
+      expect(hasApproximateTokenCount(info), id).toBe(false)
     }
-  })
-
-  it('covers at least one model, so the flag stays meaningful', () => {
-    const approximate = Object.values(EMBEDDING_MODELS).filter(hasApproximateTokenCount)
-    expect(approximate.length).toBeGreaterThan(0)
   })
 })

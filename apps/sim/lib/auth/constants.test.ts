@@ -36,7 +36,6 @@ describe('sign-in provider allowlist', () => {
       'wordpress',
       'google-drive',
       'google-sheets',
-      'vertex-ai',
     ]
     for (const providerId of connectors) {
       expect(isSignInProviderAllowed(providerId)).toBe(false)

@@ -1,6 +1,6 @@
 /**
  * Shared plumbing for the per-provider live streaming tool loops
- * (`providers/{anthropic,openai-compat,gemini,bedrock}/streaming-tool-loop.ts`).
+ * (`providers/openai/streaming-tool-loop.ts` and the shared `openai-compat` loop).
  *
  * The wire handling in each loop is provider-specific; everything here is the
  * provider-agnostic contract they share.
@@ -16,16 +16,7 @@ import type { AgentStreamEvent, ToolCallEndStatus } from '@/providers/stream-eve
  * capability reporting consume this set; providers select their own internal
  * loop from request shape. Event exposure is controlled separately.
  */
-export const STREAMING_TOOL_CALL_PROVIDERS: ReadonlySet<string> = new Set([
-  'openai',
-  'anthropic',
-  'azure-anthropic',
-  'groq',
-  'deepseek',
-  'google',
-  'vertex',
-  'bedrock',
-])
+export const STREAMING_TOOL_CALL_PROVIDERS: ReadonlySet<string> = new Set(['openai'])
 
 /** Aggregate result reported by a streaming tool loop when its stream closes. */
 export interface StreamingToolLoopComplete {

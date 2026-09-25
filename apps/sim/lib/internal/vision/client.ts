@@ -1,19 +1,11 @@
-import { GoogleGenAI } from '@google/genai'
 import { createLogger } from '@sim/logger'
 import { toRecord } from '@sim/utils/object'
 import type { EgressProfile } from '@/lib/core/security/egress/profiles'
-import {
-  MAX_JSON_API_RESPONSE_BYTES,
-  secureFetchWithPinnedIP,
-} from '@/lib/core/security/input-validation.server'
-import {
-  consumeOrCancelBody,
-  readResponseJsonWithLimit,
-  readResponseToBufferWithLimit,
-} from '@/lib/core/utils/stream-limits'
+import { MAX_JSON_API_RESPONSE_BYTES } from '@/lib/core/security/input-validation.server'
+import { readResponseJsonWithLimit } from '@/lib/core/utils/stream-limits'
 import { VisionOperationError } from '@/lib/internal/vision/errors'
-import { MAX_BUFFERED_TRANSFER_BYTES } from '@/lib/uploads/shared/types'
-import { convertUsageMetadata, extractTextContent } from '@/providers/google/utils'
+import { getOpenAIBaseUrl, getOpenAIExtraHeaders } from '@/providers/openai/client-config'
+import { isOpenAIReasoningModelId, resolveOpenAIModelId } from '@/providers/openai/model-ids'
 
 const logger = createLogger('VisionClient')
 const MAX_PROVIDER_ERROR_BYTES = 64 * 1024
@@ -76,97 +68,17 @@ async function readProviderError(response: Response, signal?: AbortSignal): Prom
   })
 }
 
-function parseDataImage(imageSource: string): { mediaType: string; base64Data: string } {
-  const marker = ';base64,'
-  const markerIndex = imageSource.indexOf(marker)
-  if (!imageSource.startsWith('data:') || markerIndex === -1) {
-    throw new VisionOperationError('Invalid base64 image format', 400)
-  }
-  const rawMimeType = imageSource.slice('data:'.length, markerIndex)
-  const mediaType = rawMimeType.split(';')[0] || 'image/jpeg'
-  const base64Data = imageSource.slice(markerIndex + marker.length)
-  if (!base64Data) throw new VisionOperationError('Invalid base64 image format', 400)
-  return { mediaType, base64Data }
+/**
+ * Output budget. GPT-5 family models spend part of it on hidden reasoning, so
+ * they get a larger allowance than a non-reasoning model needs for a description.
+ */
+function maxCompletionTokens(model: string): number {
+  return isOpenAIReasoningModelId(model) ? 4096 : 1000
 }
 
-async function fetchGeminiImage(input: VisionClientInput, signal?: AbortSignal): Promise<string> {
-  if (input.imageSource.startsWith('data:')) return input.imageSource
-  if (!input.remoteImageResolvedIP) {
-    throw new VisionOperationError('Invalid image URL', 400)
-  }
-
-  const response = await secureFetchWithPinnedIP(input.imageSource, input.remoteImageResolvedIP, {
-    profile: input.remoteImageProfile ?? 'contentFetch',
-    method: 'GET',
-    maxResponseBytes: MAX_BUFFERED_TRANSFER_BYTES,
-    signal,
-  })
-  if (!response.ok) {
-    await consumeOrCancelBody(response)
-    throw new VisionOperationError('Failed to fetch image for Gemini', 400)
-  }
-  const contentType = response.headers.get('content-type') || input.imageContentType || 'image/jpeg'
-  const buffer = await readResponseToBufferWithLimit(response, {
-    maxBytes: MAX_BUFFERED_TRANSFER_BYTES,
-    label: 'Gemini source image',
-    signal,
-  })
-  return `data:${contentType};base64,${buffer.toString('base64')}`
-}
-
-async function analyzeWithGemini(
-  input: VisionClientInput,
-  signal?: AbortSignal
-): Promise<VisionAnalysisResult> {
-  signal?.throwIfAborted()
-  const base64Payload = await fetchGeminiImage(input, signal)
-  const { mediaType, base64Data } = parseDataImage(base64Payload)
-  const ai = new GoogleGenAI({ apiKey: input.apiKey })
-  const response = await ai.models.generateContent({
-    model: input.model,
-    contents: [
-      {
-        role: 'user',
-        parts: [{ text: input.prompt }, { inlineData: { mimeType: mediaType, data: base64Data } }],
-      },
-    ],
-    config: { abortSignal: signal },
-  })
-  signal?.throwIfAborted()
-  const usage = convertUsageMetadata(response.usageMetadata)
+function openAiRequest(input: VisionClientInput, model: string): Record<string, unknown> {
   return {
-    content: extractTextContent(response.candidates?.[0]),
-    model: input.model,
-    tokens: usage.totalTokenCount || undefined,
-  }
-}
-
-function anthropicRequest(input: VisionClientInput): Record<string, unknown> {
-  const source = input.imageSource.startsWith('data:')
-    ? (() => {
-        const match = input.imageSource.match(/^data:([^;]+);base64,(.+)$/)
-        if (!match) throw new VisionOperationError('Invalid base64 image format', 400)
-        return { type: 'base64', media_type: match[1], data: match[2] }
-      })()
-    : { type: 'url', url: input.imageSource }
-  return {
-    model: input.model,
-    max_tokens: 1024,
-    messages: [
-      {
-        role: 'user',
-        content: [
-          { type: 'text', text: input.prompt },
-          { type: 'image', source },
-        ],
-      },
-    ],
-  }
-}
-
-function openAiRequest(input: VisionClientInput): Record<string, unknown> {
-  return {
-    model: input.model,
+    model,
     messages: [
       {
         role: 'user',
@@ -176,31 +88,32 @@ function openAiRequest(input: VisionClientInput): Record<string, unknown> {
         ],
       },
     ],
-    max_completion_tokens: 1000,
+    max_completion_tokens: maxCompletionTokens(model),
   }
 }
 
-async function analyzeWithHttpProvider(
+/**
+ * Labbai: vision runs on OpenAI only (chat completions with an `image_url` part,
+ * at `OPENAI_BASE_URL`). A stored Claude / Gemini / retired OpenAI model id maps
+ * to the closest curated OpenAI model via {@link resolveOpenAIModelId}. The
+ * caller's key is an OpenAI key.
+ */
+export async function analyzeVision(
   input: VisionClientInput,
   signal?: AbortSignal
 ): Promise<VisionAnalysisResult> {
-  const isClaude = input.model.startsWith('claude-')
-  const apiUrl = isClaude
-    ? 'https://api.anthropic.com/v1/messages'
-    : 'https://api.openai.com/v1/chat/completions'
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-  if (isClaude) {
-    headers['x-api-key'] = input.apiKey
-    headers['anthropic-version'] = '2023-06-01'
-  } else {
-    headers.Authorization = `Bearer ${input.apiKey}`
+  const model = resolveOpenAIModelId(input.model)
+  const headers: Record<string, string> = {
+    ...getOpenAIExtraHeaders(),
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${input.apiKey}`,
   }
 
   signal?.throwIfAborted()
-  const response = await fetch(apiUrl, {
+  const response = await fetch(`${getOpenAIBaseUrl()}/chat/completions`, {
     method: 'POST',
     headers,
-    body: JSON.stringify(isClaude ? anthropicRequest(input) : openAiRequest(input)),
+    body: JSON.stringify(openAiRequest(input, model)),
     signal,
   })
   signal?.throwIfAborted()
@@ -208,7 +121,7 @@ async function analyzeWithHttpProvider(
     const error = await readProviderError(response, signal)
     signal?.throwIfAborted()
     logger.error('Vision provider request failed', {
-      model: input.model,
+      model,
       status: response.status,
       error,
     })
@@ -217,16 +130,15 @@ async function analyzeWithHttpProvider(
 
   const data = record(await readProviderJson(response, signal))
   const usage = record(data.usage)
-  const content = Array.isArray(data.content) ? record(data.content[0]) : {}
   const choices = Array.isArray(data.choices) ? record(data.choices[0]) : {}
   const message = record(choices.message)
-  const inputTokens = number(usage.input_tokens)
-  const outputTokens = number(usage.output_tokens)
+  const inputTokens = number(usage.prompt_tokens) ?? number(usage.input_tokens)
+  const outputTokens = number(usage.completion_tokens) ?? number(usage.output_tokens)
   const totalTokens = number(usage.total_tokens)
   return {
-    content: string(content.text) || string(message.content),
-    model: string(data.model),
-    tokens: Array.isArray(data.content) ? (inputTokens || 0) + (outputTokens || 0) : totalTokens,
+    content: string(message.content),
+    model: string(data.model) ?? model,
+    tokens: totalTokens,
     usage:
       Object.keys(usage).length > 0
         ? {
@@ -236,13 +148,4 @@ async function analyzeWithHttpProvider(
           }
         : undefined,
   }
-}
-
-export async function analyzeVision(
-  input: VisionClientInput,
-  signal?: AbortSignal
-): Promise<VisionAnalysisResult> {
-  return input.model.startsWith('gemini-')
-    ? analyzeWithGemini(input, signal)
-    : analyzeWithHttpProvider(input, signal)
 }

@@ -11,8 +11,8 @@ import type {
 import { findCatalogModel } from '@/local-copilot/lib/compat'
 
 /**
- * Stable tiktoken encoding for prompt fitting. Bedrock IDs have no encoding and
- * would otherwise under-count Claude/JSON tokens via a silent gpt-4 fallback.
+ * Stable tiktoken encoding for prompt fitting. Model ids without a tiktoken
+ * encoding would otherwise under-count tokens via a silent gpt-4 fallback.
  */
 export const LOCAL_COPILOT_TOKEN_COUNT_MODEL = 'gpt-4o'
 
@@ -25,36 +25,11 @@ const DEFAULT_TOKEN_COUNT_MODEL = LOCAL_COPILOT_TOKEN_COUNT_MODEL
  */
 export const LOCAL_COPILOT_PROMPT_TOKEN_BUDGET = 120_000
 
-/**
- * Higher soft ceiling for Gemini 3.8 Flash (1M context). Still well below the
- * catalog window so cost/latency stay bounded for Local Copilot turns.
- */
-export const LOCAL_COPILOT_GEMINI_38_FLASH_PROMPT_TOKEN_BUDGET = 300_000
-
-/**
- * Tighter ceiling for Bedrock Converse. Catalog Claude entries list 1M windows
- * (and Llama Scout 10M) but on-demand Converse is typically 200k without the
- * 1M beta, Llama/Mistral/GLM do not cache, and tiktoken undercounts Claude.
- */
-export const LOCAL_COPILOT_BEDROCK_PROMPT_TOKEN_BUDGET = 48_000
-
-/**
- * Budgeting cap for Bedrock catalog windows. Extended 1M Claude on Bedrock
- * requires a beta header we do not send.
- */
-export const LOCAL_COPILOT_BEDROCK_CONTEXT_WINDOW_CAP = 200_000
-
 /** Floor so extreme reservations still leave a usable prompt. */
 export const LOCAL_COPILOT_MIN_PROMPT_TOKEN_BUDGET = 8_000
 
-/** Matches Bedrock/Anthropic local-copilot default `maxTokens`. */
+/** Default local-copilot `maxTokens`. */
 export const LOCAL_COPILOT_DEFAULT_MAX_OUTPUT_TOKENS = 8_192
-
-/**
- * Higher generation cap for Gemini 3.8 Flash (catalog max 65,536). 32k leaves
- * headroom for thinking/tool turns without spending the full output quota.
- */
-export const LOCAL_COPILOT_GEMINI_38_FLASH_MAX_OUTPUT_TOKENS = 32_768
 
 /**
  * Headroom for tokenizer mismatch, message framing, and cache/tool overhead
@@ -62,21 +37,15 @@ export const LOCAL_COPILOT_GEMINI_38_FLASH_MAX_OUTPUT_TOKENS = 32_768
  */
 export const LOCAL_COPILOT_CONTEXT_SAFETY_BUFFER_TOKENS = 4_000
 
-/** Extra Converse framing / toolConfig / cache-point overhead on Bedrock. */
-export const LOCAL_COPILOT_BEDROCK_CONTEXT_SAFETY_BUFFER_TOKENS = 8_000
-
 /** Assumed window when the model is missing from the pricing catalog. */
 export const LOCAL_COPILOT_DEFAULT_CONTEXT_WINDOW = 128_000
 
 /** Workflow JSON above this size is sent as block summaries instead of full state. */
 export const LOCAL_COPILOT_WORKFLOW_FULL_STATE_TOKEN_BUDGET = 24_000
 
-/** Compact sooner on Bedrock so multi-agent graphs do not fill the 48k cap. */
-export const LOCAL_COPILOT_BEDROCK_WORKFLOW_FULL_STATE_TOKEN_BUDGET = 8_000
-
 export interface ResolveLocalCopilotPromptTokenBudgetOptions {
   model: string
-  /** When `bedrock`, applies the tighter Converse window and soft cap. */
+  /** Active transport (kept for call-site compat; budgets are model-driven). */
   provider?: LocalCopilotProviderId
   /** Estimated tokens for tool definitions sent beside the prompt. */
   toolDefinitionTokens?: number
@@ -101,15 +70,12 @@ export interface ResolvedLocalCopilotPromptTokenBudget {
  * Resolves a model-aware prompt token budget:
  * `min(softCap, max(minBudget, contextWindow − maxOutput − tools − safety))`.
  *
- * Smaller Bedrock windows (e.g. Llama 128k) shrink below the 120k soft cap so
- * input + tools + maxTokens fit. Larger Anthropic/OpenAI windows stay
- * soft-capped at 120k. Bedrock uses a 48k soft cap and a 200k window cap.
- * Gemini 3.8 Flash uses a 300k soft cap.
+ * Smaller windows shrink below the 120k soft cap so input + tools + maxTokens
+ * fit. Larger OpenAI windows stay soft-capped at 120k.
  */
 export function resolveLocalCopilotPromptTokenBudget(
   options: ResolveLocalCopilotPromptTokenBudgetOptions
 ): ResolvedLocalCopilotPromptTokenBudget {
-  const isBedrock = options.provider === 'bedrock'
   const softCap =
     options.softCap ?? resolveDefaultPromptTokenSoftCap(options.model, options.provider)
   const maxOutputTokens = Math.max(
@@ -117,20 +83,15 @@ export function resolveLocalCopilotPromptTokenBudget(
     options.maxOutputTokens ?? LOCAL_COPILOT_DEFAULT_MAX_OUTPUT_TOKENS
   )
   const toolDefinitionTokens = Math.max(0, Math.ceil(options.toolDefinitionTokens ?? 0))
-  const safetyBuffer = isBedrock
-    ? LOCAL_COPILOT_BEDROCK_CONTEXT_SAFETY_BUFFER_TOKENS
-    : LOCAL_COPILOT_CONTEXT_SAFETY_BUFFER_TOKENS
+  const safetyBuffer = LOCAL_COPILOT_CONTEXT_SAFETY_BUFFER_TOKENS
   const reservedTokens = maxOutputTokens + toolDefinitionTokens + safetyBuffer
 
   const catalog = findCatalogModel(options.model)
   const catalogWindow = catalog?.model.contextWindow
-  let contextWindow =
+  const contextWindow =
     typeof catalogWindow === 'number' && catalogWindow > 0
       ? catalogWindow
       : LOCAL_COPILOT_DEFAULT_CONTEXT_WINDOW
-  if (isBedrock) {
-    contextWindow = Math.min(contextWindow, LOCAL_COPILOT_BEDROCK_CONTEXT_WINDOW_CAP)
-  }
 
   const usable = Math.max(LOCAL_COPILOT_MIN_PROMPT_TOKEN_BUDGET, contextWindow - reservedTokens)
   const softCapped = usable > softCap
@@ -144,45 +105,32 @@ export function resolveLocalCopilotPromptTokenBudget(
  * call site.
  */
 export function resolveDefaultPromptTokenSoftCap(
-  model: string,
-  provider?: LocalCopilotProviderId
+  _model: string,
+  _provider?: LocalCopilotProviderId
 ): number {
-  if (provider === 'bedrock') return LOCAL_COPILOT_BEDROCK_PROMPT_TOKEN_BUDGET
-  const normalized = normalizeLocalCopilotModelId(model)
-  if (normalized === 'gemini-3.8-flash') {
-    return LOCAL_COPILOT_GEMINI_38_FLASH_PROMPT_TOKEN_BUDGET
-  }
   return LOCAL_COPILOT_PROMPT_TOKEN_BUDGET
 }
 
 /**
- * Max completion tokens for a Local Copilot parent/specialist request.
- * Gemini 3.8 Flash gets 32k; everyone else keeps the 8k default.
+ * Max completion tokens for a Local Copilot parent/specialist request (8k).
+ * OpenAI reasoning models raise it to their own floor in the provider.
  */
-export function resolveLocalCopilotMaxOutputTokens(model: string): number {
-  const normalized = normalizeLocalCopilotModelId(model)
-  if (normalized === 'gemini-3.8-flash') {
-    return LOCAL_COPILOT_GEMINI_38_FLASH_MAX_OUTPUT_TOKENS
-  }
+export function resolveLocalCopilotMaxOutputTokens(_model: string): number {
   return LOCAL_COPILOT_DEFAULT_MAX_OUTPUT_TOKENS
 }
 
-function normalizeLocalCopilotModelId(model: string): string {
-  return model
-    .toLowerCase()
-    .replace(/^vertex\//, '')
-    .trim()
-}
-
 /**
- * Encoding used to fit prompts. Bedrock model IDs are not in tiktoken.
+ * Encoding used to fit prompts. OpenAI GPT ids (bare or `openai/...`) use their
+ * own encoding; anything else (e.g. a custom `COPILOT_MODEL` on an
+ * openai-compatible endpoint) counts with {@link LOCAL_COPILOT_TOKEN_COUNT_MODEL}.
  */
 export function resolveLocalCopilotTokenCountModel(
   model: string,
-  provider?: LocalCopilotProviderId
+  _provider?: LocalCopilotProviderId
 ): string {
-  if (provider === 'bedrock') return LOCAL_COPILOT_TOKEN_COUNT_MODEL
-  return model || DEFAULT_TOKEN_COUNT_MODEL
+  const id = model.trim().replace(/^openai\//i, '')
+  if (!id || id.includes('/')) return DEFAULT_TOKEN_COUNT_MODEL
+  return /^(gpt|o\d|chatgpt)/i.test(id) ? id : DEFAULT_TOKEN_COUNT_MODEL
 }
 
 /** Recent user/assistant turns kept verbatim (full message bodies) in chat history. */

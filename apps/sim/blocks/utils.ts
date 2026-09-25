@@ -1,32 +1,16 @@
 import { toError } from '@sim/utils/errors'
-import { SimAutoIcon } from '@/components/icons'
 import { getDeploymentShape } from '@/lib/core/config/deployment-shape'
-import { getEnv, isTruthy } from '@/lib/core/config/env'
-import { isOllamaConfigured, platformLlmProviders } from '@/lib/core/config/env-flags'
-import { getScopesForService } from '@/lib/oauth/utils'
+import { platformLlmProviders } from '@/lib/core/config/env-flags'
 import { containsReference } from '@/lib/workflows/sanitization/references'
 import type { SubBlockConfig } from '@/blocks/types'
 import {
-  findProviderFromModel,
-  getBaseModelProviders,
-  getHostedModels,
   getModelSunsetStatus,
   getProviderIcon,
-  getProviderModels,
-  isAutoModel,
-  isCustomModelId,
   isEvaluationModel,
-  orderModelIdsByReleaseDate,
-  SIM_AUTO_MODEL_ID,
+  PROVIDER_DEFINITIONS,
 } from '@/providers/models'
 import type { ProviderId } from '@/providers/types'
 import { getProviderFromModel } from '@/providers/utils'
-import { useProvidersStore } from '@/stores/providers/store'
-
-export const AZURE_MODELS = [
-  ...getProviderModels('azure-openai'),
-  ...getProviderModels('azure-anthropic'),
-]
 
 /**
  * Standard subblocks for Google service account impersonation.
@@ -49,7 +33,8 @@ export const SERVICE_ACCOUNT_SUBBLOCKS: SubBlockConfig[] = [
 ]
 
 /**
- * Returns model options for combobox subblocks, combining all provider sources.
+ * Returns model options for combobox subblocks: the curated OpenAI catalog
+ * (Labbai runs on OpenAI only — no dynamic providers, no local model servers).
  */
 export function getModelOptions() {
   return buildModelOptions(false)
@@ -61,31 +46,8 @@ export function getAgentModelOptions() {
 }
 
 function buildModelOptions(includeEvaluation: boolean) {
-  const providersState = useProvidersStore.getState()
-  const baseModels = orderModelIdsByReleaseDate(providersState.providers.base.models)
-  const ollamaModels = providersState.providers.ollama.models
-  const ollamaCloudModels = providersState.providers['ollama-cloud'].models
-  const vllmModels = providersState.providers.vllm.models
-  const litellmModels = providersState.providers.litellm.models
-  const openrouterModels = providersState.providers.openrouter.models
-  const fireworksModels = providersState.providers.fireworks.models
-  const togetherModels = providersState.providers.together.models
-  const basetenModels = providersState.providers.baseten.models
-  const allModels = Array.from(
-    new Set([
-      ...baseModels,
-      ...ollamaModels,
-      ...ollamaCloudModels,
-      ...vllmModels,
-      ...litellmModels,
-      ...openrouterModels,
-      ...fireworksModels,
-      ...togetherModels,
-      ...basetenModels,
-    ])
-  )
-
-  const options = allModels
+  return Object.values(PROVIDER_DEFINITIONS)
+    .flatMap((provider) => provider.models.map((model) => model.id))
     .filter(
       (model) =>
         getModelSunsetStatus(model) !== 'deprecated' &&
@@ -95,37 +57,6 @@ function buildModelOptions(includeEvaluation: boolean) {
       const icon = getProviderIcon(model)
       return { label: model, id: model, ...(icon && { icon }) }
     })
-
-  // Hosted-only automatic model. Deliberately LAST in the list (limited
-  // visibility for the initial release): available to anyone who scrolls or
-  // searches for it, but never the first thing the dropdown offers.
-  if (getDeploymentShape().hosted) {
-    options.push({ label: 'Auto', id: SIM_AUTO_MODEL_ID, icon: SimAutoIcon })
-  }
-
-  return options
-}
-
-function getProviderFromStore(model: string): string | null {
-  const { providers } = useProvidersStore.getState()
-  const normalized = model.toLowerCase()
-  for (const [key, state] of Object.entries(providers)) {
-    if (state.models.some((m: string) => m.toLowerCase() === normalized)) {
-      return key
-    }
-  }
-  return null
-}
-
-/**
- * Whether an Ollama instance is available. `isOllamaConfigured` reads the
- * server-only `OLLAMA_URL` env var, which is always undefined in the browser —
- * there the providers store (populated from the server's model list, which is
- * non-empty only when Ollama is configured) is the signal.
- */
-function isOllamaAvailable(): boolean {
-  if (isOllamaConfigured) return true
-  return useProvidersStore.getState().providers.ollama.models.length > 0
 }
 
 function buildModelVisibilityCondition(model: string, shouldShow: boolean) {
@@ -137,71 +68,26 @@ function buildModelVisibilityCondition(model: string, shouldShow: boolean) {
 }
 
 /**
- * Whether the block must show an API Key field for `model` on this deployment:
- * false for hosted models on hosted Sim (BYOK or the platform key serve them),
- * for providers with their own credential fields, and for local servers.
+ * Whether the block must show an API Key field for `model`.
+ *
+ * Labbai: every model runs on OpenAI with the server's `OPENAI_API_KEY`, and
+ * `platformLlmProviders` always covers `openai` — so this is false for every model. Kept as a function for the model-fallback and
+ * validation callers.
  */
 export function shouldRequireApiKeyForModel(model: string): boolean {
-  const normalizedModel = model.trim().toLowerCase()
+  const normalizedModel = model.trim()
   if (!normalizedModel) return false
 
-  const { hosted, azureConfigured } = getDeploymentShape()
-  // On hosted Sim the auto pseudo-model resolves server-side to a hosted pool
-  // model. On self-hosted it exists only via imported workflows and always
-  // falls back to the default Anthropic model, so the key field must show.
-  if (isAutoModel(normalizedModel)) return !hosted
-
-  if (hosted) {
-    const hostedModels = getHostedModels()
-    if (hostedModels.some((m) => m.toLowerCase() === normalizedModel)) return false
-  }
-
-  if (normalizedModel.startsWith('vertex/') || normalizedModel.startsWith('bedrock/')) {
+  try {
+    return !platformLlmProviders.has(getProviderFromModel(normalizedModel))
+  } catch {
+    // Blacklisted model or provider: there is no key the user could supply.
     return false
   }
-  if (
-    azureConfigured &&
-    (normalizedModel.startsWith('azure/') ||
-      normalizedModel.startsWith('azure-openai/') ||
-      normalizedModel.startsWith('azure-anthropic/') ||
-      AZURE_MODELS.some((m) => m.toLowerCase() === normalizedModel))
-  ) {
-    return false
-  }
-  if (
-    normalizedModel.startsWith('ollama/') ||
-    normalizedModel.startsWith('vllm/') ||
-    normalizedModel.startsWith('litellm/')
-  ) {
-    return false
-  }
-
-  if (isCustomModelId(normalizedModel)) return true
-
-  if (platformLlmProviders.size > 0) {
-    try {
-      if (platformLlmProviders.has(getProviderFromModel(normalizedModel))) return false
-    } catch {
-      // Unknown model id — fall through to the default rules.
-    }
-  }
-
-  const storeProvider = getProviderFromStore(normalizedModel)
-  if (storeProvider === 'ollama' || storeProvider === 'vllm' || storeProvider === 'litellm')
-    return false
-  if (storeProvider) return true
-
-  if (isOllamaAvailable()) {
-    if (normalizedModel.includes('/')) return true
-    if (normalizedModel in getBaseModelProviders()) return true
-    return false
-  }
-
-  return true
 }
 
 /** Model whose provider is recorded when a block's own `model` cannot be resolved. */
-const SERIALIZATION_FALLBACK_MODEL = 'gpt-4o'
+const SERIALIZATION_FALLBACK_MODEL = 'gpt-5-mini'
 
 /** Last-resort provider for when even {@link SERIALIZATION_FALLBACK_MODEL} cannot be resolved. */
 const SERIALIZATION_FALLBACK_PROVIDER: ProviderId = 'openai'
@@ -211,14 +97,10 @@ const SERIALIZATION_FALLBACK_PROVIDER: ProviderId = 'openai'
  *
  * Serialization runs before variable resolution, and every model block's handler
  * re-derives the provider from the *resolved* model without ever reading this
- * value — so it only has to be shape-correct, and it must never throw. Two cases
- * reach here that {@link getBaseModelProviders} cannot answer: `model` may still
- * hold a `<variable.x>` reference, and gateway providers (OpenRouter, vLLM,
- * LiteLLM, Ollama, …) are deliberately absent from that map even when the model
- * id is perfectly valid. A reference resolves to {@link SERIALIZATION_FALLBACK_MODEL}'s
- * provider; anything else is left to `getProviderFromModel`, which defaults an
- * unrecognised id to `ollama` rather than failing serialization with an error the
- * user cannot act on.
+ * value — so it only has to be shape-correct, and it must never throw. `model`
+ * may still hold a `<variable.x>` reference, which resolves to
+ * {@link SERIALIZATION_FALLBACK_MODEL}'s provider; anything else is left to
+ * `getProviderFromModel`, which routes every id (known or not) to OpenAI.
  *
  * The remaining throw is a blacklisted provider or model, which is env-driven and
  * can name the fallback itself — so recovery returns
@@ -291,68 +173,36 @@ export function getCohereRerankerApiKeyCondition() {
 }
 
 /**
- * Whether `model` can only run with credentials that live on the block beyond an
- * API key: a Vertex OAuth credential, Bedrock AWS keys, or an Azure endpoint,
- * unless the deployment supplies them server-side (the same env flags that hide
- * those fields). The fields render only while the block's own `model` is in
- * that provider family, so nothing outside the family can inherit them.
+ * Whether `model` needs credentials on the block beyond an API key (Vertex OAuth,
+ * Bedrock AWS keys, an Azure endpoint). Labbai has none of those providers — OpenAI
+ * is authenticated server-side — so this is always false.
+ * Kept for the model-fallback callers.
  */
-export function requiresProviderFamilyCredentials(model: string): boolean {
-  return providerRequiresFamilyCredentials(findProviderFromModel(model.trim()))
-}
-
-/**
- * The provider-keyed half of {@link requiresProviderFamilyCredentials}, for a
- * caller that has already resolved the provider and must not pay for a second
- * catalog scan.
- */
-export function providerRequiresFamilyCredentials(provider: string | null | undefined): boolean {
-  if (provider === 'vertex') return true
-  if (provider === 'bedrock') return !isTruthy(getEnv('NEXT_PUBLIC_BEDROCK_DEFAULT_CREDENTIALS'))
-  if (provider === 'azure-openai' || provider === 'azure-anthropic') {
-    return !getDeploymentShape().azureConfigured
-  }
+export function requiresProviderFamilyCredentials(_model: string): boolean {
   return false
 }
 
-function getModelProviderCondition(...providerIds: ProviderId[]) {
-  return (values?: Record<string, unknown>) => {
-    const model = typeof values?.model === 'string' ? values.model : ''
-    const provider = findProviderFromModel(model.trim())
-    return buildModelVisibilityCondition(model, provider !== null && providerIds.includes(provider))
-  }
+/**
+ * The provider-keyed half of {@link requiresProviderFamilyCredentials}. Always
+ * false: no Labbai provider carries block-level credentials.
+ */
+export function providerRequiresFamilyCredentials(_provider: string | null | undefined): boolean {
+  return false
 }
 
 /**
- * Returns the standard provider credential subblocks used by LLM-based blocks.
- * This includes: Vertex AI OAuth, API Key, Azure (OpenAI + Anthropic), Vertex AI config, and Bedrock config.
+ * Returns the provider credential subblocks used by LLM-based blocks.
+ *
+ * Labbai: only the legacy `apiKey` field remains, and it never renders — the
+ * OpenAI key is a server secret (see
+ * {@link shouldRequireApiKeyForModel}). It stays declared so existing workflows
+ * that stored a value keep a valid subblock shape. The Azure / Vertex / Bedrock
+ * credential fields were removed with those providers.
  *
  * Usage: Spread into your block's subBlocks array after block-specific fields
  */
 export function getProviderCredentialSubBlocks(): SubBlockConfig[] {
   return [
-    {
-      id: 'vertexCredential',
-      title: 'Google Cloud Account',
-      type: 'oauth-input',
-      serviceId: 'vertex-ai',
-      canonicalParamId: 'vertexCredential',
-      mode: 'basic',
-      requiredScopes: getScopesForService('vertex-ai'),
-      placeholder: 'Select Google Cloud account',
-      required: true,
-      condition: getModelProviderCondition('vertex'),
-    },
-    {
-      id: 'vertexManualCredential',
-      title: 'Google Cloud Account',
-      type: 'short-input',
-      canonicalParamId: 'vertexCredential',
-      mode: 'advanced',
-      placeholder: 'Enter credential ID',
-      required: true,
-      condition: getModelProviderCondition('vertex'),
-    },
     {
       id: 'apiKey',
       title: 'API Key',
@@ -363,74 +213,6 @@ export function getProviderCredentialSubBlocks(): SubBlockConfig[] {
       required: true,
       condition: getApiKeyCondition(),
     },
-    {
-      id: 'azureEndpoint',
-      title: 'Azure Endpoint',
-      type: 'short-input',
-      password: true,
-      placeholder: 'https://your-resource.services.ai.azure.com',
-      connectionDroppable: false,
-      hideWhenEnvSet: 'NEXT_PUBLIC_AZURE_CONFIGURED',
-      condition: getModelProviderCondition('azure-openai', 'azure-anthropic'),
-    },
-    {
-      id: 'azureApiVersion',
-      title: 'Azure API Version',
-      type: 'short-input',
-      placeholder: 'Enter API version',
-      connectionDroppable: false,
-      hideWhenEnvSet: 'NEXT_PUBLIC_AZURE_CONFIGURED',
-      condition: getModelProviderCondition('azure-openai', 'azure-anthropic'),
-    },
-    {
-      id: 'vertexProject',
-      title: 'Vertex AI Project',
-      type: 'short-input',
-      password: true,
-      placeholder: 'your-gcp-project-id',
-      connectionDroppable: false,
-      required: true,
-      condition: getModelProviderCondition('vertex'),
-    },
-    {
-      id: 'vertexLocation',
-      title: 'Vertex AI Location',
-      type: 'short-input',
-      placeholder: 'us-central1',
-      connectionDroppable: false,
-      required: true,
-      condition: getModelProviderCondition('vertex'),
-    },
-    {
-      id: 'bedrockAccessKeyId',
-      title: 'AWS Access Key ID',
-      type: 'short-input',
-      password: true,
-      placeholder: 'Enter your AWS Access Key ID',
-      connectionDroppable: false,
-      required: true,
-      hideWhenEnvSet: 'NEXT_PUBLIC_BEDROCK_DEFAULT_CREDENTIALS',
-      condition: getModelProviderCondition('bedrock'),
-    },
-    {
-      id: 'bedrockSecretKey',
-      title: 'AWS Secret Access Key',
-      type: 'short-input',
-      password: true,
-      placeholder: 'Enter your AWS Secret Access Key',
-      connectionDroppable: false,
-      required: true,
-      hideWhenEnvSet: 'NEXT_PUBLIC_BEDROCK_DEFAULT_CREDENTIALS',
-      condition: getModelProviderCondition('bedrock'),
-    },
-    {
-      id: 'bedrockRegion',
-      title: 'AWS Region',
-      type: 'short-input',
-      placeholder: 'us-east-1',
-      connectionDroppable: false,
-      condition: getModelProviderCondition('bedrock'),
-    },
   ]
 }
 
@@ -440,17 +222,6 @@ export function getProviderCredentialSubBlocks(): SubBlockConfig[] {
  */
 export const PROVIDER_CREDENTIAL_INPUTS = {
   apiKey: { type: 'string', description: 'Provider API key' },
-  azureEndpoint: { type: 'string', description: 'Azure endpoint URL' },
-  azureApiVersion: { type: 'string', description: 'Azure API version' },
-  vertexProject: { type: 'string', description: 'Google Cloud project ID for Vertex AI' },
-  vertexLocation: { type: 'string', description: 'Google Cloud location for Vertex AI' },
-  vertexCredential: {
-    type: 'string',
-    description: 'Google Cloud OAuth credential ID for Vertex AI',
-  },
-  bedrockAccessKeyId: { type: 'string', description: 'AWS Access Key ID for Bedrock' },
-  bedrockSecretKey: { type: 'string', description: 'AWS Secret Access Key for Bedrock' },
-  bedrockRegion: { type: 'string', description: 'AWS region for Bedrock' },
 } as const
 
 /**

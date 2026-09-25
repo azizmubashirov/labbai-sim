@@ -2,9 +2,7 @@
  * @vitest-environment node
  */
 import { describe, expect, it } from 'vitest'
-import { createAzureOpenAIAdapter } from '@/lib/embeddings/providers/azure-openai'
 import { createOpenAIAdapter } from '@/lib/embeddings/providers/openai'
-import { createOpenRouterAdapter } from '@/lib/embeddings/providers/openrouter'
 
 const IDENTITY = {
   modelName: 'text-embedding-3-small',
@@ -88,20 +86,4 @@ describe('OpenAI base64 embeddings', () => {
     expect(() => request.parse({ data: [{ embedding }] })).toThrow('base64 embedding')
   })
 
-  it('keeps Azure and OpenRouter on their existing numeric wire format', () => {
-    const adapters = [
-      createAzureOpenAIAdapter({
-        ...IDENTITY,
-        endpoint: 'https://fixture.openai.azure.com',
-        apiVersion: '2024-10-21',
-      }),
-      createOpenRouterAdapter(IDENTITY),
-    ]
-
-    for (const adapter of adapters) {
-      const request = adapter.buildRequest({ inputs: ['query'], taskType: 'query' })
-      expect(request.body).toMatchObject({ encoding_format: 'float' })
-      expect(request.parse({ data: [{ embedding: [0.1, 0.2] }] })).toEqual([[0.1, 0.2]])
-    }
-  })
 })

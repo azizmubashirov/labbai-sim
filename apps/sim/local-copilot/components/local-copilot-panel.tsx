@@ -58,8 +58,8 @@ export function LocalCopilotPanel({
       >
         {variant === 'drawer' ? <PanelHeader onClose={() => onOpenChange?.(false)} /> : null}
         <div className='flex flex-1 items-center justify-center p-4 text-center text-[13px] text-[var(--text-muted)]'>
-          Arena Copilot is disabled. Set COPILOT_ENABLED=true and configure ANTHROPIC_API_KEY or
-          ANTHROPIC_API_KEY_1 through _3.
+          Arena Copilot is disabled. Set COPILOT_ENABLED=true and set OPENAI_API_KEY on the
+          server.
         </div>
       </aside>
     )

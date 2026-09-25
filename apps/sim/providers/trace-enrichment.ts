@@ -4,7 +4,7 @@ import { LIST_PRICE_POLICY, priceModelUsage } from '@/providers/cost-policy'
 import {
   getOpenRouterReasoningDetailText,
   type OpenRouterReasoningDetail,
-} from '@/providers/openrouter/reasoning'
+} from '@/providers/openai-compat/reasoning'
 
 /**
  * Minimal structural shape shared by OpenAI Chat Completions and every

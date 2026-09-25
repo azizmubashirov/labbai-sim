@@ -7,6 +7,7 @@ import type {
   LocalCopilotProvider,
 } from '@/local-copilot/lib/providers/types'
 import type { LocalCopilotConfig } from '@/local-copilot/lib/types'
+import { isOpenAIReasoningModelId } from '@/providers/openai/model-ids'
 
 const logger = createLogger('LocalCopilotOpenAIProvider')
 
@@ -17,6 +18,20 @@ function resolveBaseUrl(config: LocalCopilotConfig): string {
     throw new Error('Azure OpenAI requires COPILOT_BASE_URL to be set.')
   }
   throw new Error('COPILOT_BASE_URL is required for openai-compatible providers.')
+}
+
+/**
+ * Request headers: JSON content type, configured extra headers
+ * (`OPENAI_EXTRA_HEADERS`, e.g. gateway metadata), then `Authorization: Bearer <key>`.
+ */
+export function buildOpenAiCompatibleHeaders(config: LocalCopilotConfig): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(config.extraHeaders ?? {}),
+  }
+  const key = config.apiKey?.trim()
+  if (key) headers.Authorization = `Bearer ${key}`
+  return headers
 }
 
 function toOpenAiTools(tools: ChatCompletionRequest['tools']) {
@@ -31,10 +46,17 @@ function toOpenAiTools(tools: ChatCompletionRequest['tools']) {
   }))
 }
 
-/** True for OpenAI models that take `max_completion_tokens` and a fixed temperature. */
+/**
+ * True for OpenAI reasoning models (gpt-5+, gpt-6, o-series) that take
+ * `max_completion_tokens`, no custom temperature, and `reasoning_effort`.
+ * Bare ids count on OpenAI / Azure; explicit `openai/<model>` ids count on any
+ * transport (e.g. an `openai-compatible` gateway in front of OpenAI).
+ */
 export function isOpenAiReasoningModel(provider: string, model: string): boolean {
+  const id = model.trim().toLowerCase()
+  if (id.startsWith('openai/')) return isOpenAIReasoningModelId(id)
   if (provider !== 'openai' && provider !== 'azure-openai') return false
-  return /^(gpt-5|gpt-6|o\d)/i.test(model.trim())
+  return isOpenAIReasoningModelId(id)
 }
 
 export function createOpenAiCompatibleProvider(config: LocalCopilotConfig): LocalCopilotProvider {
@@ -74,7 +96,10 @@ export function createOpenAiCompatibleProvider(config: LocalCopilotConfig): Loca
         // OpenAI reasoning models (gpt-5+, o-series) reject `max_tokens` and any
         // non-default temperature; their budget also covers hidden reasoning tokens.
         ...(isOpenAiReasoningModel(config.provider, request.model || config.model)
-          ? { max_completion_tokens: Math.max(request.maxTokens ?? 0, 32768) }
+          ? {
+              max_completion_tokens: Math.max(request.maxTokens ?? 0, 32768),
+              ...(config.thinkingLevel ? { reasoning_effort: config.thinkingLevel } : {}),
+            }
           : {
               temperature: request.temperature ?? 0.2,
               max_tokens: request.maxTokens ?? 4096,
@@ -89,10 +114,7 @@ export function createOpenAiCompatibleProvider(config: LocalCopilotConfig): Loca
         url,
         {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${config.apiKey ?? ''}`,
-          },
+          headers: buildOpenAiCompatibleHeaders(config),
           body: JSON.stringify(body),
           signal: request.signal,
         },

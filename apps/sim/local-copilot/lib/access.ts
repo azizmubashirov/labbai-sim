@@ -9,6 +9,7 @@ import {
   DEFAULT_LOCAL_COPILOT_CATALOG_ID,
   type LocalCopilotCatalogId,
   resolveLocalCopilotCatalogId,
+  toLocalCopilotDefaultModelEnumValue,
 } from '@/local-copilot/lib/model-catalog'
 
 const logger = createLogger('LocalCopilotAccess')
@@ -84,7 +85,11 @@ export async function updateLocalCopilotDefaultModel(
   try {
     const [row] = await db
       .update(localCopilotUserAccess)
-      .set({ defaultModel, updatedAt: new Date() })
+      // `default_model` is a legacy Postgres enum: store the catalog id's slot.
+      .set({
+        defaultModel: toLocalCopilotDefaultModelEnumValue(defaultModel),
+        updatedAt: new Date(),
+      })
       .where(eq(localCopilotUserAccess.userId, userId))
       .returning({
         hasAccess: localCopilotUserAccess.hasAccess,

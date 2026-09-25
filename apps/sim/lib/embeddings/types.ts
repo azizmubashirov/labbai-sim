@@ -4,30 +4,21 @@
  * `@/lib/embeddings/providers`.
  */
 
-export type EmbeddingProviderKind =
-  | 'openai'
-  | 'azure-openai'
-  | 'openrouter'
-  | 'gemini'
-  | 'cohere'
-  | 'mistral'
-  | 'ollama'
-
 /**
- * Providers a catalog model can belong to. Azure OpenAI and OpenRouter are
- * transports for OpenAI models, so no model is catalogued under either one.
+ * Labbai: embeddings run on OpenAI only (direct OpenAI API, platform key
+ * `OPENAI_API_KEY` or a workspace OpenAI BYOK key). The Azure OpenAI, OpenRouter,
+ * Gemini, Cohere, Mistral and Ollama embedding paths were removed.
  */
-export type EmbeddingCatalogProvider = Exclude<EmbeddingProviderKind, 'azure-openai' | 'openrouter'>
+export type EmbeddingProviderKind = 'openai'
 
-/**
- * Catalog providers reached with an API key. Ollama is a self-hosted server
- * addressed by URL and takes no credential, so every key-resolution table is
- * keyed by this narrower type rather than carrying a meaningless Ollama entry.
- */
-export type KeyedEmbeddingProvider = Exclude<EmbeddingCatalogProvider, 'ollama'>
+/** Providers a catalog model can belong to. */
+export type EmbeddingCatalogProvider = EmbeddingProviderKind
+
+/** Catalog providers reached with an API key. */
+export type KeyedEmbeddingProvider = EmbeddingCatalogProvider
 
 /** Provider id for `estimateTokenCount` so token counts match the embedding provider's tokenization. */
-export type TokenizerProviderId = 'openai' | 'google' | 'cohere' | 'mistral' | 'ollama'
+export type TokenizerProviderId = 'openai'
 
 /**
  * What the embedding will be used for. Providers that support task-conditioned
@@ -59,13 +50,13 @@ export interface BuildEmbeddingRequestOptions {
 
 export interface EmbeddingProviderAdapter {
   buildRequest: (options: BuildEmbeddingRequestOptions) => EmbeddingProviderRequest
-  /** Hard per-request item cap enforced by the provider (e.g. Gemini caps at 100). */
+  /** Hard per-request item cap enforced by the provider (OpenAI caps at 2048). */
   maxItemsPerRequest?: number
 }
 
 /** What every adapter needs regardless of how its provider is reached. */
 export interface EmbeddingAdapterIdentity {
-  /** Model name as the provider expects it on the wire (an Azure deployment name for Azure). */
+  /** Model name as the provider expects it on the wire. */
   modelName: string
   /** Model's un-reduced dimensionality, so adapters can detect a Matryoshka reduction. */
   nativeDimensions: number
@@ -73,28 +64,6 @@ export interface EmbeddingAdapterIdentity {
 
 export interface EmbeddingAdapterContext extends EmbeddingAdapterIdentity {
   apiKey: string
-}
-
-/**
- * Ollama is addressed by server URL and authenticates with nothing, so it needs
- * routing fields no other provider takes and holds no credential at all.
- * Declared as its own context rather than as an optional `baseUrl` on the shared
- * one, so the adapter cannot be constructed without a server to talk to.
- */
-export interface OllamaEmbeddingAdapterContext extends EmbeddingAdapterIdentity {
-  /** Origin of the Ollama server, without a trailing slash. */
-  baseUrl: string
-}
-
-/**
- * Azure selects the model by deployment name in the URL, so it needs routing
- * fields no other provider takes. Declared as its own context rather than as
- * optional fields on the shared one, so a caller cannot construct the Azure
- * adapter without them and silently produce an `undefined/...` URL.
- */
-export interface AzureEmbeddingAdapterContext extends EmbeddingAdapterContext {
-  endpoint: string
-  apiVersion: string
 }
 
 export type EmbeddingAdapterFactory<
@@ -135,8 +104,6 @@ export interface EmbedOptions {
   signal?: AbortSignal
   /** Catalog model id. Defaults to the platform default when omitted. */
   model?: string
-  /** Transport override for catalog models exposed through another provider. */
-  transport?: 'openrouter'
   /** Workspace used to look up a BYOK key before falling back to platform keys. */
   workspaceId?: string | null
   taskType?: EmbeddingTaskType
@@ -173,16 +140,4 @@ export interface EmbedResult {
   pricingId: string
   /** Dimensionality of the returned vectors. */
   dimensions: number
-}
-
-export interface OpenRouterEmbedOptions {
-  /** Cancels provider requests, retry waits, and remaining batches. */
-  signal?: AbortSignal
-  apiKey: string
-  model?: string
-  /** Per-input ceiling reported by OpenRouter's embedding model catalog. */
-  maxInputTokens: number
-  /** Forwarded when a caller explicitly requests a provider-supported reduction. */
-  dimensions?: number
-  projectInputs: ((values: readonly string[]) => string[]) | null
 }

@@ -43,8 +43,6 @@ export const OpenAIBlock: BlockConfig = {
       type: 'dropdown',
       options: [
         { label: 'text-embedding-3-small', id: 'text-embedding-3-small' },
-        { label: 'text-embedding-3-large', id: 'text-embedding-3-large' },
-        { label: 'text-embedding-ada-002', id: 'text-embedding-ada-002' },
       ],
       value: () => 'text-embedding-3-small',
     },
@@ -118,7 +116,7 @@ export const OpenAIBlockMeta = {
       description:
         'Generate an OpenAI embedding vector for a piece of text to use in semantic search or similarity.',
       content:
-        '# Embed Text\n\nConvert text into an OpenAI embedding vector.\n\n## Steps\n1. Take the input text. If it is long, ensure it fits the model context; otherwise chunk it first.\n2. Choose the model — text-embedding-3-small for cost-efficient general use or text-embedding-3-large for higher accuracy. Keep the model consistent with any existing vectors it will be compared against.\n3. Generate the embedding.\n\n## Output\nReturn the embedding vector, the model used, and token usage. Note the vector dimensionality so it can be matched to the destination vector index.',
+        '# Embed Text\n\nConvert text into an OpenAI embedding vector.\n\n## Steps\n1. Take the input text. If it is long, ensure it fits the model context; otherwise chunk it first.\n2. Use text-embedding-3-small. Keep the model consistent with any existing vectors it will be compared against.\n3. Generate the embedding.\n\n## Output\nReturn the embedding vector, the model used, and token usage. Note the vector dimensionality so it can be matched to the destination vector index.',
     },
     {
       name: 'embed-documents-for-retrieval',

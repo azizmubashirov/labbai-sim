@@ -190,11 +190,6 @@ const IMAGE_TOOL_IDS = ['image_generate'] as const
 
 const EMBEDDINGS_TOOL_IDS = [
   'embeddings_openai',
-  'embeddings_openrouter',
-  'embeddings_gemini',
-  'embeddings_cohere',
-  'embeddings_mistral',
-  'embeddings_ollama',
   'openai_embeddings',
 ] as const
 

@@ -7,6 +7,7 @@ import {
   getSerializedModelProviderId,
   PROVIDER_CREDENTIAL_INPUTS,
 } from '@/blocks/utils'
+import { OPENAI_DEFAULT_MODEL } from '@/providers/openai/model-ids'
 import type { ToolResponse } from '@/tools/types'
 
 interface RouterResponse extends ToolResponse {
@@ -183,7 +184,7 @@ export const RouterBlock: BlockConfig<RouterResponse> = {
       type: 'combobox',
       placeholder: 'Type or select a model...',
       required: true,
-      defaultValue: 'claude-sonnet-5',
+      defaultValue: OPENAI_DEFAULT_MODEL,
       options: getModelOptions,
     },
     ...getProviderCredentialSubBlocks(),
@@ -209,11 +210,6 @@ export const RouterBlock: BlockConfig<RouterResponse> = {
   tools: {
     access: [
       'openai_chat',
-      'anthropic_chat',
-      'google_chat',
-      'xai_chat',
-      'deepseek_chat',
-      'deepseek_reasoner',
     ],
     config: {
       tool: (params: Record<string, any>) => getSerializedModelProviderId(params.model),
@@ -302,7 +298,7 @@ export const RouterV2Block: BlockConfig<RouterV2Response> = {
       type: 'combobox',
       placeholder: 'Type or select a model...',
       required: true,
-      defaultValue: 'claude-sonnet-5',
+      defaultValue: OPENAI_DEFAULT_MODEL,
       options: getModelOptions,
     },
     ...getProviderCredentialSubBlocks(),
@@ -311,11 +307,6 @@ export const RouterV2Block: BlockConfig<RouterV2Response> = {
   tools: {
     access: [
       'openai_chat',
-      'anthropic_chat',
-      'google_chat',
-      'xai_chat',
-      'deepseek_chat',
-      'deepseek_reasoner',
     ],
     config: {
       tool: (params: Record<string, any>) => getSerializedModelProviderId(params.model),

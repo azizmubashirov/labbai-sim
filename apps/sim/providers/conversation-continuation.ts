@@ -1,11 +1,9 @@
 import { createLogger } from '@sim/logger'
 import { getErrorMessage } from '@sim/utils/errors'
 import { isRecordLike } from '@sim/utils/object'
-import { env } from '@/lib/core/config/env'
 import { decryptMemoryCheckpoint } from '@/lib/memory/checkpoint-codec'
 import type { AgentConversationSession } from '@/lib/memory/conversation-types'
 import { renderConversationExecutionRecord } from '@/lib/memory/execution-record'
-import { isChatCompletionsEndpoint } from '@/providers/azure-openai/utils'
 import { getConfiguredConversationToolBinding } from '@/providers/conversation-history'
 import {
   getEncryptedConversationMessage,
@@ -133,13 +131,9 @@ export async function restoreConversationNativeMessages(
   model: string,
   binding: string,
   memoryId?: string,
-  request?: Pick<ProviderRequest, 'azureEndpoint'>
+  _request?: Pick<ProviderRequest, 'model'>
 ): Promise<Message[]> {
-  const protocol =
-    providerId === 'azure-openai' &&
-    isChatCompletionsEndpoint(request?.azureEndpoint || env.AZURE_OPENAI_ENDPOINT || '')
-      ? 'chat-completions'
-      : providerHistoryProtocols[providerId]
+  const protocol = providerHistoryProtocols[providerId]
   if (!protocol) throw new Error('Evaluation providers do not support conversation history')
   const restored: Message[] = []
   for (const group of groupConversationMessages(messages)) {

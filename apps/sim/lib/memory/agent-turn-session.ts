@@ -194,11 +194,7 @@ function validState(value: unknown): value is AgentTurnState {
         return false
       const protocol =
         providerHistoryProtocols[native.providerId as keyof typeof providerHistoryProtocols]
-      if (
-        native.protocol !== protocol &&
-        !(native.providerId === 'azure-openai' && native.protocol === 'chat-completions')
-      )
-        return false
+      if (native.protocol !== protocol) return false
     }
     if (
       step.cost !== undefined &&

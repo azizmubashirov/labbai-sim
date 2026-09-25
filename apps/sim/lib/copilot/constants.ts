@@ -1,4 +1,5 @@
 import { resolveSimAgentApiUrl } from '@/local-copilot/lib/sim-agent-url'
+import { OPENAI_MODEL_GPT_5_5 } from '@/providers/openai/model-ids'
 
 export const SIM_AGENT_API_URL_DEFAULT = 'https://www.copilot.sim.ai'
 export const SIM_AGENT_VERSION = '3.0.0'
@@ -85,4 +86,5 @@ export const COPILOT_REQUEST_MODES = ['assistant', 'build', 'plan', 'agent'] as 
  * the chat it creates is stamped with the model it also runs the turn and
  * generates the title with, which that module owns separately.
  */
-export const MOTHERSHIP_CHAT_DEFAULT_MODEL = 'claude-opus-4-8'
+/** Labbai: matches the Local copilot default (OpenAI only). */
+export const MOTHERSHIP_CHAT_DEFAULT_MODEL = OPENAI_MODEL_GPT_5_5

@@ -1,8 +1,6 @@
 import { createLogger } from '@sim/logger'
-import { getErrorMessage, toError } from '@sim/utils/errors'
+import { getErrorMessage } from '@sim/utils/errors'
 import { isPlainRecord } from '@sim/utils/object'
-import { authorizeCredentialUseForAuth } from '@/lib/auth/credential-access'
-import { AuthType } from '@/lib/auth/hybrid'
 import {
   BILLING_ATTRIBUTION_HEADER,
   type BillingAttributionSnapshot,
@@ -13,7 +11,6 @@ import {
   inspectModelInputProjectionState,
   inspectModelInputProvenanceRequest,
 } from '@/lib/execution/model-input-provenance'
-import { resolveVertexAccessToken } from '@/lib/internal/llm/credentials'
 import { LlmOperationError } from '@/lib/internal/llm/errors'
 import type { LlmProviderOperationInput } from '@/lib/internal/llm/input'
 import { checkWorkspaceAccess } from '@/lib/workspaces/permissions/utils'
@@ -41,34 +38,6 @@ export interface LlmProviderOperationContext {
 
 function fail(status: number, error: string): never {
   throw new LlmOperationError(status, { error })
-}
-
-function authenticatedCaller(context: LlmProviderOperationContext) {
-  return {
-    success: true,
-    userId: context.actorUserId,
-    authType: AuthType.INTERNAL_JWT,
-  } as const
-}
-
-async function authorizeVertexCredential(
-  input: LlmProviderOperationInput,
-  context: LlmProviderOperationContext
-): Promise<void> {
-  if (input.provider !== 'vertex' || !input.vertexCredential) return
-
-  const access = await authorizeCredentialUseForAuth(authenticatedCaller(context), {
-    credentialId: input.vertexCredential,
-    workflowId: input.workflowId || undefined,
-    callerUserId: context.actorUserId,
-  })
-  if (!access.ok) {
-    logger.warn(`[${context.requestId}] Vertex credential access denied`, {
-      error: access.error,
-      credentialId: input.vertexCredential,
-    })
-    fail(401, access.error || 'Unauthorized')
-  }
 }
 
 function resolveBillingAttribution(
@@ -122,23 +91,6 @@ async function prepareProviderRequest(
   request: ProviderRequest
   runtimeContext: Awaited<ReturnType<typeof prepareCopilotEnvironmentContext>>
 }> {
-  let apiKey = input.apiKey
-  try {
-    await authorizeVertexCredential(input, context)
-    if (input.provider === 'vertex' && input.vertexCredential) {
-      apiKey = await resolveVertexAccessToken(context.requestId, input.vertexCredential)
-    }
-  } catch (error) {
-    if (error instanceof LlmOperationError) throw error
-    logger.error(`[${context.requestId}] Failed to resolve Vertex credential`, {
-      provider: input.provider,
-      model: input.model,
-      error: toError(error).message,
-      hasVertexCredential: Boolean(input.vertexCredential),
-    })
-    fail(400, getErrorMessage(error, 'Credential error'))
-  }
-
   const billingAttribution = resolveBillingAttribution(input, context)
   let request: ProviderRequest = {
     model: input.model,
@@ -147,14 +99,7 @@ async function prepareProviderRequest(
     tools: input.tools,
     temperature: input.temperature,
     maxTokens: input.maxTokens,
-    apiKey,
-    azureEndpoint: input.azureEndpoint,
-    azureApiVersion: input.azureApiVersion,
-    vertexProject: input.vertexProject,
-    vertexLocation: input.vertexLocation,
-    bedrockAccessKeyId: input.bedrockAccessKeyId,
-    bedrockSecretKey: input.bedrockSecretKey,
-    bedrockRegion: input.bedrockRegion,
+    apiKey: input.apiKey,
     responseFormat: input.responseFormat,
     workflowId: input.workflowId,
     workspaceId: input.workspaceId,

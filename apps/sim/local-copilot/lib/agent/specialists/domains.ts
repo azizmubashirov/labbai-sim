@@ -55,7 +55,7 @@ export const ALWAYS_ON_TOOL_NAMES = new Set<string>([
   'get_available_integrations',
   'get_blocks_metadata',
   'load_copilot_artifact',
-  // Core mutation tools — always available so Bedrock/Gemini can edit without
+  // Core mutation tools — always available so every model can edit without
   // depending solely on the `workflow` specialist entry tool.
   'create_workflow',
   'edit_workflow',

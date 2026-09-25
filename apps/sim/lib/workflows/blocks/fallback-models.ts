@@ -6,7 +6,6 @@ import {
   getReasoningEffortValuesForModel,
   getThinkingLevelsForModel,
   getVerbosityValuesForModel,
-  isAutoModel,
   isKnownModelId,
 } from '@/providers/models'
 
@@ -64,7 +63,7 @@ export function isWholeEnvVarReference(value: unknown): value is string {
  * Normalizes a stored fallback list into the ordered candidates execution walks.
  *
  * Tolerant rather than strict because it runs on every execution: rows the
- * editor could not have written (missing model, sim-auto) are dropped instead
+ * editor could not have written (missing model) are dropped instead
  * of failing the block, and duplicates keep their first position so the order
  * the builder chose is preserved.
  *
@@ -84,7 +83,7 @@ export function normalizeFallbackModels(raw: unknown): FallbackModelCandidate[] 
     const { model, apiKey } = row as { model?: unknown; apiKey?: unknown }
     if (typeof model !== 'string') continue
     const trimmed = model.trim()
-    if (!trimmed || isAutoModel(trimmed)) continue
+    if (!trimmed) continue
     const key = trimmed.toLowerCase()
     if (seen.has(key)) continue
     seen.add(key)
@@ -194,7 +193,7 @@ export function changeFallbackRowTuning(
  */
 export function isViableFallbackModel(model: string, primaryModel: string): boolean {
   const trimmed = model.trim()
-  if (!trimmed || isAutoModel(trimmed)) return false
+  if (!trimmed) return false
   if (trimmed.toLowerCase() === primaryModel.trim().toLowerCase()) return false
 
   const provider = findProviderFromModel(trimmed)

@@ -49,12 +49,10 @@ describe('urls mock', () => {
     ).toEqual(['https://a.example.com'])
   })
 
-  it('socket and ollama URLs read env with localhost fallbacks', () => {
+  it('socket URL reads env with a localhost fallback', () => {
     expect(urlsMock.getSocketServerUrl()).toBe('http://localhost:3002')
-    expect(urlsMock.getOllamaUrl()).toBe('http://localhost:11434')
-    setEnv({ SOCKET_SERVER_URL: 'http://sockets:3002', OLLAMA_URL: 'http://ollama:11434' })
+    setEnv({ SOCKET_SERVER_URL: 'http://sockets:3002' })
     expect(urlsMock.getSocketServerUrl()).toBe('http://sockets:3002')
-    expect(urlsMock.getOllamaUrl()).toBe('http://ollama:11434')
   })
 
   it('resetUrlsMock restores default implementations after overrides', () => {

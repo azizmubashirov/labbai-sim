@@ -27,15 +27,7 @@ export function estimateTokenCount(text: string, providerId?: string): TokenEsti
 
   switch (effectiveProviderId) {
     case 'openai':
-    case 'azure-openai':
       estimatedTokens = estimateOpenAITokens(text)
-      break
-    case 'anthropic':
-    case 'azure-anthropic':
-      estimatedTokens = estimateAnthropicTokens(text)
-      break
-    case 'google':
-      estimatedTokens = estimateGoogleTokens(text)
       break
     default:
       estimatedTokens = estimateGenericTokens(text, config.avgCharsPerToken)
@@ -73,53 +65,6 @@ function estimateOpenAITokens(text: string): number {
 
   const newlineCount = (text.match(/\n/g) || []).length
   tokenCount += newlineCount * 0.5
-
-  return tokenCount
-}
-
-/**
- * Anthropic Claude-specific token estimation
- */
-function estimateAnthropicTokens(text: string): number {
-  const words = text.trim().split(/\s+/)
-  let tokenCount = 0
-
-  for (const word of words) {
-    if (word.length === 0) continue
-
-    if (word.length <= 4) {
-      tokenCount += 1
-    } else if (word.length <= 8) {
-      tokenCount += Math.ceil(word.length / 5)
-    } else {
-      tokenCount += Math.ceil(word.length / 4.5)
-    }
-  }
-
-  const newlineCount = (text.match(/\n/g) || []).length
-  tokenCount += newlineCount * 0.3
-
-  return tokenCount
-}
-
-/**
- * Google Gemini-specific token estimation
- */
-function estimateGoogleTokens(text: string): number {
-  const words = text.trim().split(/\s+/)
-  let tokenCount = 0
-
-  for (const word of words) {
-    if (word.length === 0) continue
-
-    if (word.length <= 5) {
-      tokenCount += 1
-    } else if (word.length <= 10) {
-      tokenCount += Math.ceil(word.length / 6)
-    } else {
-      tokenCount += Math.ceil(word.length / 5)
-    }
-  }
 
   return tokenCount
 }

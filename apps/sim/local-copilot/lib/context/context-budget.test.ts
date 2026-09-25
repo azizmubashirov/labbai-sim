@@ -5,12 +5,12 @@ import { describe, expect, it } from 'vitest'
 import {
   buildGetWorkflowContextResult,
   LOCAL_COPILOT_DEFAULT_MAX_OUTPUT_TOKENS,
-  LOCAL_COPILOT_GEMINI_38_FLASH_MAX_OUTPUT_TOKENS,
-  LOCAL_COPILOT_GEMINI_38_FLASH_PROMPT_TOKEN_BUDGET,
   LOCAL_COPILOT_PROMPT_TOKEN_BUDGET,
+  LOCAL_COPILOT_TOKEN_COUNT_MODEL,
   resolveDefaultPromptTokenSoftCap,
   resolveLocalCopilotMaxOutputTokens,
   resolveLocalCopilotPromptTokenBudget,
+  resolveLocalCopilotTokenCountModel,
 } from '@/local-copilot/lib/context/context-budget'
 import type { LocalCopilotStructuredContext } from '@/local-copilot/lib/types'
 
@@ -70,49 +70,43 @@ describe('buildGetWorkflowContextResult', () => {
 })
 
 describe('resolveDefaultPromptTokenSoftCap', () => {
-  it('raises the soft cap for Gemini 3.8 Flash', () => {
-    expect(resolveDefaultPromptTokenSoftCap('gemini-3.8-flash')).toBe(
-      LOCAL_COPILOT_GEMINI_38_FLASH_PROMPT_TOKEN_BUDGET
-    )
-    expect(resolveDefaultPromptTokenSoftCap('vertex/gemini-3.8-flash', 'vertex')).toBe(
-      LOCAL_COPILOT_GEMINI_38_FLASH_PROMPT_TOKEN_BUDGET
-    )
-  })
-
-  it('keeps the default soft cap for other Gemini models', () => {
-    expect(resolveDefaultPromptTokenSoftCap('gemini-2.5-pro')).toBe(
+  it('uses the 120k soft cap for OpenAI models', () => {
+    expect(resolveDefaultPromptTokenSoftCap('gpt-5.5', 'openai')).toBe(
       LOCAL_COPILOT_PROMPT_TOKEN_BUDGET
     )
+    expect(resolveDefaultPromptTokenSoftCap('gpt-5-mini')).toBe(LOCAL_COPILOT_PROMPT_TOKEN_BUDGET)
   })
 })
 
 describe('resolveLocalCopilotPromptTokenBudget', () => {
-  it('soft-caps Gemini 3.8 Flash at 300k instead of 120k', () => {
+  it('never exceeds the soft cap and reserves output + safety buffer', () => {
     const budget = resolveLocalCopilotPromptTokenBudget({
-      model: 'gemini-3.8-flash',
-      provider: 'gemini',
-      maxOutputTokens: LOCAL_COPILOT_GEMINI_38_FLASH_MAX_OUTPUT_TOKENS,
+      model: 'gpt-5.5',
+      provider: 'openai',
       toolDefinitionTokens: 0,
     })
-    expect(budget.tokenBudget).toBe(LOCAL_COPILOT_GEMINI_38_FLASH_PROMPT_TOKEN_BUDGET)
-    expect(budget.softCapped).toBe(true)
-    expect(budget.reservedTokens).toBe(LOCAL_COPILOT_GEMINI_38_FLASH_MAX_OUTPUT_TOKENS + 4_000)
+    expect(budget.tokenBudget).toBeLessThanOrEqual(LOCAL_COPILOT_PROMPT_TOKEN_BUDGET)
+    expect(budget.reservedTokens).toBe(LOCAL_COPILOT_DEFAULT_MAX_OUTPUT_TOKENS + 4_000)
   })
 })
 
 describe('resolveLocalCopilotMaxOutputTokens', () => {
-  it('returns 32k for Gemini 3.8 Flash', () => {
-    expect(resolveLocalCopilotMaxOutputTokens('gemini-3.8-flash')).toBe(
-      LOCAL_COPILOT_GEMINI_38_FLASH_MAX_OUTPUT_TOKENS
-    )
-    expect(resolveLocalCopilotMaxOutputTokens('vertex/gemini-3.8-flash')).toBe(
-      LOCAL_COPILOT_GEMINI_38_FLASH_MAX_OUTPUT_TOKENS
+  it('keeps the 8k default', () => {
+    expect(resolveLocalCopilotMaxOutputTokens('gpt-5.5')).toBe(
+      LOCAL_COPILOT_DEFAULT_MAX_OUTPUT_TOKENS
     )
   })
+})
 
-  it('keeps the 8k default for other models', () => {
-    expect(resolveLocalCopilotMaxOutputTokens('gemini-2.5-pro')).toBe(
-      LOCAL_COPILOT_DEFAULT_MAX_OUTPUT_TOKENS
+describe('resolveLocalCopilotTokenCountModel', () => {
+  it('uses the GPT encoding for OpenAI ids and gpt-4o for everything else', () => {
+    expect(resolveLocalCopilotTokenCountModel('gpt-5-mini')).toBe('gpt-5-mini')
+    expect(resolveLocalCopilotTokenCountModel('openai/gpt-5.5')).toBe('gpt-5.5')
+    expect(resolveLocalCopilotTokenCountModel('my-custom-model')).toBe(
+      LOCAL_COPILOT_TOKEN_COUNT_MODEL
+    )
+    expect(resolveLocalCopilotTokenCountModel('vendor/some-model')).toBe(
+      LOCAL_COPILOT_TOKEN_COUNT_MODEL
     )
   })
 })

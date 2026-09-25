@@ -5,29 +5,10 @@ import { cn, disclosureChevronClass, formatChartCompactNumber } from '@sim/emcn'
 import { ArrowRight, ChevronDown } from '@sim/emcn/icons'
 import {
   AnthropicIcon,
-  AzureIcon,
-  BasetenIcon,
-  BedrockIcon,
-  CerebrasIcon,
-  DeepseekIcon,
-  FireworksIcon,
+  CohereIcon,
   GeminiIcon,
-  GroqIcon,
-  KimiIcon,
-  LitellmIcon,
-  MetaIcon,
   MistralIcon,
-  NvidiaIcon,
-  OllamaIcon,
   OpenAIIcon,
-  OpenRouterIcon,
-  SakanaIcon,
-  TogetherIcon,
-  TypeSafeIcon,
-  VertexIcon,
-  VllmIcon,
-  xAIIcon,
-  ZaiIcon,
 } from '@/components/icons'
 import type {
   OrganizationUsageBreakdown,
@@ -51,38 +32,20 @@ import { USAGE_TAB_EMPTY_COPY } from '@/ee/organization-usage/constants'
  * imports, so this is a re-keying, never a second set of artwork.
  *
  * It must list every provider the registry defines, or a model resolving to a
- * missing one renders an unexplained blank where every neighbouring row has a mark
- * — which is how `zai` (GLM) shipped iconless. `usage-consumers.test.ts` fails when
- * the two drift, so the coverage is checked rather than remembered.
+ * missing one renders an unexplained blank where every neighbouring row has a mark.
+ * `usage-consumers.test.ts` fails when the two drift.
  */
 const PROVIDER_ICONS: Readonly<Record<string, ComponentType<{ className?: string }>>> = {
-  anthropic: AnthropicIcon,
-  baseten: BasetenIcon,
-  bedrock: BedrockIcon,
-  cerebras: CerebrasIcon,
-  deepseek: DeepseekIcon,
-  fireworks: FireworksIcon,
-  google: GeminiIcon,
-  groq: GroqIcon,
-  kimi: KimiIcon,
-  litellm: LitellmIcon,
-  meta: MetaIcon,
-  mistral: MistralIcon,
-  nvidia: NvidiaIcon,
-  ollama: OllamaIcon,
-  'ollama-cloud': OllamaIcon,
+  /** Labbai: every LLM call runs on OpenAI. */
   openai: OpenAIIcon,
-  openrouter: OpenRouterIcon,
-  sakana: SakanaIcon,
-  together: TogetherIcon,
-  typesafe: TypeSafeIcon,
-  vertex: VertexIcon,
-  vllm: VllmIcon,
-  xai: xAIIcon,
-  zai: ZaiIcon,
-  'azure-anthropic': AzureIcon,
-  /** Not a registry provider — a BYOK credential kind the breakdown can also emit. */
-  'azure-openai': AzureIcon,
+  /**
+   * Not registry providers: BYOK credential kinds the breakdown can still emit
+   * (embeddings, OCR, reranking), and rows recorded before the OpenAI-only switch.
+   */
+  anthropic: AnthropicIcon,
+  google: GeminiIcon,
+  mistral: MistralIcon,
+  cohere: CohereIcon,
 }
 
 export const USAGE_PROVIDER_ICON_IDS = Object.keys(PROVIDER_ICONS)

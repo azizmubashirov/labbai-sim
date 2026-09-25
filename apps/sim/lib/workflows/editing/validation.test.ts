@@ -4,7 +4,7 @@
 import { resetEnvFlagsMock, setEnvFlags } from '@sim/testing'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getTuningOptionsForModel } from '@/lib/workflows/blocks/fallback-models'
-import { getThinkingLevelsForModel } from '@/providers/models'
+import { getReasoningEffortValuesForModel } from '@/providers/models'
 import { normalizeConditionRouterIds } from './builders'
 
 const {
@@ -334,64 +334,67 @@ describe('validateInputsForBlock', () => {
 
     it('accepts known models with env-var-referenced keys and fills missing row ids', () => {
       const result = validate([
-        { id: 'row-1', model: ' claude-sonnet-5 ' },
-        { model: 'openrouter/anthropic/claude', apiKey: '{{OPENROUTER_API_KEY}}' },
+        { id: 'row-1', model: ' gpt-5-mini ' },
+        { model: 'gpt-4.1', apiKey: '{{OPENAI_API_KEY}}' },
       ])
       expect(result.valid).toBe(true)
       const rows = (result as { value: Array<{ id: string; model: string; apiKey?: string }> })
         .value
-      expect(rows[0]).toEqual({ id: 'row-1', model: 'claude-sonnet-5' })
+      expect(rows[0]).toEqual({ id: 'row-1', model: 'gpt-5-mini' })
       expect(rows[1].id).toEqual(expect.any(String))
       expect(rows[1]).toMatchObject({
-        model: 'openrouter/anthropic/claude',
-        apiKey: '{{OPENROUTER_API_KEY}}',
+        model: 'gpt-4.1',
+        apiKey: '{{OPENAI_API_KEY}}',
       })
     })
 
     it('refuses a raw key rather than repairing it', () => {
-      const result = validate([{ model: 'claude-sonnet-5', apiKey: 'sk-live-raw' }])
+      const result = validate([{ model: 'gpt-5-mini', apiKey: 'sk-live-raw' }])
       expect(result.valid).toBe(false)
       expect((result as { error: { error: string } }).error.error).toContain(
         'apiKey must be a whole {{ENV_VAR}} reference'
       )
     })
 
-    it('refuses sim-auto, unknown models, missing models, and non-arrays', () => {
+    it('refuses retired vendor ids, unknown models, missing models, and non-arrays', () => {
       expect(validate([{ model: 'sim-auto' }]).valid).toBe(false)
+      expect(validate([{ model: 'claude-sonnet-5' }]).valid).toBe(false)
       expect(validate([{ model: 'definitely-not-a-model-9000' }]).valid).toBe(false)
       expect(validate([{ apiKey: '{{KEY}}' }]).valid).toBe(false)
-      expect(validate({ model: 'claude-sonnet-5' }).valid).toBe(false)
+      expect(validate({ model: 'gpt-5-mini' }).valid).toBe(false)
     })
 
     it('accepts a row tuning value the model declares and refuses one it does not', () => {
-      const levels = getThinkingLevelsForModel('claude-sonnet-5')
+      const levels = getReasoningEffortValuesForModel('gpt-5-mini')
       expect(levels?.length).toBeGreaterThan(0)
       const ok = validate([
-        { model: 'claude-sonnet-5', thinkingLevel: ` ${levels![0].toUpperCase()} ` },
+        { model: 'gpt-5-mini', reasoningEffort: ` ${levels![0].toUpperCase()} ` },
       ])
       expect(ok.valid).toBe(true)
-      expect((ok as { value: Array<{ thinkingLevel?: string }> }).value[0].thinkingLevel).toBe(
+      expect((ok as { value: Array<{ reasoningEffort?: string }> }).value[0].reasoningEffort).toBe(
         levels![0]
       )
 
-      const bad = validate([{ model: 'claude-sonnet-5', thinkingLevel: 'bogus' }])
+      const bad = validate([{ model: 'gpt-5-mini', reasoningEffort: 'bogus' }])
       expect(bad.valid).toBe(false)
-      expect((bad as { error: { error: string } }).error.error).toContain('thinking level option')
+      expect((bad as { error: { error: string } }).error.error).toContain(
+        'reasoning effort option'
+      )
 
-      const notAString = validate([{ model: 'claude-sonnet-5', thinkingLevel: 42 }])
+      const notAString = validate([{ model: 'gpt-5-mini', reasoningEffort: 42 }])
       expect(notAString.valid).toBe(false)
       expect((notAString as { error: { error: string } }).error.error).toContain('"42"')
 
       const undeclared = (['reasoningEffort', 'verbosity', 'thinkingLevel'] as const).find(
-        (knob) => getTuningOptionsForModel('claude-sonnet-5', knob) === null
+        (knob) => getTuningOptionsForModel('gpt-5-mini', knob) === null
       )
       expect(undeclared).toBeDefined()
-      const missingKnob = validate([{ model: 'claude-sonnet-5', [undeclared as string]: 'low' }])
+      const missingKnob = validate([{ model: 'gpt-5-mini', [undeclared as string]: 'low' }])
       expect(missingKnob.valid).toBe(false)
     })
 
     it('refuses more rows than the cap', () => {
-      const rows = Array.from({ length: 6 }, () => ({ model: 'claude-sonnet-5' }))
+      const rows = Array.from({ length: 6 }, () => ({ model: 'gpt-5-mini' }))
       const result = validate(rows)
       expect(result.valid).toBe(false)
       expect((result as { error: { error: string } }).error.error).toContain('at most 5')
@@ -516,23 +519,22 @@ describe('validateInputsForBlock', () => {
   })
 
   it('accepts known agent model ids', () => {
-    const result = validateInputsForBlock('agent', { model: 'claude-sonnet-4-6' }, 'agent-1')
+    const result = validateInputsForBlock('agent', { model: 'gpt-5-mini' }, 'agent-1')
 
     expect(result.errors).toHaveLength(0)
-    expect(result.validInputs.model).toBe('claude-sonnet-4-6')
+    expect(result.validInputs.model).toBe('gpt-5-mini')
   })
 
   it('rejects hallucinated agent model ids that match a static provider pattern', () => {
-    const result = validateInputsForBlock('agent', { model: 'claude-sonnet-4.6' }, 'agent-1')
+    const result = validateInputsForBlock('agent', { model: 'gpt-5.mini' }, 'agent-1')
 
     expect(result.validInputs.model).toBeUndefined()
     expect(result.errors).toHaveLength(1)
     expect(result.errors[0]?.field).toBe('model')
     expect(result.errors[0]?.error).toContain('Unknown model id')
-    expect(result.errors[0]?.error).toContain('claude-sonnet-5')
   })
 
-  it('rejects legacy claude-4.5-haiku style ids', () => {
+  it('rejects vendor ids outside the OpenAI catalog', () => {
     const result = validateInputsForBlock('agent', { model: 'claude-4.5-haiku' }, 'agent-1')
 
     expect(result.errors).toHaveLength(1)
@@ -546,35 +548,13 @@ describe('validateInputsForBlock', () => {
     expect(result.validInputs.model).toBe('')
   })
 
-  it('allows custom ollama-prefixed model ids', () => {
-    const result = validateInputsForBlock('agent', { model: 'ollama/my-private-model' }, 'agent-1')
-
-    expect(result.errors).toHaveLength(0)
-    expect(result.validInputs.model).toBe('ollama/my-private-model')
-  })
-
-  it.each([
-    'azure/MyDeployment',
-    'AZURE/MyDeployment',
-    'azure-anthropic/MyDeployment',
-    'bedrock/custom-inference-profile',
-    'vertex/publishers/google/models/custom-gemini',
-    'GROQ/Org/CustomModel',
-    'CEREBRAS/CustomModel',
-    'NVIDIA/CustomModel',
-  ])('accepts a custom cloud model ID: %s', (model) => {
-    for (const blockType of ['agent', 'router_v2']) {
-      const result = validateInputsForBlock(blockType, { model: `  ${model}  ` }, 'block-1')
-      expect(result.errors).toEqual([])
-      expect(result.validInputs.model).toBe(model)
-    }
-  })
-
   it.each([
     'azure/',
     'azure-anthropic/',
     'bedrock/',
     'vertex/',
+    'azure/MyDeployment',
+    'vertex/publishers/google/models/custom-gemini',
     'groq/',
     'cerebras/',
     'nvidia/',
@@ -588,11 +568,11 @@ describe('validateInputsForBlock', () => {
   })
 
   it('validates the model field on router_v2 blocks too', () => {
-    const valid = validateInputsForBlock('router_v2', { model: 'claude-sonnet-4-6' }, 'router-1')
+    const valid = validateInputsForBlock('router_v2', { model: 'gpt-4.1-mini' }, 'router-1')
     expect(valid.errors).toHaveLength(0)
-    expect(valid.validInputs.model).toBe('claude-sonnet-4-6')
+    expect(valid.validInputs.model).toBe('gpt-4.1-mini')
 
-    const invalid = validateInputsForBlock('router_v2', { model: 'claude-sonnet-4.6' }, 'router-1')
+    const invalid = validateInputsForBlock('router_v2', { model: 'claude-sonnet-4-6' }, 'router-1')
     expect(invalid.validInputs.model).toBeUndefined()
     expect(invalid.errors).toHaveLength(1)
     expect(invalid.errors[0]?.blockType).toBe('router_v2')
@@ -617,7 +597,6 @@ describe('validateInputsForBlock', () => {
     expect(result.validInputs.model).toBeUndefined()
     expect(result.errors).toHaveLength(1)
     expect(result.errors[0]?.error).toContain('Unknown model id')
-    expect(result.errors[0]?.error).toContain('ollama/')
   })
 
   it('rejects date-pinned ids that are not literally in the catalog', () => {
@@ -633,10 +612,10 @@ describe('validateInputsForBlock', () => {
   })
 
   it('trims whitespace around catalog model ids and stores the trimmed value', () => {
-    const result = validateInputsForBlock('agent', { model: '  gpt-5.4  ' }, 'agent-1')
+    const result = validateInputsForBlock('agent', { model: '  gpt-5.5  ' }, 'agent-1')
 
     expect(result.errors).toHaveLength(0)
-    expect(result.validInputs.model).toBe('gpt-5.4')
+    expect(result.validInputs.model).toBe('gpt-5.5')
   })
 
   it('rejects a pattern-matching but uncataloged id even with surrounding whitespace', () => {
@@ -1120,7 +1099,7 @@ describe('preValidateCredentialInputs (hosted models)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockValidateSelectorIds.mockResolvedValue({ valid: [], invalid: [] })
-    mockGetHostedModels.mockReturnValue(['claude-sonnet-4-6'])
+    mockGetHostedModels.mockReturnValue(['gpt-5-mini'])
     setEnvFlags({ isHosted: true })
   })
 
@@ -1136,7 +1115,7 @@ describe('preValidateCredentialInputs (hosted models)', () => {
         block_id: 'agent-1',
         params: {
           type: 'agent',
-          inputs: { model: 'claude-sonnet-4-6', apiKey: 'user-anthropic-key' },
+          inputs: { model: 'gpt-5-mini', apiKey: 'user-openai-key' },
         },
       },
     ]

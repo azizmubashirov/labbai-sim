@@ -1,27 +1,12 @@
 import { createLogger } from '@sim/logger'
 import { getErrorMessage } from '@sim/utils/errors'
 import {
-  DEFAULT_MODEL_BY_PROVIDER,
-  DEFAULT_OPENROUTER_EMBEDDING_MODEL,
   EmbeddingOutputLimitError,
   embed,
-  embedOpenRouter,
   findEmbeddingModelInfo,
   resolveDimensions,
-  toOllamaEmbeddingModelId,
 } from '@/lib/embeddings'
-import {
-  getOllamaEmbeddingModelMetadata,
-  OllamaEmbeddingModelNotFoundError,
-  OllamaEmbeddingWidthUnknownError,
-} from '@/lib/embeddings/ollama-model-catalog.server'
-import {
-  getOpenRouterEmbeddingModelMetadata,
-  type OpenRouterEmbeddingModelMetadata,
-  OpenRouterEmbeddingModelNotFoundError,
-} from '@/lib/embeddings/openrouter-model-catalog.server'
-import { normalizeOpenRouterEmbeddingModelId } from '@/lib/embeddings/openrouter-models'
-import type { EmbedResult } from '@/lib/embeddings/types'
+import { DEFAULT_EMBEDDING_MODEL } from '@/lib/embeddings/catalog'
 import {
   type EmbeddingsInput,
   MAX_EMBEDDING_INPUTS,
@@ -54,9 +39,7 @@ export async function executeEmbedding(
   context: EmbeddingOperationContext
 ): Promise<Response> {
   context.signal?.throwIfAborted()
-  const { provider, model, taskType, dimensions } = input
-  /** Ollama takes no credential, so its input variant declares no `apiKey` at all. */
-  const apiKey = provider === 'ollama' ? undefined : input.apiKey
+  const { provider, model, taskType, dimensions, apiKey } = input
   const texts = normalizeEmbeddingInput(input.input)
   if (texts.length === 0) return failureResponse('input must contain at least one text', 400)
   if (texts.length > MAX_EMBEDDING_INPUTS) {
@@ -76,116 +59,28 @@ export async function executeEmbedding(
     return failureResponse('input entries cannot be empty', 400)
   }
 
-  let resolvedModel: string
-  let openRouterModelMetadata: OpenRouterEmbeddingModelMetadata | undefined
-  /**
-   * Width Ollama reports for the selected model. Resolved from the server rather
-   * than requested by the caller: a local model's width is a property of what
-   * the operator pulled, and it is what the client validates the response
-   * against.
-   */
-  let ollamaDimensions: number | undefined
-  if (provider === 'ollama') {
-    try {
-      resolvedModel = toOllamaEmbeddingModelId(model)
-    } catch (error) {
-      return failureResponse(getErrorMessage(error, 'Invalid Ollama embedding model'), 400)
-    }
-    try {
-      ollamaDimensions = (await getOllamaEmbeddingModelMetadata(resolvedModel, context.signal))
-        .dimensions
-    } catch (error) {
-      context.signal?.throwIfAborted()
-      /**
-       * A model the caller can fix (not installed, or one whose width Ollama
-       * will not report) is a 400; anything else — an unreachable server above
-       * all — is an upstream failure and must not read as a bad request.
-       */
-      const userError =
-        error instanceof OllamaEmbeddingModelNotFoundError ||
-        error instanceof OllamaEmbeddingWidthUnknownError
-      return failureResponse(
-        getErrorMessage(error, 'Failed to load Ollama embedding model metadata'),
-        userError ? 400 : 502
-      )
-    }
-  } else if (provider === 'openrouter') {
-    try {
-      resolvedModel = normalizeOpenRouterEmbeddingModelId(
-        model || DEFAULT_OPENROUTER_EMBEDDING_MODEL
-      )
-    } catch (error) {
-      return failureResponse(getErrorMessage(error, 'Invalid OpenRouter embedding model'), 400)
-    }
-    try {
-      openRouterModelMetadata = await getOpenRouterEmbeddingModelMetadata(
-        resolvedModel,
-        context.signal
-      )
-    } catch (error) {
-      context.signal?.throwIfAborted()
-      const notFound = error instanceof OpenRouterEmbeddingModelNotFoundError
-      return failureResponse(
-        getErrorMessage(
-          error,
-          notFound
-            ? 'Unsupported OpenRouter embedding model'
-            : 'Failed to load OpenRouter embedding model metadata'
-        ),
-        notFound ? 400 : 502
-      )
-    }
-  } else {
-    resolvedModel = model || DEFAULT_MODEL_BY_PROVIDER[provider]
+  const resolvedModel = model || DEFAULT_EMBEDDING_MODEL
+  const info = findEmbeddingModelInfo(resolvedModel)
+  if (!info) return failureResponse(`Unsupported embedding model: ${resolvedModel}`, 400)
+  if (info.provider !== provider) {
+    return failureResponse(`Model ${resolvedModel} belongs to ${info.provider}, not ${provider}`, 400)
+  }
+  try {
+    resolveDimensions(info, dimensions)
+  } catch (error) {
+    return failureResponse(getErrorMessage(error, 'Invalid dimensions'), 400)
   }
 
-  if (provider !== 'openrouter') {
-    const info = findEmbeddingModelInfo(resolvedModel)
-    if (!info) return failureResponse(`Unsupported embedding model: ${resolvedModel}`, 400)
-    if (info.provider !== provider) {
-      return failureResponse(
-        `Model ${resolvedModel} belongs to ${info.provider}, not ${provider}`,
-        400
-      )
-    }
-    try {
-      resolveDimensions(info, ollamaDimensions ?? dimensions)
-    } catch (error) {
-      return failureResponse(getErrorMessage(error, 'Invalid dimensions'), 400)
-    }
-  }
-
-  /** `resolvedModel` already carries a routing prefix for the providers that use one. */
   logger.info(`Embedding ${texts.length} input(s)`, { provider, model: resolvedModel })
   try {
-    let result: EmbedResult
-    if (provider === 'openrouter') {
-      if (!openRouterModelMetadata) {
-        throw new Error('Failed to load OpenRouter embedding model metadata')
-      }
-      result = await embedOpenRouter(texts, {
-        model: resolvedModel,
-        dimensions,
-        apiKey: input.apiKey,
-        maxInputTokens: openRouterModelMetadata.maxInputTokens,
-        projectInputs: null,
-        signal: context.signal,
-      })
-    } else {
-      result = await embed(texts, {
-        model: resolvedModel,
-        taskType,
-        /**
-         * Ollama's width comes from the server, never from the caller: the
-         * adapter cannot ask for a reduction, so a requested size could only
-         * ever be an assertion, and the server already knows the answer.
-         */
-        dimensions: ollamaDimensions ?? dimensions,
-        apiKey,
-        projectInputs: null,
-        signal: context.signal,
-      })
-    }
+    const result = await embed(texts, {
+      model: resolvedModel,
+      taskType,
+      dimensions,
+      apiKey,
+      projectInputs: null,
+      signal: context.signal,
+    })
     context.signal?.throwIfAborted()
     return Response.json({
       success: true,

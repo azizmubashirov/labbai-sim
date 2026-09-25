@@ -5,11 +5,7 @@ import { and, asc, eq, notExists } from 'drizzle-orm'
 import { LRUCache } from 'lru-cache'
 import { isOrganizationBYOKEntitledCached } from '@/lib/api-key/byok-entitlement'
 import { getRotatingApiKey } from '@/lib/core/config/api-keys'
-import { env } from '@/lib/core/config/env'
-import { isHosted, platformLlmProviders } from '@/lib/core/config/env-flags'
 import { decryptSecret } from '@/lib/core/security/encryption'
-import { getHostedModels } from '@/providers/models'
-import { PROVIDER_PLACEHOLDER_KEY } from '@/providers/utils'
 import type { BYOKProviderId } from '@/tools/types'
 
 const logger = createLogger('BYOKKeys')
@@ -182,219 +178,32 @@ export async function getBYOKKey(
 }
 
 /**
- * Resolves credentials for the provider already selected by model routing.
- * Discovery lists must not override that provider and select a different key pool.
+ * Resolves the credential for an LLM call.
  *
- * `scope` is present only when the key came from a stored BYOK pool; a
- * Sim-hosted, env, or caller-supplied key has no scope. Declared rather than
- * dropped so the returned type matches what a BYOK branch actually hands back.
+ * Labbai runs on OpenAI only (direct OpenAI API). The only credential is the
+ * platform's server key pool (`OPENAI_API_KEY` or `OPENAI_API_KEY_1..3`, see
+ * `getRotatingApiKey`). There is no workspace BYOK and no block-level API key
+ * for LLMs; `workspaceId` and `userProvidedKey` are accepted for call-site
+ * compatibility and ignored.
  */
 export async function getApiKeyWithBYOK(
   provider: string,
   model: string,
-  workspaceId: string | undefined | null,
-  userProvidedKey?: string
+  _workspaceId?: string | undefined | null,
+  _userProvidedKey?: string
 ): Promise<{ apiKey: string; isBYOK: boolean; scope?: BYOKKeyScopeName }> {
-  if (provider === 'ollama') {
-    return { apiKey: 'empty', isBYOK: false }
+  if (provider !== 'openai') {
+    throw new Error(`Provider "${provider}" is not available for ${model}`)
   }
 
-  if (provider === 'vllm') {
-    return { apiKey: userProvidedKey || env.VLLM_API_KEY || 'empty', isBYOK: false }
+  let apiKey: string
+  try {
+    apiKey = getRotatingApiKey('openai')
+  } catch {
+    throw new Error(
+      'OpenAI is not configured: set OPENAI_API_KEY (or OPENAI_API_KEY_1..3) in the server environment'
+    )
   }
 
-  if (provider === 'litellm') {
-    return { apiKey: userProvidedKey || env.LITELLM_API_KEY || 'empty', isBYOK: false }
-  }
-
-  if (provider === 'fireworks') {
-    if (workspaceId) {
-      const byokResult = await getBYOKKey(workspaceId, 'fireworks')
-      if (byokResult) {
-        logger.info('Using BYOK key for Fireworks', { model, workspaceId, scope: byokResult.scope })
-        return byokResult
-      }
-    }
-
-    /**
-     * On hosted Sim the platform Fireworks key backs the static catalog (the
-     * sim-auto pool) and nothing else, exactly as the platform Anthropic and
-     * OpenAI keys back only their catalogued models. A dynamic `fireworks/*`
-     * id a workspace configured itself carries no catalog pricing, so
-     * `shouldBillModelUsage` would return false for it — serving it on Sim's
-     * key would be unmetered inference.
-     */
-    if (isHosted) {
-      const isModelHosted = getHostedModels().some((m) => m.toLowerCase() === model.toLowerCase())
-      if (isModelHosted) {
-        try {
-          const serverKey = getRotatingApiKey('fireworks')
-          return { apiKey: serverKey, isBYOK: false }
-        } catch (_error) {
-          if (userProvidedKey) {
-            return { apiKey: userProvidedKey, isBYOK: false }
-          }
-          throw new Error(`No API key available for fireworks ${model}`)
-        }
-      }
-
-      if (userProvidedKey) {
-        return { apiKey: userProvidedKey, isBYOK: false }
-      }
-      throw new Error(`API key is required for Fireworks ${model}`)
-    }
-
-    if (userProvidedKey) {
-      return { apiKey: userProvidedKey, isBYOK: false }
-    }
-    if (env.FIREWORKS_API_KEY) {
-      return { apiKey: env.FIREWORKS_API_KEY, isBYOK: false }
-    }
-    throw new Error(`API key is required for Fireworks ${model}`)
-  }
-
-  if (provider === 'together') {
-    if (workspaceId) {
-      const byokResult = await getBYOKKey(workspaceId, 'together')
-      if (byokResult) {
-        logger.info('Using BYOK key for Together AI', {
-          model,
-          workspaceId,
-          scope: byokResult.scope,
-        })
-        return byokResult
-      }
-    }
-    if (userProvidedKey) {
-      return { apiKey: userProvidedKey, isBYOK: false }
-    }
-    if (env.TOGETHER_API_KEY) {
-      return { apiKey: env.TOGETHER_API_KEY, isBYOK: false }
-    }
-    throw new Error(`API key is required for Together AI ${model}`)
-  }
-
-  if (provider === 'baseten') {
-    if (workspaceId) {
-      const byokResult = await getBYOKKey(workspaceId, 'baseten')
-      if (byokResult) {
-        logger.info('Using BYOK key for Baseten', { model, workspaceId, scope: byokResult.scope })
-        return byokResult
-      }
-    }
-    if (userProvidedKey) {
-      return { apiKey: userProvidedKey, isBYOK: false }
-    }
-    if (env.BASETEN_API_KEY) {
-      return { apiKey: env.BASETEN_API_KEY, isBYOK: false }
-    }
-    throw new Error(`API key is required for Baseten ${model}`)
-  }
-
-  if (provider === 'ollama-cloud') {
-    if (workspaceId) {
-      const byokResult = await getBYOKKey(workspaceId, 'ollama-cloud')
-      if (byokResult) {
-        logger.info('Using BYOK key for Ollama Cloud', {
-          model,
-          workspaceId,
-          scope: byokResult.scope,
-        })
-        return byokResult
-      }
-    }
-    if (userProvidedKey) {
-      return { apiKey: userProvidedKey, isBYOK: false }
-    }
-    throw new Error(`API key is required for Ollama Cloud ${model}`)
-  }
-
-  if (provider === 'bedrock') {
-    return { apiKey: PROVIDER_PLACEHOLDER_KEY, isBYOK: false }
-  }
-
-  if (provider === 'azure-openai') {
-    return { apiKey: userProvidedKey || env.AZURE_OPENAI_API_KEY || '', isBYOK: false }
-  }
-
-  if (provider === 'azure-anthropic') {
-    return { apiKey: userProvidedKey || env.AZURE_ANTHROPIC_API_KEY || '', isBYOK: false }
-  }
-
-  const isOpenAIModel = provider === 'openai'
-  const isClaudeModel = provider === 'anthropic'
-  const isGeminiModel = provider === 'google'
-  const isMistralModel = provider === 'mistral'
-  const isZaiModel = provider === 'zai'
-  const isXaiModel = provider === 'xai'
-  const isKimiModel = provider === 'kimi'
-  const isTypeSafeModel = provider === 'typesafe'
-
-  const byokProviderId = isGeminiModel ? 'google' : (provider as BYOKProviderId)
-
-  if (
-    isHosted &&
-    workspaceId &&
-    (isOpenAIModel ||
-      isClaudeModel ||
-      isGeminiModel ||
-      isMistralModel ||
-      isZaiModel ||
-      isXaiModel ||
-      isKimiModel ||
-      isTypeSafeModel)
-  ) {
-    const hostedModels = getHostedModels()
-    const isModelHosted = hostedModels.some((m) => m.toLowerCase() === model.toLowerCase())
-
-    logger.debug('BYOK check', { provider, model, workspaceId, isHosted, isModelHosted })
-
-    if (isModelHosted || isMistralModel) {
-      const byokResult = await getBYOKKey(workspaceId, byokProviderId)
-      if (byokResult) {
-        logger.info('Using BYOK key', { provider, model, workspaceId, scope: byokResult.scope })
-        return byokResult
-      }
-      logger.debug('No BYOK key found, falling back', { provider, model, workspaceId })
-
-      if (isModelHosted) {
-        try {
-          const serverKey = getRotatingApiKey(isGeminiModel ? 'gemini' : provider)
-          return { apiKey: serverKey, isBYOK: false }
-        } catch (_error) {
-          if (userProvidedKey) {
-            return { apiKey: userProvidedKey, isBYOK: false }
-          }
-          throw new Error(`No API key available for ${provider} ${model}`)
-        }
-      }
-    }
-  }
-
-  // Labbai: self-hosted platform keys (see `platformLlmProviders`). Workspace BYOK
-  // wins; otherwise the server key pool backs the block like hosted Sim does.
-  if (
-    !isHosted &&
-    !userProvidedKey &&
-    (isOpenAIModel || isClaudeModel || isGeminiModel) &&
-    platformLlmProviders.has(provider)
-  ) {
-    if (workspaceId) {
-      const byokResult = await getBYOKKey(workspaceId, byokProviderId)
-      if (byokResult) return byokResult
-    }
-    return { apiKey: getRotatingApiKey(isGeminiModel ? 'gemini' : provider), isBYOK: false }
-  }
-
-  if (!userProvidedKey) {
-    logger.debug('BYOK not applicable, no user key provided', {
-      provider,
-      model,
-      workspaceId,
-      isHosted,
-    })
-    throw new Error(`API key is required for ${provider} ${model}`)
-  }
-
-  return { apiKey: userProvidedKey, isBYOK: false }
+  return { apiKey, isBYOK: false }
 }

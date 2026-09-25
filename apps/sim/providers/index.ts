@@ -36,6 +36,7 @@ import {
   uploadLargeFilesToProvider,
 } from '@/providers/file-attachments.server'
 import { isEvaluationModel, isKnownModelId } from '@/providers/models'
+import { resolveOpenAIModelId } from '@/providers/openai/model-ids'
 import { getProviderExecutor } from '@/providers/registry'
 import {
   type ProviderRuntimeContext,
@@ -163,6 +164,21 @@ function normalizeModelLevel(value: string | undefined): string | undefined {
 
 function sanitizeRequest(request: ProviderRequest): ProviderRequest {
   const sanitizedRequest = { ...request }
+  /**
+   * Labbai: stored workflows and callers may still carry retired or non-OpenAI model
+   * ids (`gpt-4o`, `claude-sonnet-4-6`, `gemini-2.5-pro`, `azure/…`). They run on the
+   * closest curated OpenAI model instead of failing.
+   */
+  if (sanitizedRequest.model) {
+    const resolved = resolveOpenAIModelId(sanitizedRequest.model)
+    if (resolved !== sanitizedRequest.model) {
+      logger.info('Mapped model id onto a curated OpenAI model', {
+        requested: sanitizedRequest.model,
+        model: resolved,
+      })
+      sanitizedRequest.model = resolved
+    }
+  }
   const model = sanitizedRequest.model
 
   sanitizedRequest.reasoningEffort = normalizeModelLevel(sanitizedRequest.reasoningEffort)
@@ -238,10 +254,17 @@ function applyStreamingCostPolicy(
 }
 
 export async function executeProviderRequest(
-  providerId: string,
+  requestedProviderId: string,
   request: ProviderRequest,
   runtimeContext?: ProviderRuntimeContext
 ): Promise<ProviderResponse | ReadableStream | StreamingExecution> {
+  /** Labbai: OpenAI is the only provider; legacy provider ids route there. */
+  const providerId: ProviderId = 'openai'
+  if (requestedProviderId !== providerId) {
+    logger.info('Routing legacy provider id to OpenAI', {
+      requested: requestedProviderId,
+    })
+  }
   const provider = await getProviderExecutor(providerId as ProviderId)
   if (!provider) {
     throw new Error(`Provider not found: ${providerId}`)

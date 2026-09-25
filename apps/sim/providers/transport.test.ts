@@ -1,12 +1,10 @@
 /**
  * @vitest-environment node
  *
- * Pinned against the vendored SDKs rather than against numbers typed from memory: if an
+ * Pinned against the vendored SDK rather than against numbers typed from memory: if an
  * SDK bump moves a default, these fail and the divergence becomes a decision instead of
  * a surprise.
  */
-import Cerebras from '@cerebras/cerebras_cloud_sdk'
-import Groq from 'groq-sdk'
 import OpenAI from 'openai'
 import { describe, expect, it } from 'vitest'
 import {
@@ -32,21 +30,9 @@ describe('provider transport policy', () => {
 
   /**
    * The assertion that matters: object spread gets no excess-property checking, so a
-   * renamed option in either SDK would become a silent no-op with a green typecheck.
-   * These read the value back off a constructed client.
+   * renamed option in the SDK would become a silent no-op with a green typecheck.
+   * This reads the value back off a constructed client.
    */
-  it('actually reaches the Groq client, which defaults to 60s', () => {
-    const client = new Groq({ apiKey: 'test', ...openAICompatTransport() })
-    expect(client.timeout).toBe(PROVIDER_HEADERS_TIMEOUT_MS)
-    expect(client.maxRetries).toBe(PROVIDER_MAX_RETRIES)
-  })
-
-  it('actually reaches the Cerebras client, which defaults to 60s', () => {
-    const client = new Cerebras({ apiKey: 'test', ...openAICompatTransport() })
-    expect(client.timeout).toBe(PROVIDER_HEADERS_TIMEOUT_MS)
-    expect(client.maxRetries).toBe(PROVIDER_MAX_RETRIES)
-  })
-
   it('actually reaches an OpenAI-compatible client', () => {
     const client = new OpenAI({
       apiKey: 'test',

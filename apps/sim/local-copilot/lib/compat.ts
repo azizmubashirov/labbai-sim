@@ -1,12 +1,8 @@
 /**
- * Catalog and Bedrock helpers the local copilot relied on in Arena's fork of Sim.
- * Upstream Sim v0.8.59 does not export them, so they live next to their only caller.
+ * Catalog lookup the local copilot relied on in Arena's fork of Sim.
+ * Upstream Sim v0.8.59 does not export it, so it lives next to its only caller.
  */
-import {
-  getModelCapabilities,
-  PROVIDER_DEFINITIONS,
-  supportsTemperature,
-} from '@/providers/models'
+import { PROVIDER_DEFINITIONS } from '@/providers/models'
 
 function matchesCatalogModelId(candidate: string, catalogId: string): boolean {
   const normalizedCandidate = candidate.toLowerCase()
@@ -15,8 +11,8 @@ function matchesCatalogModelId(candidate: string, catalogId: string): boolean {
     return true
   }
 
-  // Local Copilot Bedrock routes use bare model IDs (`anthropic.claude-opus-5`)
-  // while the pricing catalog stores `bedrock/<id>`.
+  // Callers may pass a bare model id (`gpt-5.5`) while the catalog may store a
+  // provider-prefixed id (`openai/gpt-5.5`).
   const slashIdx = baseId.indexOf('/')
   if (slashIdx > 0) {
     const withoutProvider = baseId.slice(slashIdx + 1)
@@ -57,60 +53,4 @@ export function findCatalogModel(modelId: string): {
   }
 
   return null
-}
-
-export function bedrockAllowsTemperature(model: string): boolean {
-  const normalized = model
-    .replace(/^bedrock\//i, '')
-    .replace(/^(us|eu|apac|global|us-gov)\./i, '')
-    .toLowerCase()
-
-  if (normalized.startsWith('anthropic.')) {
-    const shortId = normalized.slice('anthropic.'.length).replace(/-\d{8}-v\d+:\d+$/i, '')
-    // Prefer Anthropic catalog — Claude 5 / Opus 4.7+ omit temperature there.
-    if (
-      shortId === 'claude-opus-5' ||
-      shortId === 'claude-sonnet-5' ||
-      shortId === 'claude-fable-5' ||
-      shortId === 'claude-opus-4-8' ||
-      shortId === 'claude-opus-4-7'
-    ) {
-      return false
-    }
-    if (supportsTemperature(shortId)) return true
-    // Known Anthropic catalog entry without temperature → omit.
-    if (getModelCapabilities(shortId)) return false
-  }
-
-  if (/claude-(?:opus|sonnet|fable)-5(?:\b|$|-)/.test(normalized)) return false
-  if (/claude-opus-4-[78](?:\b|$|-)/.test(normalized)) return false
-
-  if (supportsTemperature(`bedrock/${normalized}`)) return true
-  return supportsTemperature(model)
-}
-
-export interface BedrockInferenceConfig {
-  temperature?: number
-  maxTokens?: number
-}
-
-/**
- * Builds Bedrock `inferenceConfig`, omitting temperature when the model rejects it.
- */
-export function buildBedrockInferenceConfig(options: {
-  model: string
-  temperature?: number
-  maxTokens?: number
-  /** Default temperature when the model allows it (Nova tool-calling prefers 0). */
-  defaultTemperature?: number
-}): BedrockInferenceConfig {
-  const config: BedrockInferenceConfig = {}
-  if (options.maxTokens != null) {
-    config.maxTokens = options.maxTokens
-  }
-  if (bedrockAllowsTemperature(options.model)) {
-    const isNova = /amazon\.nova/i.test(options.model)
-    config.temperature = options.temperature ?? options.defaultTemperature ?? (isNova ? 0 : 0.2)
-  }
-  return config
 }

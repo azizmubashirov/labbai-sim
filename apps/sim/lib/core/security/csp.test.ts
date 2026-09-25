@@ -5,7 +5,6 @@ vi.mock('@/lib/core/config/env', () =>
   createEnvMock({
     NEXT_PUBLIC_APP_URL: 'https://example.com',
     NEXT_PUBLIC_SOCKET_URL: 'https://socket.example.com',
-    OLLAMA_URL: 'http://localhost:11434',
     S3_BUCKET_NAME: 'test-bucket',
     AWS_REGION: 'us-east-1',
     S3_KB_BUCKET_NAME: 'test-kb-bucket',

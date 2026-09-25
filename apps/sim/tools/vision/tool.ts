@@ -14,7 +14,7 @@ export const visionTool: InternalToolConfig<VisionParams, VisionResponse> = {
       type: 'string',
       required: true,
       visibility: 'user-only',
-      description: 'API key for the selected model provider',
+      description: 'OpenAI API key',
     },
     imageUrl: {
       type: 'string',
@@ -32,7 +32,7 @@ export const visionTool: InternalToolConfig<VisionParams, VisionResponse> = {
       type: 'string',
       required: false,
       visibility: 'user-only',
-      description: 'Vision model to use (gpt-4o, claude-3-opus-20240229, etc)',
+      description: 'OpenAI vision model to use (gpt-5-mini, gpt-4.1-mini, etc)',
     },
     prompt: {
       type: 'string',
@@ -61,7 +61,7 @@ export const visionTool: InternalToolConfig<VisionParams, VisionResponse> = {
         apiKey: params.apiKey,
         imageUrl: params.imageUrl || null,
         imageFile: params.imageFile || null,
-        model: params.model || 'gpt-5.2',
+        model: params.model || 'gpt-5-mini',
         prompt: params.prompt || null,
       }
     },
@@ -126,7 +126,7 @@ export const visionToolV2: InternalToolConfig<VisionV2Params, VisionResponse> = 
     input: (params: VisionV2Params) => ({
       apiKey: params.apiKey,
       imageFile: params.imageFile,
-      model: params.model || 'gpt-5.2',
+      model: params.model || 'gpt-5-mini',
       prompt: params.prompt || null,
     }),
   },

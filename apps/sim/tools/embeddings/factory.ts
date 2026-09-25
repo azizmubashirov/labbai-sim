@@ -1,6 +1,5 @@
-import { BYOK_PROVIDER_IDS, DEFAULT_MODEL_BY_PROVIDER } from '@/lib/embeddings/catalog'
+import { DEFAULT_EMBEDDING_MODEL } from '@/lib/embeddings/catalog'
 import type { KeyedEmbeddingProvider } from '@/lib/embeddings/types'
-import type { EmbeddingProvider } from '@/lib/internal/embeddings/schema'
 import { getEmbeddingModelPricing } from '@/providers/models'
 import type { EmbeddingsParams, EmbeddingsResponse } from '@/tools/embeddings/types'
 import type { InternalToolConfig } from '@/tools/types'
@@ -12,88 +11,47 @@ const HOSTED_KEY_RATE_LIMIT = {
   burstMultiplier: 1,
 } as const
 
-interface EmbeddingToolBaseOptions {
+interface CreateEmbeddingToolOptions {
   id: string
   name: string
   description: string
-}
-
-interface HostedEmbeddingToolOptions extends EmbeddingToolBaseOptions {
   provider: KeyedEmbeddingProvider
   envKeyPrefix: string
-  defaultModel?: never
-}
-
-interface ExplicitKeyEmbeddingToolOptions extends EmbeddingToolBaseOptions {
-  provider: Extract<EmbeddingProvider, 'openrouter'>
-  envKeyPrefix?: never
-  defaultModel: string
 }
 
 /**
- * Ollama runs on the deployment's own server and authenticates with nothing, so
- * it has neither a credential to collect nor a hosted key to meter. The model is
- * whatever the operator pulled, so there is no default either.
- */
-interface LocalEmbeddingToolOptions extends EmbeddingToolBaseOptions {
-  provider: Extract<EmbeddingProvider, 'ollama'>
-  envKeyPrefix?: never
-  defaultModel?: never
-}
-
-type CreateEmbeddingToolOptions =
-  | HostedEmbeddingToolOptions
-  | ExplicitKeyEmbeddingToolOptions
-  | LocalEmbeddingToolOptions
-
-/**
- * Builds a provider-specific embeddings tool. Every provider shares the same
- * params, operation, and output shape; only key resolution and the default
- * model differ, so they are produced from one definition rather than copied.
+ * Builds the embeddings tool. Labbai embeds with OpenAI only.
  */
 export function createEmbeddingTool(
   options: CreateEmbeddingToolOptions
 ): InternalToolConfig<EmbeddingsParams, EmbeddingsResponse> {
   const { id, name, provider, description } = options
-  const isKeyless = provider === 'ollama'
-  const defaultModel =
-    provider === 'openrouter'
-      ? options.defaultModel
-      : isKeyless
-        ? undefined
-        : DEFAULT_MODEL_BY_PROVIDER[provider]
-  /**
-   * Sim-hosted catalog providers are billed per input token with no markup.
-   * OpenRouter requires an explicit user key and Ollama takes none at all, so
-   * neither has a hosting config — and neither has a Sim-funded key to meter.
-   */
-  let hostingConfig: InternalToolConfig<EmbeddingsParams, EmbeddingsResponse>['hosting']
-  if (provider !== 'openrouter' && provider !== 'ollama') {
-    const hostedDefaultModel = DEFAULT_MODEL_BY_PROVIDER[provider]
-    hostingConfig = {
-      envKeyPrefix: options.envKeyPrefix,
-      apiKeyParam: 'apiKey',
-      byokProviderId: BYOK_PROVIDER_IDS[provider],
-      pricing: {
-        type: 'custom',
-        getCost: (_params, output) => {
-          const tokens = output.__embeddingTokens
-          if (typeof tokens !== 'number' || Number.isNaN(tokens)) {
-            throw new Error('Embedding response missing token usage')
-          }
-          const model = typeof output.model === 'string' ? output.model : hostedDefaultModel
-          const pricing = getEmbeddingModelPricing(model)
-          if (!pricing) {
-            throw new Error(`No pricing configured for embedding model: ${model}`)
-          }
-          return {
-            cost: (tokens * pricing.input) / 1_000_000,
-            metadata: { model, totalTokens: tokens, inputPricePerMillion: pricing.input },
-          }
-        },
+  /** Labbai: OpenAI is the only embedding provider; its default is the KB model. */
+  const defaultModel = DEFAULT_EMBEDDING_MODEL
+  /** Sim-hosted embeddings are billed per input token with no markup. */
+  const hostingConfig: InternalToolConfig<EmbeddingsParams, EmbeddingsResponse>['hosting'] = {
+    envKeyPrefix: options.envKeyPrefix,
+    apiKeyParam: 'apiKey',
+    byokProviderId: 'openai',
+    pricing: {
+      type: 'custom',
+      getCost: (_params, output) => {
+        const tokens = output.__embeddingTokens
+        if (typeof tokens !== 'number' || Number.isNaN(tokens)) {
+          throw new Error('Embedding response missing token usage')
+        }
+        const model = typeof output.model === 'string' ? output.model : defaultModel
+        const pricing = getEmbeddingModelPricing(model)
+        if (!pricing) {
+          throw new Error(`No pricing configured for embedding model: ${model}`)
+        }
+        return {
+          cost: (tokens * pricing.input) / 1_000_000,
+          metadata: { model, totalTokens: tokens, inputPricePerMillion: pricing.input },
+        }
       },
-      rateLimit: HOSTED_KEY_RATE_LIMIT,
-    }
+    },
+    rateLimit: HOSTED_KEY_RATE_LIMIT,
   }
 
   return {
@@ -111,47 +69,30 @@ export function createEmbeddingTool(
       },
       model: {
         type: 'string',
-        required: isKeyless,
+        required: false,
         visibility: 'user-only',
-        description: isKeyless
-          ? 'Embedding model pulled on the configured Ollama server'
-          : 'Embedding model to use',
-        ...(defaultModel !== undefined ? { default: defaultModel } : {}),
+        description: 'Embedding model to use',
+        default: defaultModel,
       },
-      /**
-       * Ollama's API accepts neither a task type nor a reduction, and its width
-       * is read off the server rather than requested, so the keyless tool
-       * declares neither — a parameter a tool ignores is worse than one it does
-       * not offer.
-       */
-      ...(isKeyless
-        ? {}
-        : {
-            taskType: {
-              type: 'string' as const,
-              required: false,
-              visibility: 'user-only' as const,
-              description:
-                'What the embedding is for, when the model supports task conditioning: document, query, similarity, classification, or clustering',
-            },
-            dimensions: {
-              type: 'number' as const,
-              required: false,
-              visibility: 'user-only' as const,
-              description:
-                'Output dimensions, when the model supports truncation. Defaults to native.',
-            },
-          }),
-      ...(isKeyless
-        ? {}
-        : {
-            apiKey: {
-              type: 'string' as const,
-              required: true,
-              visibility: 'user-only' as const,
-              description: 'API key for the selected embedding provider',
-            },
-          }),
+      taskType: {
+        type: 'string',
+        required: false,
+        visibility: 'user-only',
+        description:
+          'What the embedding is for: document, query, similarity, classification, or clustering',
+      },
+      dimensions: {
+        type: 'number',
+        required: false,
+        visibility: 'user-only',
+        description: 'Output dimensions, when the model supports truncation. Defaults to native.',
+      },
+      apiKey: {
+        type: 'string',
+        required: true,
+        visibility: 'user-only',
+        description: 'OpenAI API key',
+      },
     },
 
     hosting: hostingConfig,

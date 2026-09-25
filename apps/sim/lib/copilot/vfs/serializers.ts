@@ -14,11 +14,7 @@ import { getBlock } from '@/blocks'
 import { isCustomBlockType } from '@/blocks/custom/build-config'
 import type { BlockConfig, SubBlockConfig } from '@/blocks/types'
 import { isHiddenUnder } from '@/blocks/visibility/context'
-import {
-  DYNAMIC_MODEL_PROVIDERS,
-  PROVIDER_DEFINITIONS,
-  SIM_AUTO_MODEL_ID,
-} from '@/providers/models'
+import { PROVIDER_DEFINITIONS } from '@/providers/models'
 import { deriveHostedApiKeySupport } from '@/tools/hosted-api-key'
 import type { ExecutableToolConfig, ToolHostingCondition } from '@/tools/types'
 
@@ -534,30 +530,11 @@ interface StaticModelOption {
   deprecated?: boolean
 }
 
-const DYNAMIC_PROVIDERS_NOTE = {
-  note: 'The options array above lists Sim\'s static provider catalog. These providers also accept user-configured models that are NOT enumerated here: the user may have additional ids available at runtime (e.g. local Ollama tags). To reference one, prefix the model id with the provider slash below — for example "ollama/llama3.1:8b" instead of the bare "llama3.1:8b". The server rejects bare ids that are not in the catalog; always use the prefix for user-configured models.',
-  prefixes: DYNAMIC_MODEL_PROVIDERS.map((p) => `${p}/`),
-} as const
-
+/** Labbai: every catalog model runs on the platform OpenAI key, so all are hosted. */
 function getStaticModelOptionsForVFS(): StaticModelOption[] {
-  const hostedProviders = new Set(['openai', 'anthropic', 'google'])
-  const dynamicProviders = new Set<string>(DYNAMIC_MODEL_PROVIDERS)
-
   const models: StaticModelOption[] = []
 
-  // Hosted-only automatic model. Deliberately not `recommended` and given no
-  // prompt guidance (limited-visibility release): the build agent can write it
-  // when a user explicitly asks for the auto model, but is never steered to it.
-  if (isHosted) {
-    models.push({
-      id: SIM_AUTO_MODEL_ID,
-      provider: 'sim',
-      hosted: true,
-    })
-  }
-
   for (const [providerId, def] of Object.entries(PROVIDER_DEFINITIONS)) {
-    if (dynamicProviders.has(providerId)) continue
     for (const model of def.models) {
       // Retired models are hidden from the agent's menu (mirrors the user picker)
       // so it never suggests a model whose API calls fail; legacy stays available.
@@ -565,7 +542,7 @@ function getStaticModelOptionsForVFS(): StaticModelOption[] {
       const option: StaticModelOption = {
         id: model.id,
         provider: providerId,
-        hosted: hostedProviders.has(providerId),
+        hosted: true,
       }
       if (model.recommended) option.recommended = true
       if (model.speedOptimized) option.speedOptimized = true
@@ -662,7 +639,6 @@ export function serializeBlockSchema(
 
     if (sb.id === 'model' && sb.type === 'combobox' && typeof sb.options === 'function') {
       serialized.options = getStaticModelOptionsForVFS()
-      serialized.dynamicProviders = DYNAMIC_PROVIDERS_NOTE
     }
 
     return serialized

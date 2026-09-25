@@ -30,7 +30,6 @@ import { getModelOptions } from '@/blocks/utils'
 import { usePersonalEnvironment, useWorkspaceEnvironment } from '@/hooks/queries/environment'
 import { usePermissionConfig } from '@/hooks/use-permission-config'
 import { useSettingsNavigation } from '@/hooks/use-settings-navigation'
-import { useProvidersStore } from '@/stores/providers/store'
 
 const CREATE_SECRET_VALUE = 'action-create-secret'
 
@@ -251,7 +250,6 @@ export function ModelFallbackList({
   const { navigateToSettings } = useSettingsNavigation()
   const { isModelUsable } = usePermissionConfig()
   const deploymentShape = useDeploymentShape()
-  const providers = useProvidersStore((state) => state.providers)
   const [storeValue, setStoreValue] = useSubBlockValue<FallbackModelEntry[]>(blockId, subBlockId)
   const [primaryModelValue] = useSubBlockValue<string>(blockId, 'model')
   const [primaryReasoningEffort] = useSubBlockValue<string>(blockId, 'reasoningEffort')
@@ -296,11 +294,7 @@ export function ModelFallbackList({
     return Array.isArray(value) ? value : []
   }, [isPreview, previewValue, storeValue])
 
-  /**
-   * `getModelOptions` reads the providers store itself; subscribing to
-   * `providers` here is what recomputes the list when a dynamic provider's
-   * models finish loading.
-   */
+  /** The curated OpenAI catalog is static; the list recomputes on permission or shape changes. */
   const viableOptions = useMemo(
     (): ViableModelOption[] =>
       getModelOptions()
@@ -312,7 +306,7 @@ export function ModelFallbackList({
           value: option.id,
           ...(option.icon ? { icon: option.icon } : {}),
         })),
-    [primaryModel, isModelUsable, providers, deploymentShape]
+    [primaryModel, isModelUsable, deploymentShape]
   )
 
   const takenModels = useMemo(() => new Set(rows.map((row) => row.model).filter(Boolean)), [rows])

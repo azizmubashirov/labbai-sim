@@ -1,20 +1,16 @@
 import { createLogger } from '@sim/logger'
-import { omit } from '@sim/utils/object'
 import { resolveFallbackTuning } from '@/lib/workflows/blocks/fallback-models'
-import { providerRequiresFamilyCredentials } from '@/blocks/utils'
 import { validateModelProvider } from '@/ee/access-control/utils/permission-check'
 import { isRetryableBlockError } from '@/executor/execution/block-retry'
 import type { BlockRetryAttempt, ExecutionContext } from '@/executor/types'
 import {
   getModelFallbacks,
-  PROVIDER_FAMILY_CREDENTIAL_FIELDS,
   recordModelFallbacks,
   resolveFallbackApiKey,
 } from '@/executor/utils/model-fallbacks'
 import { executeBlockProviderRequest } from '@/executor/utils/provider-request'
 import { projectResolvedSecretDiagnosticError } from '@/executor/utils/resolved-secret-content-projection'
 import type { ResolvedSecretTraceRegistry } from '@/executor/utils/resolved-secret-trace-registry'
-import { isAutoModel, SIM_AUTO_MODEL_ID } from '@/providers/models'
 import type { ProviderRequest, ProviderResponse } from '@/providers/types'
 import { getProviderFromModel } from '@/providers/utils'
 import type { SerializedBlock } from '@/serializer/types'
@@ -28,7 +24,7 @@ interface ModelFallbackRequestInput {
   request: ProviderRequest
   configuredModel: string
   fallbackModels: unknown
-  /** The original system prompt, before an Auto identity preamble was added. */
+  /** The system prompt sent to fallback models. */
   fallbackSystemPrompt: string
   retry?: BlockRetryAttempt
   resolvedSecretTraceRegistry: ResolvedSecretTraceRegistry | undefined
@@ -71,12 +67,6 @@ export async function executeModelRequestWithFallbacks({
       try {
         candidateProviderId = getProviderFromModel(candidate.model)
         await validateModelProvider(ctx.userId, ctx.workspaceId, candidate.model, ctx)
-        if (
-          candidateProviderId !== providerId &&
-          providerRequiresFamilyCredentials(candidateProviderId)
-        ) {
-          throw new Error('Fallback requires credentials from a different provider family')
-        }
       } catch (error) {
         logger.warn(
           'Fallback model unusable; skipping',
@@ -98,7 +88,7 @@ export async function executeModelRequestWithFallbacks({
         request
       )
       candidateRequest = {
-        ...(sameProvider ? request : omit(request, [...PROVIDER_FAMILY_CREDENTIAL_FIELDS])),
+        ...request,
         ...tuning,
         temperature: tuning.temperature === undefined ? undefined : Number(tuning.temperature),
         maxTokens: tuning.maxTokens === undefined ? undefined : Number(tuning.maxTokens),
@@ -126,9 +116,7 @@ export async function executeModelRequestWithFallbacks({
       return { result, usedFallback: !isPrimary }
     } catch (error) {
       lastError = error
-      failedModels.push(
-        isPrimary && isAutoModel(configuredModel) ? SIM_AUTO_MODEL_ID : candidate.model
-      )
+      failedModels.push(candidate.model)
       if (
         index === candidates.length - 1 ||
         ctx.abortSignal?.aborted ||

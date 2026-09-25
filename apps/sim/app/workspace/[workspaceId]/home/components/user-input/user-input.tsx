@@ -77,7 +77,7 @@ interface LocalCopilotModelPickerProps {
  * Single Local Copilot model dropdown with per-provider section headers.
  */
 function LocalCopilotModelPicker({ catalogId, onCatalogIdChange }: LocalCopilotModelPickerProps) {
-  const selectedLabel = getLocalCopilotCatalogEntry(catalogId)?.label ?? 'Claude'
+  const selectedLabel = getLocalCopilotCatalogEntry(catalogId)?.label ?? 'GPT-5.5'
 
   return (
     <DropdownMenu>

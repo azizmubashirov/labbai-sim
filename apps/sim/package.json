@@ -33,9 +33,7 @@
     "org:consolidate-users": "bun run scripts/consolidate-users-into-organization.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "0.115.0",
     "@aws-sdk/client-appconfigdata": "3.1117.0",
-    "@aws-sdk/client-bedrock-runtime": "3.1117.0",
     "@aws-sdk/client-cloudwatch": "3.1117.0",
     "@aws-sdk/client-s3": "3.1117.0",
     "@aws-sdk/client-secrets-manager": "3.1117.0",
@@ -47,10 +45,8 @@
     "@better-auth/sso": "1.6.27",
     "@c15t/nextjs": "2.2.1",
     "@c15t/scripts": "2.2.0",
-    "@cerebras/cerebras_cloud_sdk": "^1.23.0",
     "@floating-ui/dom": "1.7.6",
     "@google-cloud/storage": "7.21.0",
-    "@google/genai": "2.13.0",
     "@hookform/resolvers": "5.2.2",
     "@marsidev/react-turnstile": "1.4.2",
     "@modelcontextprotocol/sdk": "1.29.0",
@@ -144,7 +140,6 @@
     "es-toolkit": "1.45.1",
     "framer-motion": "^12.5.0",
     "google-auth-library": "10.5.0",
-    "groq-sdk": "^0.15.0",
     "heic-convert": "2.1.0",
     "heic-decode": "2.1.0",
     "html-to-text": "^9.0.5",

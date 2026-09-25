@@ -14,29 +14,21 @@ import {
 
 const mocks = vi.hoisted(() => ({
   assertPermissionsAllowed: vi.fn(),
-  authorizeCredential: vi.fn(),
   checkWorkspaceAccess: vi.fn(),
   executeProviderRequest: vi.fn(),
   importProvenance: vi.fn(),
   isComplete: vi.fn(),
   prepareEnvironment: vi.fn(),
   requireBillingAttribution: vi.fn(),
-  resolveVertexAccessToken: vi.fn(),
 }))
 
 vi.mock('@/providers', () => ({ executeProviderRequest: mocks.executeProviderRequest }))
-vi.mock('@/lib/auth/credential-access', () => ({
-  authorizeCredentialUseForAuth: mocks.authorizeCredential,
-}))
 vi.mock('@/lib/billing/core/billing-attribution', () => ({
   BILLING_ATTRIBUTION_HEADER: 'x-sim-billing-attribution',
   requireBillingAttributionHeader: mocks.requireBillingAttribution,
 }))
 vi.mock('@/lib/copilot/environment-context', () => ({
   prepareCopilotEnvironmentContext: mocks.prepareEnvironment,
-}))
-vi.mock('@/lib/internal/llm/credentials', () => ({
-  resolveVertexAccessToken: mocks.resolveVertexAccessToken,
 }))
 vi.mock('@/lib/workspaces/permissions/utils', () => ({
   checkWorkspaceAccess: mocks.checkWorkspaceAccess,
@@ -74,8 +66,6 @@ describe('executeLlmProviderOperation', () => {
       },
     })
     mocks.executeProviderRequest.mockResolvedValue({ content: 'answer', model: 'gpt-4o' })
-    mocks.authorizeCredential.mockResolvedValue({ ok: true })
-    mocks.resolveVertexAccessToken.mockResolvedValue('vertex-token')
   })
 
   it('executes once with billing, provenance, and cancellation bound to provider work', async () => {
@@ -140,12 +130,11 @@ describe('executeLlmProviderOperation', () => {
     expect(mocks.executeProviderRequest).not.toHaveBeenCalled()
   })
 
-  it('authorizes and resolves Vertex credentials before provider work', async () => {
+  it('forwards the request to the gateway provider without vendor credential fields', async () => {
     await executeLlmProviderOperation(
       {
-        provider: 'vertex',
-        model: 'vertex/gemini-2.5-pro',
-        vertexCredential: 'credential-1',
+        provider: 'openai',
+        model: 'gpt-5-mini',
         workspaceId: 'workspace-1',
         workflowId: 'workflow-1',
       },
@@ -156,18 +145,14 @@ describe('executeLlmProviderOperation', () => {
       }
     )
 
-    expect(mocks.authorizeCredential).toHaveBeenCalledWith(
-      expect.objectContaining({ userId: 'user-1', authType: 'internal_jwt' }),
-      expect.objectContaining({
-        credentialId: 'credential-1',
-        workflowId: 'workflow-1',
-        callerUserId: 'user-1',
-      })
-    )
     expect(mocks.executeProviderRequest).toHaveBeenCalledWith(
-      'vertex',
-      expect.objectContaining({ apiKey: 'vertex-token' }),
+      'openai',
+      expect.objectContaining({ model: 'gpt-5-mini' }),
       expect.anything()
     )
+    const request = mocks.executeProviderRequest.mock.calls[0][1]
+    expect(request).not.toHaveProperty('vertexProject')
+    expect(request).not.toHaveProperty('azureEndpoint')
+
   })
 })

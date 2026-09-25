@@ -74,14 +74,7 @@ import {
   elevenLabsSpeechToSpeechTool,
   elevenLabsTtsTool,
 } from '@/tools/elevenlabs'
-import {
-  embeddingsCohereTool,
-  embeddingsGeminiTool,
-  embeddingsMistralTool,
-  embeddingsOllamaTool,
-  embeddingsOpenAITool,
-  embeddingsOpenRouterTool,
-} from '@/tools/embeddings'
+import { embeddingsOpenAITool } from '@/tools/embeddings'
 import {
   exaAgentTool,
   exaAnswerTool,
@@ -943,11 +936,6 @@ export const tools: Record<string, ExecutableToolConfig> = {
   mysql_execute: mysqlExecuteTool,
   mysql_introspect: mysqlIntrospectTool,
   embeddings_openai: embeddingsOpenAITool,
-  embeddings_gemini: embeddingsGeminiTool,
-  embeddings_cohere: embeddingsCohereTool,
-  embeddings_mistral: embeddingsMistralTool,
-  embeddings_openrouter: embeddingsOpenRouterTool,
-  embeddings_ollama: embeddingsOllamaTool,
   exa_search: exaSearchTool,
   exa_get_contents: exaGetContentsTool,
   exa_find_similar_links: exaFindSimilarLinksTool,

@@ -18,9 +18,9 @@ import {
 import { calculateCost } from '@/providers/utils'
 
 /** A model Sim hosts, so its usage is billable when no BYOK key is present. */
-const HOSTED_MODEL = 'claude-opus-4-6'
-/** A model reached only with a caller-supplied key, so Sim never bills it. */
-const SELF_KEYED_MODEL = 'llama-3.3-70b-versatile'
+const HOSTED_MODEL = 'gpt-5.5'
+/** A model outside the hosted catalog, so Sim never bills it. */
+const SELF_KEYED_MODEL = 'self-hosted-model'
 
 describe('resolveModelCostPolicy', () => {
   afterEach(resetEnvFlagsMock)
@@ -66,9 +66,9 @@ describe('applyModelCostPolicy', () => {
 })
 
 describe('priceModelUsage', () => {
-  /** Claude Sonnet 5: $2/MTok input, $0.20/MTok cached, $10/MTok output. */
-  const PRICED_MODEL = 'claude-sonnet-5'
-  const PER_TOKEN_INPUT = 2 / 1_000_000
+  /** GPT-5 mini: $0.25/MTok input, $0.025/MTok cached, $2/MTok output. */
+  const PRICED_MODEL = 'gpt-5-mini'
+  const PER_TOKEN_INPUT = 0.25 / 1_000_000
 
   it('prices cache reads at the cached rate, not the base rate', () => {
     const cached = priceModelUsage(
@@ -125,7 +125,7 @@ describe('priceModelUsage', () => {
 
   it('applies the highest matching input-size tier to every token bucket', () => {
     const cost = priceModelUsage(
-      'gpt-5.6-terra',
+      'gpt-5.5',
       {
         input: 100_000,
         output: 100_000,
@@ -135,7 +135,7 @@ describe('priceModelUsage', () => {
       LIST_PRICE_POLICY
     )
 
-    expect(cost).toMatchObject({ input: 0.800005, output: 1.8, total: 2.600005 })
+    expect(cost).toMatchObject({ input: 2.0000125, output: 4.5, total: 6.5000125 })
   })
 
   it('preserves zero-cost behavior for unregistered dynamic models', () => {

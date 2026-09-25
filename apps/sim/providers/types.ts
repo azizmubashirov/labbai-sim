@@ -2,33 +2,8 @@ import type { BillingAttributionSnapshot } from '@/lib/billing/core/billing-attr
 import type { CustomBlockInputFieldType } from '@/blocks/custom/build-config'
 import type { ProviderTimingSegment, StreamingExecution, UserFile } from '@/executor/types'
 
-export type ProviderId =
-  | 'openai'
-  | 'azure-openai'
-  | 'anthropic'
-  | 'azure-anthropic'
-  | 'google'
-  | 'vertex'
-  | 'deepseek'
-  | 'xai'
-  | 'cerebras'
-  | 'groq'
-  | 'sakana'
-  | 'typesafe'
-  | 'nvidia'
-  | 'meta'
-  | 'zai'
-  | 'kimi'
-  | 'mistral'
-  | 'ollama'
-  | 'ollama-cloud'
-  | 'openrouter'
-  | 'fireworks'
-  | 'together'
-  | 'baseten'
-  | 'vllm'
-  | 'litellm'
-  | 'bedrock'
+/** Labbai: OpenAI is the only LLM provider (for now). */
+export type ProviderId = 'openai'
 
 export interface ModelTokenPricing {
   input: number // Per 1M tokens
@@ -239,13 +214,6 @@ export interface ProviderRequest {
   blockNameMapping?: Record<string, string>
   isCopilotRequest?: boolean
   isBYOK?: boolean
-  azureEndpoint?: string
-  azureApiVersion?: string
-  vertexProject?: string
-  vertexLocation?: string
-  bedrockAccessKeyId?: string
-  bedrockSecretKey?: string
-  bedrockRegion?: string
   reasoningEffort?: string
   verbosity?: string
   thinkingLevel?: string

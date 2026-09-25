@@ -1,5 +1,4 @@
 import type { SubBlockConfig } from '@/blocks/types'
-import { DYNAMIC_MODEL_PROVIDERS, PROVIDER_DEFINITIONS } from '@/providers/models'
 
 /**
  * Surface-neutral projection of a block's sub-block (its configuration fields)
@@ -120,40 +119,6 @@ function normalizeRequired(required: SubBlockConfig['required']): {
 }
 
 /**
- * Models offered as static dropdown options when no provider store is available.
- *
- * Providers whose model list is fetched at runtime are skipped — a catalog must
- * not publish an option set it cannot know — and retired models are excluded so
- * a caller never receives one whose API calls fail.
- */
-function staticModelOptions(): CatalogSubBlockOption[] {
-  const models: CatalogSubBlockOption[] = []
-  for (const provider of Object.values(PROVIDER_DEFINITIONS)) {
-    if (DYNAMIC_MODEL_PROVIDER_IDS.has(provider.id)) continue
-    for (const model of provider.models ?? []) {
-      if (model.sunset?.status === 'deprecated') continue
-      models.push({ id: model.id, label: model.id })
-    }
-  }
-  return models
-}
-
-/**
- * Providers whose model list is fetched at runtime rather than declared in code.
- *
- * Derived from the canonical list rather than restated: the local copy had
- * drifted by one member (`litellm`), and a projection that disagrees with the
- * registry about which providers are dynamic answers a different question than
- * the app does.
- */
-const DYNAMIC_MODEL_PROVIDER_IDS = new Set<string>(DYNAMIC_MODEL_PROVIDERS)
-
-/** Shape of the providers store this projection substitutes while resolving options. */
-interface ProvidersStateLike {
-  providers: Record<string, { models: string[] }>
-}
-
-/**
  * Thrown when an options function breaks the synchronous precondition below.
  *
  * Deliberately its own class so `resolveSubBlockOptions` re-throws it instead of
@@ -169,66 +134,26 @@ export class AsyncOptionsFunctionError extends Error {
 }
 
 /**
- * Calls a dynamic options function with static provider data substituted for the
- * client store it would otherwise read.
+ * Calls a dynamic options function and enforces that it is synchronous.
  *
- * The model dropdowns read `useProvidersStore`, which has no state outside the
- * browser. Substituting the code-defined model list is what lets a server-side
- * projection publish the same options a user sees, instead of an empty list.
- *
- * PRECONDITION: every options function is synchronous, and this is the only
- * reason the substitution is safe. `useProvidersStore` is a process-global, and
- * `getState` is swapped for the duration of the call — so the window in which
- * one caller's substitute state is visible to every other caller is exactly the
- * synchronous body of `optionsFn`. An options function that awaited anything
- * would widen that window across the event loop and hand its stub to unrelated
- * requests. The substitution cannot be passed as an argument instead: the
- * options functions call `getModelOptions()` in `@/blocks/utils`, which reads
- * the store directly and takes no state parameter. So the precondition is
- * enforced rather than designed away — a thenable result throws
- * {@link AsyncOptionsFunctionError}.
+ * Options functions run inside a pure, server-side projection; the model
+ * dropdowns read the static OpenAI catalog (`getModelOptions()` in
+ * `@/blocks/utils`), so no client store has to be substituted. An options
+ * function that returned a thenable would publish a promise instead of options,
+ * so it throws {@link AsyncOptionsFunctionError} and fails the `catalog-sweep`
+ * test rather than silently publishing nothing.
  */
 function callOptionsWithFallback(
   optionsFn: () => CatalogSubBlockOption[]
 ): CatalogSubBlockOption[] | undefined {
-  const staticModels = staticModelOptions()
-  const substituteState: ProvidersStateLike = {
-    providers: {
-      base: { models: staticModels.map((model) => model.id) },
-      ...Object.fromEntries([...DYNAMIC_MODEL_PROVIDERS].map((id) => [id, { models: [] }])),
-      litellm: { models: [] },
-    },
+  const options = optionsFn()
+  if (typeof (options as { then?: unknown } | undefined)?.then === 'function') {
+    throw new AsyncOptionsFunctionError(
+      'A sub-block options function returned a thenable. Options functions must be ' +
+        'synchronous. Move the I/O behind a `selectorKey` instead.'
+    )
   }
-
-  let store: { useProvidersStore?: { getState: () => unknown } } | undefined
-  let originalGetState: (() => unknown) | undefined
-
-  try {
-    store = require('@/stores/providers')
-    if (store?.useProvidersStore?.getState) {
-      originalGetState = store.useProvidersStore.getState
-      store.useProvidersStore.getState = () => substituteState
-    }
-  } catch {
-    /* The store module is unavailable in this environment; the fallback stands alone. */
-  }
-
-  try {
-    const options = optionsFn()
-    if (typeof (options as { then?: unknown } | undefined)?.then === 'function') {
-      throw new AsyncOptionsFunctionError(
-        'A sub-block options function returned a thenable. Options functions must be ' +
-          'synchronous: the providers store is substituted process-wide for the duration of ' +
-          'the call, so an asynchronous one would expose its substitute state to every other ' +
-          'caller. Move the I/O behind a `selectorKey` instead.'
-      )
-    }
-    return options
-  } finally {
-    if (store?.useProvidersStore && originalGetState) {
-      store.useProvidersStore.getState = originalGetState
-    }
-  }
+  return options
 }
 
 /**

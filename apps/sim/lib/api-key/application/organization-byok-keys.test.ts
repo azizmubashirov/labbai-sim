@@ -337,7 +337,7 @@ describe('organization BYOK application boundary', () => {
         principal: sessionPrincipal,
         input: {
           organizationId: ORGANIZATION_ID,
-          providerId: 'anthropic',
+          providerId: 'exa',
           apiKey: 'sk-over-cap',
         },
       })
@@ -351,7 +351,7 @@ describe('organization BYOK application boundary', () => {
     mocks.isEntitled.mockResolvedValue(true)
     queueTableRows(schemaMock.workspaceBYOKKeys, [{ providerId: 'openai' }])
     queueTableRows(schemaMock.organizationBYOKKeys, [
-      { providerId: 'anthropic' },
+      { providerId: 'exa' },
       { providerId: 'openai' },
     ])
 
@@ -360,7 +360,7 @@ describe('organization BYOK application boundary', () => {
       input: { workspaceId: WORKSPACE_ID },
     })
 
-    expect(result).toEqual({ inheritedProviderIds: ['anthropic'] })
+    expect(result).toEqual({ inheritedProviderIds: ['exa'] })
     expect(Object.keys(result)).toEqual(['inheritedProviderIds'])
     expect(mocks.resolveWorkspacePermission).toHaveBeenCalledWith(
       'admin-1',

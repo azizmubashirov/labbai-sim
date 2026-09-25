@@ -48,18 +48,11 @@ describe('knowledgeEmbeddingFamily', () => {
           KB_EMBEDDING_MODEL: model,
           EMBEDDING_OUTPUT_DIMS: String(width),
           OPENAI_API_KEY: 'k',
-          GEMINI_API_KEY: 'k',
         }).providers.flatMap((provider) => provider.invalidFields)
         expect(issues.includes('EMBEDDING_OUTPUT_DIMS'), `${model} @ ${width}`).toBe(
           !widths.includes(width)
         )
       }
-    }
-  })
-
-  it('classifies any model on the deployment’s own Ollama by its routing prefix', () => {
-    for (const model of ['ollama/nomic-embed-text', 'ollama/mxbai-embed-large:335m']) {
-      expect(knowledgeEmbeddingFamily({ KB_EMBEDDING_MODEL: model }), model).toBe('ollama')
     }
   })
 

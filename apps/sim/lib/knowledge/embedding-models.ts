@@ -12,12 +12,10 @@
 import {
   DEFAULT_EMBEDDING_MODEL as CATALOG_DEFAULT_EMBEDDING_MODEL,
   DEFAULT_KB_EMBEDDING_DIMENSIONS,
-  findEmbeddingModelInfo,
   getEmbeddingModelInfo as getCatalogModelInfo,
   getKbEligibleModels,
   getKbEmbeddingDimensions,
   isKbEmbeddingDimensions,
-  isOllamaEmbeddingModel,
   KB_EMBEDDING_STORAGE_DIMENSIONS,
   type KbEmbeddingDimensions,
 } from '@/lib/embeddings/catalog'
@@ -58,12 +56,7 @@ function toKbModelInfo(model: string): EmbeddingModelInfo {
   }
 }
 
-/**
- * Statically catalogued models selectable for knowledge-base indexing. Ollama
- * models are absent by construction — they are whatever the operator pulled
- * onto their own server — and resolve through {@link getEmbeddingModelInfo}
- * instead.
- */
+/** Catalogued models selectable for knowledge-base indexing (Labbai: OpenAI only). */
 export const SUPPORTED_EMBEDDING_MODELS: Partial<Record<string, EmbeddingModelInfo>> =
   Object.fromEntries(
     getKbEligibleModels()
@@ -84,7 +77,6 @@ function findKbModelInfo(model: string): EmbeddingModelInfo | undefined {
 
 /** True when `model` may be recorded on a knowledge base, whatever its width. */
 export function isKbEmbeddingModel(model: string): boolean {
-  if (isOllamaEmbeddingModel(model)) return findEmbeddingModelInfo(model) !== undefined
   return findKbModelInfo(model) !== undefined
 }
 
@@ -107,12 +99,9 @@ export function getEmbeddingModelInfo(model: string): EmbeddingModelInfo {
   if (info) return info
 
   /**
-   * An Ollama id is resolved rather than looked up, because Sim has no catalog
-   * of what a given server has pulled. Every other unknown id surfaces the
-   * catalog's error, and a catalogued but ineligible model gets a KB-specific
-   * one.
+   * An unknown id surfaces the catalog's error, and a catalogued but ineligible
+   * model gets a KB-specific one.
    */
-  if (isOllamaEmbeddingModel(model)) return toKbModelInfo(model)
   getCatalogModelInfo(model)
   throw new Error(`Embedding model is not available for knowledge bases: ${model}`)
 }

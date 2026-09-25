@@ -14,7 +14,6 @@ vi.mock('@/blocks/utils', () => ({
 }))
 
 vi.mock('@/providers/models', () => ({
-  isAutoModel: (model: string) => model.trim().toLowerCase() === 'sim-auto',
   isKnownModelId: (model: string) => model.startsWith('gpt') || model.startsWith('claude'),
   findProviderFromModel: (model: string) => {
     const lower = model.toLowerCase()
@@ -107,10 +106,9 @@ describe('normalizeFallbackModels', () => {
     ).toEqual([{ model: 'gpt-5' }, { model: 'claude-sonnet-5' }])
   })
 
-  it('drops sim-auto and case-insensitive duplicates, keeping the first position', () => {
+  it('drops case-insensitive duplicates, keeping the first position', () => {
     expect(
       normalizeFallbackModels([
-        { model: 'sim-auto' },
         { model: 'gpt-5' },
         { model: 'GPT-5' },
         { model: 'claude-sonnet-5' },
@@ -147,9 +145,8 @@ describe('normalizeFallbackModels', () => {
 })
 
 describe('isViableFallbackModel', () => {
-  it('rejects empty, sim-auto, the primary itself, and unresolvable ids', () => {
+  it('rejects empty, the primary itself, and unresolvable ids', () => {
     expect(isViableFallbackModel('', 'gpt-5')).toBe(false)
-    expect(isViableFallbackModel('sim-auto', 'gpt-5')).toBe(false)
     expect(isViableFallbackModel('GPT-5', 'gpt-5')).toBe(false)
     expect(isViableFallbackModel('mystery-model', 'gpt-5')).toBe(false)
   })

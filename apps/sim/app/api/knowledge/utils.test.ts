@@ -178,8 +178,6 @@ describe('Knowledge Utils', () => {
     }
     /** Keep provider selection independent of credentials loaded from local environment files. */
     vi.stubEnv('OPENAI_API_KEY', '')
-    vi.stubEnv('OPENROUTER_API_KEY', '')
-    vi.stubEnv('AZURE_OPENAI_API_KEY', '')
     Object.assign(env, { ...defaultMockEnv, OPENAI_API_KEY: 'test-key' })
     retrySpy.mockImplementation(((fn: () => unknown) => fn()) as never)
     applyBillingSpies()
@@ -283,35 +281,7 @@ describe('Knowledge Utils', () => {
       expect(result.embeddings.length).toBe(2)
     })
 
-    it('should use Azure OpenAI when Azure config is provided', async () => {
-      const { env } = await import('@/lib/core/config/env')
-      Object.keys(env).forEach((key) => delete (env as any)[key])
-      Object.assign(env, {
-        AZURE_OPENAI_API_KEY: 'test-azure-key',
-        AZURE_OPENAI_ENDPOINT: 'https://test.openai.azure.com',
-        AZURE_OPENAI_API_VERSION: '2024-12-01-preview',
-        KB_OPENAI_MODEL_NAME: 'text-embedding-ada-002',
-        OPENAI_API_KEY: 'test-openai-key',
-      })
-
-      const fetchSpy = vi.mocked(fetch)
-      fetchSpy.mockResolvedValueOnce(createEmbeddingResponse([0.1], 'float'))
-
-      await generateEmbeddings(['test text'], DEFAULT_EMBEDDING_TARGET)
-
-      expect(fetchSpy).toHaveBeenCalledWith(
-        'https://test.openai.azure.com/openai/deployments/text-embedding-ada-002/embeddings?api-version=2024-12-01-preview',
-        expect.objectContaining({
-          headers: expect.objectContaining({
-            'api-key': 'test-azure-key',
-          }),
-        })
-      )
-
-      Object.keys(env).forEach((key) => delete (env as any)[key])
-    })
-
-    it('should fallback to OpenAI when no Azure config provided', async () => {
+    it('should call the OpenAI embeddings endpoint with the platform key', async () => {
       const { env } = await import('@/lib/core/config/env')
       Object.keys(env).forEach((key) => delete (env as any)[key])
       Object.assign(env, {

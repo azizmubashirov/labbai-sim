@@ -9,14 +9,6 @@ export interface GuardrailsValidateInput {
   topK?: string
   model?: string
   apiKey?: string
-  azureEndpoint?: string
-  azureApiVersion?: string
-  vertexProject?: string
-  vertexLocation?: string
-  vertexCredential?: string
-  bedrockAccessKeyId?: string
-  bedrockSecretKey?: string
-  bedrockRegion?: string
   _context?: {
     workflowId?: string
     workspaceId?: string
@@ -87,7 +79,7 @@ export const guardrailsValidateTool: InternalToolConfig<
       type: 'string',
       required: false,
       visibility: 'user-only',
-      description: 'LLM model for confidence scoring (default: gpt-4o-mini)',
+      description: 'LLM model for confidence scoring (default: gpt-5-mini)',
     },
     apiKey: {
       type: 'string',
@@ -143,14 +135,6 @@ export const guardrailsValidateTool: InternalToolConfig<
       topK: params.topK,
       model: params.model,
       apiKey: params.apiKey,
-      azureEndpoint: params.azureEndpoint,
-      azureApiVersion: params.azureApiVersion,
-      vertexProject: params.vertexProject,
-      vertexLocation: params.vertexLocation,
-      vertexCredential: params.vertexCredential,
-      bedrockAccessKeyId: params.bedrockAccessKeyId,
-      bedrockSecretKey: params.bedrockSecretKey,
-      bedrockRegion: params.bedrockRegion,
     }),
   },
 

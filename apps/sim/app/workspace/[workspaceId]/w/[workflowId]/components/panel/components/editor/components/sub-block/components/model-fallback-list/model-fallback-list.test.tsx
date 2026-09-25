@@ -107,11 +107,6 @@ vi.mock('@/lib/credentials/client-state', () => ({
   writePendingCredentialCreateRequest: vi.fn(),
 }))
 
-vi.mock('@/stores/providers/store', () => ({
-  useProvidersStore: (selector: (state: { providers: object }) => unknown) =>
-    selector({ providers: {} }),
-}))
-
 vi.mock('@/blocks/utils', () => ({
   shouldRequireApiKeyForModel: (model: string) =>
     model.startsWith('openrouter/') || (model.startsWith('gpt') && !getDeploymentShape().hosted),

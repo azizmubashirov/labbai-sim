@@ -1,7 +1,11 @@
 /** @vitest-environment node */
 import { describe, expect, it } from 'vitest'
 import type { ConversationProtocol } from '@/lib/memory/conversation-types'
-import { providerHistoryAdapters, providerHistoryProtocols } from '@/providers/history-adapters'
+import {
+  providerHistoryAdapters,
+  providerHistoryProtocols,
+  requiresNativeToolHistory,
+} from '@/providers/history-adapters'
 import { isEvaluationModel, PROVIDER_DEFINITIONS } from '@/providers/models'
 
 const fixtures: Array<{ protocol: ConversationProtocol; value: unknown }> = [
@@ -130,5 +134,11 @@ describe('canonical provider wire adapters', () => {
         expect(providerHistoryAdapters[protocol]).toBeDefined()
       }
     }
+  })
+
+  it('replays OpenAI history through the Responses protocol without portable projection', () => {
+    expect(providerHistoryProtocols).toEqual({ openai: 'responses' })
+    expect(requiresNativeToolHistory('openai')).toBe(false)
+    expect(requiresNativeToolHistory(undefined)).toBe(false)
   })
 })

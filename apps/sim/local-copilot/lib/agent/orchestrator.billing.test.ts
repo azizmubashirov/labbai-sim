@@ -17,8 +17,8 @@ vi.mock('@/local-copilot/lib/billing/record-turn-usage', async (importOriginal) 
 vi.mock('@/local-copilot/lib/config', () => {
   const config = {
     enabled: true,
-    provider: 'anthropic',
-    model: 'claude-sonnet-4-6',
+    provider: 'openai',
+    model: 'gpt-5.5',
     apiKey: 'test-key',
   }
   return {
@@ -31,7 +31,7 @@ vi.mock('@/local-copilot/lib/config', () => {
 
 vi.mock('@/local-copilot/lib/providers/registry', () => {
   const provider = {
-    id: 'anthropic',
+    id: 'openai',
     chatCompletionStream: mockChatCompletionStream,
   }
   return {

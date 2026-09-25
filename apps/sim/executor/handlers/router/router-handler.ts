@@ -1,11 +1,5 @@
 import { createLogger } from '@sim/logger'
 import { projectResolvedModelInput } from '@/lib/execution/model-input-provenance'
-import {
-  type AutoRoutingResult,
-  addAutoRoutingCost,
-  resolveAutoModel,
-  SIM_AUTO_SYSTEM_PREAMBLE,
-} from '@/lib/model-router/resolve'
 import { generateRouterPrompt, generateRouterV2Prompt } from '@/blocks/blocks/router'
 import type { BlockOutput } from '@/blocks/types'
 import { validateModelProvider } from '@/ee/access-control/utils/permission-check'
@@ -20,9 +14,7 @@ import type { BlockHandler, BlockNodeMetadata, ExecutionContext } from '@/execut
 import { executeModelRequestWithFallbacks } from '@/executor/utils/model-fallback-request'
 import { refuseResolvedSecretProjection } from '@/executor/utils/resolved-secret-projection-refusal'
 import type { ResolvedSecretInputPath } from '@/executor/utils/resolved-secret-trace-registry'
-import { resolveVertexCredential } from '@/executor/utils/vertex-credential'
 import { resolveProxiedModelCost } from '@/providers/cost-policy'
-import { isAutoModel, SIM_AUTO_MODEL_ID } from '@/providers/models'
 import type { ProviderRequest } from '@/providers/types'
 import { getProviderFromModel } from '@/providers/utils'
 import type { SerializedBlock } from '@/serializer/types'
@@ -90,58 +82,25 @@ export class RouterBlockHandler implements BlockHandler {
       prompt: modelInputProjection.value.prompt,
       model: inputs.model || ROUTER.DEFAULT_MODEL,
       apiKey: inputs.apiKey,
-      vertexProject: inputs.vertexProject,
-      vertexLocation: inputs.vertexLocation,
-      vertexCredential: inputs.vertexCredential,
-      bedrockAccessKeyId: inputs.bedrockAccessKeyId,
-      bedrockSecretKey: inputs.bedrockSecretKey,
-      bedrockRegion: inputs.bedrockRegion,
     }
 
     try {
       const messages = [{ role: 'user', content: routerConfig.prompt }]
       const systemPrompt = generateRouterPrompt(routerConfig.prompt, targetBlocks)
-      const resolved = await this.resolveModel(
-        ctx,
-        block.id,
-        routerConfig.model,
-        systemPrompt,
-        routerConfig.prompt,
-        false
-      )
-
-      await validateModelProvider(ctx.userId, ctx.workspaceId, resolved.model, ctx)
-      const providerId = getProviderFromModel(resolved.model)
-
-      let finalApiKey: string | undefined = routerConfig.apiKey
-      if (providerId === 'vertex' && routerConfig.vertexCredential) {
-        finalApiKey = await resolveVertexCredential({
-          credentialId: routerConfig.vertexCredential,
-          actingUserId: ctx.userId,
-          workspaceId: ctx.workspaceId,
-          workflowId: ctx.workflowId,
-          callerLabel: 'vertex-router',
-        })
-      }
+      await validateModelProvider(ctx.userId, ctx.workspaceId, routerConfig.model, ctx)
+      const providerId = getProviderFromModel(routerConfig.model)
 
       const providerRequest: ProviderRequest = {
-        model: resolved.model,
-        systemPrompt: resolved.systemPrompt,
+        model: routerConfig.model,
+        systemPrompt,
         context: JSON.stringify(messages),
         temperature: ROUTER.INFERENCE_TEMPERATURE,
-        apiKey: finalApiKey,
-        azureEndpoint: inputs.azureEndpoint,
-        azureApiVersion: inputs.azureApiVersion,
-        vertexProject: routerConfig.vertexProject,
-        vertexLocation: routerConfig.vertexLocation,
-        bedrockAccessKeyId: routerConfig.bedrockAccessKeyId,
-        bedrockSecretKey: routerConfig.bedrockSecretKey,
-        bedrockRegion: routerConfig.bedrockRegion,
+        apiKey: routerConfig.apiKey,
         workflowId: ctx.workflowId,
         workspaceId: ctx.workspaceId,
       }
 
-      const { result, usedFallback } = await executeModelRequestWithFallbacks({
+      const { result } = await executeModelRequestWithFallbacks({
         block,
         configuredModel: routerConfig.model,
         fallbackModels: inputs.fallbackModels,
@@ -172,14 +131,11 @@ export class RouterBlockHandler implements BlockHandler {
         total: DEFAULTS.TOKENS.TOTAL,
       }
 
-      const cost = addAutoRoutingCost(
-        resolveProxiedModelCost(result.cost),
-        resolved.autoRouting?.billableRoutingCost ?? 0
-      )
+      const cost = resolveProxiedModelCost(result.cost)
 
       return {
         prompt: inputs.prompt,
-        model: resolved.autoRouting && !usedFallback ? SIM_AUTO_MODEL_ID : result.model,
+        model: result.model,
         tokens: {
           input: tokens.input || DEFAULTS.TOKENS.PROMPT,
           output: tokens.output || DEFAULTS.TOKENS.COMPLETION,
@@ -189,7 +145,6 @@ export class RouterBlockHandler implements BlockHandler {
           input: cost.input,
           output: cost.output,
           total: cost.total,
-          ...(cost.routing === undefined ? {} : { routing: cost.routing }),
         },
         selectedPath: {
           blockId: chosenBlock.id,
@@ -259,53 +214,20 @@ export class RouterBlockHandler implements BlockHandler {
       context: modelInputProjection.value.context,
       model: inputs.model || ROUTER.DEFAULT_MODEL,
       apiKey: inputs.apiKey,
-      vertexProject: inputs.vertexProject,
-      vertexLocation: inputs.vertexLocation,
-      vertexCredential: inputs.vertexCredential,
-      bedrockAccessKeyId: inputs.bedrockAccessKeyId,
-      bedrockSecretKey: inputs.bedrockSecretKey,
-      bedrockRegion: inputs.bedrockRegion,
     }
 
     try {
       const messages = [{ role: 'user', content: routerConfig.context }]
       const systemPrompt = generateRouterV2Prompt(routerConfig.context, modelRoutes)
-      const resolved = await this.resolveModel(
-        ctx,
-        block.id,
-        routerConfig.model,
-        systemPrompt,
-        routerConfig.context,
-        true
-      )
-
-      await validateModelProvider(ctx.userId, ctx.workspaceId, resolved.model, ctx)
-      const providerId = getProviderFromModel(resolved.model)
-
-      let finalApiKey: string | undefined = routerConfig.apiKey
-      if (providerId === 'vertex' && routerConfig.vertexCredential) {
-        finalApiKey = await resolveVertexCredential({
-          credentialId: routerConfig.vertexCredential,
-          actingUserId: ctx.userId,
-          workspaceId: ctx.workspaceId,
-          workflowId: ctx.workflowId,
-          callerLabel: 'vertex-router',
-        })
-      }
+      await validateModelProvider(ctx.userId, ctx.workspaceId, routerConfig.model, ctx)
+      const providerId = getProviderFromModel(routerConfig.model)
 
       const providerRequest: ProviderRequest = {
-        model: resolved.model,
-        systemPrompt: resolved.systemPrompt,
+        model: routerConfig.model,
+        systemPrompt,
         context: JSON.stringify(messages),
         temperature: ROUTER.INFERENCE_TEMPERATURE,
-        apiKey: finalApiKey,
-        azureEndpoint: inputs.azureEndpoint,
-        azureApiVersion: inputs.azureApiVersion,
-        vertexProject: routerConfig.vertexProject,
-        vertexLocation: routerConfig.vertexLocation,
-        bedrockAccessKeyId: routerConfig.bedrockAccessKeyId,
-        bedrockSecretKey: routerConfig.bedrockSecretKey,
-        bedrockRegion: routerConfig.bedrockRegion,
+        apiKey: routerConfig.apiKey,
         workflowId: ctx.workflowId,
         workspaceId: ctx.workspaceId,
         responseFormat: {
@@ -329,7 +251,7 @@ export class RouterBlockHandler implements BlockHandler {
         },
       }
 
-      const { result, usedFallback } = await executeModelRequestWithFallbacks({
+      const { result } = await executeModelRequestWithFallbacks({
         block,
         configuredModel: routerConfig.model,
         fallbackModels: inputs.fallbackModels,
@@ -395,14 +317,11 @@ export class RouterBlockHandler implements BlockHandler {
         total: DEFAULTS.TOKENS.TOTAL,
       }
 
-      const cost = addAutoRoutingCost(
-        resolveProxiedModelCost(result.cost),
-        resolved.autoRouting?.billableRoutingCost ?? 0
-      )
+      const cost = resolveProxiedModelCost(result.cost)
 
       return {
         context: inputs.context,
-        model: resolved.autoRouting && !usedFallback ? SIM_AUTO_MODEL_ID : result.model,
+        model: result.model,
         tokens: {
           input: tokens.input || DEFAULTS.TOKENS.PROMPT,
           output: tokens.output || DEFAULTS.TOKENS.COMPLETION,
@@ -412,7 +331,6 @@ export class RouterBlockHandler implements BlockHandler {
           input: cost.input,
           output: cost.output,
           total: cost.total,
-          ...(cost.routing === undefined ? {} : { routing: cost.routing }),
         },
         selectedRoute: chosenRoute.id,
         reasoning,
@@ -455,53 +373,6 @@ export class RouterBlockHandler implements BlockHandler {
         inputLength: typeof input === 'string' ? input.length : undefined,
       })
       return []
-    }
-  }
-
-  private async resolveModel(
-    ctx: ExecutionContext,
-    blockId: string,
-    configuredModel: string,
-    systemPrompt: string,
-    lastMessage: unknown,
-    hasResponseFormat: boolean
-  ): Promise<{
-    model: string
-    systemPrompt: string
-    autoRouting: AutoRoutingResult | null
-  }> {
-    if (!isAutoModel(configuredModel)) {
-      return { model: configuredModel, systemPrompt, autoRouting: null }
-    }
-
-    const message =
-      typeof lastMessage === 'string' ? lastMessage : JSON.stringify(lastMessage ?? '')
-    const autoRouting = await resolveAutoModel({
-      ctx,
-      blockId,
-      signals: {
-        systemPrompt,
-        lastMessage: message,
-        messageCount: 1,
-        toolNames: [],
-        mediaKind: 'none',
-        hasResponseFormat,
-        approxInputTokens: Math.ceil((systemPrompt.length + message.length) / 4),
-      },
-      fallbackModel: ROUTER.DEFAULT_MODEL,
-    })
-
-    logger.info('Resolved sim-auto model for router', {
-      blockId,
-      model: autoRouting.model,
-      tier: autoRouting.tier,
-      decidedBy: autoRouting.decidedBy,
-    })
-
-    return {
-      model: autoRouting.model,
-      systemPrompt: [SIM_AUTO_SYSTEM_PREAMBLE, systemPrompt].filter(Boolean).join('\n\n'),
-      autoRouting,
     }
   }
 

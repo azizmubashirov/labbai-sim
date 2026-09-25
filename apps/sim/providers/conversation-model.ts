@@ -1,15 +1,12 @@
-import { getBedrockBaseModelId } from '@/providers/bedrock/model-id'
 import { getMaxOutputTokensForModel, PROVIDER_DEFINITIONS } from '@/providers/models'
 
-/** Resolves known dated models and Bedrock geographic profiles before applying conservative defaults. */
+/** Resolves known (and dated) model ids before applying conservative defaults. */
 export function getConversationModelLimits(modelId: string): {
   contextWindow: number
   outputTokens: number
 } {
   const normalized = modelId.toLowerCase()
-  const canonical = normalized.startsWith('bedrock/')
-    ? `bedrock/${getBedrockBaseModelId(normalized)}`
-    : normalized
+  const canonical = normalized
   const definitions = Object.values(PROVIDER_DEFINITIONS).flatMap((provider) => provider.models)
   const definition =
     definitions.find((model) => model.id.toLowerCase() === canonical) ??

@@ -1,11 +1,5 @@
 import { createLogger } from '@sim/logger'
 import { projectResolvedModelInput } from '@/lib/execution/model-input-provenance'
-import {
-  type AutoRoutingResult,
-  addAutoRoutingCost,
-  resolveAutoModel,
-  SIM_AUTO_SYSTEM_PREAMBLE,
-} from '@/lib/model-router/resolve'
 import type { BlockOutput } from '@/blocks/types'
 import { validateModelProvider } from '@/ee/access-control/utils/permission-check'
 import { BlockType, DEFAULTS, EVALUATOR } from '@/executor/constants'
@@ -18,9 +12,7 @@ import type {
   ResolvedSecretInputPath,
   ResolvedSecretTraceRegistry,
 } from '@/executor/utils/resolved-secret-trace-registry'
-import { resolveVertexCredential } from '@/executor/utils/vertex-credential'
 import { resolveProxiedModelCost } from '@/providers/cost-policy'
-import { isAutoModel, SIM_AUTO_MODEL_ID } from '@/providers/models'
 import type { ProviderRequest } from '@/providers/types'
 import { getProviderFromModel } from '@/providers/utils'
 import type { SerializedBlock } from '@/serializer/types'
@@ -44,12 +36,6 @@ export class EvaluatorBlockHandler implements BlockHandler {
     const evaluatorConfig = {
       model: inputs.model || EVALUATOR.DEFAULT_MODEL,
       apiKey: inputs.apiKey,
-      vertexProject: inputs.vertexProject,
-      vertexLocation: inputs.vertexLocation,
-      vertexCredential: inputs.vertexCredential,
-      bedrockAccessKeyId: inputs.bedrockAccessKeyId,
-      bedrockSecretKey: inputs.bedrockSecretKey,
-      bedrockRegion: inputs.bedrockRegion,
     }
 
     let systemPromptObj: { systemPrompt: string; responseFormat: any } = {
@@ -144,50 +130,10 @@ export class EvaluatorBlockHandler implements BlockHandler {
     }
 
     const fallbackSystemPrompt = systemPromptObj.systemPrompt
-    let model = evaluatorConfig.model
-    let autoRouting: AutoRoutingResult | null = null
-    if (isAutoModel(model)) {
-      autoRouting = await resolveAutoModel({
-        ctx,
-        blockId: block.id,
-        signals: {
-          systemPrompt: systemPromptObj.systemPrompt,
-          lastMessage: processedContent,
-          messageCount: 1,
-          toolNames: [],
-          mediaKind: 'none',
-          hasResponseFormat: true,
-          approxInputTokens: Math.ceil(
-            (systemPromptObj.systemPrompt.length + processedContent.length) / 4
-          ),
-        },
-        fallbackModel: EVALUATOR.DEFAULT_MODEL,
-      })
-      model = autoRouting.model
-      systemPromptObj.systemPrompt = [SIM_AUTO_SYSTEM_PREAMBLE, systemPromptObj.systemPrompt]
-        .filter(Boolean)
-        .join('\n\n')
-      logger.info('Resolved sim-auto model for evaluator', {
-        blockId: block.id,
-        model,
-        tier: autoRouting.tier,
-        decidedBy: autoRouting.decidedBy,
-      })
-    }
+    const model = evaluatorConfig.model
 
     await validateModelProvider(ctx.userId, ctx.workspaceId, model, ctx)
     const providerId = getProviderFromModel(model)
-
-    let finalApiKey: string | undefined = evaluatorConfig.apiKey
-    if (providerId === 'vertex' && evaluatorConfig.vertexCredential) {
-      finalApiKey = await resolveVertexCredential({
-        credentialId: evaluatorConfig.vertexCredential,
-        actingUserId: ctx.userId,
-        workspaceId: ctx.workspaceId,
-        workflowId: ctx.workflowId,
-        callerLabel: 'vertex-evaluator',
-      })
-    }
 
     try {
       const providerRequest: ProviderRequest = {
@@ -203,19 +149,12 @@ export class EvaluatorBlockHandler implements BlockHandler {
         ]),
 
         temperature: EVALUATOR.DEFAULT_TEMPERATURE,
-        apiKey: finalApiKey,
-        azureEndpoint: inputs.azureEndpoint,
-        azureApiVersion: inputs.azureApiVersion,
-        vertexProject: evaluatorConfig.vertexProject,
-        vertexLocation: evaluatorConfig.vertexLocation,
-        bedrockAccessKeyId: evaluatorConfig.bedrockAccessKeyId,
-        bedrockSecretKey: evaluatorConfig.bedrockSecretKey,
-        bedrockRegion: evaluatorConfig.bedrockRegion,
+        apiKey: evaluatorConfig.apiKey,
         workflowId: ctx.workflowId,
         workspaceId: ctx.workspaceId,
       }
 
-      const { result, usedFallback } = await executeModelRequestWithFallbacks({
+      const { result } = await executeModelRequestWithFallbacks({
         block,
         configuredModel: evaluatorConfig.model,
         fallbackModels: inputs.fallbackModels,
@@ -237,14 +176,11 @@ export class EvaluatorBlockHandler implements BlockHandler {
       const inputTokens = result.tokens?.input || DEFAULTS.TOKENS.PROMPT
       const outputTokens = result.tokens?.output || DEFAULTS.TOKENS.COMPLETION
 
-      const cost = addAutoRoutingCost(
-        resolveProxiedModelCost(result.cost),
-        autoRouting?.billableRoutingCost ?? 0
-      )
+      const cost = resolveProxiedModelCost(result.cost)
 
       return {
         content: inputs.content,
-        model: autoRouting && !usedFallback ? SIM_AUTO_MODEL_ID : result.model,
+        model: result.model,
         tokens: {
           input: inputTokens,
           output: outputTokens,
@@ -254,7 +190,6 @@ export class EvaluatorBlockHandler implements BlockHandler {
           input: cost.input,
           output: cost.output,
           total: cost.total,
-          ...(cost.routing === undefined ? {} : { routing: cost.routing }),
         },
         ...metricScores,
       }

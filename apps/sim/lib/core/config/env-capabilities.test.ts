@@ -110,41 +110,18 @@ describe('env capabilities', () => {
   })
 
   describe('fallback capabilities', () => {
-    it('resolves configured knowledge embedding transports in fallback order', () => {
+    it('resolves the OpenAI key as the only knowledge embedding transport', () => {
       expect(
         inspectCapability(KNOWLEDGE_EMBEDDINGS_CAPABILITY, {
-          OPENROUTER_API_KEY: 'openrouter-key',
-        }).providerIds
-      ).toEqual(['openrouter'])
-
-      expect(
-        inspectCapability(KNOWLEDGE_EMBEDDINGS_CAPABILITY, {
-          AZURE_OPENAI_API_KEY: 'azure-key',
-          AZURE_OPENAI_ENDPOINT: 'https://azure.example.com',
-          AZURE_OPENAI_API_VERSION: '2024-10-21',
           OPENAI_API_KEY_1: 'openai-key',
+        }).providerIds
+      ).toEqual(['openai'])
+
+      expect(
+        inspectCapability(KNOWLEDGE_EMBEDDINGS_CAPABILITY, {
           OPENROUTER_API_KEY: 'openrouter-key',
         }).providerIds
-      ).toEqual(['azure-openai', 'openai', 'openrouter'])
-    })
-
-    it('reports partially configured Azure knowledge embeddings', () => {
-      const inspection = inspectCapability(KNOWLEDGE_EMBEDDINGS_CAPABILITY, {
-        AZURE_OPENAI_API_KEY: 'azure-key',
-      })
-
-      expect(inspection).toMatchObject({
-        configured: false,
-        providerIds: [],
-        error: expect.any(EnvCapabilityConfigurationError),
-      })
-      expect(inspection.providers[0]).toMatchObject({
-        state: 'partial',
-        missingFields: expect.arrayContaining([
-          'AZURE_OPENAI_ENDPOINT',
-          'AZURE_OPENAI_API_VERSION',
-        ]),
-      })
+      ).toEqual([])
     })
 
     it('resolves every ready email provider subset in declaration order', () => {
@@ -675,10 +652,9 @@ describe('env capabilities', () => {
 
     it('tracks singular runtime LLM keys as pool fallbacks and deployment configuration', () => {
       expect(LLM_KEY_POOLS.openai.fallbackKey).toBe('OPENAI_API_KEY')
-      expect(LLM_KEY_POOLS.gemini.fallbackKey).toBe('GEMINI_API_KEY')
       expect(LLM_KEY_POOLS.cohere.fallbackKey).toBe('COHERE_API_KEY')
       expect(DEPLOYMENT_CONFIGURATION_KEYS).toEqual(
-        expect.arrayContaining(['OPENAI_API_KEY', 'GEMINI_API_KEY', 'COHERE_API_KEY'])
+        expect.arrayContaining(['OPENAI_API_KEY', 'COHERE_API_KEY'])
       )
     })
   })

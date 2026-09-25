@@ -7,9 +7,8 @@ vi.mock('@/providers/models', () => ({
     test: {
       models: [
         { id: 'gpt-test', contextWindow: 128_000 },
-        { id: 'claude-sonnet-test', contextWindow: 200_000 },
-        { id: 'claude-sonnet-test-20250514', contextWindow: 100_000 },
-        { id: 'bedrock/anthropic.test-model-v1:0', contextWindow: 200_000 },
+        { id: 'gpt-mini-test', contextWindow: 200_000 },
+        { id: 'gpt-mini-test-20250514', contextWindow: 100_000 },
       ],
     },
   },
@@ -24,22 +23,16 @@ describe('conversation model capacity', () => {
     })
   })
 
-  it.each(['us', 'us-gov', 'global', 'eu', 'apac'])(
-    'normalizes known Bedrock %s profile models',
-    (region) => {
-      expect(
-        getConversationModelLimits(`bedrock/${region}.anthropic.test-model-v1:0`).contextWindow
-      ).toBe(200_000)
-    }
-  )
-
   it('resolves compact dated model IDs while preferring an exact catalog entry', () => {
-    expect(getConversationModelLimits('claude-sonnet-test-20250929').contextWindow).toBe(200_000)
-    expect(getConversationModelLimits('claude-sonnet-test-20250514').contextWindow).toBe(100_000)
-    expect(getConversationModelLimits('claude-sonnet-test-preview').contextWindow).toBe(32_000)
+    expect(getConversationModelLimits('gpt-mini-test-20250929').contextWindow).toBe(200_000)
+    expect(getConversationModelLimits('gpt-mini-test-20250514').contextWindow).toBe(100_000)
+    expect(getConversationModelLimits('gpt-mini-test-preview').contextWindow).toBe(32_000)
   })
 
   it('keeps unknown deployment capabilities conservative', () => {
-    expect(getConversationModelLimits('azure/my-deployment').contextWindow).toBe(32_000)
+    expect(getConversationModelLimits('azure/my-deployment')).toEqual({
+      contextWindow: 32_000,
+      outputTokens: 4096,
+    })
   })
 })

@@ -42,9 +42,9 @@ export interface EnvFlagsMockState {
   isRemoteSandboxEnabled: boolean
   isMothershipSandboxEnabled: boolean
   isDocSandboxEnabled: boolean
-  isOllamaConfigured: boolean
   isAzureConfigured: boolean
   isCohereConfigured: boolean
+  platformLlmProviders: ReadonlySet<string>
   isInvitationsDisabled: boolean
   isPublicApiDisabled: boolean
   isGoogleAuthDisabled: boolean
@@ -94,9 +94,9 @@ const defaultEnvFlagsState: EnvFlagsMockState = {
   isRemoteSandboxEnabled: false,
   isMothershipSandboxEnabled: false,
   isDocSandboxEnabled: false,
-  isOllamaConfigured: false,
   isAzureConfigured: false,
   isCohereConfigured: false,
+  platformLlmProviders: new Set(['openai']),
   isInvitationsDisabled: false,
   isPublicApiDisabled: false,
   isGoogleAuthDisabled: false,

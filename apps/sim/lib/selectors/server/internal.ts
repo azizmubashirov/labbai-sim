@@ -1,8 +1,6 @@
 import { OrchestrationError } from '@/lib/core/orchestration/types'
 import { getWorkspaceOrganizationAccounts } from '@/lib/credential-groups/application/workspace-organization-accounts'
 import { listInternalCredentials } from '@/lib/credentials/application/credential-crud'
-import { fetchOllamaEmbeddingModelCatalog } from '@/lib/embeddings/ollama-model-catalog.server'
-import { fetchOpenRouterEmbeddingModelCatalog } from '@/lib/embeddings/openrouter-model-catalog.server'
 import { getEffectiveEnvironmentVariableNames } from '@/lib/environment/utils'
 import {
   listKnowledgeDocuments,
@@ -23,7 +21,6 @@ import {
 import { readTableUseCase } from '@/lib/table/application/tables'
 import { getColumnId } from '@/lib/table/column-keys'
 import { listWorkflows } from '@/lib/workflows/application/list-workflows'
-import { filterBlacklistedModels, isProviderBlacklisted } from '@/providers/utils'
 
 const WORKFLOW_PAGE_SIZE = 250
 const MAX_WORKFLOWS = 10_000
@@ -279,37 +276,23 @@ export const internalSelectorAttachments = {
       return listSelectorResult([...names].sort().map((name) => ({ id: name, label: name })))
     },
   },
+  /**
+   * Labbai: embeddings run on OpenAI only, so the Ollama / OpenRouter embedding
+   * model selectors have nothing to list. Kept registered (empty) so the manifest
+   * key set is unchanged.
+   */
   'providers.ollamaEmbeddingModels': {
     destination: 'fixed',
     async execute(args: ExecuteServerSelectorArgs) {
       if (!args.workspaceId) throw new SelectorContextUnavailableError()
-      if (isProviderBlacklisted('ollama')) return listSelectorResult([])
-      const models = await fetchOllamaEmbeddingModelCatalog(args.signal)
-      return listSelectorResult(
-        filterBlacklistedModels(models.map((model) => model.id)).map((id) => {
-          const dimensions = models.find((model) => model.id === id)?.dimensions
-          return {
-            id,
-            /**
-             * The width is in the label because matching it to
-             * `EMBEDDING_OUTPUT_DIMS` is the operator's job and Ollama is the one
-             * provider whose widths Sim cannot know ahead of time.
-             */
-            label: dimensions === undefined ? id : `${id} (${dimensions})`,
-          }
-        })
-      )
+      return listSelectorResult([])
     },
   },
   'providers.openrouterEmbeddingModels': {
     destination: 'fixed',
     async execute(args: ExecuteServerSelectorArgs) {
       if (!args.workspaceId) throw new SelectorContextUnavailableError()
-      if (isProviderBlacklisted('openrouter')) return listSelectorResult([])
-      const models = filterBlacklistedModels(
-        (await fetchOpenRouterEmbeddingModelCatalog(args.signal)).map((model) => model.id)
-      )
-      return listSelectorResult([...new Set(models)].map((model) => ({ id: model, label: model })))
+      return listSelectorResult([])
     },
   },
 } as const satisfies ServerSelectorAttachmentMap<InternalSelectorKey>

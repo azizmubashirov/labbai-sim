@@ -5,12 +5,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { LARGE_VALUE_THRESHOLD_BYTES } from '@/lib/execution/payloads/large-value-ref'
 import type { UserFile } from '@/executor/types'
 import {
-  buildAnthropicMessageContent,
-  buildBedrockMessageContent,
-  buildGeminiMessageParts,
   buildOpenAICompatibleChatContent,
   buildOpenAIMessageContent,
-  buildOpenRouterMessageContent,
   formatAttachmentSizes,
   formatMessagesForProvider,
   getProviderAttachmentMaxBytes,
@@ -22,8 +18,6 @@ import {
   prepareProviderAttachments,
   shouldUseLargeFilePath,
 } from '@/providers/attachments'
-import { setNativeConversationMessage } from '@/providers/conversation-metadata'
-import type { Message } from '@/providers/types'
 
 const imageFile: UserFile = {
   id: 'file-1',
@@ -56,26 +50,14 @@ const markdownFile: UserFile = {
 }
 
 describe('provider attachments', () => {
-  it('restores trusted native chat reasoning while leaving ordinary message JSON alone', () => {
-    const message: Message = { role: 'assistant', content: 'answer' }
-    const native = {
-      role: 'assistant',
-      content: 'answer',
-      reasoning_content: 'opaque reasoning',
-      reasoning_details: [{ type: 'reasoning.encrypted', data: 'signed-content' }],
-    }
-    setNativeConversationMessage(message, {
-      protocol: 'chat-completions',
-      providerId: 'openrouter',
-      model: 'model',
-      binding: 'test',
-      value: native,
-    })
-    expect(formatMessagesForProvider([message], 'openrouter')).toEqual([native])
-    expect(
-      formatMessagesForProvider([{ role: 'assistant', content: 'answer' }], 'openrouter')
-    ).toEqual([{ role: 'assistant', content: 'answer' }])
+  it('passes OpenAI messages through untouched for the Responses request builder', () => {
+    const messages = [{ role: 'user', content: 'Analyze this image', files: [imageFile] }]
+    const formatted = formatMessagesForProvider(messages, 'openai')
+
+    expect(formatted).toBe(messages)
+    expect(formatted[0].files).toEqual([imageFile])
   })
+
   it('infers MIME type from filename when file type is generic', () => {
     expect(
       inferAttachmentMimeType({
@@ -177,140 +159,14 @@ describe('provider attachments', () => {
     ])
   })
 
-  it('uses a neutral Bedrock document name when projection changes the original', () => {
-    const content = buildBedrockMessageContent(
-      'Analyze',
-      [{ ...markdownFile, name: 'TOKEN.md' }],
-      'bedrock',
-      () => '{{TOKEN}}.md'
-    )
+  it('formats OpenAI-compatible chat content with text and image_url parts', () => {
+    const content = buildOpenAICompatibleChatContent('Analyze this image', [imageFile], 'openai')
 
     expect(content).toEqual([
-      { text: 'Analyze' },
-      {
-        document: {
-          format: 'md',
-          name: 'Document',
-          source: { bytes: Buffer.from(markdownFile.base64, 'base64') },
-        },
-      },
-    ])
-  })
-
-  it('formats Anthropic content with image, PDF document, and text document blocks', () => {
-    const content = buildAnthropicMessageContent(
-      'Analyze these files',
-      [imageFile, pdfFile, markdownFile],
-      'anthropic'
-    )
-
-    expect(content).toEqual([
-      { type: 'text', text: 'Analyze these files' },
-      {
-        type: 'image',
-        source: {
-          type: 'base64',
-          media_type: 'image/png',
-          data: 'iVBORw0KGgo=',
-        },
-      },
-      {
-        type: 'document',
-        source: {
-          type: 'base64',
-          media_type: 'application/pdf',
-          data: 'cGRm',
-        },
-        title: 'example.pdf',
-      },
-      {
-        type: 'document',
-        source: {
-          type: 'text',
-          media_type: 'text/plain',
-          data: '# Notes\n\nHello',
-        },
-        title: 'notes.md',
-      },
-    ])
-  })
-
-  it('formats Gemini content with text and inline data parts', () => {
-    const parts = buildGeminiMessageParts('Analyze this file', [imageFile, markdownFile], 'google')
-
-    expect(parts).toEqual([
-      { text: 'Analyze this file' },
-      {
-        inlineData: {
-          mimeType: 'image/png',
-          data: 'iVBORw0KGgo=',
-        },
-      },
-      {
-        inlineData: {
-          mimeType: 'text/plain',
-          data: markdownFile.base64,
-        },
-      },
-    ])
-  })
-
-  it('formats Bedrock content with native document blocks', () => {
-    const parts = buildBedrockMessageContent('Analyze this file', [markdownFile], 'bedrock')
-
-    expect(parts).toEqual([
-      { text: 'Analyze this file' },
-      {
-        document: {
-          format: 'md',
-          name: 'notes',
-          source: {
-            bytes: Buffer.from(markdownFile.base64, 'base64'),
-          },
-        },
-      },
-    ])
-  })
-
-  it('formats OpenRouter images and PDFs with native multimodal message parts', () => {
-    const content = buildOpenRouterMessageContent(
-      'Analyze these files',
-      [imageFile, pdfFile],
-      'openrouter'
-    )
-
-    expect(content).toEqual([
-      { type: 'text', text: 'Analyze these files' },
+      { type: 'text', text: 'Analyze this image' },
       {
         type: 'image_url',
         image_url: { url: 'data:image/png;base64,iVBORw0KGgo=' },
-      },
-      {
-        type: 'file',
-        file: {
-          filename: 'example.pdf',
-          file_data: 'data:application/pdf;base64,cGRm',
-        },
-      },
-    ])
-  })
-
-  it('formats image-only provider messages and strips file fields', () => {
-    const messages = formatMessagesForProvider(
-      [{ role: 'user', content: 'Analyze this image', files: [imageFile] }],
-      'groq'
-    )
-
-    expect(messages).toEqual([
-      {
-        role: 'user',
-        content: [
-          { type: 'text', text: 'Analyze this image' },
-          {
-            type: 'image_url',
-            image_url: { url: 'data:image/png;base64,iVBORw0KGgo=' },
-          },
-        ],
       },
     ])
   })
@@ -331,7 +187,7 @@ describe('provider attachments', () => {
   })
 
   it('sniffs image bytes and corrects a wrong declared image MIME type', () => {
-    const content = buildAnthropicMessageContent(
+    const content = buildOpenAIMessageContent(
       'Analyze this image',
       [
         {
@@ -340,16 +196,13 @@ describe('provider attachments', () => {
           type: 'image/x-icon',
         },
       ],
-      'anthropic'
+      'openai'
     )
 
     expect(content[1]).toEqual({
-      type: 'image',
-      source: {
-        type: 'base64',
-        media_type: 'image/png',
-        data: 'iVBORw0KGgo=',
-      },
+      type: 'input_image',
+      image_url: 'data:image/png;base64,iVBORw0KGgo=',
+      detail: 'auto',
     })
   })
 
@@ -363,27 +216,18 @@ describe('provider attachments', () => {
             base64: Buffer.from('not an image').toString('base64'),
           },
         ],
-        'anthropic'
+        'openai'
       )
     ).toThrow('not a supported model image format')
-  })
-
-  it('rejects documents for image-only providers', () => {
-    expect(() =>
-      formatMessagesForProvider(
-        [{ role: 'user', content: 'Analyze this file', files: [pdfFile] }],
-        'groq'
-      )
-    ).toThrow('Supported attachments: images')
   })
 
   it('rejects providers without file attachment support', () => {
     expect(() =>
       formatMessagesForProvider(
         [{ role: 'user', content: 'Analyze this file', files: [imageFile] }],
-        'deepseek'
+        'anthropic'
       )
-    ).toThrow('not supported')
+    ).toThrow('File attachments are not supported for provider "anthropic"')
   })
 })
 
@@ -430,9 +274,9 @@ describe('attachment limit formatting', () => {
   })
 
   it('keeps a comfortably over-limit size readable', () => {
-    const groq = formatAttachmentSizes(21_000_000, 20 * 1024 * 1024)
-    expect(groq.limit).toBe('20')
-    expect(groq.size).toBe('20.03')
+    const overLimit = formatAttachmentSizes(21_000_000, 20 * 1024 * 1024)
+    expect(overLimit.limit).toBe('20')
+    expect(overLimit.size).toBe('20.03')
   })
 })
 
@@ -448,41 +292,32 @@ describe('provider large-file capability', () => {
     expect(LARGE_FILE_PATH_THRESHOLD_BYTES).toBeLessThan(INLINE_ATTACHMENT_THRESHOLD_BYTES)
   })
 
-  /**
-   * A `remote-url` provider only fetches images and PDFs, so it must not take over from base64
-   * early — text documents in the 6-10 MB band inline fine today and would start failing.
-   */
   /** A size we cannot read must still reach the uploader, which enforces the ceiling itself. */
   it('routes an unknown-size file to a files-api upload rather than stranding it', () => {
     const unknown = { size: 0, type: 'text/csv' }
     expect(shouldUseLargeFilePath(unknown, 'openai')).toBe(true)
-    expect(shouldUseLargeFilePath(unknown, 'anthropic')).toBe(false)
+    expect(shouldUseLargeFilePath(unknown, 'unknown-provider')).toBe(false)
     expect(shouldUseLargeFilePath({ size: Number.NaN, type: 'text/csv' }, 'openai')).toBe(true)
   })
 
-  it('crosses over to an upload at different sizes for files-api and remote-url', () => {
+  it('crosses over to an upload at the Files API threshold', () => {
     const midBand = { size: LARGE_FILE_PATH_THRESHOLD_BYTES + 1, type: 'text/plain' }
     expect(shouldUseLargeFilePath(midBand, 'openai')).toBe(true)
-    expect(shouldUseLargeFilePath(midBand, 'anthropic')).toBe(false)
-
-    const aboveInline = { size: INLINE_ATTACHMENT_THRESHOLD_BYTES + 1, type: 'application/pdf' }
-    expect(shouldUseLargeFilePath(aboveInline, 'anthropic')).toBe(true)
+    expect(
+      shouldUseLargeFilePath({ size: LARGE_FILE_PATH_THRESHOLD_BYTES, type: 'text/plain' }, 'openai')
+    ).toBe(false)
   })
 
-  it('reports per-provider strategy and ceiling, defaulting others to inline', () => {
+  it('reports the OpenAI strategy and ceiling, defaulting unknown providers to inline', () => {
     expect(getProviderFileStrategy('openai')).toBe('files-api')
-    expect(getProviderFileStrategy('google')).toBe('files-api')
-    expect(getProviderFileStrategy('anthropic')).toBe('remote-url')
-    expect(getProviderFileStrategy('groq')).toBe('remote-url')
-    expect(getProviderFileStrategy('bedrock')).toBe('inline')
-    expect(getProviderFileStrategy('azure-openai')).toBe('inline')
-    expect(getProviderFileStrategy('vertex')).toBe('inline')
+    expect(getProviderFileStrategy('anthropic')).toBe('inline')
+    expect(getProviderFileStrategy('unknown-provider')).toBe('inline')
 
+    expect(getProviderAttachmentMaxBytes('openai')).toBe(50_000_000)
     expect(getProviderAttachmentMaxBytes('openai')).toBeGreaterThan(
       INLINE_ATTACHMENT_THRESHOLD_BYTES
     )
-    expect(getProviderAttachmentMaxBytes('bedrock')).toBe(INLINE_ATTACHMENT_THRESHOLD_BYTES)
-    expect(getProviderAttachmentMaxBytes('azure-openai')).toBe(INLINE_ATTACHMENT_THRESHOLD_BYTES)
+    expect(getProviderAttachmentMaxBytes('anthropic')).toBe(INLINE_ATTACHMENT_THRESHOLD_BYTES)
   })
 
   it('routes only oversized files on capable providers to the large-file path', () => {
@@ -490,17 +325,16 @@ describe('provider large-file capability', () => {
     const large = { ...imageFile, size: LARGE_FILE_PATH_THRESHOLD_BYTES + 1 }
     expect(shouldUseLargeFilePath(small, 'openai')).toBe(false)
     expect(shouldUseLargeFilePath(large, 'openai')).toBe(true)
-    expect(shouldUseLargeFilePath(large, 'bedrock')).toBe(false)
+    expect(shouldUseLargeFilePath(large, 'unknown-provider')).toBe(false)
   })
 
-  it('does not expose generated source through a remote-url large-file path', () => {
+  it('routes generated-document source through the artifact-aware Files API upload', () => {
     const generated = {
       ...pdfFile,
       size: LARGE_FILE_PATH_THRESHOLD_BYTES + 1,
       type: 'text/x-python-pdf',
     }
     expect(shouldUseLargeFilePath(generated, 'openai')).toBe(true)
-    expect(shouldUseLargeFilePath(generated, 'anthropic')).toBe(false)
   })
 
   it('references uploaded OpenAI files by file_id instead of inlining base64', () => {
@@ -519,81 +353,15 @@ describe('provider large-file capability', () => {
     ])
   })
 
-  it('references large Anthropic files via url content-block sources', () => {
-    const content = buildAnthropicMessageContent(
-      'Analyze',
-      [
-        { ...imageFile, base64: undefined, remoteUrl: 'https://signed/img.png' },
-        { ...pdfFile, base64: undefined, remoteUrl: 'https://signed/doc.pdf' },
-      ],
-      'anthropic'
-    )
-    expect(content).toEqual([
-      { type: 'text', text: 'Analyze' },
-      { type: 'image', source: { type: 'url', url: 'https://signed/img.png' } },
-      {
-        type: 'document',
-        source: { type: 'url', url: 'https://signed/doc.pdf' },
-        title: 'example.pdf',
-      },
-    ])
-  })
-
-  it('references uploaded Gemini files via fileData uri', () => {
-    const parts = buildGeminiMessageParts(
-      'Analyze',
-      [{ ...imageFile, base64: undefined, providerFileUri: 'https://files/abc' }],
-      'google'
-    )
-    expect(parts).toEqual([
-      { text: 'Analyze' },
-      { fileData: { fileUri: 'https://files/abc', mimeType: 'image/png' } },
-    ])
-  })
-
   it('passes a remote url to OpenAI-compatible providers instead of a data url', () => {
     const content = buildOpenAICompatibleChatContent(
       'Analyze',
       [{ ...imageFile, base64: undefined, remoteUrl: 'https://signed/img.png' }],
-      'groq'
+      'openai'
     )
     expect(content).toEqual([
       { type: 'text', text: 'Analyze' },
       { type: 'image_url', image_url: { url: 'https://signed/img.png' } },
-    ])
-  })
-
-  it('rejects oversized non-PDF text documents on Anthropic (url source supports PDFs/images only)', () => {
-    expect(() =>
-      buildAnthropicMessageContent(
-        'Analyze',
-        [
-          {
-            ...markdownFile,
-            type: 'text/csv',
-            name: 'data.csv',
-            base64: undefined,
-            remoteUrl: 'https://signed/data.csv',
-          },
-        ],
-        'anthropic'
-      )
-    ).toThrow('Only PDFs and images are supported')
-  })
-
-  it('references large Anthropic PDFs via a url document source', () => {
-    const content = buildAnthropicMessageContent(
-      'Analyze',
-      [{ ...pdfFile, base64: undefined, remoteUrl: 'https://signed/doc.pdf' }],
-      'anthropic'
-    )
-    expect(content).toEqual([
-      { type: 'text', text: 'Analyze' },
-      {
-        type: 'document',
-        source: { type: 'url', url: 'https://signed/doc.pdf' },
-        title: 'example.pdf',
-      },
     ])
   })
 

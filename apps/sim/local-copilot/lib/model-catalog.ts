@@ -1,128 +1,38 @@
 import type { LocalCopilotProviderId } from '@/local-copilot/lib/types'
-
-/** Default catalog selection for new local chats and new user-access rows. */
-export const DEFAULT_LOCAL_COPILOT_CATALOG_ID = 'openai' as const
-
-/** Top-level picker groups shown when Local is selected. */
-export type LocalCopilotProviderGroup = 'openai' | 'claude' | 'gemini' | 'vertex' | 'bedrock'
+import {
+  OPENAI_MODEL_GPT_5_5,
+  OPENAI_MODEL_GPT_5_MINI,
+  resolveOpenAIModelId,
+} from '@/providers/openai/model-ids'
 
 /**
- * Allowlisted Local Copilot models selectable in chat.
- * Clients store/send these ids; the server maps them to provider + model.
+ * Default catalog selection for new local chats and new user-access rows.
+ * Labbai runs on OpenAI only, so picker ids are plain OpenAI model ids.
+ */
+export const DEFAULT_LOCAL_COPILOT_CATALOG_ID = OPENAI_MODEL_GPT_5_5
+
+/** Top-level picker groups shown when Local is selected. */
+export type LocalCopilotProviderGroup = 'openai'
+
+/**
+ * Allowlisted Local Copilot models selectable in chat. Clients store/send these
+ * ids; the server maps them to provider + model.
  */
 export const LOCAL_COPILOT_CATALOG = [
   {
-    id: 'openai',
+    id: OPENAI_MODEL_GPT_5_5,
     providerGroup: 'openai',
-    label: 'OpenAI',
+    label: 'GPT-5.5',
     provider: 'openai' as LocalCopilotProviderId,
-    // Resolved from COPILOT_MODEL at config-build time.
+    // Default leaf: honors `COPILOT_MODEL` at config-build time.
     model: null as string | null,
   },
   {
-    id: 'claude',
-    providerGroup: 'claude',
-    label: 'Claude',
-    provider: 'anthropic' as LocalCopilotProviderId,
-    model: null as string | null,
-  },
-  {
-    id: 'gemini-3.8-flash',
-    providerGroup: 'gemini',
-    label: 'Gemini 3.8 Flash',
-    provider: 'gemini' as LocalCopilotProviderId,
-    model: 'gemini-3.8-flash',
-  },
-  {
-    id: 'gemini-2.5-pro',
-    providerGroup: 'gemini',
-    label: 'Gemini 2.5 Pro',
-    provider: 'gemini' as LocalCopilotProviderId,
-    model: 'gemini-2.5-pro',
-  },
-  {
-    id: 'gemini-3.1-pro',
-    providerGroup: 'gemini',
-    label: 'Gemini 3.1 Pro',
-    provider: 'gemini' as LocalCopilotProviderId,
-    model: 'gemini-3.1-pro-preview',
-  },
-  {
-    id: 'vertex-gemini-3.8-flash',
-    providerGroup: 'vertex',
-    label: 'Gemini 3.8 Flash',
-    provider: 'vertex' as LocalCopilotProviderId,
-    model: 'gemini-3.8-flash',
-  },
-  {
-    id: 'bedrock-claude-opus-5',
-    providerGroup: 'bedrock',
-    label: 'Claude Opus 5',
-    provider: 'bedrock' as LocalCopilotProviderId,
-    model: 'anthropic.claude-opus-5',
-  },
-  {
-    id: 'bedrock-claude-sonnet-5',
-    providerGroup: 'bedrock',
-    label: 'Claude Sonnet 5',
-    provider: 'bedrock' as LocalCopilotProviderId,
-    model: 'anthropic.claude-sonnet-5',
-  },
-  {
-    id: 'bedrock-claude-opus-4-8',
-    providerGroup: 'bedrock',
-    label: 'Claude Opus 4.8',
-    provider: 'bedrock' as LocalCopilotProviderId,
-    model: 'anthropic.claude-opus-4-8',
-  },
-  {
-    id: 'bedrock-claude-opus-4-6',
-    providerGroup: 'bedrock',
-    label: 'Claude Opus 4.6',
-    provider: 'bedrock' as LocalCopilotProviderId,
-    model: 'anthropic.claude-opus-4-6-v1',
-  },
-  {
-    id: 'bedrock-claude-sonnet-4-6',
-    providerGroup: 'bedrock',
-    label: 'Claude Sonnet 4.6',
-    provider: 'bedrock' as LocalCopilotProviderId,
-    model: 'anthropic.claude-sonnet-4-6',
-  },
-  {
-    id: 'bedrock-zai-glm-5',
-    providerGroup: 'bedrock',
-    label: 'GLM 5',
-    provider: 'bedrock' as LocalCopilotProviderId,
-    model: 'zai.glm-5',
-  },
-  {
-    id: 'bedrock-deepseek-v3.2',
-    providerGroup: 'bedrock',
-    label: 'DeepSeek V3.2',
-    provider: 'bedrock' as LocalCopilotProviderId,
-    model: 'deepseek.v3.2',
-  },
-  {
-    id: 'bedrock-nemotron-super-3-120b',
-    providerGroup: 'bedrock',
-    label: 'Nemotron Super 3',
-    provider: 'bedrock' as LocalCopilotProviderId,
-    model: 'nvidia.nemotron-super-3-120b',
-  },
-  {
-    id: 'bedrock-mistral-large-3',
-    providerGroup: 'bedrock',
-    label: 'Mistral Large 3',
-    provider: 'bedrock' as LocalCopilotProviderId,
-    model: 'mistral.mistral-large-3-675b-instruct',
-  },
-  {
-    id: 'bedrock-llama-3.3-70b',
-    providerGroup: 'bedrock',
-    label: 'Llama 3.3 70B',
-    provider: 'bedrock' as LocalCopilotProviderId,
-    model: 'meta.llama3-3-70b-instruct-v1:0',
+    id: OPENAI_MODEL_GPT_5_MINI,
+    providerGroup: 'openai',
+    label: 'GPT-5 mini',
+    provider: 'openai' as LocalCopilotProviderId,
+    model: OPENAI_MODEL_GPT_5_MINI as string | null,
   },
 ] as const
 
@@ -134,8 +44,8 @@ export interface LocalCopilotCatalogEntry {
   label: string
   provider: LocalCopilotProviderId
   /**
-   * Concrete provider model id. `null` for Claude — resolved from `COPILOT_MODEL`
-   * at config-build time.
+   * Concrete OpenAI model id. `null` for the default leaf — resolved from
+   * `COPILOT_MODEL` at config-build time.
    */
   model: string | null
 }
@@ -145,17 +55,34 @@ const CATALOG_BY_ID = new Map<string, (typeof LOCAL_COPILOT_CATALOG)[number]>(
 )
 
 /**
- * Leftover Cloud / Anthropic ids stored on chats created before the Local
- * picker. `claude-opus-4-8` was the previous hosted default; map it onto the
- * generic Claude leaf rather than falling through to Gemini.
+ * `local_copilot_user_access.default_model` is a Postgres enum from the
+ * pre-OpenAI-only catalog and cannot change without a migration. Each curated
+ * model is stored under one existing enum value (its "slot"); reads decode the
+ * slot back. `openai` holds the default GPT-5.5; `gemini-3.8-flash` (the old
+ * fast tier) is reused for GPT-5 mini because no enum value names it — replace
+ * these slots with real values in the next DB migration.
  */
-const LEGACY_LOCAL_COPILOT_CATALOG_IDS: Record<string, LocalCopilotCatalogId> = {
-  'claude-opus-4-8': 'claude',
-  // Earlier Vertex picker SKUs → sole Studio-aligned Vertex leaf.
-  'vertex-gemini-3.5-flash': 'vertex-gemini-3.8-flash',
-  'vertex-gemini-2.5-flash': 'vertex-gemini-3.8-flash',
-  'vertex-gemini-2.5-pro': 'vertex-gemini-3.8-flash',
-  'vertex-gemini-3.1-pro': 'vertex-gemini-3.8-flash',
+export const LOCAL_COPILOT_DEFAULT_MODEL_ENUM_SLOTS = {
+  [OPENAI_MODEL_GPT_5_5]: 'openai',
+  [OPENAI_MODEL_GPT_5_MINI]: 'gemini-3.8-flash',
+} as const
+
+export type LocalCopilotDefaultModelEnumValue =
+  (typeof LOCAL_COPILOT_DEFAULT_MODEL_ENUM_SLOTS)[keyof typeof LOCAL_COPILOT_DEFAULT_MODEL_ENUM_SLOTS]
+
+const ENUM_SLOT_TO_CATALOG_ID = new Map<string, LocalCopilotCatalogId>(
+  (
+    Object.entries(LOCAL_COPILOT_DEFAULT_MODEL_ENUM_SLOTS) as Array<
+      [LocalCopilotCatalogId, LocalCopilotDefaultModelEnumValue]
+    >
+  ).map(([catalogId, slot]) => [slot, catalogId])
+)
+
+/** Catalog id → the `local_copilot_default_model` enum value it is stored under. */
+export function toLocalCopilotDefaultModelEnumValue(
+  catalogId: LocalCopilotCatalogId
+): LocalCopilotDefaultModelEnumValue {
+  return LOCAL_COPILOT_DEFAULT_MODEL_ENUM_SLOTS[catalogId]
 }
 
 /** Type guard for allowlisted catalog ids. */
@@ -165,41 +92,47 @@ export function isLocalCopilotCatalogId(value: string): value is LocalCopilotCat
 
 /**
  * Maps a leftover stored/request model onto a Local picker id, or `undefined`
- * when the value is not a known legacy alias.
+ * when the value is empty or already a picker id. Enum slots decode first;
+ * everything else (old picker ids / enum values such as `claude`,
+ * `bedrock-claude-opus-5`, `vertex-gemini-3.8-flash`, or vendor ids such as
+ * `claude-opus-4-8`) resolves through {@link resolveOpenAIModelId}, which never
+ * throws and falls back to the default OpenAI model.
  */
 export function remapLegacyLocalCopilotCatalogId(
   value: string | undefined | null
 ): LocalCopilotCatalogId | undefined {
-  if (!value) return undefined
-  return LEGACY_LOCAL_COPILOT_CATALOG_IDS[value]
+  const trimmed = value?.trim()
+  if (!trimmed || isLocalCopilotCatalogId(trimmed)) return undefined
+  const slot = ENUM_SLOT_TO_CATALOG_ID.get(trimmed)
+  if (slot) return slot
+  const resolved = resolveOpenAIModelId(trimmed)
+  return isLocalCopilotCatalogId(resolved) ? resolved : DEFAULT_LOCAL_COPILOT_CATALOG_ID
 }
 
 /**
- * Returns an allowlisted catalog id, falling back to the Gemini default.
+ * Returns an allowlisted catalog id, mapping legacy values and falling back to
+ * the default (GPT-5.5).
  */
 export function resolveLocalCopilotCatalogId(
   value: string | undefined | null
 ): LocalCopilotCatalogId {
   if (value && isLocalCopilotCatalogId(value)) return value
-  const remapped = remapLegacyLocalCopilotCatalogId(value)
-  if (remapped) return remapped
-  return DEFAULT_LOCAL_COPILOT_CATALOG_ID
+  return remapLegacyLocalCopilotCatalogId(value) ?? DEFAULT_LOCAL_COPILOT_CATALOG_ID
 }
 
 /**
- * Local request model: leftover stored `claude-opus-4-8` switches onto
- * `claude`; otherwise honor a valid picker id, otherwise a leftover request
- * id, otherwise the per-user `default_model` enum (Gemini when that is
- * missing or a Cloud model string).
+ * Local request model: honor a valid picker id; otherwise a leftover stored
+ * chat model mapped onto its OpenAI picker id; otherwise a leftover
+ * request id; otherwise the per-user `default_model` enum.
  */
 export function resolveLocalCopilotRequestCatalogId(
   requested: string | undefined | null,
   defaultFromAccess: string | undefined | null,
   storedChatModel?: string | null
 ): LocalCopilotCatalogId {
+  if (requested && isLocalCopilotCatalogId(requested)) return requested
   const remappedStored = remapLegacyLocalCopilotCatalogId(storedChatModel)
   if (remappedStored) return remappedStored
-  if (requested && isLocalCopilotCatalogId(requested)) return requested
   const remappedRequested = remapLegacyLocalCopilotCatalogId(requested)
   if (remappedRequested) return remappedRequested
   return resolveLocalCopilotCatalogId(defaultFromAccess)
@@ -239,19 +172,15 @@ export function resolveLocalCopilotCatalogEntry(catalogId: string): {
   }
 }
 
-/** Provider-group chip labels for the chat toolbar. */
+/** Provider-group section labels for the chat toolbar picker. */
 export const LOCAL_COPILOT_PROVIDER_GROUPS: Array<{
   id: LocalCopilotProviderGroup
   label: string
 }> = [
   { id: 'openai', label: 'OpenAI' },
-  { id: 'claude', label: 'Claude' },
-  { id: 'gemini', label: 'Gemini' },
-  { id: 'vertex', label: 'Vertex' },
-  { id: 'bedrock', label: 'Bedrock' },
 ]
 
-/** Leaf models for a provider group (Claude has a single leaf). */
+/** Leaf models for a provider group. */
 export function getLocalCopilotCatalogEntriesForGroup(
   group: LocalCopilotProviderGroup
 ): readonly (typeof LOCAL_COPILOT_CATALOG)[number][] {

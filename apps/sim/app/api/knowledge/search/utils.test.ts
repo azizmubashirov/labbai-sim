@@ -629,36 +629,7 @@ describe('Knowledge Search Utils', () => {
   })
 
   describe('generateSearchEmbedding', () => {
-    it('should use Azure OpenAI when KB-specific config is provided', async () => {
-      const { env } = await import('@/lib/core/config/env')
-      Object.keys(env).forEach((key) => delete (env as any)[key])
-      Object.assign(env, {
-        AZURE_OPENAI_API_KEY: 'test-azure-key',
-        AZURE_OPENAI_ENDPOINT: 'https://test.openai.azure.com',
-        AZURE_OPENAI_API_VERSION: '2024-12-01-preview',
-        KB_OPENAI_MODEL_NAME: 'text-embedding-ada-002',
-        OPENAI_API_KEY: 'test-openai-key',
-      })
-
-      mockNextEmbeddingResponse()
-
-      const result = await generateSearchEmbedding('test query', DEFAULT_EMBEDDING_TARGET)
-
-      expect(vi.mocked(fetch)).toHaveBeenCalledWith(
-        'https://test.openai.azure.com/openai/deployments/text-embedding-ada-002/embeddings?api-version=2024-12-01-preview',
-        expect.objectContaining({
-          headers: expect.objectContaining({
-            'api-key': 'test-azure-key',
-          }),
-        })
-      )
-      expect(result.embedding).toEqual(TEST_EMBEDDING)
-
-      // Clean up
-      Object.keys(env).forEach((key) => delete (env as any)[key])
-    })
-
-    it('should fallback to OpenAI when no KB Azure config provided', async () => {
+    it('should call the OpenAI embeddings endpoint with the platform key', async () => {
       const { env } = await import('@/lib/core/config/env')
       Object.keys(env).forEach((key) => delete (env as any)[key])
       Object.assign(env, {
@@ -683,53 +654,6 @@ describe('Knowledge Search Utils', () => {
       Object.keys(env).forEach((key) => delete (env as any)[key])
     })
 
-    it('falls back to OpenAI when AZURE_OPENAI_API_VERSION is not set', async () => {
-      const { env } = await import('@/lib/core/config/env')
-      Object.keys(env).forEach((key) => delete (env as any)[key])
-      Object.assign(env, {
-        AZURE_OPENAI_API_KEY: 'test-azure-key',
-        AZURE_OPENAI_ENDPOINT: 'https://test.openai.azure.com',
-        KB_OPENAI_MODEL_NAME: 'custom-embedding-model',
-        OPENAI_API_KEY: 'test-openai-key',
-      })
-
-      mockNextEmbeddingResponse()
-
-      await generateSearchEmbedding('test query', DEFAULT_EMBEDDING_TARGET)
-
-      expect(vi.mocked(fetch)).toHaveBeenCalledWith(
-        'https://api.openai.com/v1/embeddings',
-        expect.any(Object)
-      )
-
-      // Clean up
-      Object.keys(env).forEach((key) => delete (env as any)[key])
-    })
-
-    it('should use custom model name when provided in Azure config', async () => {
-      const { env } = await import('@/lib/core/config/env')
-      Object.keys(env).forEach((key) => delete (env as any)[key])
-      Object.assign(env, {
-        AZURE_OPENAI_API_KEY: 'test-azure-key',
-        AZURE_OPENAI_ENDPOINT: 'https://test.openai.azure.com',
-        AZURE_OPENAI_API_VERSION: '2024-12-01-preview',
-        KB_OPENAI_MODEL_NAME: 'custom-embedding-model',
-        OPENAI_API_KEY: 'test-openai-key',
-      })
-
-      mockNextEmbeddingResponse()
-
-      await generateSearchEmbedding('test query', DEFAULT_EMBEDDING_TARGET)
-
-      expect(vi.mocked(fetch)).toHaveBeenCalledWith(
-        'https://test.openai.azure.com/openai/deployments/custom-embedding-model/embeddings?api-version=2024-12-01-preview',
-        expect.any(Object)
-      )
-
-      // Clean up
-      Object.keys(env).forEach((key) => delete (env as any)[key])
-    })
-
     it('should throw error when no API configuration provided', async () => {
       const { env } = await import('@/lib/core/config/env')
       Object.keys(env).forEach((key) => delete (env as any)[key])
@@ -738,7 +662,6 @@ describe('Knowledge Search Utils', () => {
         OPENAI_API_KEY_1: undefined,
         OPENAI_API_KEY_2: undefined,
         OPENAI_API_KEY_3: undefined,
-        OPENROUTER_API_KEY: undefined,
       })
 
       await expect(generateSearchEmbedding('test query', DEFAULT_EMBEDDING_TARGET)).rejects.toThrow(
@@ -746,37 +669,11 @@ describe('Knowledge Search Utils', () => {
       )
     })
 
-    it('should handle Azure OpenAI API errors properly', async () => {
-      const { env } = await import('@/lib/core/config/env')
-      Object.keys(env).forEach((key) => delete (env as any)[key])
-      Object.assign(env, {
-        AZURE_OPENAI_API_KEY: 'test-azure-key',
-        AZURE_OPENAI_ENDPOINT: 'https://test.openai.azure.com',
-        AZURE_OPENAI_API_VERSION: '2024-12-01-preview',
-        KB_OPENAI_MODEL_NAME: 'text-embedding-ada-002',
-      })
-
-      mockNextFetchResponse({
-        ok: false,
-        status: 404,
-        statusText: 'Not Found',
-        text: 'Deployment not found',
-      })
-
-      await expect(generateSearchEmbedding('test query', DEFAULT_EMBEDDING_TARGET)).rejects.toThrow(
-        'Embedding API failed'
-      )
-
-      // Clean up
-      Object.keys(env).forEach((key) => delete (env as any)[key])
-    })
-
     it('should handle OpenAI API errors properly', async () => {
       const { env } = await import('@/lib/core/config/env')
       Object.keys(env).forEach((key) => delete (env as any)[key])
       Object.assign(env, {
         OPENAI_API_KEY: 'test-openai-key',
-        OPENROUTER_API_KEY: undefined,
       })
 
       mockNextFetchResponse({
@@ -788,35 +685,6 @@ describe('Knowledge Search Utils', () => {
 
       await expect(generateSearchEmbedding('test query', DEFAULT_EMBEDDING_TARGET)).rejects.toThrow(
         'Embedding API failed'
-      )
-
-      // Clean up
-      Object.keys(env).forEach((key) => delete (env as any)[key])
-    })
-
-    it('should include correct request body for Azure OpenAI', async () => {
-      const { env } = await import('@/lib/core/config/env')
-      Object.keys(env).forEach((key) => delete (env as any)[key])
-      Object.assign(env, {
-        AZURE_OPENAI_API_KEY: 'test-azure-key',
-        AZURE_OPENAI_ENDPOINT: 'https://test.openai.azure.com',
-        AZURE_OPENAI_API_VERSION: '2024-12-01-preview',
-        KB_OPENAI_MODEL_NAME: 'text-embedding-ada-002',
-      })
-
-      mockNextEmbeddingResponse()
-
-      await generateSearchEmbedding('test query', DEFAULT_EMBEDDING_TARGET)
-
-      expect(vi.mocked(fetch)).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.objectContaining({
-          body: JSON.stringify({
-            input: ['test query'],
-            encoding_format: 'float',
-            dimensions: 1536,
-          }),
-        })
       )
 
       // Clean up

@@ -236,7 +236,6 @@ export const V2_OAUTH_CONNECTION_PROVIDER_IDS = [
   'google-sheets',
   'google-forms',
   'google-calendar',
-  'vertex-ai',
   'airtable',
   'notion',
   'shopify',

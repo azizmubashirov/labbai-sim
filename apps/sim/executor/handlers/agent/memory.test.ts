@@ -23,12 +23,8 @@ import type { Message } from '@/executor/handlers/agent/types'
 import type { ExecutionContext, UserFile } from '@/executor/types'
 import { ResolvedSecretTraceRegistry } from '@/executor/utils/resolved-secret-trace-registry'
 import {
-  buildAnthropicMessageContent,
-  buildBedrockMessageContent,
-  buildGeminiMessageParts,
   buildOpenAICompatibleChatContent,
   buildOpenAIMessageContent,
-  buildOpenRouterMessageContent,
   prepareProviderAttachments,
 } from '@/providers/attachments'
 
@@ -326,31 +322,13 @@ describe('Memory', () => {
       context: 'workspace',
     }
     const bytes = 'iVBORw0KGgo='
+    /** Labbai: OpenAI is the only provider; both of its content builders must agree. */
     const renderers: Array<{
       providers: string[]
       render: (content: string, files: UserFile[], provider: string) => unknown
     }> = [
-      { providers: ['openai', 'azure-openai'], render: buildOpenAIMessageContent },
-      { providers: ['anthropic', 'azure-anthropic'], render: buildAnthropicMessageContent },
-      { providers: ['google', 'vertex'], render: buildGeminiMessageParts },
-      { providers: ['bedrock'], render: buildBedrockMessageContent },
-      { providers: ['openrouter'], render: buildOpenRouterMessageContent },
-      {
-        providers: [
-          'mistral',
-          'groq',
-          'fireworks',
-          'together',
-          'baseten',
-          'ollama',
-          'ollama-cloud',
-          'vllm',
-          'litellm',
-          'xai',
-          'kimi',
-        ],
-        render: buildOpenAICompatibleChatContent,
-      },
+      { providers: ['openai'], render: buildOpenAIMessageContent },
+      { providers: ['openai'], render: buildOpenAICompatibleChatContent },
     ]
     const providers = renderers.flatMap(({ providers, render }) =>
       providers.map((provider) => ({ provider, render }))
@@ -392,7 +370,7 @@ describe('Memory', () => {
       }
     )
 
-    it.each(['deepseek', 'cerebras', 'sakana', 'nvidia', 'meta', 'zai'])(
+    it.each(['anthropic', 'google', 'deepseek', 'cerebras', 'zai'])(
       'keeps the explicit unsupported-attachment error for %s',
       (provider) => {
         expect(() =>

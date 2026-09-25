@@ -56,6 +56,7 @@ import {
   isConversationHistoryNotice,
   markConversationHistoryNotice,
 } from '@/providers/conversation-metadata'
+import { getProviderExecutor } from '@/providers/registry'
 import { executeProviderTool } from '@/providers/runtime-context'
 import type { AgentStreamEvent } from '@/providers/stream-events'
 import type { ProviderRequest, ProviderResponse, ProviderToolConfig } from '@/providers/types'
@@ -72,13 +73,13 @@ const ARBITRARY_SCHEMA_CONTROL_KEYS = [
   'type',
 ] as const
 
-function makeAnthropicResponse(): ProviderResponse {
-  // Mirrors the shape produced by Anthropic core for a real BYOK execution
+function makeHostedResponse(): ProviderResponse {
+  // Mirrors the shape produced by the provider core for a real BYOK execution
   // (gross hosted-rate cost was written into time-segment cost by the trace
   // enricher even though the block-level cost should be zeroed for BYOK).
   return {
     content: 'hello',
-    model: 'claude-opus-4-6',
+    model: 'gpt-5.5',
     tokens: { input: 68057, output: 1548, total: 69605 },
     cost: {
       input: HOSTED_RATE_INPUT_COST,
@@ -93,7 +94,7 @@ function makeAnthropicResponse(): ProviderResponse {
       timeSegments: [
         {
           type: 'model',
-          name: 'claude-opus-4-6',
+          name: 'gpt-5.5',
           startTime: 1777584457878,
           endTime: 1777584499836,
           duration: 41958,
@@ -121,7 +122,7 @@ function makeProviderTool(id: string, credential: string): ProviderToolConfig {
 describe('executeProviderRequest — durable Agent continuation', () => {
   const tool = makeProviderTool('http_request', 'credential-1')
   const initialRequest: ProviderRequest = {
-    model: 'gpt-4o',
+    model: 'gpt-5-mini',
     messages: [{ role: 'user', content: 'Finish the work.' }],
     tools: [tool],
     workflowId: 'workflow-1',
@@ -139,7 +140,7 @@ describe('executeProviderRequest — durable Agent continuation', () => {
   })
   const response = (): ProviderResponse => ({
     content: 'Finished.',
-    model: 'gpt-4o',
+    model: 'gpt-5-mini',
     tokens: { input: 2, output: 1, total: 3 },
     toolCalls: [],
   })
@@ -193,8 +194,8 @@ describe('executeProviderRequest — durable Agent continuation', () => {
     ).rejects.toThrow('Primary failed')
 
     const result = (await executeProviderRequest(
-      'groq',
-      { ...initialRequest, model: 'llama-3.3-70b-versatile' },
+      'openai',
+      { ...initialRequest, model: 'gpt-4.1' },
       { agentConversation: session }
     )) as ProviderResponse
 
@@ -277,7 +278,7 @@ describe('executeProviderRequest — durable Agent continuation', () => {
           cost: { input: 0.4, output: 0.6, total: 1 },
         },
       ],
-      final: { content: '{"answer":42}', model: 'claude-opus-4-6' },
+      final: { content: '{"answer":42}', model: 'gpt-5.5' },
     }
     const restored = new AgentTurnStateMachine({ save: vi.fn() }, state)
     mockGetApiKeyWithBYOK.mockResolvedValueOnce({ apiKey: 'new-byok-key', isBYOK: true })
@@ -295,7 +296,7 @@ describe('executeProviderRequest — durable Agent continuation', () => {
     expect(mockExecuteTool).not.toHaveBeenCalled()
     expect(result).toMatchObject({
       content: '{"answer":42}',
-      model: 'claude-opus-4-6',
+      model: 'gpt-5.5',
       tokens: { input: 7, output: 3, cacheRead: 2, total: 12 },
       cost: { input: 0.4, output: 0.6, total: 1 },
     })
@@ -363,7 +364,7 @@ describe('executeProviderRequest — durable Agent continuation', () => {
         ],
       }
     )
-    mockExecuteRequest.mockResolvedValueOnce({ content: 'Finished.', model: 'gpt-4o' })
+    mockExecuteRequest.mockResolvedValueOnce({ content: 'Finished.', model: 'gpt-5-mini' })
 
     const result = (await executeProviderRequest('openai', initialRequest, {
       agentConversation: session,
@@ -493,16 +494,16 @@ describe('executeProviderRequest — tool identities', () => {
       workspaceId: 'workspace-1',
       executionId: 'execution-1',
     } as ExecutionContext
-    mockExecuteRequest.mockResolvedValueOnce({ content: 'ready', model: 'test-model' })
-    await executeProviderRequest('anthropic', { model: 'test-model' }, { executionContext })
+    mockExecuteRequest.mockResolvedValueOnce({ content: 'ready', model: 'gpt-4.1' })
+    await executeProviderRequest('openai', { model: 'gpt-4.1' }, { executionContext })
     expect(mockAttachLargeFileRemoteUrls).toHaveBeenCalledWith(
-      expect.objectContaining({ model: 'test-model' }),
-      'anthropic',
+      expect.objectContaining({ model: 'gpt-4.1' }),
+      'openai',
       executionContext
     )
     expect(mockUploadLargeFilesToProvider).toHaveBeenCalledWith(
-      expect.objectContaining({ model: 'test-model' }),
-      'anthropic',
+      expect.objectContaining({ model: 'gpt-4.1' }),
+      'openai',
       executionContext
     )
     expect(mockExecuteRequest.mock.calls[0][0]).not.toHaveProperty('executionContext')
@@ -523,7 +524,7 @@ describe('executeProviderRequest — tool identities', () => {
       expect(alias).not.toContain('credential-b')
       return {
         content: 'sent',
-        model: 'test-model',
+        model: 'gpt-4.1',
         toolCalls: [{ name: alias, arguments: {} }],
         timing: {
           startTime: 'start',
@@ -534,8 +535,8 @@ describe('executeProviderRequest — tool identities', () => {
       }
     })
 
-    const response = (await executeProviderRequest('anthropic', {
-      model: 'test-model',
+    const response = (await executeProviderRequest('openai', {
+      model: 'gpt-4.1',
       tools,
     })) as ProviderResponse
 
@@ -569,8 +570,8 @@ describe('executeProviderRequest — tool identities', () => {
       }
     })
 
-    const response = await executeProviderRequest('anthropic', {
-      model: 'test-model',
+    const response = await executeProviderRequest('openai', {
+      model: 'gpt-4.1',
       tools,
     })
     expect(response).not.toBeInstanceOf(ReadableStream)
@@ -597,10 +598,10 @@ describe('executeProviderRequest — BYOK regression', () => {
 
   it('zeroes block-level model cost for BYOK callers (existing behavior)', async () => {
     mockGetApiKeyWithBYOK.mockResolvedValue({ apiKey: 'sk-byok', isBYOK: true })
-    mockExecuteRequest.mockResolvedValue(makeAnthropicResponse())
+    mockExecuteRequest.mockResolvedValue(makeHostedResponse())
 
-    const result = (await executeProviderRequest('anthropic', {
-      model: 'claude-opus-4-6',
+    const result = (await executeProviderRequest('openai', {
+      model: 'gpt-5.5',
       workspaceId: 'ws-1',
     })) as ProviderResponse
 
@@ -611,10 +612,10 @@ describe('executeProviderRequest — BYOK regression', () => {
 
   it('zeroes per-segment model cost for BYOK callers so trace aggregation does not re-charge', async () => {
     mockGetApiKeyWithBYOK.mockResolvedValue({ apiKey: 'sk-byok', isBYOK: true })
-    mockExecuteRequest.mockResolvedValue(makeAnthropicResponse())
+    mockExecuteRequest.mockResolvedValue(makeHostedResponse())
 
-    const result = (await executeProviderRequest('anthropic', {
-      model: 'claude-opus-4-6',
+    const result = (await executeProviderRequest('openai', {
+      model: 'gpt-5.5',
       workspaceId: 'ws-1',
     })) as ProviderResponse
 
@@ -631,10 +632,10 @@ describe('executeProviderRequest — BYOK regression', () => {
 
   it('does not zero per-segment cost for non-BYOK hosted callers', async () => {
     mockGetApiKeyWithBYOK.mockResolvedValue({ apiKey: 'sk-rotating', isBYOK: false })
-    mockExecuteRequest.mockResolvedValue(makeAnthropicResponse())
+    mockExecuteRequest.mockResolvedValue(makeHostedResponse())
 
-    const result = (await executeProviderRequest('anthropic', {
-      model: 'claude-opus-4-6',
+    const result = (await executeProviderRequest('openai', {
+      model: 'gpt-5.5',
       workspaceId: 'ws-1',
     })) as ProviderResponse
 
@@ -652,7 +653,7 @@ describe('executeProviderRequest — BYOK regression', () => {
     mockGetApiKeyWithBYOK.mockResolvedValue({ apiKey: 'sk-rotating', isBYOK: false })
     mockExecuteRequest.mockResolvedValue({
       content: 'hi',
-      model: 'claude-opus-4-6',
+      model: 'gpt-5.5',
       tokens: { input: 100, output: 50, total: 150 },
       cost: {
         input: 0.0005,
@@ -664,8 +665,8 @@ describe('executeProviderRequest — BYOK regression', () => {
       toolResults: [{ cost: { total: 0.005 } }],
     } as ProviderResponse)
 
-    const result = (await executeProviderRequest('anthropic', {
-      model: 'claude-opus-4-6',
+    const result = (await executeProviderRequest('openai', {
+      model: 'gpt-5.5',
       workspaceId: 'ws-1',
     })) as ProviderResponse
 
@@ -684,13 +685,13 @@ describe('executeProviderRequest — BYOK regression', () => {
       const execution = await executeProviderTool('function_execute', {})
       expect(execution.rawResponse.success).toBe(false)
       return {
-        ...makeAnthropicResponse(),
+        ...makeHostedResponse(),
         toolResults: [{ cost: { total: 0.005 } }],
       } as ProviderResponse
     })
 
-    const result = (await executeProviderRequest('anthropic', {
-      model: 'claude-opus-4-6',
+    const result = (await executeProviderRequest('openai', {
+      model: 'gpt-5.5',
       workspaceId: 'ws-1',
       tools: [makeProviderTool('function_execute', 'credential')],
     })) as ProviderResponse
@@ -701,7 +702,7 @@ describe('executeProviderRequest — BYOK regression', () => {
   })
 
   /**
-   * Gemini hands the same cost object to its response and its model segment.
+   * A provider may hand the same cost object to its response and its model segment.
    * Adding tool cost by mutation would charge it to the segment too.
    */
   it('does not leak tool cost into a segment sharing the provider cost object', async () => {
@@ -715,7 +716,7 @@ describe('executeProviderRequest — BYOK regression', () => {
     }
     mockExecuteRequest.mockResolvedValue({
       content: 'hi',
-      model: 'claude-opus-4-6',
+      model: 'gpt-5.5',
       tokens: { input: 100, output: 50, total: 150 },
       cost: sharedCost,
       toolResults: [{ cost: { total: 0.004 } }],
@@ -726,7 +727,7 @@ describe('executeProviderRequest — BYOK regression', () => {
         timeSegments: [
           {
             type: 'model',
-            name: 'claude-opus-4-6',
+            name: 'gpt-5.5',
             startTime: 1777584457878,
             endTime: 1777584457940,
             duration: 62,
@@ -736,8 +737,8 @@ describe('executeProviderRequest — BYOK regression', () => {
       },
     } as ProviderResponse)
 
-    const result = (await executeProviderRequest('anthropic', {
-      model: 'claude-opus-4-6',
+    const result = (await executeProviderRequest('openai', {
+      model: 'gpt-5.5',
       workspaceId: 'ws-1',
     })) as ProviderResponse
 
@@ -750,7 +751,7 @@ describe('executeProviderRequest — BYOK regression', () => {
     // Cache-tier pricing this layer cannot rebuild from `tokens` alone.
     mockExecuteRequest.mockResolvedValue({
       content: 'hi',
-      model: 'claude-opus-4-6',
+      model: 'gpt-5.5',
       tokens: { input: 100, output: 50, total: 150, cacheRead: 900, cacheWrite: 400 },
       cost: {
         input: 0.0123,
@@ -760,8 +761,8 @@ describe('executeProviderRequest — BYOK regression', () => {
       },
     } as ProviderResponse)
 
-    const result = (await executeProviderRequest('anthropic', {
-      model: 'claude-opus-4-6',
+    const result = (await executeProviderRequest('openai', {
+      model: 'gpt-5.5',
       workspaceId: 'ws-1',
     })) as ProviderResponse
 
@@ -773,7 +774,7 @@ describe('executeProviderRequest — BYOK regression', () => {
     mockGetApiKeyWithBYOK.mockResolvedValue({ apiKey: 'sk-byok', isBYOK: true })
     const responseWithToolSegment: ProviderResponse = {
       content: 'hi',
-      model: 'claude-opus-4-6',
+      model: 'gpt-5.5',
       tokens: { input: 100, output: 50, total: 150 },
       cost: {
         input: 0.0005,
@@ -788,7 +789,7 @@ describe('executeProviderRequest — BYOK regression', () => {
         timeSegments: [
           {
             type: 'model',
-            name: 'claude-opus-4-6',
+            name: 'gpt-5.5',
             startTime: 1777584457878,
             endTime: 1777584457940,
             duration: 62,
@@ -807,8 +808,8 @@ describe('executeProviderRequest — BYOK regression', () => {
     }
     mockExecuteRequest.mockResolvedValue(responseWithToolSegment)
 
-    const result = (await executeProviderRequest('anthropic', {
-      model: 'claude-opus-4-6',
+    const result = (await executeProviderRequest('openai', {
+      model: 'gpt-5.5',
       workspaceId: 'ws-1',
     })) as ProviderResponse
 
@@ -823,7 +824,7 @@ describe('executeProviderRequest — BYOK regression', () => {
     const segments = [
       {
         type: 'model' as const,
-        name: 'claude-opus-4-6',
+        name: 'gpt-5.5',
         startTime: 1777584457878,
         endTime: 1777584499836,
         duration: 41958,
@@ -840,7 +841,7 @@ describe('executeProviderRequest — BYOK regression', () => {
         success: true,
         output: {
           content: '',
-          model: 'claude-opus-4-6',
+          model: 'gpt-5.5',
           tokens: { input: 0, output: 0, total: 0 },
           providerTiming: {
             startTime: '2026-04-30T21:27:37.878Z',
@@ -859,8 +860,8 @@ describe('executeProviderRequest — BYOK regression', () => {
     }
     mockExecuteRequest.mockResolvedValue(streamingResponse)
 
-    await executeProviderRequest('anthropic', {
-      model: 'claude-opus-4-6',
+    await executeProviderRequest('openai', {
+      model: 'gpt-5.5',
       workspaceId: 'ws-1',
       stream: true,
     })
@@ -891,7 +892,7 @@ describe('executeProviderRequest — streaming cost policy', () => {
         success: true,
         output: {
           content: '',
-          model: 'claude-opus-4-6',
+          model: 'gpt-5.5',
           tokens: { input: 0, output: 0, total: 0 },
           ...(initialCost ? { cost: initialCost } : {}),
         },
@@ -905,8 +906,8 @@ describe('executeProviderRequest — streaming cost policy', () => {
     const streaming = makeStreamingExecution()
     mockExecuteRequest.mockResolvedValue(streaming)
 
-    await executeProviderRequest('anthropic', {
-      model: 'claude-opus-4-6',
+    await executeProviderRequest('openai', {
+      model: 'gpt-5.5',
       workspaceId: 'ws-1',
       stream: true,
     })
@@ -916,14 +917,14 @@ describe('executeProviderRequest — streaming cost policy', () => {
     expect(streaming.execution.output.cost).toMatchObject({ input: 2, output: 4, total: 6 })
   })
 
-  it('does not charge for models Sim does not host', async () => {
+  it('bills a legacy model id at the curated model it runs on', async () => {
     const streaming = {
       stream: new ReadableStream(),
       execution: {
         success: true,
         output: {
           content: '',
-          model: 'llama-3.3-70b-versatile',
+          model: 'gpt-5-mini',
           tokens: { input: 0, output: 0, total: 0 },
         },
         logs: [],
@@ -931,15 +932,16 @@ describe('executeProviderRequest — streaming cost policy', () => {
     }
     mockExecuteRequest.mockResolvedValue(streaming)
 
-    await executeProviderRequest('groq', {
+    await executeProviderRequest('openai', {
       model: 'llama-3.3-70b-versatile',
       workspaceId: 'ws-1',
       stream: true,
     })
 
+    expect(mockExecuteRequest.mock.calls[0][0].model).toBe('gpt-5-mini')
     streaming.execution.output.cost = { input: 0.5, output: 1.5, total: 2 }
 
-    expect(streaming.execution.output.cost).toMatchObject({ input: 0, output: 0, total: 0 })
+    expect(streaming.execution.output.cost).toMatchObject({ input: 0.5, output: 1.5, total: 2 })
   })
 
   it('keeps tool cost from a settled stream that priced its tools before returning', async () => {
@@ -952,8 +954,8 @@ describe('executeProviderRequest — streaming cost policy', () => {
     })
     mockExecuteRequest.mockResolvedValue(streaming)
 
-    await executeProviderRequest('anthropic', {
-      model: 'claude-opus-4-6',
+    await executeProviderRequest('openai', {
+      model: 'gpt-5.5',
       workspaceId: 'ws-1',
       stream: true,
     })
@@ -972,7 +974,7 @@ describe('executeProviderRequest — caller-prepared model input', () => {
     vi.clearAllMocks()
     mockExecuteRequest.mockResolvedValue({
       content: 'ok',
-      model: 'test-model',
+      model: 'gpt-4.1',
       tokens: { input: 1, output: 1, total: 2 },
     } as ProviderResponse)
   })
@@ -985,9 +987,9 @@ describe('executeProviderRequest — caller-prepared model input', () => {
     registry.recordResolved('TOKEN', secret)
 
     await executeProviderRequest(
-      'anthropic',
+      'openai',
       {
-        model: 'test-model',
+        model: 'gpt-4.1',
         apiKey: secret,
         systemPrompt: `system ${secret}`,
         context: `context ${secret}`,
@@ -1103,9 +1105,9 @@ describe('executeProviderRequest — caller-prepared model input', () => {
     const registry = new ResolvedSecretTraceRegistry()
 
     await executeProviderRequest(
-      'anthropic',
+      'openai',
       {
-        model: 'test-model',
+        model: 'gpt-4.1',
         messages: [{ role: 'user', content: 'Use runtime-secret' }],
         environmentVariables: { RUNTIME_TOKEN: 'runtime-secret' },
       },
@@ -1125,7 +1127,7 @@ describe('executeProviderRequest — caller-prepared model input', () => {
     await executeProviderRequest(
       'openai',
       {
-        model: 'test-model',
+        model: 'gpt-4.1',
         systemPrompt: 'Return a string when the statement is true.',
         responseFormat: {
           name: 'ordinary_response',
@@ -1163,7 +1165,7 @@ describe('executeProviderRequest — caller-prepared model input', () => {
     await executeProviderRequest(
       'openai',
       {
-        model: 'test-model',
+        model: 'gpt-4.1',
         systemPrompt: 'Choose a loading status',
         responseFormat: {
           name: 'loading_status',
@@ -1201,7 +1203,7 @@ describe('executeProviderRequest — caller-prepared model input', () => {
     await executeProviderRequest(
       'openai',
       {
-        model: 'test-model',
+        model: 'gpt-4.1',
         systemPrompt: 'Choose loading messages',
         messages: [{ role: 'user', content: 'Select messages for this request' }],
         responseFormat: {
@@ -1239,7 +1241,7 @@ describe('executeProviderRequest — caller-prepared model input', () => {
     await executeProviderRequest(
       'openai',
       {
-        model: 'test-model',
+        model: 'gpt-4.1',
         messages: [{ role: 'user', content: 'Continue safely' }],
         responseFormat: {
           name: 'unsafe_name',
@@ -1267,7 +1269,7 @@ describe('executeProviderRequest — caller-prepared model input', () => {
       await executeProviderRequest(
         'openai',
         {
-          model: 'test-model',
+          model: 'gpt-4.1',
           messages: [{ role: 'user', content: 'Continue safely' }],
           tools: [
             {
@@ -1302,7 +1304,7 @@ describe('executeProviderRequest — caller-prepared model input', () => {
     await executeProviderRequest(
       'openai',
       {
-        model: 'test-model',
+        model: 'gpt-4.1',
         messages: [
           {
             role: 'user',
@@ -1385,7 +1387,7 @@ describe('executeProviderRequest — caller-prepared model input', () => {
       }
 
       const response = await executeProviderRequest('openai', {
-        model: 'test-model',
+        model: 'gpt-4.1',
         workspaceId: 'ws-1',
         userId: 'user-1',
         stream,
@@ -1421,7 +1423,7 @@ describe('executeProviderRequest — caller-prepared model input', () => {
 
     await expect(
       executeProviderRequest('openai', {
-        model: 'test-model',
+        model: 'gpt-4.1',
         workspaceId: 'ws-1',
         messages: [
           {
@@ -1456,7 +1458,7 @@ describe('executeProviderRequest — caller-prepared model input', () => {
     await executeProviderRequest(
       'openai',
       {
-        model: 'test-model',
+        model: 'gpt-4.1',
         messages: [
           {
             role: 'assistant',
@@ -1526,7 +1528,7 @@ describe('executeProviderRequest — caller-prepared model input', () => {
       await executeProviderRequest(
         'openai',
         {
-          model: 'test-model',
+          model: 'gpt-4.1',
           messages: [
             {
               role: 'assistant',
@@ -1706,7 +1708,7 @@ describe('executeProviderRequest — caller-prepared model input', () => {
       await executeProviderRequest(
         'openai',
         {
-          model: 'test-model',
+          model: 'gpt-4.1',
           tools: [
             {
               id: 'unsafe_tool',
@@ -1736,7 +1738,7 @@ describe('executeProviderRequest — caller-prepared model input', () => {
       await executeProviderRequest(
         'openai',
         {
-          model: 'test-model',
+          model: 'gpt-4.1',
           messages: [{ role: 'user', content: 'Continue safely' }],
           responseFormat: { name: 'unsafe_response', schema: unsafeSchema },
         },
@@ -1766,7 +1768,7 @@ describe('executeProviderRequest — caller-prepared model input', () => {
       await executeProviderRequest(
         'openai',
         {
-          model: 'test-model',
+          model: 'gpt-4.1',
           tools: [
             {
               id: 'canonical_tool',
@@ -1796,7 +1798,7 @@ describe('executeProviderRequest — caller-prepared model input', () => {
       await executeProviderRequest(
         'openai',
         {
-          model: 'test-model',
+          model: 'gpt-4.1',
           responseFormat: { name: 'canonical_response', schema },
         },
         { resolvedSecretTraceRegistry: registry }
@@ -1819,7 +1821,7 @@ describe('executeProviderRequest — caller-prepared model input', () => {
     await executeProviderRequest(
       'openai',
       {
-        model: 'test-model',
+        model: 'gpt-4.1',
         responseFormat: { name: 'safe_response', schema },
       },
       { resolvedSecretTraceRegistry: registry }
@@ -1840,7 +1842,7 @@ describe('executeProviderRequest — caller-prepared model input', () => {
       await executeProviderRequest(
         'openai',
         {
-          model: 'test-model',
+          model: 'gpt-4.1',
           messages: [{ role: 'user', content: 'Continue safely' }],
           responseFormat: {
             name: 'safe_response',
@@ -1867,21 +1869,21 @@ describe('executeProviderRequest — caller-prepared model input', () => {
     incomplete.markIncomplete('unspecified')
 
     await executeProviderRequest(
-      'anthropic',
-      { model: 'test-model', messages: [{ role: 'user', content: 'possibly secret' }] },
+      'openai',
+      { model: 'gpt-4.1', messages: [{ role: 'user', content: 'possibly secret' }] },
       { resolvedSecretTraceRegistry: incomplete }
     )
     await executeProviderRequest(
-      'anthropic',
-      { model: 'test-model', messages: [{ role: 'user', content: 'possibly secret' }] },
+      'openai',
+      { model: 'gpt-4.1', messages: [{ role: 'user', content: 'possibly secret' }] },
       {}
     )
     expect(mockExecuteRequest).toHaveBeenCalledTimes(2)
   })
 
   it('leaves non-workflow provider callers unchanged when no runtime context is supplied', async () => {
-    await executeProviderRequest('anthropic', {
-      model: 'test-model',
+    await executeProviderRequest('openai', {
+      model: 'gpt-4.1',
       messages: [{ role: 'user', content: 'raw standalone content' }],
     })
 
@@ -1904,7 +1906,7 @@ describe('executeProviderRequest — model level normalization', () => {
     mockGetApiKeyWithBYOK.mockResolvedValue({ apiKey: 'sk-rotating', isBYOK: false })
     mockExecuteRequest.mockResolvedValue({
       content: 'hi',
-      model: 'gpt-5',
+      model: 'gpt-5.5',
       tokens: { input: 1, output: 1, total: 2 },
     } as ProviderResponse)
   })
@@ -1913,7 +1915,7 @@ describe('executeProviderRequest — model level normalization', () => {
 
   it('trims and lower-cases levels a reference resolved to', async () => {
     await executeProviderRequest('openai', {
-      model: 'gpt-5',
+      model: 'gpt-5.5',
       workspaceId: 'ws-1',
       reasoningEffort: ' High ',
       verbosity: 'LOW',
@@ -1923,19 +1925,9 @@ describe('executeProviderRequest — model level normalization', () => {
     expect(sentRequest().verbosity).toBe('low')
   })
 
-  it('trims and lower-cases a thinking level a reference resolved to', async () => {
-    await executeProviderRequest('anthropic', {
-      model: 'claude-sonnet-5',
-      workspaceId: 'ws-1',
-      thinkingLevel: ' High ',
-    })
-
-    expect(sentRequest().thinkingLevel).toBe('high')
-  })
-
   it('treats a level that resolved to nothing as unset rather than an empty string', async () => {
     await executeProviderRequest('openai', {
-      model: 'gpt-5',
+      model: 'gpt-5.5',
       workspaceId: 'ws-1',
       reasoningEffort: '',
       verbosity: '   ',
@@ -1945,33 +1937,26 @@ describe('executeProviderRequest — model level normalization', () => {
     expect(sentRequest().verbosity).toBeUndefined()
   })
 
-  /**
-   * Providers treat an explicit `'none'` as "thinking off" and an absent value as "send
-   * nothing", so a reference that resolved to nothing must land on the latter.
-   */
-  it('treats a thinking level that resolved to nothing as unset, not as none', async () => {
-    await executeProviderRequest('anthropic', {
-      model: 'claude-sonnet-5',
+  /** No curated OpenAI model declares thinking levels, so any thinking level is dropped. */
+  it('drops thinking levels, including one that resolved to nothing', async () => {
+    await executeProviderRequest('openai', {
+      model: 'gpt-5.5',
+      workspaceId: 'ws-1',
+      thinkingLevel: ' High ',
+    })
+    await executeProviderRequest('openai', {
+      model: 'gpt-5.5',
       workspaceId: 'ws-1',
       thinkingLevel: '  ',
     })
 
-    expect(sentRequest().thinkingLevel).toBeUndefined()
-  })
-
-  it('preserves an explicit none thinking level', async () => {
-    await executeProviderRequest('anthropic', {
-      model: 'claude-sonnet-5',
-      workspaceId: 'ws-1',
-      thinkingLevel: 'none',
-    })
-
-    expect(sentRequest().thinkingLevel).toBe('none')
+    expect(mockExecuteRequest.mock.calls[0][0].thinkingLevel).toBeUndefined()
+    expect(mockExecuteRequest.mock.calls[1][0].thinkingLevel).toBeUndefined()
   })
 
   it('leaves an already-valid level untouched', async () => {
     await executeProviderRequest('openai', {
-      model: 'gpt-5',
+      model: 'gpt-5.5',
       workspaceId: 'ws-1',
       reasoningEffort: 'medium',
       verbosity: 'high',
@@ -1979,26 +1964,6 @@ describe('executeProviderRequest — model level normalization', () => {
 
     expect(sentRequest().reasoningEffort).toBe('medium')
     expect(sentRequest().verbosity).toBe('high')
-  })
-
-  it('keeps the reasoning effort a Grok model declares', async () => {
-    await executeProviderRequest('xai', {
-      model: 'grok-4.6',
-      workspaceId: 'ws-1',
-      reasoningEffort: 'xhigh',
-    })
-
-    expect(sentRequest().reasoningEffort).toBe('xhigh')
-  })
-
-  it('drops the reasoning effort for a Grok model that rejects the parameter', async () => {
-    await executeProviderRequest('xai', {
-      model: 'grok-4.20-0309-reasoning',
-      workspaceId: 'ws-1',
-      reasoningEffort: 'high',
-    })
-
-    expect(sentRequest().reasoningEffort).toBeUndefined()
   })
 
   /**
@@ -2009,7 +1974,7 @@ describe('executeProviderRequest — model level normalization', () => {
    */
   it('forwards a level the model does not declare so the provider reports it', async () => {
     await executeProviderRequest('openai', {
-      model: 'gpt-5',
+      model: 'gpt-5-mini',
       workspaceId: 'ws-1',
       reasoningEffort: 'xhigh',
     })
@@ -2018,172 +1983,71 @@ describe('executeProviderRequest — model level normalization', () => {
   })
 
   it('still drops levels the resolved model does not support', async () => {
-    await executeProviderRequest('anthropic', {
-      model: 'claude-opus-4-6',
+    await executeProviderRequest('openai', {
+      model: 'gpt-4.1',
       workspaceId: 'ws-1',
       reasoningEffort: 'high',
       verbosity: 'high',
+      temperature: 0.7,
     })
 
+    expect(sentRequest()).toMatchObject({ model: 'gpt-4.1', temperature: 0.7 })
     expect(sentRequest().reasoningEffort).toBeUndefined()
     expect(sentRequest().verbosity).toBeUndefined()
   })
 
-  /**
-   * A model the catalogue has never seen is unknown, not known-incapable — which is exactly
-   * how a newly released model arrives through a reference before Sim catalogues it. The
-   * provider decides, rather than the level being discarded on a stale list.
-   */
-  it('forwards levels for a model absent from the catalogue', async () => {
+  it('runs a flagship id the catalogue has not listed on gpt-5.5 with its levels', async () => {
     await executeProviderRequest('openai', {
       model: 'gpt-6-unreleased',
       workspaceId: 'ws-1',
       reasoningEffort: 'high',
     })
 
-    expect(sentRequest().reasoningEffort).toBe('high')
+    expect(sentRequest()).toMatchObject({ model: 'gpt-5.5', reasoningEffort: 'high' })
   })
 
   it.each([
+    ['anthropic', 'claude-sonnet-4-6'],
     ['azure-openai', 'azure/MyDeployment'],
-    ['azure-anthropic', 'azure-anthropic/MyDeployment'],
-    ['bedrock', 'bedrock/custom-inference-profile'],
-    ['vertex', 'vertex/custom-gemini'],
-  ])('preserves tuning levels for a custom %s deployment', async (provider, model) => {
-    await executeProviderRequest(provider, {
-      model,
-      workspaceId: 'ws-1',
-      reasoningEffort: 'high',
-      verbosity: 'low',
-      thinkingLevel: 'high',
-      temperature: 0.7,
-    })
+    ['google', 'gemini-2.5-pro'],
+    ['openai', 'gpt-5-mini'],
+  ])(
+    'routes a legacy %s request for %s to OpenAI on the default model',
+    async (provider, model) => {
+      await executeProviderRequest(provider, {
+        model,
+        workspaceId: 'ws-1',
+        reasoningEffort: 'high',
+        verbosity: 'low',
+        thinkingLevel: 'high',
+        temperature: 0.7,
+      })
 
-    expect(sentRequest()).toMatchObject({
-      model,
-      reasoningEffort: 'high',
-      verbosity: 'low',
-      thinkingLevel: 'high',
-      temperature: 0.7,
-    })
-  })
-
-  it('still drops levels for a dynamic-provider model that does not take them', async () => {
-    await executeProviderRequest('ollama', {
-      model: 'ollama/llama3',
-      workspaceId: 'ws-1',
-      reasoningEffort: 'high',
-    })
-
-    expect(sentRequest().reasoningEffort).toBeUndefined()
-  })
+      expect(getProviderExecutor).toHaveBeenCalledWith('openai')
+      expect(mockGetApiKeyWithBYOK).toHaveBeenCalledWith('openai', model, 'ws-1', undefined)
+      expect(sentRequest()).toMatchObject({
+        model: 'gpt-5-mini',
+        reasoningEffort: 'high',
+        verbosity: 'low',
+      })
+      expect(sentRequest().temperature).toBeUndefined()
+      expect(sentRequest().thinkingLevel).toBeUndefined()
+    }
+  )
 })
 
 describe('native evaluation provider boundary', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    envFlagsMockFns.getCostMultiplier.mockReturnValue(2)
-    mockExecuteRequest.mockResolvedValue({
-      content: '{"passed":true}',
-      model: 'jev-1.13.0',
-      answers: { passed: true },
-      tokens: { input: 100, output: 10, total: 110 },
-    })
-    mockGetApiKeyWithBYOK.mockResolvedValue({ apiKey: 'resolved-typesafe-key', isBYOK: true })
   })
 
-  it.each([
-    ['typesafe', { model: 'jev-1.13.0', messages: [{ role: 'user', content: 'Chat' }] }],
-    ['openai', { model: 'gpt-4o', evaluation: { state: 'Test', questions: {} } }],
-  ] satisfies Array<[string, ProviderRequest]>)(
-    'rejects a mismatched %s request modality',
-    async (provider, request) => {
-      await expect(executeProviderRequest(provider, request)).rejects.toThrow(
-        'same evaluation or chat modality'
-      )
-      expect(mockExecuteRequest).not.toHaveBeenCalled()
-    }
-  )
-
-  it('resolves BYOK credentials and keeps evaluation answers without charging Sim credits', async () => {
-    const evaluation = {
-      state: 'Task complete',
-      questions: { passed: { type: 'noul', instructions: 'Passed?' } },
-    }
-    const result = await executeProviderRequest('typesafe', {
-      model: 'jev-1.13.0',
-      apiKey: 'test-key',
-      workspaceId: 'test-workspace',
-      evaluation,
-    })
-    expect(mockGetApiKeyWithBYOK).toHaveBeenCalledWith(
-      'typesafe',
-      'jev-1.13.0',
-      'test-workspace',
-      'test-key'
-    )
-    expect(mockExecuteRequest).toHaveBeenCalledWith(
-      expect.objectContaining({ apiKey: 'resolved-typesafe-key', evaluation })
-    )
-    expect(result).toMatchObject({
-      answers: { passed: true },
-      tokens: { total: 110 },
-      cost: { input: 0, output: 0, total: 0 },
-    })
-  })
-
-  it.each(['jev-latest', 'jev-1.13.0', 'jev-preview'])(
-    'bills hosted %s using the resolved model price and shared multiplier once',
-    async (model) => {
-      mockGetApiKeyWithBYOK.mockResolvedValue({ apiKey: 'hosted-typesafe-key', isBYOK: false })
-      const result = await executeProviderRequest('typesafe', {
-        model,
-        workspaceId: 'test-workspace',
-        evaluation: {
-          state: 'Task complete',
-          questions: { passed: { type: 'noul', instructions: 'Passed?' } },
-        },
+  it('rejects an evaluation request for a chat model', async () => {
+    await expect(
+      executeProviderRequest('openai', {
+        model: 'gpt-5-mini',
+        evaluation: { state: 'Test', questions: {} },
       })
-      expect(mockExecuteRequest).toHaveBeenCalledWith(
-        expect.objectContaining({ apiKey: 'hosted-typesafe-key', isBYOK: false })
-      )
-      expect(result).toMatchObject({
-        model: 'jev-1.13.0',
-        cost: { input: 0.0000084, output: 0, total: 0.0000084 },
-      })
-    }
-  )
-
-  it.each([false, true])('applies Jev streaming billing consistently, BYOK=%s', async (isBYOK) => {
-    mockGetApiKeyWithBYOK.mockResolvedValue({ apiKey: 'resolved-typesafe-key', isBYOK })
-    const streaming: StreamingExecution = {
-      stream: new ReadableStream(),
-      execution: {
-        success: true,
-        output: {
-          content: '{"passed":{"type":"noul","noul":0.9}}',
-          answers: { passed: { type: 'noul', noul: 0.9 } },
-          model: 'jev-1.13.0',
-          tokens: { input: 100, output: 10, total: 110 },
-          cost: { input: 0.0000042, output: 0, total: 0.0000042 },
-        },
-        logs: [],
-      },
-    }
-    mockExecuteRequest.mockResolvedValue(streaming)
-    await executeProviderRequest('typesafe', {
-      model: 'jev-latest',
-      workspaceId: 'test-workspace',
-      stream: true,
-      evaluation: {
-        state: 'Task complete',
-        questions: { passed: { type: 'noul', instructions: 'Passed?' } },
-      },
-    })
-    expect(streaming.execution.output.cost).toMatchObject({
-      input: isBYOK ? 0 : 0.0000084,
-      output: 0,
-      total: isBYOK ? 0 : 0.0000084,
-    })
+    ).rejects.toThrow('same evaluation or chat modality')
+    expect(mockExecuteRequest).not.toHaveBeenCalled()
   })
 })

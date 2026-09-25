@@ -78,16 +78,10 @@ import {
 import { SettingRow } from '@/ee/components/setting-row'
 import { useBlacklistedProviders } from '@/hooks/queries/allowed-providers'
 import { useOrganizationRoster } from '@/hooks/queries/organization'
-import { useProviderModels } from '@/hooks/queries/providers'
 import { useDebouncedSearchSetter } from '@/hooks/use-debounced-search-setter'
-import {
-  DYNAMIC_MODEL_PROVIDERS,
-  getProviderModels,
-  PROVIDER_DEFINITIONS,
-} from '@/providers/models'
+import { getProviderModels, PROVIDER_DEFINITIONS } from '@/providers/models'
 import type { ProviderId } from '@/providers/types'
 import { getAllProviderIds, getProviderFromModel } from '@/providers/utils'
-import type { ProviderName } from '@/stores/providers'
 import { getToolMetadata } from '@/tools/metadata'
 
 const logger = createLogger('AccessControlGroupDetail')
@@ -471,28 +465,6 @@ function CheckboxGrid({
   )
 }
 
-interface DynamicProviderModelsProps extends DenylistControls {
-  provider: ProviderName
-  workspaceId?: string
-}
-
-function DynamicProviderModels({ provider, workspaceId, ...controls }: DynamicProviderModelsProps) {
-  const { data, isPending } = useProviderModels(provider, workspaceId)
-  const items = useMemo(
-    () => (data?.models ?? []).map((model) => ({ id: model, label: model })),
-    [data?.models]
-  )
-  return (
-    <CheckboxGrid
-      items={items}
-      isLoading={isPending}
-      searchPlaceholder='Search models...'
-      emptyLabel='No models available for this provider.'
-      {...controls}
-    />
-  )
-}
-
 interface StaticProviderModelsProps extends DenylistControls {
   providerId: ProviderId
 }
@@ -518,7 +490,6 @@ interface ProviderRowProps extends DenylistControls {
   isProviderAllowed: boolean
   onToggleProvider: () => void
   deniedCount: number
-  workspaceId?: string
 }
 
 function ProviderRow({
@@ -526,7 +497,6 @@ function ProviderRow({
   isProviderAllowed,
   onToggleProvider,
   deniedCount,
-  workspaceId,
   ...controls
 }: ProviderRowProps) {
   const [expanded, setExpanded] = useState(false)
@@ -535,7 +505,6 @@ function ProviderRow({
   const providerName =
     PROVIDER_DEFINITIONS[providerId]?.name ||
     providerId.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
-  const isDynamic = (DYNAMIC_MODEL_PROVIDERS as readonly string[]).includes(providerId)
   const checkboxId = `provider-${providerId}`
 
   return (
@@ -576,15 +545,7 @@ function ProviderRow({
       </div>
       {expanded && isProviderAllowed && (
         <div className='border-[var(--border)] border-t px-2 pt-2 pb-3'>
-          {isDynamic ? (
-            <DynamicProviderModels
-              provider={providerId as ProviderName}
-              workspaceId={workspaceId}
-              {...controls}
-            />
-          ) : (
-            <StaticProviderModels providerId={providerId} {...controls} />
-          )}
+          <StaticProviderModels providerId={providerId} {...controls} />
         </div>
       )}
     </div>
@@ -710,7 +671,6 @@ interface GroupDetailProps {
 export function GroupDetail({
   group,
   organizationId,
-  workspaceId,
   workspaceOptions,
   organizationWorkspaces,
   workspacesLoading,
@@ -1652,7 +1612,6 @@ export function GroupDetail({
                     isProviderAllowed={isProviderAllowed(providerId)}
                     onToggleProvider={() => toggleProvider(providerId)}
                     deniedCount={deniedCountByProvider[providerId] ?? 0}
-                    workspaceId={workspaceId}
                     isAllowed={isModelAllowed}
                     onToggle={toggleModel}
                     onSetDenied={setModelsDenied}

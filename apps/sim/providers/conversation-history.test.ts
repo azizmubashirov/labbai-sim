@@ -2,7 +2,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/core/config/env', () => ({ env: {} }))
-vi.mock('@/lib/core/utils/urls', () => ({ getOllamaUrl: () => 'http://localhost:11434' }))
 vi.mock('@/providers/runtime-context', () => ({ getProviderRuntimeContext: vi.fn() }))
 vi.mock('@/providers/cost-policy', () => ({
   resolveModelCostPolicy: () => ({ billable: true, multiplier: 1 }),
@@ -33,27 +32,26 @@ describe('native history request binding', () => {
   }
 
   it('binds message-level system instructions as well as the system prompt', () => {
-    const initial = getConversationBinding('bedrock', request)
+    const initial = getConversationBinding('openai', request)
     expect(
-      getConversationBinding('bedrock', {
+      getConversationBinding('openai', {
         ...request,
         messages: [{ role: 'system', content: 'changed instructions' }],
       })
     ).not.toBe(initial)
-    expect(getConversationBinding('bedrock', { ...request, systemPrompt: 'changed' })).not.toBe(
+    expect(getConversationBinding('openai', { ...request, systemPrompt: 'changed' })).not.toBe(
       initial
     )
   })
 
-  it('binds accounts and endpoints without retaining credentials in the digest', () => {
-    const initial = getConversationBinding('azure-openai', request)
+  it('binds accounts without retaining credentials in the digest', () => {
+    const initial = getConversationBinding('openai', request)
     expect(initial).toMatch(/^[a-f0-9]{64}$/)
-    expect(
-      getConversationBinding('azure-openai', { ...request, apiKey: 'another-account' })
-    ).not.toBe(initial)
-    expect(
-      getConversationBinding('azure-openai', { ...request, azureEndpoint: 'https://other.example' })
-    ).not.toBe(initial)
+    expect(initial).not.toContain('private-test-account')
+    expect(getConversationBinding('openai', { ...request, apiKey: 'another-account' })).not.toBe(
+      initial
+    )
+    expect(getConversationBinding('openai', { ...request, model: 'model-b' })).not.toBe(initial)
   })
 
   it('binds JSON-shaped parameter projection metadata for pending tool replay', () => {

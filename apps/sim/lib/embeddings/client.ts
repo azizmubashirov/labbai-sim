@@ -2,15 +2,7 @@ import { createLogger } from '@sim/logger'
 import { sha256Hex } from '@sim/security/hash'
 import { chunkArray } from '@sim/utils/helpers'
 import { truncate } from '@sim/utils/string'
-import { getBYOKKey } from '@/lib/api-key/byok'
-import { getRotatingApiKey } from '@/lib/core/config/api-keys'
 import { env, envNumber } from '@/lib/core/config/env'
-import {
-  type FallbackFactories,
-  KNOWLEDGE_EMBEDDINGS_CAPABILITY,
-  wireFallback,
-} from '@/lib/core/config/env-capabilities'
-import { isHosted } from '@/lib/core/config/env-flags'
 import {
   ProviderQuotaExhaustedError,
   recordProviderCooldown,
@@ -23,20 +15,17 @@ import {
   readResponseJsonWithLimit,
   readResponseTextWithLimit,
 } from '@/lib/core/utils/stream-limits'
-import { getOllamaUrl } from '@/lib/core/utils/urls'
 import { EmbeddingAPIError } from '@/lib/embeddings/api-error'
 import {
   DEFAULT_EMBEDDING_MODEL,
   type EmbeddingModelInfo,
   getEmbeddingModelInfo,
   hasApproximateTokenCount,
-  ollamaEmbeddingModelName,
+  normalizeEmbeddingModelId,
   resolveDimensions,
 } from '@/lib/embeddings/catalog'
 import { getEmbeddingResponseDiagnostic } from '@/lib/embeddings/error-diagnostics'
 import { resolveProviderKey } from '@/lib/embeddings/keys'
-import { isOllamaServerConfigured } from '@/lib/embeddings/ollama-model-catalog.server'
-import { DEFAULT_OPENROUTER_EMBEDDING_MODEL } from '@/lib/embeddings/openrouter-models'
 import { getAdapterFactory } from '@/lib/embeddings/providers'
 import {
   createEmbeddingQuotaCircuitIdentity,
@@ -53,7 +42,6 @@ import type {
   EmbeddingTaskType,
   EmbedOptions,
   EmbedResult,
-  OpenRouterEmbedOptions,
 } from '@/lib/embeddings/types'
 import {
   attachRetryHeaders,
@@ -126,11 +114,10 @@ const BATCH_TOKEN_TARGET = 8192
 /**
  * Hard ceiling on one successful embedding response.
  *
- * Gemini's documented 100-item request cap at the catalog's largest 3,072
- * dimensions fits comfortably inside 16 MiB, including a conservative JSON
- * representation allowance. Larger OpenAI-style batches are split below from
- * their expected vector width, so the guard rejects malformed provider output
- * rather than valid catalog traffic.
+ * OpenAI batches are split below from their expected vector width so each
+ * response fits inside 16 MiB, including a conservative JSON representation
+ * allowance; the guard therefore rejects malformed provider output rather than
+ * valid catalog traffic.
  */
 export const MAX_EMBEDDING_SUCCESS_RESPONSE_BYTES = 16 * 1024 * 1024
 
@@ -335,7 +322,7 @@ interface ResolvedProvider {
   info: EmbeddingModelInfo
   providerId: EmbeddingProviderKind
   quotaCircuitIdentity: EmbeddingQuotaCircuitIdentity
-  /** Model name as sent to the provider (an Azure deployment name when Azure is active). */
+  /** Model name as sent to the provider. */
   modelName: string
   /** Dimensionality the request will produce, for reporting and billing. */
   dimensions: number
@@ -343,106 +330,17 @@ interface ResolvedProvider {
 }
 
 /**
- * Azure OpenAI takes over for OpenAI models when fully configured, but only
- * when the caller has not supplied its own key. A user-pasted OpenAI key must
- * always go to OpenAI.
+ * Labbai: one provider (OpenAI). A caller-supplied key (the Embeddings block's
+ * pasted key) wins, then the workspace's OpenAI BYOK key, then the platform
+ * `OPENAI_API_KEY`.
  */
-function resolveAzureOverride(info: EmbeddingModelInfo, model: string) {
-  if (info.provider !== 'openai') return null
-  const apiKey = env.AZURE_OPENAI_API_KEY
-  const endpoint = env.AZURE_OPENAI_ENDPOINT
-  const apiVersion = env.AZURE_OPENAI_API_VERSION
-  if (!apiKey || !endpoint || !apiVersion) return null
-  /**
-   * Azure deployment names default to the embedding model name when
-   * `KB_OPENAI_MODEL_NAME` is unset — this matches the pre-existing
-   * convention where deployments are named after the model they host.
-   */
-  return { apiKey, endpoint, apiVersion, deployment: env.KB_OPENAI_MODEL_NAME || model }
-}
-
 async function resolveProvider(
   model: string,
   options: Omit<EmbedOptions, 'projectInputs'>
 ): Promise<ResolvedProvider> {
   const info = getEmbeddingModelInfo(model)
   const dimensions = resolveDimensions(info, options.dimensions)
-
-  if (options.transport === 'openrouter') {
-    if (info.provider !== 'openai') {
-      throw new Error(`OpenRouter transport does not support catalog provider: ${info.provider}`)
-    }
-    if (!options.apiKey) {
-      throw new Error('OPENROUTER_API_KEY is not configured')
-    }
-    return {
-      adapter: getAdapterFactory('openrouter')({
-        modelName: model,
-        apiKey: options.apiKey,
-        nativeDimensions: info.nativeDimensions,
-      }),
-      info,
-      providerId: 'openrouter',
-      quotaCircuitIdentity: createEmbeddingQuotaCircuitIdentity('openrouter', options.apiKey),
-      modelName: model,
-      dimensions,
-      isBYOK: true,
-    }
-  }
-
-  /**
-   * Ollama runs on the deployment's own server and takes no credential, so it
-   * resolves before every key-bearing path and ignores a caller-supplied key
-   * rather than pretending one applies.
-   *
-   * A self-hosted deployment may leave `OLLAMA_URL` unset and be served by the
-   * loopback default, exactly as the chat provider is; only hosted Sim, which
-   * runs no Ollama, has to be pointed at one. Requiring the variable everywhere
-   * would have made this stricter than the selector that offers the models.
-   */
-  if (info.provider === 'ollama') {
-    if (!isOllamaServerConfigured()) {
-      throw new Error('OLLAMA_URL must be configured for Ollama embeddings')
-    }
-    const baseUrl = getOllamaUrl().replace(/\/+$/, '')
-    const modelName = ollamaEmbeddingModelName(model)
-    return {
-      adapter: getAdapterFactory('ollama')({
-        modelName,
-        baseUrl,
-        nativeDimensions: info.nativeDimensions,
-      }),
-      info,
-      providerId: 'ollama',
-      /** No credential exists, so the circuit is keyed by the server it protects. */
-      quotaCircuitIdentity: createEmbeddingQuotaCircuitIdentity('ollama', baseUrl),
-      modelName,
-      dimensions,
-      /** Local inference costs Sim nothing, so none of its tokens are billable. */
-      isBYOK: true,
-    }
-  }
-
-  if (!options.apiKey) {
-    const azure = resolveAzureOverride(info, model)
-    if (azure) {
-      return {
-        adapter: getAdapterFactory('azure-openai')({
-          modelName: azure.deployment,
-          apiKey: azure.apiKey,
-          nativeDimensions: info.nativeDimensions,
-          endpoint: azure.endpoint,
-          apiVersion: azure.apiVersion,
-        }),
-        info,
-        providerId: 'azure-openai',
-        quotaCircuitIdentity: createEmbeddingQuotaCircuitIdentity('azure-openai', azure.apiKey),
-        modelName: azure.deployment,
-        dimensions,
-        isBYOK: false,
-      }
-    }
-  }
+  const modelName = normalizeEmbeddingModelId(model)
 
   const { apiKey, isBYOK } = options.apiKey
     ? { apiKey: options.apiKey, isBYOK: true }
@@ -450,14 +348,14 @@ async function resolveProvider(
 
   return {
     adapter: getAdapterFactory(info.provider)({
-      modelName: model,
+      modelName,
       apiKey,
       nativeDimensions: info.nativeDimensions,
     }),
     info,
     providerId: info.provider,
     quotaCircuitIdentity: createEmbeddingQuotaCircuitIdentity(info.provider, apiKey),
-    modelName: model,
+    modelName,
     dimensions,
     isBYOK,
   }
@@ -597,9 +495,7 @@ async function callEmbeddingAPI(
             response.status,
             isBYOK
           )
-          error.quotaExhausted =
-            isQuotaExhaustionBody(classificationBody) ||
-            (providerId === 'openrouter' && response.status === 402)
+          error.quotaExhausted = isQuotaExhaustionBody(classificationBody)
 
           if (error.quotaExhausted) {
             await openEmbeddingQuotaCircuit(admissionIdentity)
@@ -938,8 +834,7 @@ function createEmbeddingBatches(
    * 2. A provider's documented summed-token cap, when it publishes one, is a
    *    hard ceiling the target can never exceed.
    * 3. The per-input ceiling is a floor. A budget below it would make
-   *    `batchByTokenLimit` truncate inputs the provider would have accepted —
-   *    Cohere takes 128k tokens in one text, far above the target.
+   *    `batchByTokenLimit` truncate inputs the provider would have accepted.
    */
   const requestBudget = Math.max(
     Math.min(limits.maxTokensPerRequest ?? BATCH_TOKEN_TARGET, BATCH_TOKEN_TARGET),
@@ -1016,6 +911,11 @@ export async function embed(texts: string[], options: EmbedOptions): Promise<Emb
   options.signal?.throwIfAborted()
   const model = options.model ?? DEFAULT_EMBEDDING_MODEL
   const taskType = options.taskType ?? 'document'
+  /** Refuse an oversized aggregate before key resolution or input projection. */
+  assertEmbeddingAggregateResponseWithinLimit(
+    texts.length,
+    resolveDimensions(getEmbeddingModelInfo(model), options.dimensions)
+  )
   const provider = await resolveProvider(model, options)
   const boundedInputs = prepareEmbeddingInputs(
     texts,
@@ -1035,337 +935,32 @@ export async function embed(texts: string[], options: EmbedOptions): Promise<Emb
   )
 }
 
-/** Generates embeddings for any model returned by OpenRouter's embedding catalog. */
-export async function embedOpenRouter(
-  texts: string[],
-  options: OpenRouterEmbedOptions
-): Promise<EmbedResult> {
-  if (texts.length === 0) throw new Error('At least one embedding input is required')
-  if (!options.apiKey) throw new Error('OpenRouter API key is required')
-  if (!Number.isInteger(options.maxInputTokens) || options.maxInputTokens <= 0) {
-    throw new Error('OpenRouter max input tokens must be a positive integer')
-  }
-
-  const model = options.model ?? DEFAULT_OPENROUTER_EMBEDDING_MODEL
-  const limits: EmbeddingInputLimits = {
-    maxInputTokens: options.maxInputTokens,
-    tokenizerProvider: 'openrouter',
-    approximateTokenCount: true,
-  }
-  const boundedInputs = prepareEmbeddingInputs(texts, model, limits, options.projectInputs)
-  const adapter = getAdapterFactory('openrouter')({
-    modelName: model,
-    apiKey: options.apiKey,
-    nativeDimensions: options.dimensions ?? 0,
-  })
-  const quotaCircuitIdentity = createEmbeddingQuotaCircuitIdentity('openrouter', options.apiKey)
-  const callOpenRouterBatch = (
-    batch: string[],
-    expectedDimensions: number | undefined
-  ): Promise<{ embeddings: number[][]; totalTokens: number; dimensions: number }> =>
-    callEmbeddingAPI(
-      batch,
-      adapter,
-      limits.tokenizerProvider,
-      'document',
-      'openrouter',
-      model,
-      quotaCircuitIdentity,
-      options.dimensions,
-      expectedDimensions,
-      true,
-      options.signal
-    )
-
-  let batchResults: { embeddings: number[][]; totalTokens: number; dimensions: number }[]
-  if (options.dimensions === undefined) {
-    const firstInput = boundedInputs[0]
-    if (firstInput === undefined) {
-      throw new EmbeddingResponseValidationError('the response did not contain any vectors')
-    }
-    options.signal?.throwIfAborted()
-    const firstResult = await callOpenRouterBatch([firstInput], undefined)
-    assertEmbeddingAggregateResponseWithinLimit(boundedInputs.length, firstResult.dimensions)
-    const batches = createEmbeddingBatches(
-      boundedInputs.slice(1),
-      model,
-      limits,
-      adapter.maxItemsPerRequest,
-      firstResult.dimensions
-    )
-    const remainingResults = await mapWithConcurrency(batches, MAX_CONCURRENT_BATCHES, (batch) => {
-      options.signal?.throwIfAborted()
-      return callOpenRouterBatch(batch, firstResult.dimensions)
-    })
-    batchResults = [firstResult, ...remainingResults]
-  } else {
-    assertEmbeddingAggregateResponseWithinLimit(boundedInputs.length, options.dimensions)
-    const batches = createEmbeddingBatches(
-      boundedInputs,
-      model,
-      limits,
-      adapter.maxItemsPerRequest,
-      options.dimensions
-    )
-    batchResults = await mapWithConcurrency(batches, MAX_CONCURRENT_BATCHES, (batch) => {
-      options.signal?.throwIfAborted()
-      return callOpenRouterBatch(batch, options.dimensions)
-    })
-  }
-  const result = combineEmbeddingBatches(batchResults)
-
-  const dimensions = result.dimensions
-  if (dimensions === undefined) {
-    throw new EmbeddingResponseValidationError('the response did not contain any vectors')
-  }
-
-  return {
-    embeddings: result.embeddings,
-    totalTokens: result.totalTokens,
-    billableTokens: 0,
-    isBYOK: true,
-    modelName: model,
-    pricingId: model,
-    dimensions,
-  }
-}
-
-type KnowledgeEmbedOptions = Omit<EmbedOptions, 'apiKey' | 'transport'>
+type KnowledgeEmbedOptions = Omit<EmbedOptions, 'apiKey'>
 type KnowledgeProviderOptions = Omit<KnowledgeEmbedOptions, 'projectInputs'>
 
-function resolveEnvironmentOpenAIKey(): string {
-  if (env.OPENAI_API_KEY) return env.OPENAI_API_KEY
-  return getRotatingApiKey('openai')
-}
-
-async function resolveKnowledgeFallback(options: KnowledgeProviderOptions, hosted: boolean) {
-  const model = options.model ?? DEFAULT_EMBEDDING_MODEL
-  const info = getEmbeddingModelInfo(model)
-  if (hosted || !env.OPENROUTER_API_KEY || info.provider !== 'openai') return null
-  const dimensions = resolveDimensions(info, options.dimensions)
-  const workspaceKey = options.workspaceId ? await getBYOKKey(options.workspaceId, 'openai') : null
-  const capabilityValues = {
-    ...env,
-    /**
-     * The capability gates its providers on the model and width
-     * `KB_EMBEDDING_MODEL` and `EMBEDDING_OUTPUT_DIMS` name, but what matters
-     * here is the target this call actually embeds with: a knowledge base keeps
-     * the model and width it was created with, so one created before the
-     * deployment default changed must still resolve its own family's transports.
-     * Both are substituted — the model alone would leave the deployment's width
-     * being validated against this base's family, which rejects the chain
-     * outright for a base whose family accepts a width the deployment's does not.
-     */
-    KB_EMBEDDING_MODEL: model,
-    EMBEDDING_OUTPUT_DIMS: String(dimensions),
-    ...(workspaceKey ? { OPENAI_API_KEY: workspaceKey.apiKey } : {}),
-  }
-
-  const factories = {
-    'azure-openai': () => {
-      const azure = resolveAzureOverride(info, model)
-      if (!azure) return null
-      return {
-        adapter: getAdapterFactory('azure-openai')({
-          modelName: azure.deployment,
-          apiKey: azure.apiKey,
-          nativeDimensions: info.nativeDimensions,
-          endpoint: azure.endpoint,
-          apiVersion: azure.apiVersion,
-        }),
-        info,
-        providerId: 'azure-openai',
-        quotaCircuitIdentity: createEmbeddingQuotaCircuitIdentity('azure-openai', azure.apiKey),
-        modelName: azure.deployment,
-        dimensions,
-        isBYOK: false,
-      }
-    },
-    openai: () => {
-      const apiKey = workspaceKey?.apiKey ?? resolveEnvironmentOpenAIKey()
-      return {
-        adapter: getAdapterFactory('openai')({
-          modelName: model,
-          apiKey,
-          nativeDimensions: info.nativeDimensions,
-        }),
-        info,
-        providerId: 'openai',
-        quotaCircuitIdentity: createEmbeddingQuotaCircuitIdentity('openai', apiKey),
-        modelName: model,
-        dimensions,
-        isBYOK: Boolean(workspaceKey),
-      }
-    },
-    openrouter: () => {
-      if (!env.OPENROUTER_API_KEY) return null
-      return {
-        adapter: getAdapterFactory('openrouter')({
-          modelName: model,
-          apiKey: env.OPENROUTER_API_KEY,
-          nativeDimensions: info.nativeDimensions,
-        }),
-        info,
-        providerId: 'openrouter',
-        quotaCircuitIdentity: createEmbeddingQuotaCircuitIdentity(
-          'openrouter',
-          env.OPENROUTER_API_KEY
-        ),
-        modelName: model,
-        dimensions,
-        isBYOK: false,
-      }
-    },
-    /**
-     * Gemini and Ollama are declared on the capability because they serve
-     * knowledge embeddings, but never through this chain: it is built only for
-     * OpenAI models (the guard above returns for everything else), and the
-     * capability's own family gating marks them inactive here for the same
-     * reason. `wireFallback` throws if a provider it resolved as ready returns
-     * null, so this stays a loud failure rather than a silent wrong provider if
-     * either assumption ever stops holding.
-     */
-    gemini: () => null,
-    ollama: () => null,
-  } satisfies FallbackFactories<typeof KNOWLEDGE_EMBEDDINGS_CAPABILITY, ResolvedProvider>
-
-  return wireFallback<typeof KNOWLEDGE_EMBEDDINGS_CAPABILITY, ResolvedProvider>({
-    definition: KNOWLEDGE_EMBEDDINGS_CAPABILITY,
-    values: capabilityValues,
-    factories,
-    shouldFallback: (error) => !options.signal?.aborted && isTransientEmbeddingError(error),
-    onFailure(providerId, error) {
-      logger.warn(
-        'Knowledge embedding provider failed; continuing fallback chain',
-        isEmbeddingQuotaExhaustion(error)
-          ? { providerId, quotaExhausted: true }
-          : { providerId, error }
-      )
-    },
-  })
-}
-
-/** @internal Exported for deterministic hosted/self-hosted routing tests. */
-export async function assertKnowledgeEmbeddingCapacityForDeployment(
-  options: KnowledgeProviderOptions,
-  hosted: boolean
-): Promise<void> {
-  options.signal?.throwIfAborted()
-  const fallback = await resolveKnowledgeFallback(options, hosted)
-  const providers = fallback?.providers ?? [
-    await resolveProvider(options.model ?? DEFAULT_EMBEDDING_MODEL, options),
-  ]
-  const errors: EmbeddingQuotaExhaustedError[] = []
-  for (const provider of providers) {
-    options.signal?.throwIfAborted()
-    const exhausted = await isEmbeddingQuotaCircuitOpen(embeddingAdmissionIdentity(provider))
-    options.signal?.throwIfAborted()
-    if (!exhausted) return
-    errors.push(new EmbeddingQuotaExhaustedError(provider.providerId))
-  }
-  if (errors.length === 1) throw errors[0]
-  throw new AggregateError(
-    errors,
-    'Every configured knowledge embedding provider has exhausted quota'
-  )
-}
-
-/** Avoids downloading, parsing, and OCR when every usable provider is already paused for quota. */
+/**
+ * Avoids downloading, parsing, and OCR when the OpenAI embedding credential is
+ * already paused for quota.
+ */
 export async function assertKnowledgeEmbeddingCapacity(
   options: KnowledgeProviderOptions
 ): Promise<void> {
-  return assertKnowledgeEmbeddingCapacityForDeployment(options, isHosted)
-}
-
-/** @internal Exported for deterministic hosted/self-hosted routing tests. */
-export async function embedKnowledgeForDeployment(
-  texts: string[],
-  options: KnowledgeEmbedOptions,
-  hosted: boolean
-): Promise<EmbedResult> {
   options.signal?.throwIfAborted()
-  const fallback = await resolveKnowledgeFallback(options, hosted)
-  if (!fallback) return embed(texts, options)
-  const model = options.model ?? DEFAULT_EMBEDDING_MODEL
-  const info = getEmbeddingModelInfo(model)
-  const dimensions = resolveDimensions(info, options.dimensions)
-  assertEmbeddingAggregateResponseWithinLimit(texts.length, dimensions)
-  const taskType = options.taskType ?? 'document'
-  const boundedInputs = prepareEmbeddingInputs(
-    texts,
-    model,
-    getEmbeddingInputLimits(info),
-    options.projectInputs,
-    options.inputOverflow
-  )
-
-  const itemLimits = fallback.providers.flatMap((provider) =>
-    provider.adapter.maxItemsPerRequest ? [provider.adapter.maxItemsPerRequest] : []
-  )
-  const batches = createEmbeddingBatches(
-    boundedInputs,
-    model,
-    info,
-    itemLimits.length > 0 ? Math.min(...itemLimits) : undefined,
-    dimensions
-  )
-  const inputHash = options.checkpoints ? sha256Hex(JSON.stringify(boundedInputs)) : ''
-  const batchResults = await mapEmbeddingBatches(batches, async (batch, i) => {
-    try {
-      options.signal?.throwIfAborted()
-      return await fallback.execute(async (provider) => ({
-        ...(await callCheckpointedEmbeddingBatch(
-          batch,
-          i,
-          inputHash,
-          taskType,
-          options.dimensions,
-          provider,
-          options.signal,
-          options.checkpoints
-        )),
-        provider,
-      }))
-    } catch (error) {
-      const message = `Failed to generate embeddings for batch ${i + 1}/${batches.length}:`
-      if (isEmbeddingQuotaExhaustion(error)) {
-        logger.warn(message, { quotaExhausted: true })
-      } else if (isBYOKEmbeddingCredentialRejection(error)) {
-        logger.warn(message, {
-          outcome: 'customer_configuration',
-          status: error.status,
-        })
-      } else {
-        logger.error(message, error)
-      }
-      throw error
-    }
-  })
-  const { embeddings, totalTokens } = combineEmbeddingBatches(batchResults)
-  const defaultProvider = fallback.providers[0]
-  const usedProviders = batchResults.map((batch) => batch.provider)
-  const metadataProvider = usedProviders[0] ?? defaultProvider
-  const modelNames = new Set(usedProviders.map((provider) => provider.modelName))
-  const billableTokens = batchResults.reduce(
-    (sum, batch) => sum + (batch.provider.isBYOK ? 0 : batch.totalTokens),
-    0
-  )
-
-  return {
-    embeddings,
-    totalTokens,
-    billableTokens,
-    isBYOK: usedProviders.length > 0 ? billableTokens === 0 : metadataProvider.isBYOK,
-    modelName: modelNames.size > 1 ? model : metadataProvider.modelName,
-    pricingId: info.pricingId,
-    dimensions,
-  }
+  const provider = await resolveProvider(options.model ?? DEFAULT_EMBEDDING_MODEL, options)
+  options.signal?.throwIfAborted()
+  const exhausted = await isEmbeddingQuotaCircuitOpen(embeddingAdmissionIdentity(provider))
+  options.signal?.throwIfAborted()
+  if (exhausted) throw new EmbeddingQuotaExhaustedError(provider.providerId)
 }
 
-/** Generates KB document/query embeddings with opt-in self-hosted OpenRouter fallback. */
+/**
+ * Generates KB document/query embeddings. Labbai has a single embedding provider
+ * (OpenAI), so there is no fallback chain: this is {@link embed} with the key
+ * resolved from the workspace BYOK key or the platform `OPENAI_API_KEY`.
+ */
 export async function embedKnowledge(
   texts: string[],
   options: KnowledgeEmbedOptions
 ): Promise<EmbedResult> {
-  return embedKnowledgeForDeployment(texts, options, isHosted)
+  return embed(texts, options)
 }

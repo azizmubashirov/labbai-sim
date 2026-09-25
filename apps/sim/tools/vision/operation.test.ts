@@ -58,7 +58,7 @@ describe('Vision operation declarations', () => {
     expect(input).toEqual({
       apiKey: 'secret',
       imageFile: expect.objectContaining({ key: 'workspace/workspace-1/image.png' }),
-      model: 'gpt-5.2',
+      model: 'gpt-5-mini',
       prompt: null,
     })
     expect(input).not.toHaveProperty('imageUrl')

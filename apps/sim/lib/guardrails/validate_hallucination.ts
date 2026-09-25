@@ -1,13 +1,9 @@
-import { db } from '@sim/db'
-import { account } from '@sim/db/schema'
 import { createLogger } from '@sim/logger'
 import { getErrorMessage } from '@sim/utils/errors'
 import { isPlainRecord } from '@sim/utils/object'
-import { eq } from 'drizzle-orm'
 import type { BillingAttributionSnapshot } from '@/lib/billing/core/billing-attribution'
 import { searchKnowledgeAsExecutor } from '@/lib/internal/knowledge/search'
 import type { InternalToolOperationContext } from '@/lib/internal/tool-operations/types'
-import { refreshTokenIfNeeded } from '@/lib/oauth/credential-service'
 import { projectResolvedSecretModelContent } from '@/executor/utils/resolved-secret-content-projection'
 import { refuseResolvedSecretProjection } from '@/executor/utils/resolved-secret-projection-refusal'
 import type { ResolvedSecretTraceRegistry } from '@/executor/utils/resolved-secret-trace-registry'
@@ -34,16 +30,6 @@ export interface HallucinationValidationInput {
   topK: number // Number of chunks to retrieve, default 10
   model: string
   apiKey?: string
-  providerCredentials?: {
-    azureEndpoint?: string
-    azureApiVersion?: string
-    vertexProject?: string
-    vertexLocation?: string
-    vertexCredential?: string
-    bedrockAccessKeyId?: string
-    bedrockSecretKey?: string
-    bedrockRegion?: string
-  }
   workflowId?: string
   workspaceId?: string
   actorUserId: string
@@ -119,7 +105,6 @@ async function scoreHallucinationWithLLM(
   ragContext: string[],
   model: string,
   apiKey: string | undefined,
-  providerCredentials: HallucinationValidationInput['providerCredentials'],
   workspaceId: string | undefined,
   requestId: string,
   resolvedSecretTraceRegistry: ResolvedSecretTraceRegistry,
@@ -160,23 +145,6 @@ Evaluate the consistency and provide your score and reasoning in JSON format.`
 
     const providerId = getProviderFromModel(model)
 
-    let finalApiKey: string | undefined = apiKey
-    if (providerId === 'vertex' && providerCredentials?.vertexCredential) {
-      const credential = await db.query.account.findFirst({
-        where: eq(account.id, providerCredentials.vertexCredential),
-      })
-      if (credential) {
-        const { accessToken } = await refreshTokenIfNeeded(
-          requestId,
-          credential,
-          providerCredentials.vertexCredential
-        )
-        if (accessToken) {
-          finalApiKey = accessToken
-        }
-      }
-    }
-
     const response = await executeProviderRequest(
       providerId,
       {
@@ -189,14 +157,7 @@ Evaluate the consistency and provide your score and reasoning in JSON format.`
           },
         ],
         temperature: 0.1, // Low temperature for consistent scoring
-        apiKey: finalApiKey,
-        azureEndpoint: providerCredentials?.azureEndpoint,
-        azureApiVersion: providerCredentials?.azureApiVersion,
-        vertexProject: providerCredentials?.vertexProject,
-        vertexLocation: providerCredentials?.vertexLocation,
-        bedrockAccessKeyId: providerCredentials?.bedrockAccessKeyId,
-        bedrockSecretKey: providerCredentials?.bedrockSecretKey,
-        bedrockRegion: providerCredentials?.bedrockRegion,
+        apiKey,
         workspaceId,
         abortSignal,
       },
@@ -263,7 +224,6 @@ export async function validateHallucination(
     topK,
     model,
     apiKey,
-    providerCredentials,
     workflowId,
     workspaceId,
     actorUserId,
@@ -345,7 +305,6 @@ export async function validateHallucination(
       contextProjection.value,
       model,
       apiKey,
-      providerCredentials,
       workspaceId,
       requestId,
       providerRegistry,

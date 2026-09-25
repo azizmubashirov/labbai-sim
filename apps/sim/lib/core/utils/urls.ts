@@ -177,7 +177,6 @@ export function getEmailDomain(): string {
 }
 
 const DEFAULT_SOCKET_URL = 'http://localhost:3002'
-const DEFAULT_OLLAMA_URL = 'http://localhost:11434'
 /**
  * Parses a comma-separated list of origins (e.g. from a `TRUSTED_ORIGINS` env
  * var) into a deduped array of normalized origins. Invalid entries are dropped.
@@ -279,19 +278,3 @@ export function getSocketUrl(): string {
   return DEFAULT_SOCKET_URL
 }
 
-/**
- * Returns the Ollama server URL.
- * Reads from OLLAMA_URL with a localhost fallback for development.
- */
-export function getOllamaUrl(): string {
-  return env.OLLAMA_URL || DEFAULT_OLLAMA_URL
-}
-
-/**
- * Whether OLLAMA_URL names a server, as opposed to {@link getOllamaUrl} falling
- * back to the loopback default. Callers use this to tell "someone pointed us at
- * an Ollama" apart from "nobody configured one".
- */
-export function isOllamaUrlConfigured(): boolean {
-  return Boolean(env.OLLAMA_URL)
-}

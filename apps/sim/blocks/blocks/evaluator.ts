@@ -8,6 +8,7 @@ import {
   getSerializedModelProviderId,
   PROVIDER_CREDENTIAL_INPUTS,
 } from '@/blocks/utils'
+import { OPENAI_DEFAULT_MODEL } from '@/providers/openai/model-ids'
 import type { ToolResponse } from '@/tools/types'
 
 const logger = createLogger('EvaluatorBlock')
@@ -186,7 +187,7 @@ export const EvaluatorBlock: BlockConfig<EvaluatorResponse> = {
       type: 'combobox',
       placeholder: 'Type or select a model...',
       required: true,
-      defaultValue: 'claude-sonnet-5',
+      defaultValue: OPENAI_DEFAULT_MODEL,
       options: getModelOptions,
     },
     ...getProviderCredentialSubBlocks(),
@@ -247,11 +248,6 @@ export const EvaluatorBlock: BlockConfig<EvaluatorResponse> = {
   tools: {
     access: [
       'openai_chat',
-      'anthropic_chat',
-      'google_chat',
-      'xai_chat',
-      'deepseek_chat',
-      'deepseek_reasoner',
     ],
     config: {
       tool: (params: Record<string, any>) => getSerializedModelProviderId(params.model),

@@ -9,14 +9,11 @@ import type {
   VerificationRecord,
 } from '@/local-copilot/lib/verification/types'
 
-export type LocalCopilotProviderId =
-  | 'openai'
-  | 'anthropic'
-  | 'azure-openai'
-  | 'bedrock'
-  | 'gemini'
-  | 'vertex'
-  | 'openai-compatible'
+/**
+ * Local Copilot LLM transports. `openai` (default) is the OpenAI API; the others
+ * are OpenAI-compatible overrides (Azure OpenAI, or any `COPILOT_BASE_URL`).
+ */
+export type LocalCopilotProviderId = 'openai' | 'azure-openai' | 'openai-compatible'
 
 export interface LocalCopilotConfig {
   enabled: boolean
@@ -24,20 +21,20 @@ export interface LocalCopilotConfig {
   /** Main agent model (parent tool loop). */
   model: string
   /**
-   * Model for specialist / parallel-subagent passes. Defaults to a cheaper
-   * Anthropic Haiku when provider is anthropic; otherwise matches {@link model}.
+   * Model for specialist / parallel-subagent passes. Defaults to
+   * `gpt-5-mini` on OpenAI; otherwise matches {@link model}.
    */
   specialistModel: string
   /**
-   * Thinking level for Gemini / Vertex Local Copilot LLM calls (`low` /
-   * `medium` / `high`, plus `minimal` on some Flash SKUs). Lower = faster /
-   * cheaper. Unset for other providers.
+   * `COPILOT_THINKING_LEVEL`, sent as `reasoning_effort` to OpenAI reasoning
+   * models (gpt-5*, o-series). Unset = provider default.
    */
   thinkingLevel?: string
+  /** Credential, sent as `Authorization: Bearer <key>`. */
   apiKey?: string
   baseUrl?: string
-  /** AWS region for Bedrock (defaults to `AWS_REGION` / `us-east-1`). */
-  region?: string
+  /** Extra request headers merged into every LLM call (`OPENAI_EXTRA_HEADERS`). */
+  extraHeaders?: Record<string, string>
 }
 
 export interface LocalCopilotWorkspaceContext {

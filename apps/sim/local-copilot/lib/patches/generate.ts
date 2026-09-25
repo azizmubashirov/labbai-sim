@@ -80,17 +80,6 @@ export async function generateWorkflowPatchFromRequest(
     }
   }
 
-  if (request.includes('anthropic') && request.includes('openai') && context.workflow) {
-    const openAiBlock = Object.values(context.workflow.blocks).find((b) => b.type === 'openai')
-    if (openAiBlock) {
-      changes.push({
-        operation: 'update_block',
-        blockId: openAiBlock.id,
-        updates: { type: 'anthropic', name: openAiBlock.name.replace(/openai/i, 'Anthropic') },
-      })
-    }
-  }
-
   if (request.includes('postgres') || request.includes('store')) {
     const anchorId = targetBlockId ?? findLastNonTriggerBlock(context)
     const pgBlockId = generateId()

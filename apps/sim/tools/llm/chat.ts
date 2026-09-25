@@ -12,14 +12,6 @@ interface LLMChatParams {
   apiKey?: string
   temperature?: number
   maxTokens?: number
-  azureEndpoint?: string
-  azureApiVersion?: string
-  vertexProject?: string
-  vertexLocation?: string
-  vertexCredential?: string
-  bedrockAccessKeyId?: string
-  bedrockSecretKey?: string
-  bedrockRegion?: string
   _context?: {
     workspaceId?: string
     workflowId?: string
@@ -42,14 +34,14 @@ interface LLMChatResponse extends ToolResponse {
 export const llmChatTool: InternalToolConfig<LLMChatParams, LLMChatResponse> = {
   id: 'llm_chat',
   name: 'LLM Chat',
-  description: 'Send a chat completion request to any supported LLM provider',
+  description: 'Send a chat completion request to an OpenAI model',
   version: '1.0.0',
 
   params: {
     model: {
       type: 'string',
       required: true,
-      description: 'The model to use (e.g., gpt-4o, claude-sonnet-4-5, gemini-2.0-flash)',
+      description: 'The OpenAI model to use (e.g., gpt-5-mini, gpt-5.5, gpt-4.1-mini)',
     },
     systemPrompt: {
       type: 'string',
@@ -77,54 +69,6 @@ export const llmChatTool: InternalToolConfig<LLMChatParams, LLMChatResponse> = {
       required: false,
       description: 'Maximum tokens in the response',
     },
-    azureEndpoint: {
-      type: 'string',
-      required: false,
-      visibility: 'hidden',
-      description: 'Azure OpenAI endpoint URL',
-    },
-    azureApiVersion: {
-      type: 'string',
-      required: false,
-      visibility: 'hidden',
-      description: 'Azure OpenAI API version',
-    },
-    vertexProject: {
-      type: 'string',
-      required: false,
-      visibility: 'hidden',
-      description: 'Google Cloud project ID for Vertex AI',
-    },
-    vertexLocation: {
-      type: 'string',
-      required: false,
-      visibility: 'hidden',
-      description: 'Google Cloud location for Vertex AI (defaults to us-central1)',
-    },
-    vertexCredential: {
-      type: 'string',
-      required: false,
-      visibility: 'hidden',
-      description: 'Google Cloud OAuth credential ID for Vertex AI',
-    },
-    bedrockAccessKeyId: {
-      type: 'string',
-      required: false,
-      visibility: 'hidden',
-      description: 'AWS Access Key ID for Bedrock',
-    },
-    bedrockSecretKey: {
-      type: 'string',
-      required: false,
-      visibility: 'hidden',
-      description: 'AWS Secret Access Key for Bedrock',
-    },
-    bedrockRegion: {
-      type: 'string',
-      required: false,
-      visibility: 'hidden',
-      description: 'AWS region for Bedrock (defaults to us-east-1)',
-    },
   },
 
   operation: {
@@ -147,14 +91,6 @@ export const llmChatTool: InternalToolConfig<LLMChatParams, LLMChatResponse> = {
         apiKey: params.apiKey,
         temperature: params.temperature,
         maxTokens: params.maxTokens,
-        azureEndpoint: params.azureEndpoint,
-        azureApiVersion: params.azureApiVersion,
-        vertexProject: params.vertexProject,
-        vertexLocation: params.vertexLocation,
-        vertexCredential: params.vertexCredential,
-        bedrockAccessKeyId: params.bedrockAccessKeyId,
-        bedrockSecretKey: params.bedrockSecretKey,
-        bedrockRegion: params.bedrockRegion,
       }
     },
   },

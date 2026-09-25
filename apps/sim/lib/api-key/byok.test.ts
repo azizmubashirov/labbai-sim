@@ -4,10 +4,13 @@
 import { dbChainMockFns, hasMockCondition, resetDbChainMock, schemaMock } from '@sim/testing'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { mockDecryptSecret, mockIsOrganizationBYOKEntitled } = vi.hoisted(() => ({
-  mockDecryptSecret: vi.fn(),
-  mockIsOrganizationBYOKEntitled: vi.fn(),
-}))
+const { mockDecryptSecret, mockIsOrganizationBYOKEntitled, mockGetRotatingApiKey } = vi.hoisted(
+  () => ({
+    mockDecryptSecret: vi.fn(),
+    mockIsOrganizationBYOKEntitled: vi.fn(),
+    mockGetRotatingApiKey: vi.fn(),
+  })
+)
 
 vi.mock('@/lib/core/security/encryption', () => ({
   decryptSecret: mockDecryptSecret,
@@ -21,47 +24,7 @@ vi.mock('@/lib/core/config/api-keys', () => ({
   getRotatingApiKey: mockGetRotatingApiKey,
 }))
 
-const { mockEnv, mockGetRotatingApiKey, mockGetHostedModels, mockIsHosted } = vi.hoisted(() => ({
-  mockEnv: {} as Record<string, string | undefined>,
-  mockGetRotatingApiKey: vi.fn(),
-  mockGetHostedModels: vi.fn(() => [] as string[]),
-  mockIsHosted: { value: true },
-}))
-
-vi.mock('@/lib/core/config/env', () => ({
-  env: mockEnv,
-}))
-
-vi.mock('@/lib/core/config/env-flags', () => ({
-  get isHosted() {
-    return mockIsHosted.value
-  },
-}))
-
-vi.mock('@/providers/models', () => ({
-  getProviderFileAttachment: vi
-    .fn()
-    .mockReturnValue({ maxBytes: 10 * 1024 * 1024, strategy: 'inline' }),
-  INLINE_ATTACHMENT_MAX_BYTES: 10 * 1024 * 1024,
-  getHostedModels: mockGetHostedModels,
-}))
-
-vi.mock('@/providers/utils', () => ({
-  isFunctionToolCall: (toolCall: unknown) =>
-    typeof toolCall === 'object' &&
-    toolCall !== null &&
-    'function' in toolCall &&
-    (toolCall as { function?: unknown }).function != null,
-  PROVIDER_PLACEHOLDER_KEY: 'placeholder',
-}))
-
-vi.mock('@/stores/providers/store', () => ({
-  useProvidersStore: { getState: vi.fn() },
-}))
-
-import { byokProviderIdSchema } from '@/lib/api/contracts/byok-keys'
 import { getApiKeyWithBYOK, getBYOKKey } from '@/lib/api-key/byok'
-import { useProvidersStore } from '@/stores/providers/store'
 
 /**
  * Rotation counters persist for the process lifetime, so each test uses
@@ -90,12 +53,12 @@ describe('getBYOKKey', () => {
   })
 
   it('returns null when no workspaceId is provided', async () => {
-    expect(await getBYOKKey(undefined, 'openai')).toBeNull()
-    expect(await getBYOKKey(null, 'openai')).toBeNull()
+    expect(await getBYOKKey(undefined, 'firecrawl')).toBeNull()
+    expect(await getBYOKKey(null, 'firecrawl')).toBeNull()
   })
 
   it('returns null when neither the workspace nor its organization has provider keys', async () => {
-    expect(await getBYOKKey(uniqueWorkspaceId(), 'openai')).toBeNull()
+    expect(await getBYOKKey(uniqueWorkspaceId(), 'firecrawl')).toBeNull()
     expect(dbChainMockFns.orderBy).toHaveBeenCalledTimes(2)
     expect(mockIsOrganizationBYOKEntitled).not.toHaveBeenCalled()
   })
@@ -105,7 +68,7 @@ describe('getBYOKKey', () => {
     dbChainMockFns.orderBy.mockResolvedValue([storedKey('key-1')])
 
     for (let call = 0; call < 3; call++) {
-      expect(await getBYOKKey(workspaceId, 'openai')).toEqual({
+      expect(await getBYOKKey(workspaceId, 'firecrawl')).toEqual({
         apiKey: 'decrypted-key-1',
         isBYOK: true,
         scope: 'workspace',
@@ -123,7 +86,7 @@ describe('getBYOKKey', () => {
 
     const apiKeys = []
     for (let call = 0; call < 4; call++) {
-      const result = await getBYOKKey(workspaceId, 'openai')
+      const result = await getBYOKKey(workspaceId, 'firecrawl')
       apiKeys.push(result?.apiKey)
     }
 
@@ -139,9 +102,9 @@ describe('getBYOKKey', () => {
     const workspaceId = uniqueWorkspaceId()
     dbChainMockFns.orderBy.mockResolvedValue([storedKey('key-1')])
 
-    await getBYOKKey(workspaceId, 'openai')
-    await getBYOKKey(workspaceId, 'openai')
-    await getBYOKKey(workspaceId, 'openai')
+    await getBYOKKey(workspaceId, 'firecrawl')
+    await getBYOKKey(workspaceId, 'firecrawl')
+    await getBYOKKey(workspaceId, 'firecrawl')
 
     expect(dbChainMockFns.orderBy).toHaveBeenCalledTimes(3)
   })
@@ -150,9 +113,9 @@ describe('getBYOKKey', () => {
     const workspaceId = uniqueWorkspaceId()
     dbChainMockFns.orderBy.mockResolvedValue([storedKey('key-1'), storedKey('key-2')])
 
-    expect((await getBYOKKey(workspaceId, 'openai'))?.apiKey).toBe('decrypted-key-1')
-    expect((await getBYOKKey(workspaceId, 'anthropic'))?.apiKey).toBe('decrypted-key-1')
-    expect((await getBYOKKey(workspaceId, 'openai'))?.apiKey).toBe('decrypted-key-2')
+    expect((await getBYOKKey(workspaceId, 'firecrawl'))?.apiKey).toBe('decrypted-key-1')
+    expect((await getBYOKKey(workspaceId, 'exa'))?.apiKey).toBe('decrypted-key-1')
+    expect((await getBYOKKey(workspaceId, 'firecrawl'))?.apiKey).toBe('decrypted-key-2')
   })
 
   it('skips a key that fails to decrypt and returns the next one', async () => {
@@ -165,7 +128,7 @@ describe('getBYOKKey', () => {
       return { decrypted: encrypted.replace('encrypted-', 'decrypted-') }
     })
 
-    expect(await getBYOKKey(workspaceId, 'openai')).toEqual({
+    expect(await getBYOKKey(workspaceId, 'firecrawl')).toEqual({
       apiKey: 'decrypted-key-2',
       isBYOK: true,
       scope: 'workspace',
@@ -177,7 +140,7 @@ describe('getBYOKKey', () => {
     dbChainMockFns.orderBy.mockResolvedValue([storedKey('key-1'), storedKey('key-2')])
     mockDecryptSecret.mockRejectedValue(new Error('corrupt ciphertext'))
 
-    expect(await getBYOKKey(workspaceId, 'openai')).toBeNull()
+    expect(await getBYOKKey(workspaceId, 'firecrawl')).toBeNull()
     expect(dbChainMockFns.innerJoin).not.toHaveBeenCalled()
     expect(mockIsOrganizationBYOKEntitled).not.toHaveBeenCalled()
   })
@@ -185,7 +148,7 @@ describe('getBYOKKey', () => {
   it('returns null when the keys query throws', async () => {
     dbChainMockFns.orderBy.mockRejectedValue(new Error('database unavailable'))
 
-    expect(await getBYOKKey(uniqueWorkspaceId(), 'openai')).toBeNull()
+    expect(await getBYOKKey(uniqueWorkspaceId(), 'firecrawl')).toBeNull()
     expect(dbChainMockFns.innerJoin).not.toHaveBeenCalled()
     expect(mockIsOrganizationBYOKEntitled).not.toHaveBeenCalled()
   })
@@ -197,7 +160,7 @@ describe('getBYOKKey', () => {
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([storedOrganizationKey(organizationId, 'org-key-1')])
 
-    await expect(getBYOKKey(workspaceId, 'openai')).resolves.toEqual({
+    await expect(getBYOKKey(workspaceId, 'firecrawl')).resolves.toEqual({
       apiKey: 'decrypted-org-key-1',
       isBYOK: true,
       scope: 'organization',
@@ -226,7 +189,7 @@ describe('getBYOKKey', () => {
         (node) =>
           node.type === 'eq' &&
           node.left === schemaMock.organizationBYOKKeys.providerId &&
-          node.right === 'openai'
+          node.right === 'firecrawl'
       )
     ).toBe(true)
     expect(hasMockCondition(outerWhere, (node) => node.type === 'notExists')).toBe(true)
@@ -247,7 +210,7 @@ describe('getBYOKKey', () => {
         (node) =>
           node.type === 'eq' &&
           node.left === schemaMock.workspaceBYOKKeys.providerId &&
-          node.right === 'openai'
+          node.right === 'firecrawl'
       )
     ).toBe(true)
   })
@@ -256,7 +219,7 @@ describe('getBYOKKey', () => {
     const workspaceId = uniqueWorkspaceId()
     dbChainMockFns.orderBy.mockResolvedValue([storedKey('workspace-key')])
 
-    await expect(getBYOKKey(workspaceId, 'openai')).resolves.toEqual({
+    await expect(getBYOKKey(workspaceId, 'firecrawl')).resolves.toEqual({
       apiKey: 'decrypted-workspace-key',
       isBYOK: true,
       scope: 'workspace',
@@ -271,17 +234,17 @@ describe('getBYOKKey', () => {
     const workspaceId = uniqueWorkspaceId()
     const organizationId = uniqueOrganizationId()
     dbChainMockFns.orderBy
-      .mockResolvedValueOnce([storedKey('workspace-openai')])
+      .mockResolvedValueOnce([storedKey('workspace-firecrawl')])
       .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([storedOrganizationKey(organizationId, 'org-anthropic')])
+      .mockResolvedValueOnce([storedOrganizationKey(organizationId, 'org-exa')])
 
-    await expect(getBYOKKey(workspaceId, 'openai')).resolves.toEqual({
-      apiKey: 'decrypted-workspace-openai',
+    await expect(getBYOKKey(workspaceId, 'firecrawl')).resolves.toEqual({
+      apiKey: 'decrypted-workspace-firecrawl',
       isBYOK: true,
       scope: 'workspace',
     })
-    await expect(getBYOKKey(workspaceId, 'anthropic')).resolves.toEqual({
-      apiKey: 'decrypted-org-anthropic',
+    await expect(getBYOKKey(workspaceId, 'exa')).resolves.toEqual({
+      apiKey: 'decrypted-org-exa',
       isBYOK: true,
       scope: 'organization',
     })
@@ -298,7 +261,7 @@ describe('getBYOKKey', () => {
       .mockResolvedValueOnce([storedOrganizationKey(organizationId, 'org-key')])
     mockIsOrganizationBYOKEntitled.mockResolvedValue(false)
 
-    await expect(getBYOKKey(workspaceId, 'openai')).resolves.toBeNull()
+    await expect(getBYOKKey(workspaceId, 'firecrawl')).resolves.toBeNull()
     expect(mockDecryptSecret).not.toHaveBeenCalled()
   })
 
@@ -310,7 +273,7 @@ describe('getBYOKKey', () => {
       .mockResolvedValueOnce([storedOrganizationKey(organizationId, 'org-key')])
     mockIsOrganizationBYOKEntitled.mockRejectedValue(new Error('entitlement unavailable'))
 
-    await expect(getBYOKKey(workspaceId, 'openai')).resolves.toBeNull()
+    await expect(getBYOKKey(workspaceId, 'firecrawl')).resolves.toBeNull()
     expect(mockDecryptSecret).not.toHaveBeenCalled()
   })
 
@@ -328,8 +291,8 @@ describe('getBYOKKey', () => {
       .mockResolvedValueOnce(organizationPool)
     mockIsOrganizationBYOKEntitled.mockResolvedValueOnce(false).mockResolvedValueOnce(true)
 
-    await expect(getBYOKKey(workspaceId, 'openai')).resolves.toBeNull()
-    await expect(getBYOKKey(workspaceId, 'openai')).resolves.toEqual({
+    await expect(getBYOKKey(workspaceId, 'firecrawl')).resolves.toBeNull()
+    await expect(getBYOKKey(workspaceId, 'firecrawl')).resolves.toEqual({
       apiKey: 'decrypted-org-key-1',
       isBYOK: true,
       scope: 'organization',
@@ -341,7 +304,7 @@ describe('getBYOKKey', () => {
       .mockResolvedValueOnce([])
       .mockRejectedValueOnce(new Error('organization keys unavailable'))
 
-    await expect(getBYOKKey(uniqueWorkspaceId(), 'openai')).resolves.toBeNull()
+    await expect(getBYOKKey(uniqueWorkspaceId(), 'firecrawl')).resolves.toBeNull()
     expect(mockIsOrganizationBYOKEntitled).not.toHaveBeenCalled()
     expect(mockDecryptSecret).not.toHaveBeenCalled()
   })
@@ -356,7 +319,7 @@ describe('getBYOKKey', () => {
       ])
     mockDecryptSecret.mockRejectedValue(new Error('corrupt organization ciphertext'))
 
-    await expect(getBYOKKey(uniqueWorkspaceId(), 'openai')).resolves.toBeNull()
+    await expect(getBYOKKey(uniqueWorkspaceId(), 'firecrawl')).resolves.toBeNull()
     expect(mockDecryptSecret).toHaveBeenCalledTimes(2)
   })
 
@@ -372,12 +335,12 @@ describe('getBYOKKey', () => {
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce(organizationPool)
 
-    await expect(getBYOKKey(uniqueWorkspaceId(), 'openai')).resolves.toEqual({
+    await expect(getBYOKKey(uniqueWorkspaceId(), 'firecrawl')).resolves.toEqual({
       apiKey: 'decrypted-org-key-1',
       isBYOK: true,
       scope: 'organization',
     })
-    await expect(getBYOKKey(uniqueWorkspaceId(), 'openai')).resolves.toEqual({
+    await expect(getBYOKKey(uniqueWorkspaceId(), 'firecrawl')).resolves.toEqual({
       apiKey: 'decrypted-org-key-2',
       isBYOK: true,
       scope: 'organization',
@@ -396,12 +359,12 @@ describe('getBYOKKey', () => {
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce(organizationPool)
 
-    await expect(getBYOKKey(sharedId, 'openai')).resolves.toEqual({
+    await expect(getBYOKKey(sharedId, 'firecrawl')).resolves.toEqual({
       apiKey: 'decrypted-workspace-key-1',
       isBYOK: true,
       scope: 'workspace',
     })
-    await expect(getBYOKKey(uniqueWorkspaceId(), 'openai')).resolves.toEqual({
+    await expect(getBYOKKey(uniqueWorkspaceId(), 'firecrawl')).resolves.toEqual({
       apiKey: 'decrypted-org-key-1',
       isBYOK: true,
       scope: 'organization',
@@ -417,12 +380,12 @@ describe('getBYOKKey', () => {
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([storedOrganizationKey(organizationId, 'org-key-after')])
 
-    await expect(getBYOKKey(workspaceId, 'openai')).resolves.toEqual({
+    await expect(getBYOKKey(workspaceId, 'firecrawl')).resolves.toEqual({
       apiKey: 'decrypted-org-key-before',
       isBYOK: true,
       scope: 'organization',
     })
-    await expect(getBYOKKey(workspaceId, 'openai')).resolves.toEqual({
+    await expect(getBYOKKey(workspaceId, 'firecrawl')).resolves.toEqual({
       apiKey: 'decrypted-org-key-after',
       isBYOK: true,
       scope: 'organization',
@@ -440,260 +403,53 @@ describe('getBYOKKey', () => {
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([])
 
-    await expect(getBYOKKey(workspaceId, 'openai')).resolves.toEqual({
+    await expect(getBYOKKey(workspaceId, 'firecrawl')).resolves.toEqual({
       apiKey: 'decrypted-org-key',
       isBYOK: true,
       scope: 'organization',
     })
-    await expect(getBYOKKey(workspaceId, 'openai')).resolves.toBeNull()
+    await expect(getBYOKKey(workspaceId, 'firecrawl')).resolves.toBeNull()
 
     expect(dbChainMockFns.orderBy).toHaveBeenCalledTimes(4)
     expect(mockIsOrganizationBYOKEntitled).toHaveBeenCalledTimes(1)
   })
 })
 
-describe('getApiKeyWithBYOK provider classification', () => {
-  const dynamicProviders = [
-    'ollama',
-    'vllm',
-    'litellm',
-    'fireworks',
-    'together',
-    'baseten',
-    'ollama-cloud',
-  ] as const
-
+describe('getApiKeyWithBYOK (OpenAI only)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     resetDbChainMock()
-    mockIsHosted.value = true
-    mockEnv.AZURE_OPENAI_API_KEY = 'azure-env-key'
-    mockEnv.AZURE_ANTHROPIC_API_KEY = 'azure-anthropic-env-key'
-    mockEnv.VLLM_API_KEY = 'vllm-env-key'
-    mockEnv.LITELLM_API_KEY = 'litellm-env-key'
-    dbChainMockFns.orderBy.mockResolvedValue([storedKey('other-provider-key')])
-    mockDecryptSecret.mockImplementation(async (encrypted: string) => ({
-      decrypted: encrypted.replace('encrypted-', 'decrypted-'),
-    }))
   })
 
-  it.each(dynamicProviders)(
-    'keeps Azure credentials when %s discovery contains the same model ID',
-    async (discoveredProvider) => {
-      const model = 'AZURE/CustomDeployment'
-      vi.mocked(useProvidersStore.getState).mockReturnValue({
-        providers: Object.fromEntries(
-          dynamicProviders.map((provider) => [
-            provider,
-            { models: provider === discoveredProvider ? [model] : [] },
-          ])
-        ),
-      } as ReturnType<typeof useProvidersStore.getState>)
+  it('returns the platform OpenAI key without touching BYOK', async () => {
+    mockGetRotatingApiKey.mockReturnValue('sk-platform')
 
-      const result = await getApiKeyWithBYOK('azure-openai', model, uniqueWorkspaceId())
-
-      expect(result).toEqual({ apiKey: 'azure-env-key', isBYOK: false })
-      expect(dbChainMockFns.where).not.toHaveBeenCalled()
-      expect(mockGetRotatingApiKey).not.toHaveBeenCalled()
-    }
-  )
-
-  it.each([
-    ['vertex', 'vertex/CustomDeployment', 'vertex-access-token'],
-    ['azure-anthropic', 'azure-anthropic/CustomDeployment', 'azure-anthropic-user-key'],
-  ])(
-    'retains caller credentials for %s despite a local model name collision',
-    async (provider, model, apiKey) => {
-      vi.mocked(useProvidersStore.getState).mockReturnValue({
-        providers: Object.fromEntries(dynamicProviders.map((name) => [name, { models: [model] }])),
-      } as ReturnType<typeof useProvidersStore.getState>)
-
-      expect(await getApiKeyWithBYOK(provider, model, uniqueWorkspaceId(), apiKey)).toEqual({
-        apiKey,
-        isBYOK: false,
-      })
-      expect(dbChainMockFns.where).not.toHaveBeenCalled()
-    }
-  )
-
-  it.each([
-    ['ollama', 'empty'],
-    ['vllm', 'vllm-env-key'],
-    ['litellm', 'litellm-env-key'],
-  ])('preserves %s authentication for a custom unprefixed model', async (provider, apiKey) => {
-    expect(await getApiKeyWithBYOK(provider, 'MyCustomModel', uniqueWorkspaceId())).toEqual({
-      apiKey,
-      isBYOK: false,
-    })
-    expect(dbChainMockFns.where).not.toHaveBeenCalled()
+    await expect(
+      getApiKeyWithBYOK('openai', 'gpt-5-mini', uniqueWorkspaceId(), 'user-key')
+    ).resolves.toEqual({ apiKey: 'sk-platform', isBYOK: false })
+    expect(mockGetRotatingApiKey).toHaveBeenCalledWith('openai')
+    expect(dbChainMockFns.orderBy).not.toHaveBeenCalled()
+    expect(mockDecryptSecret).not.toHaveBeenCalled()
   })
 
-  it.each(['vllm', 'litellm'])(
-    'prefers a caller key to the configured %s key for a local model',
-    async (provider) => {
-      expect(
-        await getApiKeyWithBYOK(provider, 'MyCustomModel', uniqueWorkspaceId(), 'caller-key')
-      ).toEqual({ apiKey: 'caller-key', isBYOK: false })
-    }
-  )
-
-  it('uses Bedrock credentials for an uncataloged inference profile', async () => {
-    expect(
-      await getApiKeyWithBYOK('bedrock', 'BEDROCK/MyInferenceProfile', uniqueWorkspaceId())
-    ).toEqual({ apiKey: 'placeholder', isBYOK: false })
-    expect(dbChainMockFns.where).not.toHaveBeenCalled()
-  })
-})
-
-describe('getApiKeyWithBYOK for TypeSafe', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    resetDbChainMock()
-    mockIsHosted.value = true
-    mockGetHostedModels.mockReturnValue(['jev-latest', 'jev-1.13.0', 'jev-preview'])
-    mockGetRotatingApiKey.mockReturnValue('hosted-typesafe-key')
-    mockDecryptSecret.mockImplementation(async (encrypted: string) => ({
-      decrypted: encrypted.replace('encrypted-', 'decrypted-'),
-    }))
-    mockIsOrganizationBYOKEntitled.mockResolvedValue(true)
-  })
-
-  it('accepts TypeSafe in workspace and organization BYOK contracts', () => {
-    expect(byokProviderIdSchema.parse('typesafe')).toBe('typesafe')
-  })
-
-  it.each(['jev-latest', 'jev-1.13.0', 'jev-preview'])(
-    'resolves the platform pool when %s has no BYOK key',
-    async (model) => {
-      await expect(getApiKeyWithBYOK('typesafe', model, uniqueWorkspaceId())).resolves.toEqual({
-        apiKey: 'hosted-typesafe-key',
-        isBYOK: false,
-      })
-      expect(mockGetRotatingApiKey).toHaveBeenCalledWith('typesafe')
-    }
-  )
-
-  it('prefers the workspace pool without selecting a hosted key', async () => {
-    dbChainMockFns.orderBy.mockResolvedValueOnce([storedKey('workspace-key')])
-    await expect(getApiKeyWithBYOK('typesafe', 'jev-latest', uniqueWorkspaceId())).resolves.toEqual(
-      {
-        apiKey: 'decrypted-workspace-key',
-        isBYOK: true,
-        scope: 'workspace',
-      }
-    )
-    expect(mockGetRotatingApiKey).not.toHaveBeenCalled()
-    expect(mockIsOrganizationBYOKEntitled).not.toHaveBeenCalled()
-  })
-
-  it('inherits an entitled organization pool before using hosted credits', async () => {
-    dbChainMockFns.orderBy
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([storedOrganizationKey(uniqueOrganizationId(), 'organization-key')])
-    await expect(getApiKeyWithBYOK('typesafe', 'jev-latest', uniqueWorkspaceId())).resolves.toEqual(
-      {
-        apiKey: 'decrypted-organization-key',
-        isBYOK: true,
-        scope: 'organization',
-      }
-    )
-    expect(mockGetRotatingApiKey).not.toHaveBeenCalled()
-  })
-
-  it('rejects missing hosted credentials instead of making an unauthenticated request', async () => {
+  it('throws a clear error when no OpenAI key is configured', async () => {
     mockGetRotatingApiKey.mockImplementation(() => {
-      throw new Error('No configured key')
+      throw new Error('No API keys configured for rotation.')
     })
-    await expect(getApiKeyWithBYOK('typesafe', 'jev-latest', uniqueWorkspaceId())).rejects.toThrow(
-      'No API key available for typesafe jev-latest'
+
+    await expect(getApiKeyWithBYOK('openai', 'gpt-5-mini', null)).rejects.toThrow(
+      'OPENAI_API_KEY'
     )
   })
 
-  it('never gives the hosted key to an unlisted model', async () => {
-    await expect(getApiKeyWithBYOK('typesafe', 'jev-custom', uniqueWorkspaceId())).rejects.toThrow(
-      'API key is required'
-    )
+  it('rejects every other provider, even with a caller-supplied key', async () => {
+    mockGetRotatingApiKey.mockReturnValue('sk-platform')
+
+    for (const provider of ['anthropic', 'google', 'ollama', 'bedrock', 'azure-openai']) {
+      await expect(getApiKeyWithBYOK(provider, 'some-model', null, 'user-key')).rejects.toThrow(
+        `Provider "${provider}" is not available`
+      )
+    }
     expect(mockGetRotatingApiKey).not.toHaveBeenCalled()
-  })
-
-  it('requires caller credentials on self-hosted deployments', async () => {
-    mockIsHosted.value = false
-    await expect(
-      getApiKeyWithBYOK('typesafe', 'jev-latest', uniqueWorkspaceId(), 'caller-key')
-    ).resolves.toEqual({ apiKey: 'caller-key', isBYOK: false })
-    await expect(getApiKeyWithBYOK('typesafe', 'jev-latest', uniqueWorkspaceId())).rejects.toThrow(
-      'API key is required'
-    )
-    expect(mockGetRotatingApiKey).not.toHaveBeenCalled()
-  })
-})
-
-describe('getApiKeyWithBYOK for Fireworks', () => {
-  const HOSTED_POOL_MODEL = 'fireworks/glm-5.2'
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    resetDbChainMock()
-    mockIsHosted.value = true
-    mockEnv.FIREWORKS_API_KEY = 'platform-fireworks-key'
-    mockGetHostedModels.mockReturnValue([HOSTED_POOL_MODEL, 'fireworks/kimi-k3'])
-    mockGetRotatingApiKey.mockReturnValue('rotated-fireworks-key')
-    ;(useProvidersStore.getState as ReturnType<typeof vi.fn>).mockReturnValue({
-      providers: {
-        ollama: { models: [] },
-        vllm: { models: [] },
-        litellm: { models: [] },
-        fireworks: { models: [] },
-        together: { models: [] },
-        baseten: { models: [] },
-        'ollama-cloud': { models: [] },
-      },
-    })
-  })
-
-  it('serves the rotating platform key for a hosted catalog model', async () => {
-    const result = await getApiKeyWithBYOK('fireworks', HOSTED_POOL_MODEL, uniqueWorkspaceId())
-
-    expect(mockGetRotatingApiKey).toHaveBeenCalledWith('fireworks')
-    expect(result).toEqual({ apiKey: 'rotated-fireworks-key', isBYOK: false })
-  })
-
-  it('prefers a workspace BYOK key over the platform key, as hosted models do', async () => {
-    dbChainMockFns.orderBy.mockResolvedValue([storedKey('key-1')])
-
-    const result = await getApiKeyWithBYOK('fireworks', HOSTED_POOL_MODEL, uniqueWorkspaceId())
-
-    expect(result).toEqual({ apiKey: 'decrypted-key-1', isBYOK: true, scope: 'workspace' })
-    expect(mockGetRotatingApiKey).not.toHaveBeenCalled()
-  })
-
-  it('never serves the platform key to a dynamic model on hosted', async () => {
-    await expect(
-      getApiKeyWithBYOK('fireworks', 'fireworks/accounts/acme/models/custom', uniqueWorkspaceId())
-    ).rejects.toThrow('API key is required for Fireworks')
-    expect(mockGetRotatingApiKey).not.toHaveBeenCalled()
-  })
-
-  it('serves a user-provided key for a dynamic model on hosted', async () => {
-    const result = await getApiKeyWithBYOK(
-      'fireworks',
-      'fireworks/accounts/acme/models/custom',
-      uniqueWorkspaceId(),
-      'user-key'
-    )
-
-    expect(result).toEqual({ apiKey: 'user-key', isBYOK: false })
-  })
-
-  it('falls back to the env key for any model when self-hosted', async () => {
-    mockIsHosted.value = false
-
-    const result = await getApiKeyWithBYOK(
-      'fireworks',
-      'fireworks/accounts/acme/models/custom',
-      uniqueWorkspaceId()
-    )
-
-    expect(result).toEqual({ apiKey: 'platform-fireworks-key', isBYOK: false })
   })
 })

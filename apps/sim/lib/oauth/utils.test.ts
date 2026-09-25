@@ -202,7 +202,6 @@ describe('getProviderIdFromServiceId', () => {
       { serviceId: 'google-sheets', expectedProviderId: 'google-sheets' },
       { serviceId: 'google-forms', expectedProviderId: 'google-forms' },
       { serviceId: 'google-calendar', expectedProviderId: 'google-calendar' },
-      { serviceId: 'vertex-ai', expectedProviderId: 'vertex-ai' },
     ]
 
     googleServices.forEach(({ serviceId, expectedProviderId }) => {
@@ -375,7 +374,6 @@ describe('parseProvider', () => {
       { provider: 'google-sheets', expectedFeature: 'google-sheets' },
       { provider: 'google-forms', expectedFeature: 'google-forms' },
       { provider: 'google-calendar', expectedFeature: 'google-calendar' },
-      { provider: 'vertex-ai', expectedFeature: 'vertex-ai' },
     ]
 
     googleServices.forEach(({ provider, expectedFeature }) => {

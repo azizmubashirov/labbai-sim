@@ -6,15 +6,8 @@ import {
 } from '@/lib/billing/core/billing-attribution'
 import { recordUsage } from '@/lib/billing/core/usage-log'
 import { env, envNumber } from '@/lib/core/config/env'
-import { OrchestrationError } from '@/lib/core/orchestration/types'
 import { embedKnowledge } from '@/lib/embeddings'
-import { isOllamaEmbeddingModel } from '@/lib/embeddings/catalog'
 import { EmbeddingInputLimitError } from '@/lib/embeddings/client'
-import {
-  getOllamaEmbeddingModelMetadata,
-  OllamaEmbeddingModelNotFoundError,
-  OllamaEmbeddingWidthUnknownError,
-} from '@/lib/embeddings/ollama-model-catalog.server'
 import type { EmbeddingBatchCheckpoints } from '@/lib/embeddings/types'
 import { PermanentDocumentProcessingError } from '@/lib/knowledge/documents/document-processing-error'
 import {
@@ -67,10 +60,8 @@ function resolveConfiguredEmbeddingModel(): string {
 /**
  * Vector width new knowledge bases are stored at, from `EMBEDDING_OUTPUT_DIMS`.
  *
- * Matching the width to what the configured model actually emits is the
- * operator's job — Sim cannot verify it for a model on their own Ollama server,
- * and for a catalogued model it can only check the widths the provider
- * documents. Either way a value this deployment cannot store falls back rather
+ * Matching the width to what the configured model actually emits is checked
+ * against the widths the provider documents. A value this deployment cannot store falls back rather
  * than failing knowledge-base creation outright, because a base that exists at
  * a working width is recoverable and one that could not be created is not.
  */
@@ -105,55 +96,11 @@ function resolveConfiguredEmbeddingDimensions(model: string): KbEmbeddingDimensi
 
 /**
  * Model and vector width every knowledge base created on this deployment uses.
- *
- * Asynchronous for one case: an Ollama model whose width the deployment did not
- * state. Sim can read that from the server the model is installed on, and doing
- * so is much better than the platform default, which would silently create every
- * base at 1,536 and fail each document against a 768-wide model.
+ * Labbai: OpenAI `text-embedding-3-small` at 1536 dims unless the deployment
+ * names another storable width. Kept async so callers need not change.
  */
 export async function getConfiguredKbEmbedding(): Promise<KbEmbeddingTarget> {
   const model = resolveConfiguredEmbeddingModel()
-  const configured = env.EMBEDDING_OUTPUT_DIMS
-  const stated = configured !== undefined && String(configured).trim() !== ''
-
-  /**
-   * An Ollama model's width is a property of what the operator pulled, and the
-   * adapter cannot ask for a different one, so there is no width to fall back
-   * to: the platform default would pin every base to 1,536 and fail every
-   * document against a model that emits anything else. When it cannot be
-   * established the base is refused instead, which is recoverable — a base
-   * created at an impossible width is not.
-   */
-  if (isOllamaEmbeddingModel(model) && !stated) {
-    let dimensions: number
-    try {
-      dimensions = (await getOllamaEmbeddingModelMetadata(model)).dimensions
-    } catch (error) {
-      /**
-       * A model the server does not have, or one whose width it will not report,
-       * is the operator's to fix and is surfaced as such. An unreachable server
-       * is a dependency failure and keeps its default classification — the
-       * orchestration vocabulary has no upstream-failure code, and the message
-       * carries the cause either way.
-       */
-      const message = `Could not read the vector width of ${model} from the configured Ollama server (${getErrorMessage(error, 'Unknown error')}). Set EMBEDDING_OUTPUT_DIMS to the width it emits.`
-      if (
-        error instanceof OllamaEmbeddingModelNotFoundError ||
-        error instanceof OllamaEmbeddingWidthUnknownError
-      ) {
-        throw new OrchestrationError('validation', message)
-      }
-      throw new Error(message, { cause: error })
-    }
-    if (!isKbEmbeddingDimensions(dimensions)) {
-      throw new OrchestrationError(
-        'validation',
-        `${model} emits ${dimensions}-dimensional vectors, which knowledge bases cannot store. Choose a model emitting one of ${KB_EMBEDDING_STORAGE_DIMENSIONS.join(', ')}.`
-      )
-    }
-    return { model, dimensions }
-  }
-
   return { model, dimensions: resolveConfiguredEmbeddingDimensions(model) }
 }
 

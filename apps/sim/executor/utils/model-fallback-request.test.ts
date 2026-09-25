@@ -20,7 +20,6 @@ vi.mock('@/ee/access-control/utils/permission-check', () => ({
 vi.mock('@/providers/utils', () => ({
   getProviderFromModel: (model: string) => {
     if (model.startsWith('claude')) return 'anthropic'
-    if (model.startsWith('vertex/')) return 'vertex'
     return 'openai'
   },
 }))
@@ -140,7 +139,7 @@ describe('executeModelRequestWithFallbacks', () => {
     ).toMatchObject({ usedFallback: true, result: { model: 'claude-sonnet-5' } })
   })
 
-  it('skips denied and incompatible provider families without sending them a request', async () => {
+  it('skips denied models without sending them a request', async () => {
     request.mockRejectedValueOnce(new Error('overloaded'))
     validateModel.mockImplementation(async (_user, _workspace, model) => {
       if (model === 'claude-sonnet-5') throw new Error('not permitted')
@@ -149,7 +148,6 @@ describe('executeModelRequestWithFallbacks', () => {
       ...input(),
       fallbackModels: [
         { model: 'claude-sonnet-5' },
-        { model: 'vertex/gemini-3.1-pro' },
         { model: 'gpt-4o-mini' },
       ],
     }
@@ -189,7 +187,7 @@ describe('executeModelRequestWithFallbacks', () => {
     expect(request).toHaveBeenCalledTimes(1)
   })
 
-  it('only sends a cross-provider key that was stored as a reference, and drops family credentials', async () => {
+  it('only sends a cross-provider key that was stored as a reference', async () => {
     const options = input()
     const rows = [{ model: 'claude-sonnet-5', apiKey: '{{ANTHROPIC_KEY}}', thinkingLevel: 'high' }]
     options.block = { ...block, config: { ...block.config, params: { fallbackModels: rows } } }
@@ -198,8 +196,6 @@ describe('executeModelRequestWithFallbacks', () => {
       ...options,
       request: {
         ...options.request,
-        vertexProject: 'private-project',
-        bedrockSecretKey: 'private-key',
         responseFormat: { name: 'scores', schema: { type: 'object' }, strict: true },
       },
       fallbackModels: [{ ...rows[0], apiKey: 'resolved-key' }],
@@ -214,8 +210,6 @@ describe('executeModelRequestWithFallbacks', () => {
         responseFormat: { name: 'scores' },
       },
     })
-    expect(fallback.request.vertexProject).toBeUndefined()
-    expect(fallback.request.bedrockSecretKey).toBeUndefined()
   })
 
   it.each(['raw-key', '{{MISSING_KEY}}'])(
@@ -265,15 +259,14 @@ describe('executeModelRequestWithFallbacks', () => {
     expect(request.mock.calls[1][0].request.apiKey).toBeUndefined()
   })
 
-  it('strips the Auto identity prompt from fallbacks and keeps the pool model out of the trace', async () => {
+  it('sends the fallback system prompt to fallbacks and names the failed primary in the trace', async () => {
     const options = input()
     request.mockRejectedValueOnce(new Error('overloaded'))
     await executeModelRequestWithFallbacks({
       ...options,
-      configuredModel: 'sim-auto',
-      request: { ...options.request, systemPrompt: 'Auto identity\n\nScore the content' },
+      request: { ...options.request, systemPrompt: 'Primary-only preface\n\nScore the content' },
     })
     expect(request.mock.calls[1][0].request.systemPrompt).toBe('Score the content')
-    expect(options.ctx.blockLogs[0].modelFallbacks).toEqual(['sim-auto'])
+    expect(options.ctx.blockLogs[0].modelFallbacks).toEqual(['gpt-4o'])
   })
 })

@@ -15,11 +15,6 @@ export interface ChatMessage {
     id: string
     name: string
     arguments: string
-    /**
-     * Gemini 3+ opaque signature that must be echoed on subsequent turns
-     * when replaying this function call.
-     */
-    thoughtSignature?: string
   }>
 }
 
@@ -46,8 +41,6 @@ export interface ChatCompletionChunk {
     id: string
     name: string
     arguments: string
-    /** Gemini 3+ thought signature to echo on the next model turn. */
-    thoughtSignature?: string
   }
   finishReason?: string
   usage?: TokenUsage

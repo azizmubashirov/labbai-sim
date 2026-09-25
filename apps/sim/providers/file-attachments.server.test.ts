@@ -1,7 +1,8 @@
 /**
  * @vitest-environment node
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { resetEnvMock, setEnv } from '@sim/testing'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ExecutionContext } from '@/executor/types'
 import { ResolvedSecretTraceRegistry } from '@/executor/utils/resolved-secret-trace-registry'
 import {
@@ -26,7 +27,6 @@ const {
   mockVerifyFileAccess,
   mockCreateExecutorPrincipal,
   mockAssertUserFileContentAccess,
-  mockGoogleUpload,
 } = vi.hoisted(() => ({
   mockDownloadServableFileFromStorage: vi.fn(),
   mockGeneratePresignedDownloadUrl: vi.fn(),
@@ -34,7 +34,6 @@ const {
   mockVerifyFileAccess: vi.fn(),
   mockCreateExecutorPrincipal: vi.fn(),
   mockAssertUserFileContentAccess: vi.fn(),
-  mockGoogleUpload: vi.fn(),
 }))
 
 vi.mock('@/lib/internal/principals/executor', () => ({
@@ -43,13 +42,6 @@ vi.mock('@/lib/internal/principals/executor', () => ({
 
 vi.mock('@/lib/execution/payloads/materialization.server', () => ({
   assertUserFileContentAccess: mockAssertUserFileContentAccess,
-}))
-
-vi.mock('@google/genai', () => ({
-  FileState: { PROCESSING: 'PROCESSING', FAILED: 'FAILED' },
-  GoogleGenAI: class {
-    files = { upload: mockGoogleUpload }
-  },
 }))
 
 vi.mock('@/lib/uploads', () => ({
@@ -107,11 +99,6 @@ describe('OpenAI large-file attachment lifecycle', () => {
       workspaceId: 'workspace-1',
     })
     mockAssertUserFileContentAccess.mockResolvedValue(undefined)
-    mockGoogleUpload.mockResolvedValue({
-      name: 'files/harness',
-      uri: 'https://generativelanguage.googleapis.com/files/harness',
-      state: 'ACTIVE',
-    })
     mockGeneratePresignedDownloadUrl.mockResolvedValue('https://storage.example.com/signed')
     mockDownloadServableFileFromStorage.mockResolvedValue({
       buffer: Buffer.alloc(CSV_BYTES, 0x61),
@@ -123,7 +110,12 @@ describe('OpenAI large-file attachment lifecycle', () => {
     )
   })
 
+  afterEach(() => {
+    resetEnvMock()
+  })
+
   it('uploads to the Files API and references the file by id instead of inlining it', async () => {
+    setEnv({ OPENAI_BASE_URL: undefined, OPENAI_EXTRA_HEADERS: undefined })
     const request = makeRequest(CSV_BYTES)
 
     await attachLargeFileRemoteUrls(request, 'openai')
@@ -152,6 +144,28 @@ describe('OpenAI large-file attachment lifecycle', () => {
       { type: 'input_text', text: 'what does this say' },
       { type: 'input_file', file_id: 'file-abc' },
     ])
+  })
+
+  it('posts to the configured OpenAI base URL with the extra headers', async () => {
+    setEnv({
+      OPENAI_BASE_URL: 'https://gateway.example.com/v1/openai/',
+      OPENAI_EXTRA_HEADERS: JSON.stringify({
+        'cf-aig-authorization': 'Bearer gateway-token',
+        Authorization: 'Bearer must-not-win',
+      }),
+    })
+    const request = makeRequest(CSV_BYTES)
+
+    await attachLargeFileRemoteUrls(request, 'openai')
+    await uploadLargeFilesToProvider(request, 'openai')
+
+    const [url, init] = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0]
+    expect(url).toBe('https://gateway.example.com/v1/openai/files')
+    expect(init.headers).toEqual({
+      'cf-aig-authorization': 'Bearer gateway-token',
+      Authorization: 'Bearer sk-test',
+    })
+    expect(request.messages?.[0].files?.[0].providerFileId).toBe('file-abc')
   })
 
   it('preserves a multipart filename that collides with a configured secret', async () => {
@@ -186,17 +200,15 @@ describe('OpenAI large-file attachment lifecycle', () => {
   /**
    * The hydration cap has to track `shouldUseLargeFilePath`'s crossover exactly. Stopping short
    * of it leaves a band with neither base64 nor a handle — the defect this function was added to
-   * remove — and `remote-url` deliberately crosses over later than `files-api`.
+   * remove.
    */
-  it('caps base64 hydration exactly where each strategy hands off to an upload', () => {
+  it('caps base64 hydration exactly where the Files API takes over', () => {
     mockHasCloudStorage.mockReturnValue(true)
     expect(getInlineHydrationMaxBytes('openai')).toBe(LARGE_FILE_PATH_THRESHOLD_BYTES)
-    expect(getInlineHydrationMaxBytes('anthropic')).toBe(INLINE_ATTACHMENT_THRESHOLD_BYTES)
-    expect(getInlineHydrationMaxBytes('bedrock')).toBe(INLINE_ATTACHMENT_THRESHOLD_BYTES)
+    expect(getInlineHydrationMaxBytes('unknown-provider')).toBe(INLINE_ATTACHMENT_THRESHOLD_BYTES)
 
     mockHasCloudStorage.mockReturnValue(false)
     expect(getInlineHydrationMaxBytes('openai')).toBe(INLINE_ATTACHMENT_THRESHOLD_BYTES)
-    expect(getInlineHydrationMaxBytes('anthropic')).toBe(INLINE_ATTACHMENT_THRESHOLD_BYTES)
   })
 
   /**
@@ -270,23 +282,15 @@ describe('OpenAI large-file attachment lifecycle', () => {
     expect(fetch).not.toHaveBeenCalled()
   })
 
-  it.each(['openai', 'google'])(
-    'uploads an authorized actorless workspace file through %s',
-    async (provider) => {
-      const request = makeRequest(CSV_BYTES)
-      await attachLargeFileRemoteUrls(request, provider, executionContext)
-      await uploadLargeFilesToProvider(request, provider, executionContext)
-      expect(mockCreateExecutorPrincipal).toHaveBeenCalledTimes(2)
-      expect(mockAssertUserFileContentAccess).toHaveBeenCalledTimes(2)
-      expect(mockVerifyFileAccess).not.toHaveBeenCalled()
-      const file = request.messages?.[0].files?.[0]
-      if (provider === 'openai') expect(file?.providerFileId).toBe('file-abc')
-      else
-        expect(file?.providerFileUri).toBe(
-          'https://generativelanguage.googleapis.com/files/harness'
-        )
-    }
-  )
+  it('uploads an authorized actorless workspace file through openai', async () => {
+    const request = makeRequest(CSV_BYTES)
+    await attachLargeFileRemoteUrls(request, 'openai', executionContext)
+    await uploadLargeFilesToProvider(request, 'openai', executionContext)
+    expect(mockCreateExecutorPrincipal).toHaveBeenCalledTimes(2)
+    expect(mockAssertUserFileContentAccess).toHaveBeenCalledTimes(2)
+    expect(mockVerifyFileAccess).not.toHaveBeenCalled()
+    expect(request.messages?.[0].files?.[0].providerFileId).toBe('file-abc')
+  })
 
   it('does not mint a remote URL after execution authorization fails', async () => {
     mockCreateExecutorPrincipal.mockRejectedValueOnce(new Error('Run no longer active'))

@@ -211,7 +211,7 @@ Return ONLY the regex pattern - no explanations, no quotes, no forward slashes, 
     },
     model: {
       type: 'string',
-      description: 'LLM model for hallucination scoring (default: gpt-4o-mini)',
+      description: 'LLM model for hallucination scoring (default: gpt-5-mini)',
     },
     ...PROVIDER_CREDENTIAL_INPUTS,
   },

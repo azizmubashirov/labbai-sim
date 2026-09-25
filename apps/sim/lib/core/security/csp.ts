@@ -12,7 +12,6 @@ import { isDev, isHosted, isReactGrabEnabled } from '../config/env-flags'
  */
 
 const DEFAULT_SOCKET_URL = 'http://localhost:3002'
-const DEFAULT_OLLAMA_URL = 'http://localhost:11434'
 
 function toWebSocketUrl(httpUrl: string): string {
   return httpUrl.replace('http://', 'ws://').replace('https://', 'wss://')
@@ -190,7 +189,6 @@ export const buildTimeCSPDirectives: CSPDirectives = {
   'connect-src': [
     ...STATIC_CONNECT_SRC,
     env.NEXT_PUBLIC_APP_URL || '',
-    ...(env.OLLAMA_URL ? [env.OLLAMA_URL] : isDev ? [DEFAULT_OLLAMA_URL] : []),
     ...(env.NEXT_PUBLIC_SOCKET_URL
       ? [env.NEXT_PUBLIC_SOCKET_URL, toWebSocketUrl(env.NEXT_PUBLIC_SOCKET_URL)]
       : isDev
@@ -242,7 +240,6 @@ export function generateRuntimeCSP(): string {
   const socketUrl =
     getEnv('NEXT_PUBLIC_SOCKET_URL') || (isDev || isLocalhostUrl(appUrl) ? DEFAULT_SOCKET_URL : '')
   const socketWsUrl = socketUrl ? toWebSocketUrl(socketUrl) : ''
-  const ollamaUrl = getEnv('OLLAMA_URL') || (isDev ? DEFAULT_OLLAMA_URL : '')
 
   const brandLogoDomains = getHostnameFromUrl(getEnv('NEXT_PUBLIC_BRAND_LOGO_URL'))
   const privacyDomains = getHostnameFromUrl(getEnv('NEXT_PUBLIC_PRIVACY_URL'))
@@ -256,7 +253,6 @@ export function generateRuntimeCSP(): string {
     'connect-src': [
       ...STATIC_CONNECT_SRC,
       appUrl,
-      ollamaUrl,
       socketUrl,
       socketWsUrl,
       ...brandLogoDomains,

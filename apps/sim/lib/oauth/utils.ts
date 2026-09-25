@@ -24,8 +24,7 @@ export const SCOPE_DESCRIPTIONS: Record<string, string> = {
   'https://www.googleapis.com/auth/forms.body': 'View and manage Google Forms',
   'https://www.googleapis.com/auth/forms.responses.readonly': 'View responses to Google Forms',
   'https://www.googleapis.com/auth/admin.directory.group.readonly': 'View Google Workspace groups',
-  'https://www.googleapis.com/auth/cloud-platform':
-    'Full access to Google Cloud resources for Vertex AI',
+  'https://www.googleapis.com/auth/cloud-platform': 'Full access to Google Cloud resources',
 
   // Confluence scopes
   'read:confluence-content.all': 'Read all Confluence content',

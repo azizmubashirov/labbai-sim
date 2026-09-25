@@ -31,8 +31,8 @@ export type PostBuildToolMode = 'all' | 'oauth_only' | 'final_only' | 'done'
 /**
  * Tools to attach on a model round after a successful workflow populate.
  *
- * Bedrock requires `toolConfig` whenever the conversation already contains
- * toolUse/toolResult blocks — never return `[]` for `final_only`. Keep the
+ * Some OpenAI-compatible endpoints require tools whenever the
+ * conversation already contains tool calls — never return `[]` for `final_only`. Keep the
  * catalog and discard unwanted tool calls in the orchestrator instead.
  */
 export function resolvePostBuildRoundTools<T extends { name: string }>(

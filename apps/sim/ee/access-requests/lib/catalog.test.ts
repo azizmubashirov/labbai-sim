@@ -23,7 +23,6 @@ vi.mock('@/lib/core/config/block-visibility', () => ({ getBlockVisibility: mocks
 vi.mock('@/lib/credential-groups/scoped-availability', () => ({
   isScopedCredentialGroupsAvailable: mocks.credentialGroups,
 }))
-vi.mock('@/lib/core/config/env', () => ({ env: { VLLM_BASE_URL: '', LITELLM_BASE_URL: '' } }))
 vi.mock('@/lib/core/config/env-flags', () => ({
   getAllowedIntegrationsFromEnv: mocks.allowedIntegrations,
   getBlacklistedProvidersFromEnv: mocks.blacklistedProviders,
@@ -33,7 +32,6 @@ vi.mock('@/lib/core/config/env-flags', () => ({
   isPublicApiDisabled: true,
   isSsoEnabled: false,
 }))
-vi.mock('@/lib/core/utils/urls', () => ({ isOllamaUrlConfigured: () => false }))
 vi.mock('@/lib/integrations/availability.server', () => ({
   isIntegrationDeploymentAvailableForVisibility: mocks.integrationAvailable,
   isOAuthServiceDeploymentAvailable: mocks.oauthAvailable,
@@ -55,9 +53,6 @@ vi.mock('@/providers/models', () => {
     PROVIDER_DEFINITIONS: {
       openai: { id: 'openai', name: 'OpenAI', models: publicModels.openai },
       anthropic: { id: 'anthropic', name: 'Anthropic', models: [{ id: 'anthropic-model' }] },
-      ollama: { id: 'ollama', name: 'Ollama', models: [{ id: 'private-local' }] },
-      vllm: { id: 'vllm', name: 'vLLM', models: [] },
-      litellm: { id: 'litellm', name: 'LiteLLM', models: [] },
       openrouter: {
         id: 'openrouter',
         name: 'OpenRouter',
@@ -216,7 +211,7 @@ describe('access request catalog deployment ceilings', () => {
     expect(config.allowedIntegrations).toEqual(['notion_v2'])
   })
 
-  it('omits blacklisted/retired models, unconfigured endpoints, and private dynamic names', async () => {
+  it('omits blacklisted/retired models and private dynamic names', async () => {
     const catalog = await loadAccessRequestCatalog(context)
     expect([...catalog.providers.keys()]).toEqual(['openai', 'openrouter', 'fireworks'])
     expect([...catalog.models.keys()]).toEqual(['public-model', 'fireworks/public-model'])

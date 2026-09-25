@@ -1,11 +1,8 @@
 import { getBlockVisibility } from '@/lib/core/config/block-visibility'
-import { env } from '@/lib/core/config/env'
 import {
   getAllowedIntegrationsFromEnv,
   getBlacklistedProvidersFromEnv,
-  isHosted,
 } from '@/lib/core/config/env-flags'
-import { isOllamaUrlConfigured } from '@/lib/core/utils/urls'
 import { isScopedCredentialGroupsAvailable } from '@/lib/credential-groups/scoped-availability'
 import {
   isIntegrationDeploymentAvailableForVisibility,
@@ -36,10 +33,8 @@ export interface AccessRequestCatalogContext {
   workspaceId: string | null
 }
 
-function isProviderDeploymentAvailable(providerId: string): boolean {
-  if (providerId === 'ollama') return !isHosted || isOllamaUrlConfigured()
-  if (providerId === 'vllm') return Boolean(env.VLLM_BASE_URL?.trim())
-  if (providerId === 'litellm') return Boolean(env.LITELLM_BASE_URL?.trim())
+/** Labbai: the only provider is OpenAI, configured server-side (`OPENAI_API_KEY`). */
+function isProviderDeploymentAvailable(_providerId: string): boolean {
   return true
 }
 

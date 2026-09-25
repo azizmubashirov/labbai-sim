@@ -1,8 +1,6 @@
 import { createLogger } from '@sim/logger'
 import { authorizeWorkflowByWorkspacePermission } from '@sim/platform-authz/workflow'
 import { getErrorMessage } from '@sim/utils/errors'
-import { authorizeCredentialUseForAuth } from '@/lib/auth/credential-access'
-import { AuthType } from '@/lib/auth/hybrid'
 import {
   type BillingAttributionSnapshot,
   requireBillingAttributionHeader,
@@ -24,7 +22,6 @@ import {
 } from '@/ee/access-control/utils/permission-check'
 import type { ResolvedSecretTraceRegistry } from '@/executor/utils/resolved-secret-trace-registry'
 import { isAbortError } from '@/providers/streaming-tool-loop-shared'
-import { getProviderFromModel } from '@/providers/utils'
 
 const logger = createLogger('GuardrailsOperation')
 
@@ -73,35 +70,6 @@ function failedVerdict(
       input,
       error,
     },
-  }
-}
-
-function authenticatedCaller(context: GuardrailsOperationContext) {
-  return {
-    success: true,
-    userId: context.actorUserId,
-    authType: AuthType.INTERNAL_JWT,
-  } as const
-}
-
-async function authorizeVertexCredential(
-  input: GuardrailsValidationInput,
-  context: GuardrailsOperationContext
-): Promise<void> {
-  if (!input.vertexCredential || !input.model || getProviderFromModel(input.model) !== 'vertex') {
-    return
-  }
-  const access = await authorizeCredentialUseForAuth(authenticatedCaller(context), {
-    credentialId: input.vertexCredential,
-    workflowId: input.workflowId,
-    callerUserId: context.actorUserId,
-  })
-  if (!access.ok) {
-    logger.warn(`[${context.requestId}] Vertex credential access denied`, {
-      error: access.error,
-      credentialId: input.vertexCredential,
-    })
-    fail(401, access.error || 'Unauthorized')
   }
 }
 
@@ -162,8 +130,6 @@ async function prepareHallucinationContext(
     fail(402, usage.message || 'Usage limit exceeded. Please upgrade your plan to continue.')
   }
 
-  await authorizeVertexCredential(input, context)
-
   const provenanceInspection = inspectModelInputProvenanceRequest(context.headers, input)
   if (provenanceInspection.status === 'invalid') {
     fail(400, 'Invalid model input provenance')
@@ -222,16 +188,6 @@ async function executeValidation(
       topK: input.topK ? Number.parseInt(input.topK) : 10,
       model: input.model,
       apiKey: input.apiKey,
-      providerCredentials: {
-        azureEndpoint: input.azureEndpoint,
-        azureApiVersion: input.azureApiVersion,
-        vertexProject: input.vertexProject,
-        vertexLocation: input.vertexLocation,
-        vertexCredential: input.vertexCredential,
-        bedrockAccessKeyId: input.bedrockAccessKeyId,
-        bedrockSecretKey: input.bedrockSecretKey,
-        bedrockRegion: input.bedrockRegion,
-      },
       workflowId: input.workflowId,
       workspaceId: hallucinationContext.workspaceId,
       actorUserId: context.actorUserId,

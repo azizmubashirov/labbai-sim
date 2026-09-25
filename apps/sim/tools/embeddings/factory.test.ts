@@ -2,21 +2,10 @@
  * @vitest-environment node
  */
 import { describe, expect, it } from 'vitest'
-import { embeddingsCohereTool } from '@/tools/embeddings/cohere'
-import { embeddingsGeminiTool } from '@/tools/embeddings/gemini'
-import { embeddingsMistralTool } from '@/tools/embeddings/mistral'
 import { embeddingsOpenAITool } from '@/tools/embeddings/openai'
-import { embeddingsOpenRouterTool } from '@/tools/embeddings/openrouter'
 import { embeddingsTool as legacyOpenAIEmbeddingsTool } from '@/tools/openai/embeddings'
 
-const ALL_TOOLS = [
-  embeddingsOpenAITool,
-  embeddingsGeminiTool,
-  embeddingsCohereTool,
-  embeddingsMistralTool,
-  embeddingsOpenRouterTool,
-  legacyOpenAIEmbeddingsTool,
-]
+const ALL_TOOLS = [embeddingsOpenAITool, legacyOpenAIEmbeddingsTool]
 
 /**
  * `input` is the only param that leaves as model-visible content. Without a
@@ -79,12 +68,11 @@ describe('embeddings tools model-input projection', () => {
     }
   })
 
-  it('requires an explicit OpenRouter key without hosted-key injection', () => {
-    expect(embeddingsOpenRouterTool.params.apiKey.required).toBe(true)
-    expect(embeddingsOpenRouterTool.hosting).toBeUndefined()
-    expect(embeddingsOpenRouterTool.operation.input({ input: 'hello' } as never)).toMatchObject({
-      provider: 'openrouter',
-      model: 'openrouter/openai/text-embedding-3-small',
+  it('meters the hosted OpenAI key and defaults to the KB embedding model', () => {
+    expect(embeddingsOpenAITool.hosting?.byokProviderId).toBe('openai')
+    expect(embeddingsOpenAITool.operation.input({ input: 'hello' } as never)).toMatchObject({
+      provider: 'openai',
+      model: 'text-embedding-3-small',
     })
   })
 })

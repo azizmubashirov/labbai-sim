@@ -4,17 +4,7 @@ import { type ContractJsonResponse, defineRouteContract } from '@/lib/api/contra
 
 export const byokProviderIdSchema = z.enum([
   'openai',
-  'anthropic',
-  'google',
   'mistral',
-  'zai',
-  'kimi',
-  'typesafe',
-  'xai',
-  'fireworks',
-  'together',
-  'baseten',
-  'ollama-cloud',
   'falai',
   'firecrawl',
   'exa',

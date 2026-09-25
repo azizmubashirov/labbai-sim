@@ -13,7 +13,7 @@ import {
   bindConversationRequestContext,
   getConversationBinding,
 } from '@/providers/conversation-history'
-import { providerHistoryAdapters, providerHistoryProtocols } from '@/providers/history-adapters'
+import { providerHistoryProtocols } from '@/providers/history-adapters'
 import { getProviderExecutor } from '@/providers/registry'
 import { runWithProviderRuntimeContext } from '@/providers/runtime-context'
 import type { ProviderId, ProviderRequest } from '@/providers/types'
@@ -22,7 +22,12 @@ const enabled = process.env.RUN_AGENT_MEMORY_PROVIDER_SMOKE === 'true'
 
 /** Live calls require an explicit gate and operator-supplied models/credentials; CI never spends by default. */
 describe.skipIf(!enabled)('live durable provider history contracts', () => {
-  for (const protocol of Object.keys(providerHistoryAdapters) as ConversationProtocol[]) {
+  const liveProtocols = new Set(
+    Object.values(providerHistoryProtocols).filter(
+      (protocol): protocol is ConversationProtocol => protocol !== null
+    )
+  )
+  for (const protocol of liveProtocols) {
     it(protocol, async () => {
       const configured: unknown = JSON.parse(process.env.AGENT_MEMORY_PROVIDER_SMOKE_CASES ?? '[]')
       if (!Array.isArray(configured)) throw new Error('Provider smoke cases must be an array')
@@ -42,11 +47,6 @@ describe.skipIf(!enabled)('live durable provider history contracts', () => {
       const request: ProviderRequest = {
         model: entry.model,
         apiKey: credential('apiKey'),
-        azureEndpoint: credential('azureEndpoint'),
-        azureApiVersion: credential('azureApiVersion'),
-        bedrockAccessKeyId: credential('bedrockAccessKeyId'),
-        bedrockSecretKey: credential('bedrockSecretKey'),
-        bedrockRegion: credential('bedrockRegion'),
         maxTokens: 512,
         workflowId: 'memory-smoke',
         executionId: 'memory-smoke',

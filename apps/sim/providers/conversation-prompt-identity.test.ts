@@ -2,9 +2,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { ConversationProtocol } from '@/lib/memory/conversation-types'
 import type { UserFile } from '@/executor/types'
-import { convertAnthropicRequestHistory } from '@/providers/anthropic/request-history'
-import { formatMessagesForProvider } from '@/providers/attachments'
-import { convertBedrockRequestHistory } from '@/providers/bedrock/request-history'
 import {
   bindConversationGenerationPrompt,
   prepareConversationGeneration,
@@ -15,7 +12,6 @@ import {
   isConversationHistoryNotice,
   markConversationHistoryNotice,
 } from '@/providers/conversation-metadata'
-import { convertToGeminiFormat } from '@/providers/google/utils'
 import { buildResponsesInputFromMessages } from '@/providers/openai/utils'
 import type { Message, ProviderRequest } from '@/providers/types'
 
@@ -32,30 +28,9 @@ const protocols: {
   convert: (request: ProviderRequest) => object[]
 }[] = [
   {
-    protocol: 'chat-completions',
-    key: 'messages',
-    convert: (request) => formatMessagesForProvider(request.messages ?? [], 'openrouter'),
-  },
-  {
     protocol: 'responses',
     key: 'input',
     convert: (request) => buildResponsesInputFromMessages(request.messages ?? []),
-  },
-  {
-    protocol: 'anthropic',
-    key: 'messages',
-    convert: (request) =>
-      convertAnthropicRequestHistory({ ...request, providerId: 'anthropic' }).messages,
-  },
-  {
-    protocol: 'gemini',
-    key: 'contents',
-    convert: (request) => convertToGeminiFormat(request).contents,
-  },
-  {
-    protocol: 'bedrock',
-    key: 'messages',
-    convert: (request) => convertBedrockRequestHistory(request).messages,
   },
 ]
 

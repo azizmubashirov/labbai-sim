@@ -12,11 +12,6 @@ import type { InternalToolOperationHandler } from '@/lib/internal/tool-operation
 const PROVIDERS_BY_TOOL_ID: Record<string, EmbeddingProvider> = {
   openai_embeddings: 'openai',
   embeddings_openai: 'openai',
-  embeddings_openrouter: 'openrouter',
-  embeddings_gemini: 'gemini',
-  embeddings_cohere: 'cohere',
-  embeddings_mistral: 'mistral',
-  embeddings_ollama: 'ollama',
 }
 
 /** @internal Exported so the registry's family list can be pinned against it. */

@@ -5,7 +5,7 @@ import type OpenAI from 'openai'
 import type { BillingAttributionSnapshot } from '@/lib/billing/core/billing-attribution'
 import { formatCreditCost } from '@/lib/billing/credits/conversion'
 import { env } from '@/lib/core/config/env'
-import { getBlacklistedProvidersFromEnv, isHosted } from '@/lib/core/config/env-flags'
+import { getBlacklistedProvidersFromEnv } from '@/lib/core/config/env-flags'
 import {
   normalizeRecord,
   normalizeStringRecord,
@@ -26,7 +26,6 @@ import type { SubBlockConfig } from '@/blocks/types'
 import { isCustomTool } from '@/executor/constants'
 import {
   findProviderFromModel as findProviderFromDefinitions,
-  getComputerUseModels,
   getHostedModels as getHostedModelsFromDefinitions,
   getMaxOutputTokensForModel as getMaxOutputTokensForModelFromDefinitions,
   getMaxTemperature as getMaxTempFromDefinitions,
@@ -48,7 +47,6 @@ import {
   PROVIDER_DEFINITIONS,
   supportsTemperature as supportsTemperatureFromDefinitions,
   supportsToolUsageControl as supportsToolUsageControlFromDefinitions,
-  updateOllamaModels as updateOllamaModelsInDefinitions,
 } from '@/providers/models'
 import {
   getModelPricing as getRegisteredModelPricing,
@@ -137,111 +135,19 @@ function buildProviderMetadata(providerId: ProviderId): ProviderMetadata {
 }
 
 export const providers: Record<ProviderId, ProviderMetadata> = {
-  ollama: buildProviderMetadata('ollama'),
-  'ollama-cloud': buildProviderMetadata('ollama-cloud'),
-  vllm: buildProviderMetadata('vllm'),
-  litellm: buildProviderMetadata('litellm'),
-  openai: {
-    ...buildProviderMetadata('openai'),
-    computerUseModels: ['computer-use-preview'],
-  },
-  anthropic: {
-    ...buildProviderMetadata('anthropic'),
-    computerUseModels: getComputerUseModels().filter((model) =>
-      getProviderModelsFromDefinitions('anthropic').includes(model)
-    ),
-  },
-  google: buildProviderMetadata('google'),
-  vertex: buildProviderMetadata('vertex'),
-  'azure-openai': buildProviderMetadata('azure-openai'),
-  'azure-anthropic': buildProviderMetadata('azure-anthropic'),
-  deepseek: buildProviderMetadata('deepseek'),
-  xai: buildProviderMetadata('xai'),
-  cerebras: buildProviderMetadata('cerebras'),
-  groq: buildProviderMetadata('groq'),
-  sakana: buildProviderMetadata('sakana'),
-  typesafe: buildProviderMetadata('typesafe'),
-  nvidia: buildProviderMetadata('nvidia'),
-  meta: buildProviderMetadata('meta'),
-  zai: buildProviderMetadata('zai'),
-  kimi: buildProviderMetadata('kimi'),
-  mistral: buildProviderMetadata('mistral'),
-  bedrock: buildProviderMetadata('bedrock'),
-  openrouter: buildProviderMetadata('openrouter'),
-  fireworks: buildProviderMetadata('fireworks'),
-  together: buildProviderMetadata('together'),
-  baseten: buildProviderMetadata('baseten'),
-}
-
-export function updateOllamaProviderModels(models: string[]): void {
-  updateOllamaModelsInDefinitions(models)
-  providers.ollama.models = getProviderModelsFromDefinitions('ollama')
-}
-
-export function updateVLLMProviderModels(models: string[]): void {
-  const { updateVLLMModels } = require('@/providers/models')
-  updateVLLMModels(models)
-  providers.vllm.models = getProviderModelsFromDefinitions('vllm')
-}
-
-export function updateLiteLLMProviderModels(models: string[]): void {
-  const { updateLiteLLMModels } = require('@/providers/models')
-  updateLiteLLMModels(models)
-  providers.litellm.models = getProviderModelsFromDefinitions('litellm')
-}
-
-export async function updateOpenRouterProviderModels(models: string[]): Promise<void> {
-  const { updateOpenRouterModels } = await import('@/providers/models')
-  updateOpenRouterModels(models)
-  providers.openrouter.models = getProviderModelsFromDefinitions('openrouter')
-}
-
-export async function updateFireworksProviderModels(models: string[]): Promise<void> {
-  const { updateFireworksModels } = await import('@/providers/models')
-  updateFireworksModels(models)
-  providers.fireworks.models = getProviderModelsFromDefinitions('fireworks')
-}
-
-export async function updateOllamaCloudProviderModels(models: string[]): Promise<void> {
-  const { updateOllamaCloudModels } = await import('@/providers/models')
-  updateOllamaCloudModels(models)
-  providers['ollama-cloud'].models = getProviderModelsFromDefinitions('ollama-cloud')
-}
-
-export async function updateTogetherProviderModels(models: string[]): Promise<void> {
-  const { updateTogetherModels } = await import('@/providers/models')
-  updateTogetherModels(models)
-  providers.together.models = getProviderModelsFromDefinitions('together')
-}
-
-export async function updateBasetenProviderModels(models: string[]): Promise<void> {
-  const { updateBasetenModels } = await import('@/providers/models')
-  updateBasetenModels(models)
-  providers.baseten.models = getProviderModelsFromDefinitions('baseten')
+  openai: buildProviderMetadata('openai'),
 }
 
 export function getBaseModelProviders(): Record<string, ProviderId> {
-  const allProviders = Object.entries(providers)
-    .filter(
-      ([providerId]) =>
-        providerId !== 'ollama' &&
-        providerId !== 'ollama-cloud' &&
-        providerId !== 'vllm' &&
-        providerId !== 'litellm' &&
-        providerId !== 'openrouter' &&
-        providerId !== 'fireworks' &&
-        providerId !== 'together' &&
-        providerId !== 'baseten'
-    )
-    .reduce(
-      (map, [providerId, config]) => {
-        config.models.forEach((model) => {
-          map[model.toLowerCase()] = providerId as ProviderId
-        })
-        return map
-      },
-      {} as Record<string, ProviderId>
-    )
+  const allProviders = Object.entries(providers).reduce(
+    (map, [providerId, config]) => {
+      config.models.forEach((model) => {
+        map[model.toLowerCase()] = providerId as ProviderId
+      })
+      return map
+    },
+    {} as Record<string, ProviderId>
+  )
 
   return filterBlacklistedModelsFromProviderMap(allProviders)
 }
@@ -277,10 +183,8 @@ export function getAllModelProviders(): Record<string, ProviderId> {
  * The provider that declares `model`, or `null` when none does.
  *
  * The non-guessing half of {@link getProviderFromModel}. A caller that *gates*
- * on the answer needs "unknown" to stay distinct from "ollama": this registry
- * holds chat models only, so every embedding, speech, image and video model id
- * would otherwise read as an Ollama model and be judged against an allowlist
- * that was never about it.
+ * on the answer needs "unknown" to stay distinct from a chat model: this registry
+ * holds chat models only, so embedding, speech, image and video ids return null.
  */
 export function findProviderFromModel(model: string): ProviderId | null {
   return findProviderFromDefinitions(model)
@@ -292,8 +196,8 @@ export function getProviderFromModel(model: string): ProviderId {
   let providerId = findProviderFromModel(model)
 
   if (!providerId) {
-    logger.warn(`No provider found for model: ${model}, defaulting to ollama`)
-    providerId = 'ollama'
+    logger.warn(`No provider found for model: ${model}, routing to OpenAI`)
+    providerId = 'openai'
   }
 
   if (isProviderBlacklisted(providerId)) {
@@ -308,8 +212,9 @@ export function getProviderFromModel(model: string): ProviderId {
 }
 
 export function getProvider(id: string): ProviderMetadata | undefined {
-  const providerId = id.split('/')[0] as ProviderId
-  return providers[providerId]
+  if (id in providers) return providers[id as ProviderId]
+  const providerId = findProviderFromModel(id)
+  return providerId ? providers[providerId] : undefined
 }
 
 export function getProviderConfigFromModel(model: string): ProviderMetadata | undefined {
@@ -1140,77 +1045,17 @@ export function shouldBillModelUsage(model: string): boolean {
 }
 
 /**
- * Placeholder returned for providers that use their own credential mechanism
- * rather than a user-supplied API key (e.g. AWS Bedrock via IAM/instance profiles).
- * Must be truthy so upstream key-presence checks don't reject it.
+ * Get the credential for a provider request (server-side only).
+ *
+ * Labbai: OpenAI is the only provider and always runs on the platform key
+ * (OPENAI_API_KEY or its rotation pool). There are no per-block LLM keys.
  */
-export const PROVIDER_PLACEHOLDER_KEY = 'provider-uses-own-credentials'
-
-/**
- * Get an API key for a specific provider, handling rotation and fallbacks
- * For use server-side only
- */
-export function getApiKey(provider: string, model: string, userProvidedKey?: string): string {
-  const hasUserKey = !!userProvidedKey
-
-  if (provider === 'ollama') {
-    return 'empty'
+export function getApiKey(provider: string, model: string, _userProvidedKey?: string): string {
+  if (provider !== 'openai') {
+    throw new Error(`Provider "${provider}" is not available for ${model}`)
   }
-
-  if (provider === 'vllm') {
-    return userProvidedKey || 'empty'
-  }
-
-  if (provider === 'litellm') {
-    return userProvidedKey || 'empty'
-  }
-
-  /** Bedrock authenticates through its configured AWS credentials. */
-  if (provider === 'bedrock') {
-    return PROVIDER_PLACEHOLDER_KEY
-  }
-
-  const isOpenAIModel = provider === 'openai'
-  const isClaudeModel = provider === 'anthropic'
-  const isGeminiModel = provider === 'google'
-  const isZaiModel = provider === 'zai'
-  const isXaiModel = provider === 'xai'
-  const isKimiModel = provider === 'kimi'
-  const isTypeSafeModel = provider === 'typesafe'
-
-  if (
-    isHosted &&
-    (isOpenAIModel ||
-      isClaudeModel ||
-      isGeminiModel ||
-      isZaiModel ||
-      isXaiModel ||
-      isKimiModel ||
-      isTypeSafeModel)
-  ) {
-    const hostedModels = getHostedModels()
-    const isModelHosted = hostedModels.some((m) => m.toLowerCase() === model.toLowerCase())
-
-    if (isModelHosted) {
-      try {
-        const { getRotatingApiKey } = require('@/lib/core/config/api-keys')
-        const serverKey = getRotatingApiKey(isGeminiModel ? 'gemini' : provider)
-        return serverKey
-      } catch (_error) {
-        if (hasUserKey) {
-          return userProvidedKey!
-        }
-
-        throw new Error(`No API key available for ${provider} ${model}`)
-      }
-    }
-  }
-
-  if (!hasUserKey) {
-    throw new Error(`API key is required for ${provider} ${model}`)
-  }
-
-  return userProvidedKey!
+  const { getRotatingApiKey } = require('@/lib/core/config/api-keys')
+  return getRotatingApiKey('openai')
 }
 
 /**
@@ -1556,17 +1401,6 @@ export function supportsPromptCaching(model: string): boolean {
 
 export function isDeepResearchModel(model: string): boolean {
   return MODELS_WITH_DEEP_RESEARCH.includes(model.toLowerCase())
-}
-
-export function isGemini3Model(model: string): boolean {
-  const normalized = model
-    .toLowerCase()
-    .replace(/^vertex\//, '')
-    .replace(
-      /^(?:google\/|(?:projects\/[^/]+\/locations\/[^/]+\/)?publishers\/google\/models\/)/,
-      ''
-    )
-  return normalized.startsWith('gemini-3')
 }
 
 /**

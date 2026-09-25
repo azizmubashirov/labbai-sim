@@ -20,7 +20,6 @@ import {
 } from 'vitest'
 import { resetDeploymentShape } from '@/lib/core/config/deployment-shape'
 import type { AgentTurnSession } from '@/lib/memory/agent-turn-session'
-import type { AutoRoutingSignals } from '@/lib/model-router/resolve'
 import * as userFileBase64 from '@/lib/uploads/utils/user-file-base64.server'
 import { getAllBlocks } from '@/blocks'
 import { AGENT, BlockType, isMcpTool } from '@/executor/constants'
@@ -40,8 +39,7 @@ import {
   markConversationHistoryNotice,
   setEncryptedConversationMessage,
 } from '@/providers/conversation-metadata'
-import { installStreamingCostPolicy } from '@/providers/cost-policy'
-import { getModelCapabilities, SIM_AUTO_MODEL_ID } from '@/providers/models'
+import { getModelCapabilities } from '@/providers/models'
 import {
   getProviderToolInputProvenance,
   getProviderToolModelInputRegistry,
@@ -1348,32 +1346,6 @@ describe('AgentBlockHandler', () => {
       expect(mockExecuteProviderRequest).toHaveBeenCalledTimes(1)
     })
 
-    it('leaves provider-family credentials off a fallback on another provider', async () => {
-      mockExecuteProviderRequest
-        .mockRejectedValueOnce(new Error('one'))
-        .mockRejectedValueOnce(new Error('two'))
-        .mockResolvedValueOnce(providerResponse('gpt-4o-mini'))
-
-      await handler.execute(mockContext, mockBlock, {
-        ...baseInputs,
-        vertexCredential: 'vertex-secret',
-        bedrockSecretKey: 'bedrock-secret',
-        azureEndpoint: 'https://azure.example.com',
-        fallbackModels: [{ model: 'claude-sonnet-5' }, { model: 'gpt-4o-mini' }],
-      })
-
-      const [, crossProvider] = mockExecuteProviderRequest.mock.calls[1]
-      const [, sameProvider] = mockExecuteProviderRequest.mock.calls[2]
-      expect(crossProvider.vertexCredential).toBeUndefined()
-      expect(crossProvider.bedrockSecretKey).toBeUndefined()
-      expect(crossProvider.azureEndpoint).toBeUndefined()
-      expect(JSON.stringify(crossProvider)).not.toMatch(
-        /vertex-secret|bedrock-secret|azure\.example/
-      )
-      expect(sameProvider.bedrockSecretKey).toBe('bedrock-secret')
-      expect(sameProvider.azureEndpoint).toBe('https://azure.example.com')
-    })
-
     it('ignores a row key the block did not store as a reference', async () => {
       mockExecuteProviderRequest
         .mockRejectedValueOnce(new Error('one'))
@@ -1462,7 +1434,7 @@ describe('AgentBlockHandler', () => {
       expect(blockLog.modelFallbacks).toBeUndefined()
     })
 
-    it('skips sim-auto, duplicates, the primary itself, and unusable providers', async () => {
+    it('skips duplicates, the primary itself, and unusable providers', async () => {
       mockExecuteProviderRequest
         .mockRejectedValueOnce(new Error('down'))
         .mockResolvedValueOnce(providerResponse('claude-sonnet-5'))
@@ -1470,7 +1442,6 @@ describe('AgentBlockHandler', () => {
       await handler.execute(mockContext, mockBlock, {
         ...baseInputs,
         fallbackModels: [
-          { model: 'sim-auto' },
           { model: 'GPT-4o' },
           { model: 'blacklisted-model' },
           { model: 'claude-sonnet-5' },
@@ -1726,37 +1697,6 @@ describe('AgentBlockHandler', () => {
       )
     })
 
-    it('keeps the fallback name when a routed sim-auto primary fails and a fallback answers', async () => {
-      mockExecuteProviderRequest
-        .mockRejectedValueOnce(new Error('pool model down'))
-        .mockResolvedValueOnce(providerResponse('gpt-5.4-mini'))
-      const blockLog = openLog()
-
-      const result = (await handler.execute({ ...mockContext, blockLogs: [blockLog] }, mockBlock, {
-        model: SIM_AUTO_MODEL_ID,
-        systemPrompt: 'Be brief.',
-        userPrompt: 'Hello!',
-        fallbackModels: [{ model: 'gpt-5.4-mini', reasoningEffort: 'low' }],
-      })) as { model: string }
-
-      expect(result.model).toBe('gpt-5.4-mini')
-      expect(mockExecuteProviderRequest).toHaveBeenCalledTimes(2)
-      /** The trace names the auto identity, never the pool model that was routed. */
-      expect(blockLog.modelFallbacks).toEqual([SIM_AUTO_MODEL_ID])
-      /** The row's tuning was set against the auto id in the editor, so it applies whatever was routed. */
-      expect(mockExecuteProviderRequest.mock.calls[1][1].reasoningEffort).toBe('low')
-      /** The auto identity preamble belongs to the pool model, not a named fallback. */
-      const systemText = (request: { messages?: Array<{ role: string; content: string }> }) =>
-        (request.messages ?? [])
-          .filter((message) => message.role === 'system')
-          .map((message) => message.content)
-          .join('\n')
-      expect(systemText(mockExecuteProviderRequest.mock.calls[0][1])).toContain('Sim auto model')
-      expect(systemText(mockExecuteProviderRequest.mock.calls[1][1])).not.toContain(
-        'Sim auto model'
-      )
-    })
-
     it('records the failed models on the open log entry, not an earlier closed one', async () => {
       mockExecuteProviderRequest
         .mockRejectedValueOnce(new Error('down'))
@@ -1874,127 +1814,6 @@ describe('AgentBlockHandler', () => {
       expect(mockExecuteProviderRequest).not.toHaveBeenCalled()
     })
 
-    it('reports a sim-auto run under the sim-auto identity, not the model that served it', async () => {
-      mockExecuteProviderRequest.mockResolvedValue({
-        content: 'Mocked response content',
-        model: AGENT.DEFAULT_MODEL,
-        tokens: { input: 10, output: 20, total: 30 },
-        toolCalls: [],
-        cost: { input: 0.001, output: 0.002, total: 0.003 },
-        timing: {
-          total: 100,
-          timeSegments: [
-            { type: 'model', name: AGENT.DEFAULT_MODEL, provider: 'anthropic', duration: 100 },
-          ],
-        },
-      })
-
-      const result = (await handler.execute(mockContext, mockBlock, {
-        model: SIM_AUTO_MODEL_ID,
-        userPrompt: 'Hello!',
-      })) as {
-        model: string
-        cost: unknown
-        tokens: unknown
-        providerTiming: { timeSegments: Array<{ name?: string; provider?: string }> }
-      }
-
-      expect(result.model).toBe(SIM_AUTO_MODEL_ID)
-      expect(result.providerTiming.timeSegments[0].name).toBe(SIM_AUTO_MODEL_ID)
-      expect(result.providerTiming.timeSegments[0].provider).toBeUndefined()
-      // Only the label changes: tokens and the already-priced cost are untouched.
-      expect(result.tokens).toEqual({ input: 10, output: 20, total: 30 })
-      expect(result.cost).toEqual({ input: 0.001, output: 0.002, total: 0.003 })
-    })
-
-    /** Reaches the private signal builder; routing depends on nothing else. */
-    const buildAutoRoutingSignalsFor = (inputs: Record<string, unknown>) =>
-      (
-        handler as unknown as {
-          buildAutoRoutingSignals: (i: unknown, rf: unknown) => { mediaKind: string }
-        }
-      ).buildAutoRoutingSignals(inputs, undefined)
-
-    it('leaves auto-routing signal projection to the shared model router boundary', () => {
-      const signals = buildAutoRoutingSignalsFor({
-        systemPrompt: 'Keep routing-secret-value private',
-        userPrompt: 'Use routing-secret-value',
-        tools: [{ title: 'routing-secret-value' }],
-      }) as AutoRoutingSignals
-
-      expect(signals.systemPrompt).toBe('Keep routing-secret-value private')
-      expect(signals.lastMessage).toBe('Use routing-secret-value')
-      expect(signals.toolNames).toEqual(['routing-secret-value'])
-    })
-
-    const png = { id: 'f1', type: 'image/png' }
-    const pdf = { id: 'f2', type: 'application/pdf' }
-
-    it('reports no media when neither the files input nor any message carries one', async () => {
-      const signals = buildAutoRoutingSignalsFor({
-        messages: [{ role: 'user' as const, content: 'Summarize this text' }],
-      })
-
-      expect(signals.mediaKind).toBe('none')
-    })
-
-    it('detects media carried on inbound messages, not just the files input', async () => {
-      const signals = buildAutoRoutingSignalsFor({
-        messages: [{ role: 'user' as const, content: 'What is in this image?', files: [png] }],
-      })
-
-      expect(signals.mediaKind).toBe('image')
-    })
-
-    it('classifies an all-image attachment set as image', async () => {
-      expect(buildAutoRoutingSignalsFor({ files: [png, png] }).mediaKind).toBe('image')
-    })
-
-    it('classifies a mixed image + document set as file', async () => {
-      expect(buildAutoRoutingSignalsFor({ files: [png, pdf] }).mediaKind).toBe('file')
-    })
-
-    it('treats an unknown MIME type as file rather than assuming it is an image', async () => {
-      expect(buildAutoRoutingSignalsFor({ files: [{ id: 'f3' }] }).mediaKind).toBe('file')
-    })
-
-    it('overlays the routing charge on a streaming cost written after the fact', async () => {
-      // Mirrors the real streaming shape: the policy accessor is installed at
-      // provider-return time, the drain writes the final cost long after the
-      // handler returned, and consumers read it at log time.
-      const output: Record<string, unknown> = { cost: { input: 0, output: 0, total: 0 } }
-      installStreamingCostPolicy(output as never, { billable: true, multiplier: 1 })
-      const streaming = { stream: new ReadableStream(), execution: { output } }
-
-      ;(
-        handler as unknown as { applyRoutingCost: (r: unknown, c: number) => void }
-      ).applyRoutingCost(streaming, 0.002)
-
-      // The drain settles the model cost afterwards.
-      ;(output as { cost: unknown }).cost = { input: 0.01, output: 0.02, total: 0.03 }
-
-      expect(output.cost).toEqual({
-        input: 0.01,
-        output: 0.02,
-        total: expect.closeTo(0.032, 10),
-        routing: 0.002,
-      })
-    })
-
-    it('adds the routing charge to a settled non-streaming cost', async () => {
-      const result: Record<string, unknown> = { cost: { input: 0.01, output: 0.02, total: 0.03 } }
-
-      ;(
-        handler as unknown as { applyRoutingCost: (r: unknown, c: number) => void }
-      ).applyRoutingCost(result, 0.002)
-
-      expect(result.cost).toEqual({
-        input: 0.01,
-        output: 0.02,
-        total: expect.closeTo(0.032, 10),
-        routing: 0.002,
-      })
-    })
 
     it('leaves the reported model alone for an explicitly selected model', async () => {
       const result = (await handler.execute(mockContext, mockBlock, {
@@ -4757,31 +4576,27 @@ describe('AgentBlockHandler', () => {
       expect(requestBody.messages[1]).not.toHaveProperty('conversationId')
     })
 
-    it('should pass Azure OpenAI parameters through the request pipeline', async () => {
+    it('drops stale Azure credential inputs instead of forwarding them to the provider', async () => {
       const inputs = {
-        model: 'azure/gpt-4o',
+        model: 'gpt-4.1',
         systemPrompt: 'You are a helpful assistant.',
         userPrompt: 'Hello!',
-        apiKey: 'test-azure-api-key',
+        apiKey: 'test-openai-api-key',
         azureEndpoint: 'https://my-azure-resource.openai.azure.com',
         azureApiVersion: '2024-07-01-preview',
         temperature: 0.7,
       }
 
-      mockGetProviderFromModel.mockReturnValue('azure-openai')
+      mockGetProviderFromModel.mockReturnValue('openai')
 
       await handler.execute(mockContext, mockBlock, inputs)
 
-      expect(mockExecuteProviderRequest).toHaveBeenCalled()
-
-      const providerCall = mockExecuteProviderRequest.mock.calls[0]
-      const requestBody = providerCall[1]
-
-      expect(requestBody.azureEndpoint).toBe('https://my-azure-resource.openai.azure.com')
-      expect(requestBody.azureApiVersion).toBe('2024-07-01-preview')
-      expect(providerCall[0]).toBe('azure-openai')
-      expect(requestBody.model).toBe('azure/gpt-4o')
-      expect(requestBody.apiKey).toBe('test-azure-api-key')
+      const [providerId, requestBody] = mockExecuteProviderRequest.mock.calls[0]
+      expect(providerId).toBe('openai')
+      expect(requestBody.model).toBe('gpt-4.1')
+      expect(requestBody.apiKey).toBe('test-openai-api-key')
+      expect(requestBody).not.toHaveProperty('azureEndpoint')
+      expect(requestBody).not.toHaveProperty('azureApiVersion')
     })
 
     it('should pass GPT-5 specific parameters (reasoningEffort and verbosity) through the request pipeline', async () => {

@@ -38,14 +38,6 @@ export interface AgentInputs {
   temperature?: string | number
   maxTokens?: string | number
   apiKey?: string
-  azureEndpoint?: string
-  azureApiVersion?: string
-  vertexProject?: string
-  vertexLocation?: string
-  vertexCredential?: string
-  bedrockAccessKeyId?: string
-  bedrockSecretKey?: string
-  bedrockRegion?: string
   reasoningEffort?: string
   verbosity?: string
   thinkingLevel?: string

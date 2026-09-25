@@ -8,17 +8,7 @@ import type { ResolvedSecretInputPath } from '@/executor/utils/resolved-secret-t
 
 export type BYOKProviderId =
   | 'openai'
-  | 'anthropic'
-  | 'google'
   | 'mistral'
-  | 'zai'
-  | 'kimi'
-  | 'typesafe'
-  | 'xai'
-  | 'fireworks'
-  | 'together'
-  | 'baseten'
-  | 'ollama-cloud'
   | 'falai'
   | 'firecrawl'
   | 'exa'

@@ -157,38 +157,15 @@ describe('durable conversation restoration and continuation', () => {
     expect(JSON.stringify(messages)).not.toContain('private-signature')
   })
 
-  it.each(['anthropic', 'azure-anthropic', 'bedrock', 'google', 'vertex', 'deepseek'] as const)(
-    'projects foreign tool history for %s without inventing required reasoning state',
-    async (providerId) => {
-      const restored = await restoreConversationNativeMessages(
-        toolGroup(),
-        providerId,
-        'model-a',
-        'binding-a'
-      )
-      expect(restored).toHaveLength(1)
-      expect(restored[0].role).toBe('user')
-      expect(restored[0].content).toContain('untrusted_prior_tool_execution')
-      expect(restored[0].content).toContain('result')
-    }
-  )
-
-  it('bounds incompatible provider history without modifying the recorded arguments or outcomes', async () => {
-    const messages = toolGroup('retained result '.repeat(1000))
-    messages[0].tool_calls![0].function.arguments = JSON.stringify({
-      value: 'original argument '.repeat(1000),
-    })
-    const original = structuredClone(messages)
+  it('replays OpenAI tool history natively without a portable execution record', async () => {
     const restored = await restoreConversationNativeMessages(
-      messages,
-      'anthropic',
+      toolGroup(),
+      'openai',
       'model-a',
       'binding-a'
     )
-    expect(restored).toHaveLength(1)
-    expect(restored[0].content!.length).toBeLessThanOrEqual(4096)
-    expect(restored[0].content).toContain('execution record shortened')
-    expect(messages).toEqual(original)
+    expect(restored.map((message) => message.role)).toEqual(['assistant', 'tool'])
+    expect(JSON.stringify(restored)).not.toContain('untrusted_prior_tool_execution')
   })
 
   it('applies the same compatibility policy to current invocation and persisted exchanges', async () => {
@@ -200,49 +177,18 @@ describe('durable conversation restoration and continuation', () => {
       rawResponse: response,
       modelResponse: response,
     })
-    const current = session.getMessages('anthropic', 'other-model', 'other-binding')
+    const current = session.getMessages('openai', 'other-model', 'other-binding')
     expect(current).toHaveLength(2)
     const persisted = structuredClone(current)
     expect(
-      await restoreConversationNativeMessages(current, 'anthropic', 'other-model', 'other-binding')
+      await restoreConversationNativeMessages(current, 'openai', 'other-model', 'other-binding')
     ).toEqual(
       await restoreConversationNativeMessages(
         persisted,
-        'anthropic',
+        'openai',
         'other-model',
         'other-binding'
       )
     )
-  })
-
-  it.each([
-    { endpoint: 'https://azure.test', protocol: 'responses' as const },
-    { endpoint: 'https://azure.test/openai/v1/responses', protocol: 'responses' as const },
-    {
-      endpoint: 'https://azure.test/openai/deployments/model/chat/completions',
-      protocol: 'chat-completions' as const,
-    },
-  ])('uses Azure endpoint protocol $protocol for $endpoint', async ({ endpoint, protocol }) => {
-    const messages = toolGroup()
-    const native = {
-      protocol,
-      providerId: 'azure-openai' as const,
-      model: 'model-a',
-      binding: 'binding-a',
-      value: { private: 'continuation' },
-    }
-    setEncryptedConversationMessage(
-      messages[0],
-      await encryptMemoryCheckpoint({ memoryId: 'memory-1', native })
-    )
-    await restoreConversationNativeMessages(
-      messages,
-      'azure-openai',
-      'model-a',
-      'binding-a',
-      'memory-1',
-      { azureEndpoint: endpoint }
-    )
-    expect(getNativeConversationMessage(messages[0], protocol)).toEqual(native.value)
   })
 })

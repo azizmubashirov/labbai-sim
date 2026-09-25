@@ -32,7 +32,7 @@ describe('executeEmbeddingsTool', () => {
     mockExecuteEmbedding.mockResolvedValue(Response.json({ success: true }))
   })
 
-  it('rejects a provider that does not match the declared tool', async () => {
+  it('rejects a provider other than OpenAI', async () => {
     const response = await executeEmbeddingsTool(
       request({ provider: 'gemini', apiKey: 'key', input: 'hello' })
     )
@@ -94,20 +94,5 @@ describe('executeEmbeddingsTool', () => {
     )
 
     expect(registered.sort()).toEqual(routedHere.sort())
-  })
-
-  it('runs Ollama without a credential the schema does not declare', async () => {
-    const response = await executeEmbeddingsTool(
-      request(
-        { provider: 'ollama', model: 'nomic-embed-text', input: 'hello' },
-        { toolId: 'embeddings_ollama' }
-      )
-    )
-
-    expect(response.status).toBe(200)
-    expect(mockExecuteEmbedding).toHaveBeenCalledWith(
-      expect.objectContaining({ provider: 'ollama', model: 'nomic-embed-text' }),
-      expect.any(Object)
-    )
   })
 })

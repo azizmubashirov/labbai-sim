@@ -16,7 +16,6 @@ import {
   PipedriveIcon,
   ShopifyIcon,
   TrelloIcon,
-  VertexIcon,
   WordpressIcon,
   ZoomIcon,
 } from '@/components/icons'
@@ -134,18 +133,6 @@ export const OAUTH_PROVIDERS: Record<string, OAuthProviderConfig> = {
         baseProviderIcon: GoogleIcon,
         scopes: [],
         authType: 'service_account',
-      },
-      'vertex-ai': {
-        name: 'Vertex AI',
-        description: 'Access Google Cloud Vertex AI for Gemini models with OAuth.',
-        providerId: 'vertex-ai',
-        icon: VertexIcon,
-        baseProviderIcon: VertexIcon,
-        scopes: [
-          'https://www.googleapis.com/auth/userinfo.email',
-          'https://www.googleapis.com/auth/userinfo.profile',
-          'https://www.googleapis.com/auth/cloud-platform',
-        ],
       },
     },
     defaultService: 'gmail',

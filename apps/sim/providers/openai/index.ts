@@ -1,11 +1,11 @@
 import { createLogger } from '@sim/logger'
 import type { StreamingExecution } from '@/executor/types'
 import { getProviderDefaultModel, getProviderModels } from '@/providers/models'
+import { getOpenAIBaseUrl, getOpenAIExtraHeaders } from '@/providers/openai/client-config'
 import type { ProviderConfig, ProviderRequest, ProviderResponse } from '@/providers/types'
 import { executeResponsesProviderRequest } from './core'
 
 const logger = createLogger('OpenAIProvider')
-const responsesEndpoint = 'https://api.openai.com/v1/responses'
 
 export const openaiProvider: ProviderConfig = {
   id: 'openai',
@@ -26,8 +26,10 @@ export const openaiProvider: ProviderConfig = {
       providerId: 'openai',
       providerLabel: 'OpenAI',
       modelName: request.model,
-      endpoint: responsesEndpoint,
+      // Labbai: OPENAI_BASE_URL / OPENAI_EXTRA_HEADERS let a gateway sit in front later.
+      endpoint: `${getOpenAIBaseUrl()}/responses`,
       headers: {
+        ...getOpenAIExtraHeaders(),
         Authorization: `Bearer ${request.apiKey}`,
         'Content-Type': 'application/json',
         'OpenAI-Beta': 'responses=v1',

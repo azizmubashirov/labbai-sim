@@ -136,9 +136,8 @@ describe('projections never hand out registry state', () => {
 
 describe('options functions must be synchronous', () => {
   /**
-   * The providers store is substituted process-wide for the duration of the
-   * call, so an asynchronous options function would expose its substitute state
-   * to every other caller. It fails loudly rather than degrading to no options.
+   * An asynchronous options function would publish a promise instead of options.
+   * It fails loudly rather than degrading to no options.
    */
   it('throws rather than swallowing a thenable result', () => {
     const subBlock = {

@@ -82,41 +82,12 @@ export const providerHistoryAdapters: Record<ConversationProtocol, ProviderHisto
 
 export const providerHistoryProtocols: Record<ProviderId, ConversationProtocol | null> = {
   openai: 'responses',
-  'azure-openai': 'responses',
-  anthropic: 'anthropic',
-  'azure-anthropic': 'anthropic',
-  google: 'gemini',
-  vertex: 'gemini',
-  bedrock: 'bedrock',
-  deepseek: 'chat-completions',
-  xai: 'chat-completions',
-  cerebras: 'chat-completions',
-  groq: 'chat-completions',
-  sakana: 'chat-completions',
-  typesafe: null,
-  nvidia: 'chat-completions',
-  meta: 'chat-completions',
-  zai: 'chat-completions',
-  kimi: 'chat-completions',
-  mistral: 'chat-completions',
-  ollama: 'chat-completions',
-  'ollama-cloud': 'chat-completions',
-  openrouter: 'chat-completions',
-  fireworks: 'chat-completions',
-  together: 'chat-completions',
-  baseten: 'chat-completions',
-  vllm: 'chat-completions',
-  litellm: 'chat-completions',
 }
 
-/** Bedrock is treated conservatively because its Claude models also require signed thinking. */
-export function requiresNativeToolHistory(providerId: ProviderId | undefined): boolean {
-  return (
-    providerId === 'anthropic' ||
-    providerId === 'azure-anthropic' ||
-    providerId === 'bedrock' ||
-    providerId === 'google' ||
-    providerId === 'vertex' ||
-    providerId === 'deepseek'
-  )
+/**
+ * Whether tool history must replay the provider's native signed blocks. OpenAI's
+ * Responses history replays without signed thinking blocks, so it never does.
+ */
+export function requiresNativeToolHistory(_providerId: ProviderId | undefined): boolean {
+  return false
 }

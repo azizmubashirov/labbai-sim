@@ -1,6 +1,7 @@
 import type { EmbeddingAdapterFactory } from '@/lib/embeddings/types'
+import { getOpenAIBaseUrl, getOpenAIExtraHeaders } from '@/providers/openai/client-config'
 
-/** OpenAI-compatible envelope; Azure and OpenRouter request numeric vectors. */
+/** OpenAI `/v1/embeddings` response envelope. */
 export interface OpenAIEmbeddingResponse<TEmbedding = number[]> {
   data: Array<{ embedding: TEmbedding }>
   usage?: { prompt_tokens?: number; total_tokens?: number }
@@ -25,7 +26,8 @@ function decodeEmbedding(encoded: string, dimensions: number): number[] {
 }
 
 /**
- * OpenAI `/v1/embeddings`. Omitting `dimensions` yields the model's native
+ * OpenAI `/v1/embeddings` at {@link getOpenAIBaseUrl} (`OPENAI_BASE_URL`, default
+ * the public API) with any `OPENAI_EXTRA_HEADERS`. Omitting `dimensions` yields the model's native
  * dimensionality. Base64 carries Float32 coordinates with less JSON overhead,
  * matching the native OpenAI SDK's transport; callers still receive number arrays.
  */
@@ -36,8 +38,9 @@ export const createOpenAIAdapter: EmbeddingAdapterFactory = ({
 }) => ({
   maxItemsPerRequest: OPENAI_MAX_ITEMS_PER_REQUEST,
   buildRequest: ({ inputs, dimensions }) => ({
-    apiUrl: 'https://api.openai.com/v1/embeddings',
+    apiUrl: `${getOpenAIBaseUrl()}/embeddings`,
     headers: {
+      ...getOpenAIExtraHeaders(),
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },

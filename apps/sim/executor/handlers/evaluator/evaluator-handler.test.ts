@@ -4,9 +4,8 @@ import { createLogger } from '@sim/logger'
 import { authOAuthUtilsMock, authOAuthUtilsMockFns } from '@sim/testing'
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest'
 
-const { mockResolveAutoModel, mockCheckWorkspaceAccess } = vi.hoisted(() => ({
+const { mockCheckWorkspaceAccess } = vi.hoisted(() => ({
   mockCheckWorkspaceAccess: vi.fn(),
-  mockResolveAutoModel: vi.fn(),
 }))
 
 vi.mock('@/lib/workspaces/permissions/utils', () => ({
@@ -34,13 +33,6 @@ vi.mock('@/lib/credentials/access', () => ({
     canWriteWorkspace: true,
     isAdmin: true,
   }),
-}))
-
-vi.mock('@/lib/model-router/resolve', () => ({
-  addAutoRoutingCost: (cost: Record<string, number>, routingCost: number) =>
-    routingCost > 0 ? { ...cost, routing: routingCost, total: cost.total + routingCost } : cost,
-  resolveAutoModel: mockResolveAutoModel,
-  SIM_AUTO_SYSTEM_PREAMBLE: 'Sim auto system preamble',
 }))
 
 import { BlockType } from '@/executor/constants'
@@ -124,12 +116,6 @@ describe('EvaluatorBlockHandler', () => {
       refreshed: false,
     })
     mockGetProviderFromModel.mockReturnValue('openai')
-    mockResolveAutoModel.mockResolvedValue({
-      model: 'fireworks/glm-5.2',
-      tier: '2',
-      decidedBy: 'llm',
-      billableRoutingCost: 0.002,
-    })
 
     mockExecuteProviderRequest.mockResolvedValue({
       content: JSON.stringify({ score1: 5, score2: 8 }),
@@ -160,7 +146,7 @@ describe('EvaluatorBlockHandler', () => {
     apiKey: 'test-api-key',
   }
 
-  it('preserves metric scores and Auto routing cost when a fallback answers', async () => {
+  it('preserves metric scores and cost when a fallback answers', async () => {
     mockGetProviderFromModel.mockImplementation((model: string) =>
       model.startsWith('claude') ? 'anthropic' : 'fireworks'
     )
@@ -174,7 +160,7 @@ describe('EvaluatorBlockHandler', () => {
       })
     const output = await handler.execute(mockContext, mockBlock, {
       ...admissionInputs,
-      model: 'sim-auto',
+      model: 'gpt-4o',
       fallbackModels: [{ model: 'claude-sonnet-5' }],
     })
     expect(output).toMatchObject({
@@ -182,12 +168,12 @@ describe('EvaluatorBlockHandler', () => {
       model: 'claude-sonnet-5',
       score1: 7,
       tokens: { total: 15 },
-      cost: { total: 0.006 },
+      cost: { total: 0.004 },
     })
     const first = mockExecuteProviderRequest.mock.calls[0][1]
     const fallback = mockExecuteProviderRequest.mock.calls[1][1]
     expect(fallback.responseFormat).toEqual(first.responseFormat)
-    expect(fallback.systemPrompt).not.toContain('Sim auto system preamble')
+    expect(fallback.systemPrompt).toBe(first.systemPrompt)
     expect(fallback.apiKey).toBeUndefined()
   })
 
@@ -450,60 +436,6 @@ describe('EvaluatorBlockHandler', () => {
     expect(providerRuntimeRegistry()).toBeUndefined()
   })
 
-  it('resolves sim-auto before executing evaluator and preserves its public identity', async () => {
-    const inputs = {
-      content: 'A clear and accurate answer.',
-      metrics: [
-        {
-          name: 'quality',
-          description: 'Overall answer quality',
-          range: { min: 1, max: 5 },
-        },
-      ],
-      model: 'sim-auto',
-    }
-
-    mockExecuteProviderRequest.mockResolvedValueOnce({
-      content: JSON.stringify({ quality: 5 }),
-      model: 'fireworks/glm-5.2',
-      tokens: { input: 80, output: 10, total: 90 },
-      cost: { input: 0.001, output: 0.0005, total: 0.0015 },
-    })
-
-    const result = await handler.execute(mockContext, mockBlock, inputs)
-
-    expect(mockResolveAutoModel).toHaveBeenCalledWith({
-      ctx: mockContext,
-      blockId: mockBlock.id,
-      signals: expect.objectContaining({
-        lastMessage: inputs.content,
-        messageCount: 1,
-        toolNames: [],
-        mediaKind: 'none',
-        hasResponseFormat: true,
-      }),
-      fallbackModel: 'claude-sonnet-5',
-    })
-    expect(mockGetProviderFromModel).toHaveBeenCalledWith('fireworks/glm-5.2')
-
-    const requestBody = providerRequestBody()
-    expect(requestBody).toMatchObject({
-      provider: 'openai',
-      model: 'fireworks/glm-5.2',
-      systemPrompt: expect.stringMatching(/^Sim auto system preamble\n\n/),
-    })
-    expect(result).toMatchObject({
-      model: 'sim-auto',
-      quality: 5,
-      cost: {
-        input: 0.001,
-        output: 0.0005,
-        routing: 0.002,
-        total: 0.0035,
-      },
-    })
-  })
-
   it('bills the cost the provider proxy decided rather than recomputing it', async () => {
     // The proxy already resolved key provenance and the margin; recomputing
     // here would re-charge a BYOK caller the proxy correctly zeroed.
@@ -748,95 +680,6 @@ describe('EvaluatorBlockHandler', () => {
     expect(logged).toContain('{{CONTENT_SECRET}}')
   })
 
-  it('should handle Azure OpenAI models with endpoint and API version', async () => {
-    const inputs = {
-      content: 'Test content to evaluate',
-      metrics: [
-        {
-          name: 'quality',
-          description: 'Quality score',
-          range: { min: 1, max: 10 },
-        },
-      ],
-      model: 'gpt-4o',
-      apiKey: 'test-azure-key',
-      azureEndpoint: 'https://test.openai.azure.com',
-      azureApiVersion: '2024-07-01-preview',
-    }
-
-    mockGetProviderFromModel.mockReturnValue('azure-openai')
-
-    mockExecuteProviderRequest.mockResolvedValueOnce({
-      content: JSON.stringify({ quality: 8 }),
-      model: 'gpt-4o',
-      tokens: {},
-      cost: 0,
-      timing: {},
-    })
-
-    await handler.execute(mockContext, mockBlock, inputs)
-
-    const requestBody = providerRequestBody()
-
-    expect(requestBody).toMatchObject({
-      provider: 'azure-openai',
-      model: 'gpt-4o',
-      apiKey: 'test-azure-key',
-      azureEndpoint: 'https://test.openai.azure.com',
-      azureApiVersion: '2024-07-01-preview',
-    })
-  })
-
-  it('should handle Vertex AI models with OAuth credential', async () => {
-    const inputs = {
-      content: 'Test content to evaluate',
-      metrics: [
-        {
-          name: 'quality',
-          description: 'Quality score',
-          range: { min: 1, max: 10 },
-        },
-      ],
-      model: 'gemini-2.0-flash-exp',
-      vertexCredential: 'test-vertex-credential-id',
-      vertexProject: 'test-gcp-project',
-      vertexLocation: 'us-central1',
-    }
-
-    mockGetProviderFromModel.mockReturnValue('vertex')
-
-    // Mock the database query for Vertex credential
-    const mockDb = await import('@sim/db')
-    const mockAccount = {
-      id: 'test-vertex-credential-id',
-      accessToken: 'mock-access-token',
-      refreshToken: 'mock-refresh-token',
-      expiresAt: new Date(Date.now() + 3600000), // 1 hour from now
-    }
-    ;(mockDb.db.query as any).account = { findFirst: vi.fn() }
-    vi.spyOn(mockDb.db.query.account, 'findFirst').mockResolvedValue(mockAccount as any)
-
-    mockExecuteProviderRequest.mockResolvedValueOnce({
-      content: JSON.stringify({ quality: 9 }),
-      model: 'gemini-2.0-flash-exp',
-      tokens: {},
-      cost: 0,
-      timing: {},
-    })
-
-    await handler.execute(mockContext, mockBlock, inputs)
-
-    const requestBody = providerRequestBody()
-
-    expect(requestBody).toMatchObject({
-      provider: 'vertex',
-      model: 'gemini-2.0-flash-exp',
-      vertexProject: 'test-gcp-project',
-      vertexLocation: 'us-central1',
-    })
-    expect(requestBody.apiKey).toBe('mock-access-token')
-  })
-
   it('should use default model when not provided', async () => {
     const inputs = {
       content: 'Test content',
@@ -847,7 +690,7 @@ describe('EvaluatorBlockHandler', () => {
 
     mockExecuteProviderRequest.mockResolvedValueOnce({
       content: JSON.stringify({ score: 7 }),
-      model: 'claude-sonnet-5',
+      model: 'gpt-5-mini',
       tokens: {},
       cost: 0,
       timing: {},
@@ -857,6 +700,6 @@ describe('EvaluatorBlockHandler', () => {
 
     const requestBody = providerRequestBody()
 
-    expect(requestBody.model).toBe('claude-sonnet-5')
+    expect(requestBody.model).toBe('gpt-5-mini')
   })
 })

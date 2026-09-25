@@ -1,4 +1,3 @@
-import { GoogleGenAI, type Part } from '@google/genai'
 import { createLogger } from '@sim/logger'
 import { getErrorMessage, toError } from '@sim/utils/errors'
 import {
@@ -16,23 +15,120 @@ import {
   ServerToolModelInputError,
 } from '@/lib/copilot/tools/server/model-input'
 import { writeCopilotWorkspaceFileByPath } from '@/lib/copilot/vfs/resource-writer'
-import { getRotatingApiKey } from '@/lib/core/config/api-keys'
+import { env } from '@/lib/core/config/env'
 import { MAX_MEDIA_BYTES } from '@/lib/media/falai'
 import { createWorkspaceFileSecretProvenanceFromRegistry } from '@/lib/uploads/contexts/workspace/workspace-file-secret-provenance'
 import { fileOperations } from '@/lib/workspace-files/application/operations'
 import { readWorkspaceFileContent } from '@/lib/workspace-files/application/read-workspace-file-content'
+import { getOpenAIBaseUrl, getOpenAIExtraHeaders } from '@/providers/openai/client-config'
 
 const logger = createLogger('GenerateImageTool')
 
-const NANO_BANANA_MODEL = 'gemini-3.1-flash-image-preview'
-const NANO_BANANA_IMAGE_COST_USD = 0.101
+/**
+ * Labbai: copilot image generation runs on OpenAI's image model with the
+ * platform `OPENAI_API_KEY` (previously Gemini "Nano Banana"). With no key
+ * configured the tool is disabled.
+ */
+const OPENAI_IMAGE_MODEL = 'gpt-image-1'
 
-const ASPECT_RATIO_TO_SIZE: Record<string, string> = {
+/** gpt-image-1 list prices, USD per 1M tokens. */
+const IMAGE_PRICING = { textInput: 5, imageInput: 10, imageOutput: 40 } as const
+/** Charged when the response carries no usage block (medium quality, landscape). */
+const FALLBACK_IMAGE_COST_USD = 0.063
+
+type OpenAIImageSize = '1024x1024' | '1536x1024' | '1024x1536'
+
+const ASPECT_RATIO_TO_SIZE: Record<string, OpenAIImageSize> = {
   '1:1': '1024x1024',
   '16:9': '1536x1024',
+  '4:3': '1536x1024',
   '9:16': '1024x1536',
-  '4:3': '1024x768',
-  '3:4': '768x1024',
+  '3:4': '1024x1536',
+}
+
+function getOpenAIImageApiKey(): string | null {
+  return env.OPENAI_API_KEY?.trim() || null
+}
+
+interface ReferenceImage {
+  buffer: Buffer
+  name: string
+  mimeType: string
+}
+
+interface OpenAIImageResponse {
+  data?: Array<{ b64_json?: string }>
+  usage?: ImageUsage
+  error?: { message?: string }
+}
+
+/**
+ * Calls OpenAI `/images/generations`, or `/images/edits` (multipart) when
+ * reference images are supplied, at `OPENAI_BASE_URL`.
+ */
+async function requestOpenAIImage(
+  apiKey: string,
+  prompt: string,
+  size: OpenAIImageSize,
+  references: ReferenceImage[],
+  signal?: AbortSignal
+): Promise<OpenAIImageResponse> {
+  const headers: Record<string, string> = {
+    ...getOpenAIExtraHeaders(),
+    Authorization: `Bearer ${apiKey}`,
+  }
+  let response: Response
+  if (references.length > 0) {
+    const form = new FormData()
+    form.append('model', OPENAI_IMAGE_MODEL)
+    form.append('prompt', prompt)
+    form.append('size', size)
+    form.append('n', '1')
+    for (const reference of references) {
+      form.append(
+        'image[]',
+        new Blob([new Uint8Array(reference.buffer)], { type: reference.mimeType }),
+        reference.name
+      )
+    }
+    response = await fetch(`${getOpenAIBaseUrl()}/images/edits`, {
+      method: 'POST',
+      headers,
+      body: form,
+      signal,
+    })
+  } else {
+    response = await fetch(`${getOpenAIBaseUrl()}/images/generations`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: OPENAI_IMAGE_MODEL, prompt, size, n: 1 }),
+      signal,
+    })
+  }
+  const body = (await response.json().catch(() => ({}))) as OpenAIImageResponse
+  if (!response.ok) {
+    throw new Error(body.error?.message || `OpenAI image request failed (${response.status})`)
+  }
+  return body
+}
+
+interface ImageUsage {
+  input_tokens?: number
+  output_tokens?: number
+  input_tokens_details?: { text_tokens?: number; image_tokens?: number }
+}
+
+function imageCostFromUsage(usage: ImageUsage | undefined): number {
+  if (!usage || typeof usage.output_tokens !== 'number') return FALLBACK_IMAGE_COST_USD
+  const imageInput = usage.input_tokens_details?.image_tokens ?? 0
+  const textInput =
+    usage.input_tokens_details?.text_tokens ?? Math.max(0, (usage.input_tokens ?? 0) - imageInput)
+  return (
+    (textInput * IMAGE_PRICING.textInput +
+      imageInput * IMAGE_PRICING.imageInput +
+      usage.output_tokens * IMAGE_PRICING.imageOutput) /
+    1_000_000
+  )
 }
 
 interface GenerateImageArgs {
@@ -77,15 +173,21 @@ export const generateImageServerTool: BaseServerTool<GenerateImageArgs, Generate
       return { success: false, message: 'prompt is required' }
     }
 
+    const apiKey = getOpenAIImageApiKey()
+    if (!apiKey) {
+      return {
+        success: false,
+        message: 'Image generation is not available: no OpenAI API key is configured.',
+      }
+    }
+
     try {
       const prompt = params.prompt
-      const apiKey = getRotatingApiKey('gemini')
-      const ai = new GoogleGenAI({ apiKey })
 
       const aspectRatio = params.aspectRatio || '1:1'
-      const sizeHint = ASPECT_RATIO_TO_SIZE[aspectRatio]
+      const size = ASPECT_RATIO_TO_SIZE[aspectRatio] ?? '1024x1024'
 
-      const parts: Part[] = []
+      const referenceImages: ReferenceImage[] = []
 
       const referencePaths = params.inputs?.files?.map((file) => file.path) ?? []
 
@@ -111,10 +213,11 @@ export const generateImageServerTool: BaseServerTool<GenerateImageArgs, Generate
               },
               { fileId: fileRecord.id }
             )
-            const base64 = buffer.toString('base64')
             const mime = fileRecord.type || 'image/png'
-            parts.push({
-              inlineData: { mimeType: mime, data: base64 },
+            referenceImages.push({
+              buffer,
+              name: fileRecord.name || 'reference.png',
+              mimeType: mime,
             })
             logger.info('Loaded reference image', {
               filePath,
@@ -132,50 +235,29 @@ export const generateImageServerTool: BaseServerTool<GenerateImageArgs, Generate
         }
       }
 
-      const sizeInstruction = sizeHint
-        ? ` Generate the image at ${sizeHint} resolution with a ${aspectRatio} aspect ratio.`
-        : ''
-
-      parts.push({ text: prompt + sizeInstruction })
-
-      logger.info('Generating image with Nano Banana 2', {
-        model: NANO_BANANA_MODEL,
+      logger.info('Generating image with OpenAI', {
+        model: OPENAI_IMAGE_MODEL,
         aspectRatio,
+        size,
         promptLength: prompt.length,
-        referenceImageCount: referencePaths.length,
+        referenceImageCount: referenceImages.length,
       })
 
-      const response = await ai.models.generateContent({
-        model: NANO_BANANA_MODEL,
-        contents: [{ role: 'user', parts }],
-        config: {
-          responseModalities: ['IMAGE', 'TEXT'],
-        },
-      })
+      const response = await requestOpenAIImage(
+        apiKey,
+        prompt,
+        size,
+        referenceImages,
+        context.abortSignal
+      )
 
-      let imageBase64: string | undefined
-      let mimeType = 'image/png'
-
-      if (response.candidates?.[0]?.content?.parts) {
-        for (const part of response.candidates[0].content.parts) {
-          if (part.inlineData?.data) {
-            imageBase64 = part.inlineData.data
-            if (part.inlineData.mimeType) {
-              mimeType = part.inlineData.mimeType
-            }
-            break
-          }
-        }
-      }
+      const imageBase64 = response.data?.[0]?.b64_json ?? undefined
+      const mimeType = 'image/png'
 
       if (!imageBase64) {
-        const textParts = response.candidates?.[0]?.content?.parts
-          ?.filter((p) => p.text)
-          .map((p) => p.text)
-          .join(' ')
         return {
           success: false,
-          message: `Image generation returned no image data. ${textParts ? `Model response: ${textParts.slice(0, 500)}` : 'No response from model.'}`,
+          message: 'Image generation returned no image data.',
         }
       }
 
@@ -220,12 +302,15 @@ export const generateImageServerTool: BaseServerTool<GenerateImageArgs, Generate
 
       return {
         success: true,
-        message: `Image ${referencePaths.length ? 'edited' : 'generated'} and ${written.mode === 'overwrite' ? 'updated' : 'saved'} at "${written.vfsPath}" (${imageBuffer.length} bytes)`,
+        message: `Image ${referenceImages.length ? 'edited' : 'generated'} and ${written.mode === 'overwrite' ? 'updated' : 'saved'} at "${written.vfsPath}" (${imageBuffer.length} bytes)`,
         fileId: written.id,
         fileName: written.name,
         vfsPath: written.vfsPath,
         downloadUrl: written.downloadUrl,
-        _serviceCost: { service: 'nano_banana_2', cost: NANO_BANANA_IMAGE_COST_USD },
+        _serviceCost: {
+          service: OPENAI_IMAGE_MODEL,
+          cost: imageCostFromUsage(response.usage),
+        },
       }
     } catch (error) {
       const msg = getErrorMessage(error, 'Unknown error')

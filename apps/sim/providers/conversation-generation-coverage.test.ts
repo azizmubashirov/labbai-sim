@@ -47,20 +47,6 @@ describe('provider generation context coverage', () => {
           if (/\.chat\.completions\.create$/.test(callee)) {
             /** Provider callbacks receive the already-prepared shared streaming-loop payload. */
             if (!insideNamedAncestor(node, 'createStream')) argument = 0
-          } else if (/\.models\.generateContent(Stream)?$/.test(callee)) {
-            argument = 0
-          } else if (/^Converse(Stream)?Command$/.test(callee)) {
-            argument = 0
-          } else if (/anthropic\.messages\.(create|stream)$/.test(callee)) {
-            /** Both Anthropic helper branches receive a prepared payload at every call site. */
-            if (!insideNamedAncestor(node, 'createMessage')) argument = 0
-          } else if (callee === 'createMessage' && file.endsWith('/anthropic/core.ts')) {
-            argument = 1
-          } else if (
-            callee === 'createStream' &&
-            file.endsWith('/openai-compat/streaming-tool-loop.ts')
-          ) {
-            argument = 0
           } else if (callee === 'JSON.stringify' && insideNamedAncestor(node, 'postOnce')) {
             argument = 0
           }
@@ -78,6 +64,7 @@ describe('provider generation context coverage', () => {
       visit(source)
     }
     expect(uncovered).toEqual([])
-    expect(guarded).toBeGreaterThan(90)
+    /** OpenAI Responses: every request leaves through `postOnce` in `openai/core.ts`. */
+    expect(guarded).toBeGreaterThanOrEqual(1)
   })
 })

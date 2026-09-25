@@ -1,8 +1,6 @@
 import { createHash } from 'node:crypto'
 import { createLogger } from '@sim/logger'
 import { getErrorMessage } from '@sim/utils/errors'
-import { env } from '@/lib/core/config/env'
-import { getOllamaUrl } from '@/lib/core/utils/urls'
 import type { ConversationProtocol, ConversationUsage } from '@/lib/memory/conversation-types'
 import { getConversationPrefixHash } from '@/providers/conversation-prefix'
 import { priceModelUsage, resolveModelCostPolicy } from '@/providers/cost-policy'
@@ -56,30 +54,11 @@ export function getConversationBinding(providerId: ProviderId, request: Provider
       JSON.stringify({
         providerId,
         model: request.model,
-        endpoint:
-          request.azureEndpoint ??
-          (providerId === 'azure-openai' ? env.AZURE_OPENAI_ENDPOINT : undefined) ??
-          (providerId === 'vllm'
-            ? env.VLLM_BASE_URL
-            : providerId === 'litellm'
-              ? env.LITELLM_BASE_URL
-              : providerId === 'ollama'
-                ? getOllamaUrl()
-                : undefined),
-        apiVersion:
-          request.azureApiVersion ??
-          (providerId === 'azure-openai' ? env.AZURE_OPENAI_API_VERSION : undefined),
+        endpoint: 'openai',
         systemPrompt: request.systemPrompt,
         systemMessages: request.messages?.filter((message) => message.role === 'system'),
         context: request.context,
-        account: {
-          apiKey: request.apiKey,
-          accessKey: request.bedrockAccessKeyId,
-          secretKey: request.bedrockSecretKey,
-        },
-        project: request.vertexProject,
-        location: request.vertexLocation,
-        region: request.bedrockRegion,
+        account: { apiKey: request.apiKey },
         tools: request.tools?.map(getConfiguredConversationToolBinding),
         responseFormat: request.responseFormat,
         reasoningEffort: request.reasoningEffort,

@@ -35,7 +35,7 @@ vi.mock('@/providers/utils', () => ({
     hasFilteredTools: false,
   }),
   trackForcedToolUsage: () => ({ hasUsedForcedTool: false, usedForcedTools: [] }),
-  supportsReasoningEffort: (model: string) => ['gpt-5.5', 'o3'].includes(model),
+  supportsReasoningEffort: (model: string) => ['gpt-5.5', 'gpt-5-mini'].includes(model),
 }))
 
 vi.mock('@/tools', () => ({ executeTool: vi.fn() }))
@@ -132,7 +132,7 @@ describe('executeResponsesProviderRequest reasoning payload', () => {
     })
 
     it('requests reasoning.summary auto when effort is unset', async () => {
-      await run({ model: 'o3', agentEvents: true })
+      await run({ model: 'gpt-5-mini', agentEvents: true })
       const body = JSON.parse(fetchMock.mock.calls[0][1].body as string)
       expect(body.reasoning).toEqual({ summary: 'auto' })
     })
@@ -160,7 +160,7 @@ describe('executeResponsesProviderRequest reasoning payload', () => {
         )
         .mockResolvedValueOnce(jsonResponse(COMPLETED_RESPONSE))
 
-      const result = await run({ model: 'o3', agentEvents: true, reasoningEffort: 'high' })
+      const result = await run({ model: 'gpt-5-mini', agentEvents: true, reasoningEffort: 'high' })
 
       expect(fetchMock).toHaveBeenCalledTimes(2)
       const retryBody = JSON.parse(fetchMock.mock.calls[1][1].body as string)
@@ -195,7 +195,7 @@ describe('executeResponsesProviderRequest reasoning payload', () => {
       ;(executeTool as Mock).mockResolvedValue({ success: true, output: { results: [] } })
 
       await run({
-        model: 'o3',
+        model: 'gpt-5-mini',
         agentEvents: true,
         tools: [{ id: 'exa_search', name: 'exa_search', description: 'd', parameters: {} }] as any,
       })
@@ -212,14 +212,14 @@ describe('executeResponsesProviderRequest reasoning payload', () => {
       fetchMock.mockResolvedValue(
         jsonResponse({ error: { message: 'Invalid value for input' } }, 400)
       )
-      await expect(run({ model: 'o3', agentEvents: true })).rejects.toThrow('Invalid value')
+      await expect(run({ model: 'gpt-5-mini', agentEvents: true })).rejects.toThrow('Invalid value')
       expect(fetchMock).toHaveBeenCalledTimes(1)
     })
   })
 
   describe('legacy runs (no agent events)', () => {
     it('omits reasoning entirely when effort is unset', async () => {
-      await run({ model: 'o3' })
+      await run({ model: 'gpt-5-mini' })
       const body = JSON.parse(fetchMock.mock.calls[0][1].body as string)
       expect(body.reasoning).toBeUndefined()
     })
@@ -240,7 +240,7 @@ describe('executeResponsesProviderRequest reasoning payload', () => {
   })
 
   it('omits reasoning for non-reasoning models', async () => {
-    await run({ model: 'gpt-4o', agentEvents: true })
+    await run({ model: 'gpt-4.1-mini', agentEvents: true })
     const body = JSON.parse(fetchMock.mock.calls[0][1].body as string)
     expect(body.reasoning).toBeUndefined()
   })

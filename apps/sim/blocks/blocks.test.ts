@@ -530,13 +530,11 @@ describe.concurrent('Blocks Module', () => {
         expect(modelSubBlock).toBeDefined()
         expect(modelSubBlock?.type).toBe('combobox')
         expect(modelSubBlock?.required).toBe(true)
-        expect(modelSubBlock?.defaultValue).toBe('claude-sonnet-5')
+        expect(modelSubBlock?.defaultValue).toBe('gpt-5-mini')
       })
 
       it('should have LLM tool access', () => {
-        expect(block?.tools.access).toContain('openai_chat')
-        expect(block?.tools.access).toContain('anthropic_chat')
-        expect(block?.tools.access).toContain('google_chat')
+        expect(block?.tools.access).toEqual(['openai_chat'])
       })
 
       it('should have tools.config with tool selector function', () => {
@@ -920,7 +918,7 @@ describe.concurrent('Blocks Module', () => {
       )
     })
 
-    it('should offer every embeddings provider with a matching tool and model list', () => {
+    it('should offer OpenAI as the only embeddings provider with a tool and model list', () => {
       const block = getBlock('embeddings')
       const providerSubBlock = block?.subBlocks.find((sb) => sb.id === 'provider')
       const providerOptions = providerSubBlock?.options
@@ -928,28 +926,13 @@ describe.concurrent('Blocks Module', () => {
         ? providerOptions.map((option) => option.id)
         : []
 
-      expect(providerSubBlock?.commandSearchable).toBe(true)
       expect(providerSubBlock?.value?.()).toBe('openai')
-      expect(providerIds).toEqual(['openai', 'gemini', 'cohere', 'mistral', 'openrouter', 'ollama'])
-
-      for (const provider of providerIds) {
-        // Each provider routes to its own registered tool...
-        const toolId = block?.tools.config?.tool?.({ provider })
-        expect(block?.tools.access).toContain(toolId)
-        // ...and has either a static model list or a dynamic model loader.
-        const modelSubBlock = block?.subBlocks.find(
-          (sb) => sb.id === 'model' && sb.condition?.value === provider
-        )
-        // OpenRouter's catalog is remote and Ollama's is the deployment's own,
-        // so neither can be enumerated here.
-        if (provider === 'openrouter' || provider === 'ollama') {
-          expect(modelSubBlock?.selectorKey).toBeTypeOf('string')
-        } else {
-          expect(
-            Array.isArray(modelSubBlock?.options) ? modelSubBlock.options.length : 0
-          ).toBeGreaterThan(0)
-        }
-      }
+      expect(providerIds).toEqual(['openai'])
+      expect(block?.tools.access).toEqual(['embeddings_openai'])
+      const modelSubBlock = block?.subBlocks.find((sb) => sb.id === 'model')
+      expect(
+        Array.isArray(modelSubBlock?.options) ? modelSubBlock.options.length : 0
+      ).toBeGreaterThan(0)
     })
 
     it('should default an embeddings block saved before the provider field existed to openai', () => {
@@ -958,7 +941,8 @@ describe.concurrent('Blocks Module', () => {
       // Serialization runs before variable resolution, so an absent provider
       // must still resolve to the original OpenAI tool.
       expect(block?.tools.config?.tool?.({})).toBe('embeddings_openai')
-      expect(block?.tools.config?.tool?.({ provider: 'gemini' })).toBe('embeddings_gemini')
+      // A provider saved before the OpenAI-only switch still routes to OpenAI.
+      expect(block?.tools.config?.tool?.({ provider: 'gemini' })).toBe('embeddings_openai')
     })
 
     it('should mark the agent model combobox as command-searchable', () => {
@@ -972,9 +956,8 @@ describe.concurrent('Blocks Module', () => {
 
     /** Each model-tuning field with a model that accepts it and one that does not. */
     const AGENT_MODEL_LEVEL_FIELDS = [
-      { id: 'reasoningEffort', capable: 'gpt-5.1', incapable: 'claude-sonnet-5' },
-      { id: 'verbosity', capable: 'gpt-5.1', incapable: 'claude-sonnet-5' },
-      { id: 'thinkingLevel', capable: 'claude-sonnet-5', incapable: 'gpt-5.1' },
+      { id: 'reasoningEffort', capable: 'gpt-5-mini', incapable: 'gpt-4.1' },
+      { id: 'verbosity', capable: 'gpt-5-mini', incapable: 'gpt-4.1' },
     ] as const
 
     it('should let the agent model-tuning fields take a typed reference', () => {

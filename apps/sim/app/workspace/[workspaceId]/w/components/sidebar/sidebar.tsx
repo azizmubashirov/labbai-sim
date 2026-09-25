@@ -143,7 +143,6 @@ import { useFolderStore } from '@/stores/folders/store'
 import type { WorkflowFolder } from '@/stores/folders/types'
 import { useFilterStore } from '@/stores/logs/filters/store'
 import { useSearchModalStore } from '@/stores/modals/search/store'
-import { useProvidersStore } from '@/stores/providers'
 import { useSettingsDirtyStore } from '@/stores/settings/dirty/store'
 import { useSidebarStore } from '@/stores/sidebar/store'
 
@@ -380,14 +379,6 @@ export const Sidebar = memo(function Sidebar() {
   const { getSettingsHref, navigateToSettings } = useSettingsNavigation()
   const initializeSearchData = useSearchModalStore((state) => state.initializeData)
   const customBlockOverlayVersion = useCustomBlockOverlayVersion()
-  const providers = useProvidersStore((state) => state.providers)
-  const providerModelSignature = useMemo(
-    () =>
-      Object.values(providers)
-        .map((provider) => provider.models.join('\x00'))
-        .join('\x01'),
-    [providers]
-  )
 
   useEffect(() => {
     initializeSearchData(filterBlocks, isToolAllowed)
@@ -395,7 +386,6 @@ export const Sidebar = memo(function Sidebar() {
     initializeSearchData,
     filterBlocks,
     isToolAllowed,
-    providerModelSignature,
     customBlockOverlayVersion,
   ])
 

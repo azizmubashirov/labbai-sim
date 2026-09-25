@@ -99,7 +99,7 @@ describe('executeSpecialistLoop billing', () => {
     await executeSpecialistLoop({
       domain: 'research',
       userMessage: 'search for billing docs',
-      model: 'claude-sonnet-4-6',
+      model: 'gpt-5-mini',
       provider,
       allTools: [searchOnlineTool],
       toolCtx,

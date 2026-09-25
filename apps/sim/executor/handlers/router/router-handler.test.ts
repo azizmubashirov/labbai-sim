@@ -9,8 +9,7 @@ import {
 } from '@sim/testing'
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest'
 
-const { mockResolveAutoModel, mockCheckWorkspaceAccess } = vi.hoisted(() => ({
-  mockResolveAutoModel: vi.fn(),
+const { mockCheckWorkspaceAccess } = vi.hoisted(() => ({
   mockCheckWorkspaceAccess: vi.fn(),
 }))
 
@@ -40,13 +39,6 @@ vi.mock('@/lib/credentials/access', () => ({
     canWriteWorkspace: true,
     isAdmin: true,
   }),
-}))
-
-vi.mock('@/lib/model-router/resolve', () => ({
-  addAutoRoutingCost: (cost: Record<string, number>, routingCost: number) =>
-    routingCost > 0 ? { ...cost, routing: routingCost, total: cost.total + routingCost } : cost,
-  resolveAutoModel: mockResolveAutoModel,
-  SIM_AUTO_SYSTEM_PREAMBLE: 'Sim auto system preamble',
 }))
 
 import { generateRouterPrompt, generateRouterV2Prompt } from '@/blocks/blocks/router'
@@ -162,12 +154,6 @@ describe('RouterBlockHandler', () => {
     })
     mockGetProviderFromModel.mockReturnValue('openai')
     mockGenerateRouterPrompt.mockReturnValue('Generated System Prompt')
-    mockResolveAutoModel.mockResolvedValue({
-      model: 'fireworks/glm-5.2',
-      tier: '2',
-      decidedBy: 'llm',
-      billableRoutingCost: 0.002,
-    })
 
     mockExecuteProviderRequest.mockResolvedValue({
       content: 'target-block-1',
@@ -465,10 +451,9 @@ describe('RouterBlockHandler', () => {
       mockContext.workflow!.blocks = hasEnabledSibling ? [mockBlock, mockTargetBlock2] : [mockBlock]
 
       await expect(
-        handler.execute(mockContext, mockBlock, { prompt: 'Test', model: 'sim-auto' })
+        handler.execute(mockContext, mockBlock, { prompt: 'Test', model: 'gpt-4o' })
       ).rejects.toThrow('Target block target-block-1 not found')
       expect(mockGenerateRouterPrompt).not.toHaveBeenCalled()
-      expect(mockResolveAutoModel).not.toHaveBeenCalled()
       expect(mockExecuteProviderRequest).not.toHaveBeenCalled()
     }
   )
@@ -536,39 +521,6 @@ describe('RouterBlockHandler', () => {
     }
   )
 
-  it('resolves sim-auto and preserves provider billing with existing routing candidates', async () => {
-    mockExecuteProviderRequest.mockResolvedValueOnce({
-      content: 'target-block-2',
-      model: 'fireworks/glm-5.2',
-      tokens: { input: 100, output: 20, total: 120 },
-      cost: { input: 0.001, output: 0.0005, total: 0.0015 },
-    })
-
-    const result = await handler.execute(mockContext, mockBlock, {
-      prompt: 'Choose the best option.',
-      model: 'sim-auto',
-    })
-
-    expect(mockResolveAutoModel).toHaveBeenCalledWith({
-      ctx: mockContext,
-      blockId: mockBlock.id,
-      signals: expect.objectContaining({
-        lastMessage: 'Choose the best option.',
-        hasResponseFormat: false,
-      }),
-      fallbackModel: 'claude-sonnet-5',
-    })
-    expect(providerRequestBody()).toMatchObject({
-      model: 'fireworks/glm-5.2',
-      systemPrompt: 'Sim auto system preamble\n\nGenerated System Prompt',
-    })
-    expect(result).toMatchObject({
-      model: 'sim-auto',
-      selectedRoute: 'target-block-2',
-      cost: { input: 0.001, output: 0.0005, routing: 0.002, total: 0.0035 },
-    })
-  })
-
   it('should throw error if LLM response is not a valid target block ID', async () => {
     const inputs = { prompt: 'Test', apiKey: 'test-api-key' }
 
@@ -620,11 +572,11 @@ describe('RouterBlockHandler', () => {
 
     await handler.execute(mockContext, mockBlock, inputs)
 
-    expect(mockGetProviderFromModel).toHaveBeenCalledWith('claude-sonnet-5')
+    expect(mockGetProviderFromModel).toHaveBeenCalledWith('gpt-5-mini')
 
     const requestBody = providerRequestBody()
     expect(requestBody).toMatchObject({
-      model: 'claude-sonnet-5',
+      model: 'gpt-5-mini',
       temperature: 0.1,
     })
   })
@@ -653,64 +605,6 @@ describe('RouterBlockHandler', () => {
     expect(logged).not.toContain('provider-plaintext-secret')
     expect(logged).not.toContain('__var_')
     expect(logged).not.toContain('__sim_')
-  })
-
-  it('should handle Azure OpenAI models with endpoint and API version', async () => {
-    const inputs = {
-      prompt: 'Choose the best option.',
-      model: 'gpt-4o',
-      apiKey: 'test-azure-key',
-      azureEndpoint: 'https://test.openai.azure.com',
-      azureApiVersion: '2024-07-01-preview',
-    }
-
-    mockGetProviderFromModel.mockReturnValue('azure-openai')
-
-    await handler.execute(mockContext, mockBlock, inputs)
-
-    const requestBody = providerRequestBody()
-
-    expect(requestBody).toMatchObject({
-      provider: 'azure-openai',
-      model: 'gpt-4o',
-      apiKey: 'test-azure-key',
-      azureEndpoint: 'https://test.openai.azure.com',
-      azureApiVersion: '2024-07-01-preview',
-    })
-  })
-
-  it('should handle Vertex AI models with OAuth credential', async () => {
-    const inputs = {
-      prompt: 'Choose the best option.',
-      model: 'gemini-2.0-flash-exp',
-      vertexCredential: 'test-vertex-credential-id',
-      vertexProject: 'test-gcp-project',
-      vertexLocation: 'us-central1',
-    }
-
-    mockGetProviderFromModel.mockReturnValue('vertex')
-
-    const mockDb = await import('@sim/db')
-    const mockAccount = {
-      id: 'test-vertex-credential-id',
-      accessToken: 'mock-access-token',
-      refreshToken: 'mock-refresh-token',
-      expiresAt: new Date(Date.now() + 3600000),
-    }
-    ;(mockDb.db.query as any).account = { findFirst: vi.fn() }
-    vi.spyOn(mockDb.db.query.account, 'findFirst').mockResolvedValue(mockAccount as any)
-
-    await handler.execute(mockContext, mockBlock, inputs)
-
-    const requestBody = providerRequestBody()
-
-    expect(requestBody).toMatchObject({
-      provider: 'vertex',
-      model: 'gemini-2.0-flash-exp',
-      vertexProject: 'test-gcp-project',
-      vertexLocation: 'us-central1',
-    })
-    expect(requestBody.apiKey).toBe('mock-access-token')
   })
 })
 
@@ -797,19 +691,13 @@ describe('RouterBlockHandler V2', () => {
     })
     mockGetProviderFromModel.mockReturnValue('openai')
     mockGenerateRouterV2Prompt.mockReturnValue('Generated V2 System Prompt')
-    mockResolveAutoModel.mockResolvedValue({
-      model: 'fireworks/glm-5.2',
-      tier: '2',
-      decidedBy: 'llm',
-      billableRoutingCost: 0.002,
-    })
   })
 
   it('should handle router_v2 blocks', () => {
     expect(handler.canHandle(mockRouterV2Block)).toBe(true)
   })
 
-  it('preserves route selection and reasoning when an Auto request falls back', async () => {
+  it('preserves route selection and reasoning when a request falls back', async () => {
     mockExecuteProviderRequest
       .mockRejectedValueOnce(new Error('overloaded'))
       .mockResolvedValueOnce({
@@ -820,7 +708,7 @@ describe('RouterBlockHandler V2', () => {
       })
     const output = await handler.execute(mockContext, mockRouterV2Block, {
       context: 'Help me',
-      model: 'sim-auto',
+      model: 'gpt-4o',
       routes: [{ id: 'route-support', title: 'Support', value: 'Needs help' }],
       fallbackModels: [{ model: 'claude-sonnet-5' }],
     })
@@ -828,7 +716,7 @@ describe('RouterBlockHandler V2', () => {
       model: 'claude-sonnet-5',
       selectedRoute: 'route-support',
       reasoning: 'Needs assistance',
-      cost: { total: 0.003 },
+      cost: { total: 0.001 },
     })
     expect(mockExecuteProviderRequest.mock.calls[1][1].systemPrompt).toBe(
       'Generated V2 System Prompt'
@@ -977,64 +865,6 @@ describe('RouterBlockHandler V2', () => {
     })
 
     expect(providerRuntimeRegistry()).toBeUndefined()
-  })
-
-  it('resolves sim-auto before executing router V2 and preserves its public identity', async () => {
-    const inputs = {
-      context: 'How do I get Tableau on my work laptop?',
-      model: 'sim-auto',
-      routes: [
-        { id: 'route-support', title: 'Support', value: 'Something is broken' },
-        {
-          id: 'route-sales',
-          title: 'Request',
-          value: 'User wants something new',
-        },
-      ],
-    }
-
-    mockExecuteProviderRequest.mockResolvedValueOnce({
-      content: JSON.stringify({
-        route: 'route-sales',
-        reasoning: 'This is a new request.',
-      }),
-      model: 'fireworks/glm-5.2',
-      tokens: { input: 100, output: 20, total: 120 },
-      cost: { input: 0.001, output: 0.0005, total: 0.0015 },
-    })
-
-    const result = await handler.execute(mockContext, mockRouterV2Block, inputs)
-
-    expect(mockResolveAutoModel).toHaveBeenCalledWith({
-      ctx: mockContext,
-      blockId: mockRouterV2Block.id,
-      signals: expect.objectContaining({
-        lastMessage: inputs.context,
-        messageCount: 1,
-        toolNames: [],
-        mediaKind: 'none',
-        hasResponseFormat: true,
-      }),
-      fallbackModel: 'claude-sonnet-5',
-    })
-    expect(mockGetProviderFromModel).toHaveBeenCalledWith('fireworks/glm-5.2')
-
-    const requestBody = providerRequestBody()
-    expect(requestBody).toMatchObject({
-      provider: 'openai',
-      model: 'fireworks/glm-5.2',
-      systemPrompt: 'Sim auto system preamble\n\nGenerated V2 System Prompt',
-    })
-    expect(result).toMatchObject({
-      model: 'sim-auto',
-      selectedRoute: 'route-sales',
-      cost: {
-        input: 0.001,
-        output: 0.0005,
-        routing: 0.002,
-        total: 0.0035,
-      },
-    })
   })
 
   it('should include responseFormat in provider request', async () => {

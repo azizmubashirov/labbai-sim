@@ -1152,29 +1152,12 @@ export const OCR_CAPABILITY = defineCapability({
 } as const)
 
 /**
- * Model families a knowledge base can be indexed with.
- *
- * `KB_EMBEDDING_MODEL` names a model rather than a provider, so the family is
- * read off the id. The match has to be exactly as strict as the runtime's,
- * which keeps the configured id only when it is one a knowledge base can
- * actually use and otherwise falls back to `text-embedding-3-small`: a looser
- * rule here reports a family as configured that the runtime will not use, so a
- * deployment holding only that family's credentials passes its status check and
- * then fails every embedding call. So no prefix matching for the catalogued
- * families and no case folding — `Gemini-Embedding-001` is not a model the
- * runtime accepts, and neither is `gemini-embedding-999`.
- *
- * Ollama is the one open-ended family: its models are whatever the operator
- * pulled, so any id under the exact `ollama/` prefix counts, matching
- * `isOllamaEmbeddingModel`.
- *
- * This mirrors `apps/sim/lib/embeddings/catalog.ts`, which packages cannot
- * import. `apps/sim/lib/embeddings/knowledge-embedding-family.test.ts` pins the
- * two together, including for ids the runtime rejects.
+ * Model families a knowledge base can be indexed with. Labbai indexes with
+ * OpenAI `text-embedding-3-small` only; this mirrors `apps/sim/lib/embeddings/catalog.ts`,
+ * pinned by `apps/sim/lib/embeddings/knowledge-embedding-family.test.ts`.
  */
-export type KnowledgeEmbeddingFamily = 'openai' | 'gemini' | 'ollama'
-
-const OLLAMA_EMBEDDING_MODEL_PREFIX = 'ollama/'
+/** Labbai: OpenAI is the only knowledge-embedding family. */
+export type KnowledgeEmbeddingFamily = 'openai'
 
 /**
  * Widths each knowledge-base-eligible model can be indexed at, as the app
@@ -1183,12 +1166,7 @@ const OLLAMA_EMBEDDING_MODEL_PREFIX = 'ollama/'
  */
 const KB_EMBEDDING_MODEL_WIDTHS: Readonly<Record<string, readonly number[]>> = {
   'text-embedding-3-small': [1536, 1024, 768],
-  'text-embedding-3-large': [3072, 1536, 1024, 768],
-  'gemini-embedding-001': [3072, 1536, 768],
 }
-
-/** Knowledge-base-eligible Gemini model ids, as the app catalog defines them. */
-const GEMINI_KB_EMBEDDING_MODELS: readonly string[] = ['gemini-embedding-001']
 
 /**
  * Rejects a width the *selected model* cannot emit, which the per-field pattern
@@ -1216,17 +1194,7 @@ function validateEmbeddingModelWidth(
   ]
 }
 
-export function knowledgeEmbeddingFamily(values: EnvCapabilityValues): KnowledgeEmbeddingFamily {
-  /**
-   * Read raw, not trimmed: the runtime looks the value up exactly as configured,
-   * so ` gemini-embedding-001 ` is a model it rejects. Trimming here would
-   * report Gemini as configured for a value that routes to OpenAI's default.
-   */
-  const model = String(readValue(values, 'KB_EMBEDDING_MODEL') ?? '')
-  if (model.startsWith(OLLAMA_EMBEDDING_MODEL_PREFIX)) {
-    return model.length > OLLAMA_EMBEDDING_MODEL_PREFIX.length ? 'ollama' : 'openai'
-  }
-  if (GEMINI_KB_EMBEDDING_MODELS.includes(model)) return 'gemini'
+export function knowledgeEmbeddingFamily(_values: EnvCapabilityValues): KnowledgeEmbeddingFamily {
   return 'openai'
 }
 
@@ -1254,51 +1222,17 @@ function embeddingOutputDimsField(widths: readonly number[]) {
   })
 }
 
-const OPENAI_EMBEDDING_WIDTHS = [768, 1024, 1536, 3072] as const
-const GEMINI_EMBEDDING_WIDTHS = [768, 1536, 3072] as const
-const OLLAMA_EMBEDDING_WIDTHS = [384, 768, 1024, 1536, 3072] as const
+const OPENAI_EMBEDDING_WIDTHS = [768, 1024, 1536] as const
 
 /**
- * Which credential serves knowledge-base embeddings.
- *
- * `KB_EMBEDDING_MODEL` picks the family and the family's transports are tried in
- * order, so the providers below are gated on the selected family as well as on
- * their own keys: a Gemini key does not make Gemini a fallback for an OpenAI
- * model, and it does not become one just because it is present. Only the OpenAI
- * family has more than one transport, and it is the only one `wireFallback`
- * ever chains — the others are reached directly by `embed()`.
+ * Which credential serves knowledge-base embeddings. Labbai: the platform OpenAI
+ * key (optionally behind OPENAI_BASE_URL) is the only transport.
  */
 export const KNOWLEDGE_EMBEDDINGS_CAPABILITY = defineCapability({
   strategy: 'fallback',
   id: 'knowledge-embeddings',
   label: 'Knowledge embeddings',
   providers: [
-    {
-      id: 'azure-openai',
-      label: 'Azure OpenAI',
-      activation: {
-        mode: 'any-present',
-        keys: ['AZURE_OPENAI_API_KEY', 'AZURE_OPENAI_ENDPOINT', 'AZURE_OPENAI_API_VERSION'],
-      },
-      activeWhen: embeddingFamilyIs('openai'),
-      requires: allOf(
-        envField('AZURE_OPENAI_API_KEY'),
-        envField('AZURE_OPENAI_ENDPOINT', {
-          validation: {
-            kind: 'url',
-            protocols: ['http:', 'https:'],
-            message: 'must be a valid HTTP(S) URL',
-          },
-        }),
-        envField('AZURE_OPENAI_API_VERSION')
-      ),
-      optionalFields: [
-        envField('KB_OPENAI_MODEL_NAME'),
-        envField('KB_EMBEDDING_MODEL'),
-        embeddingOutputDimsField(OPENAI_EMBEDDING_WIDTHS),
-      ],
-      validate: validateEmbeddingModelWidth,
-    },
     {
       id: 'openai',
       label: 'OpenAI',
@@ -1318,76 +1252,6 @@ export const KNOWLEDGE_EMBEDDINGS_CAPABILITY = defineCapability({
         embeddingOutputDimsField(OPENAI_EMBEDDING_WIDTHS),
       ],
       validate: validateEmbeddingModelWidth,
-    },
-    {
-      id: 'openrouter',
-      label: 'OpenRouter',
-      activation: { mode: 'any-present', keys: ['OPENROUTER_API_KEY'] },
-      activeWhen: embeddingFamilyIs('openai'),
-      requires: envField('OPENROUTER_API_KEY'),
-      /**
-       * The same optional fields as the other OpenAI-family transports. Without
-       * them a deployment whose only transport is OpenRouter reports an
-       * unsupported width as configured, because no active provider validates it.
-       */
-      optionalFields: [
-        envField('KB_EMBEDDING_MODEL'),
-        embeddingOutputDimsField(OPENAI_EMBEDDING_WIDTHS),
-      ],
-      validate: validateEmbeddingModelWidth,
-    },
-    {
-      id: 'gemini',
-      label: 'Google Gemini',
-      activation: {
-        mode: 'any-present',
-        keys: ['GEMINI_API_KEY', 'GEMINI_API_KEY_1', 'GEMINI_API_KEY_2', 'GEMINI_API_KEY_3'],
-      },
-      activeWhen: embeddingFamilyIs('gemini'),
-      requires: allOf(
-        anyOf(
-          envField('GEMINI_API_KEY'),
-          envField('GEMINI_API_KEY_1'),
-          envField('GEMINI_API_KEY_2'),
-          envField('GEMINI_API_KEY_3')
-        ),
-        envField('KB_EMBEDDING_MODEL')
-      ),
-      optionalFields: [embeddingOutputDimsField(GEMINI_EMBEDDING_WIDTHS)],
-      validate: validateEmbeddingModelWidth,
-    },
-    {
-      /**
-       * Activated by `KB_EMBEDDING_MODEL` as well as `OLLAMA_URL`, so an
-       * operator who names an Ollama model but has not pointed Sim at a server
-       * is told which field is missing rather than that nothing is configured.
-       */
-      id: 'ollama',
-      label: 'Ollama',
-      activation: { mode: 'any-present', keys: ['OLLAMA_URL', 'KB_EMBEDDING_MODEL'] },
-      activeWhen: embeddingFamilyIs('ollama'),
-      requires: allOf(
-        envField('OLLAMA_URL', {
-          validation: {
-            kind: 'url',
-            protocols: ['http:', 'https:'],
-            message: 'must be a valid HTTP(S) URL',
-          },
-        }),
-        /**
-         * Constrained to the routing prefix, which is what makes it an Ollama
-         * model at all. It also stops the setup flow carrying a model from
-         * another family forward when an existing install switches to Ollama.
-         */
-        envField('KB_EMBEDDING_MODEL', {
-          validation: {
-            kind: 'pattern',
-            pattern: /^ollama\/.+/,
-            message: 'must name a model on your Ollama server, as ollama/<model>',
-          },
-        })
-      ),
-      optionalFields: [embeddingOutputDimsField(OLLAMA_EMBEDDING_WIDTHS)],
     },
   ],
 } as const)
@@ -1422,24 +1286,9 @@ export const LLM_KEY_POOLS = {
     keys: ['OPENAI_API_KEY_1', 'OPENAI_API_KEY_2', 'OPENAI_API_KEY_3'],
     fallbackKey: 'OPENAI_API_KEY',
   },
-  anthropic: {
-    keys: ['ANTHROPIC_API_KEY_1', 'ANTHROPIC_API_KEY_2', 'ANTHROPIC_API_KEY_3'],
-  },
-  gemini: {
-    keys: ['GEMINI_API_KEY_1', 'GEMINI_API_KEY_2', 'GEMINI_API_KEY_3'],
-    fallbackKey: 'GEMINI_API_KEY',
-  },
   cohere: {
     keys: ['COHERE_API_KEY_1', 'COHERE_API_KEY_2', 'COHERE_API_KEY_3'],
     fallbackKey: 'COHERE_API_KEY',
-  },
-  zai: { keys: ['ZAI_API_KEY_1', 'ZAI_API_KEY_2', 'ZAI_API_KEY_3'] },
-  xai: { keys: ['XAI_API_KEY_1', 'XAI_API_KEY_2', 'XAI_API_KEY_3'] },
-  kimi: { keys: ['KIMI_API_KEY_1', 'KIMI_API_KEY_2', 'KIMI_API_KEY_3'] },
-  typesafe: { keys: ['TYPESAFE_API_KEY_1', 'TYPESAFE_API_KEY_2', 'TYPESAFE_API_KEY_3'] },
-  fireworks: {
-    keys: ['FIREWORKS_API_KEY_1', 'FIREWORKS_API_KEY_2', 'FIREWORKS_API_KEY_3'],
-    fallbackKey: 'FIREWORKS_API_KEY',
   },
 } as const
 
@@ -1483,7 +1332,6 @@ const GOOGLE_OAUTH_SERVICES = new Set([
   'google-sheets',
   'google-calendar',
   'google-forms',
-  'vertex-ai',
 ])
 
 const MICROSOFT_OAUTH_SERVICES = new Set(['microsoft'])

@@ -22,17 +22,9 @@ import { createMcpToolId } from '@/lib/mcp/utils'
 import { type AgentTurnSession, openAgentTurnSession } from '@/lib/memory/agent-turn-session'
 import { MEMORY } from '@/lib/memory/constants'
 import { createAgentMemoryRetrievalTool } from '@/lib/memory/retrieval-tool'
-import {
-  type AutoMediaKind,
-  type AutoRoutingResult,
-  type AutoRoutingSignals,
-  resolveAutoModel,
-  SIM_AUTO_SYSTEM_PREAMBLE,
-} from '@/lib/model-router/resolve'
 import { importWorkspaceFileSecretProvenanceForModelView } from '@/lib/uploads/contexts/workspace/workspace-file-secret-provenance'
 import {
   getFileExtension,
-  MODEL_SUPPORTED_IMAGE_MIME_TYPES,
   processFilesToUserFiles,
   type RawFileInput,
   tryInferContextFromKey,
@@ -91,7 +83,6 @@ import { collectBlockData } from '@/executor/utils/block-data'
 import { stringifyJSON } from '@/executor/utils/json'
 import {
   getModelFallbacks,
-  PROVIDER_FAMILY_CREDENTIAL_FIELDS,
   recordModelFallbacks,
   resolveFallbackApiKey,
 } from '@/executor/utils/model-fallbacks'
@@ -103,7 +94,6 @@ import type {
   ResolvedSecretTraceRegistry,
 } from '@/executor/utils/resolved-secret-trace-registry'
 import { annotateDuplicateToolBindings } from '@/executor/utils/tool-binding-labels'
-import { resolveVertexCredential } from '@/executor/utils/vertex-credential'
 import { executeProviderRequest } from '@/providers'
 import {
   formatAttachmentSizes,
@@ -120,7 +110,7 @@ import {
   canUseProviderLargeFilePath,
   getInlineHydrationMaxBytes,
 } from '@/providers/file-attachments.server'
-import { isAutoModel, isEvaluationModel, SIM_AUTO_MODEL_ID } from '@/providers/models'
+import { isEvaluationModel } from '@/providers/models'
 import {
   type ProviderToolInputProvenance,
   registerProviderToolInputProvenance,
@@ -146,14 +136,6 @@ const AGENT_RAW_PROVIDER_ERROR_INPUT_PATHS: readonly ResolvedSecretInputPath[] =
   ['temperature'],
   ['maxTokens'],
   ['apiKey'],
-  ['azureEndpoint'],
-  ['azureApiVersion'],
-  ['vertexProject'],
-  ['vertexLocation'],
-  ['vertexCredential'],
-  ['bedrockAccessKeyId'],
-  ['bedrockSecretKey'],
-  ['bedrockRegion'],
   ['reasoningEffort'],
   ['verbosity'],
   ['thinkingLevel'],
@@ -167,33 +149,9 @@ interface IndexedToolInput {
   toolIndex: number
 }
 
-/**
- * Removes the sim-auto identity preamble from the system messages built for a
- * routed primary. A fallback the builder named is not a pool model, so it must
- * not be told to hide which model it is. Messages are built once per block run
- * (building them appends to memory), which is why this strips rather than
- * rebuilds.
- */
-function stripAutoPreamble(messages: Message[] | undefined): Message[] | undefined {
-  if (!messages) return messages
-  const prefix = `${SIM_AUTO_SYSTEM_PREAMBLE}\n\n`
-  return messages.flatMap((message) => {
-    if (message.role !== 'system' || typeof message.content !== 'string') return [message]
-    if (message.content === SIM_AUTO_SYSTEM_PREAMBLE) return []
-    if (!message.content.startsWith(prefix)) return [message]
-    return [{ ...message, content: message.content.slice(prefix.length) }]
-  })
-}
-
 /** One model in the order the block tries them; the primary carries the block's own key. */
 interface ModelCandidate extends FallbackModelCandidate {
   isPrimary: boolean
-  /**
-   * What the trace calls this model when it fails. A routed sim-auto primary
-   * shows as the auto identity, since naming the pool model is the leak that
-   * `applyAutoModelLabel` exists to close.
-   */
-  traceName?: string
 }
 
 interface ExecuteAcrossModelsConfig {
@@ -202,8 +160,7 @@ interface ExecuteAcrossModelsConfig {
   primaryModel: string
   /**
    * The model the builder configured, which is what the editor showed the
-   * per-row tuning fields against. Under sim-auto that is the auto id, not the
-   * pool model routed for this run, so a row's value applies whatever was routed.
+   * per-row tuning fields against.
    */
   configuredModel: string
   primaryProviderId: string
@@ -212,12 +169,6 @@ interface ExecuteAcrossModelsConfig {
   hydratedByProvider: Map<string, Message[] | undefined>
   fileProjection: ReturnType<AgentBlockHandler['projectFileNamesForModel']>
   modelInputs: AgentInputs
-  /**
-   * The system prompt without the sim-auto identity preamble, present only when
-   * the primary was auto-routed: a fallback the builder named is not a pool
-   * model and must not be told to hide which model it is.
-   */
-  fallbackSystemPrompt?: string
   formattedTools: ProviderToolConfig[]
   responseFormat: any
   streaming: boolean
@@ -407,8 +358,6 @@ export class AgentBlockHandler implements BlockHandler {
         ...modelInputProjection.value,
         responseFormat: responseFormatProjection.value,
       }
-      /** The system prompt as the model may see it, before any auto-routing preamble joins it. */
-      const projectedSystemPrompt = modelInputs.systemPrompt
       const projectedToolInputs = this.projectToolInputsForProvenance(ctx, tools)
 
       await this.validateToolPermissions(ctx, filteredInputs.tools || [])
@@ -416,50 +365,7 @@ export class AgentBlockHandler implements BlockHandler {
       const responseFormat = parseResponseFormat(modelInputs.responseFormat)
       const configuredModel = filteredInputs.model || AGENT.DEFAULT_MODEL
 
-      let model = configuredModel
-      let autoRouting: AutoRoutingResult | null = null
-      if (isAutoModel(configuredModel)) {
-        autoRouting = await resolveAutoModel({
-          ctx,
-          blockId: block.id,
-          signals: this.buildAutoRoutingSignals(
-            {
-              ...modelInputs,
-              systemPrompt: filteredInputs.systemPrompt ? modelInputs.systemPrompt : undefined,
-              userPrompt: filteredInputs.userPrompt
-                ? modelInputs.userPrompt
-                : filteredInputs.userPrompt,
-            },
-            responseFormat
-          ),
-          fallbackModel: AGENT.DEFAULT_MODEL,
-        })
-        model = autoRouting.model
-        logger.info(
-          'Resolved sim-auto model',
-          projectAgentDiagnosticMetadata(
-            ctx,
-            {
-              blockId: block.id,
-              model,
-              tier: autoRouting.tier,
-              decidedBy: autoRouting.decidedBy,
-            },
-            {
-              blockId: block.id,
-              tier: autoRouting.tier,
-              decidedBy: autoRouting.decidedBy,
-            }
-          )
-        )
-        // Hidden identity preamble for every auto execution (fallback included):
-        // keeps pool models in English by default and off the topic of which
-        // underlying model they are. Applied after signal building so the
-        // preamble never influences classification.
-        modelInputs.systemPrompt = [SIM_AUTO_SYSTEM_PREAMBLE, modelInputs.systemPrompt]
-          .filter(Boolean)
-          .join('\n\n')
-      }
+      const model = configuredModel
 
       await validateModelProvider(ctx.userId, ctx.workspaceId, model, ctx)
 
@@ -592,7 +498,6 @@ export class AgentBlockHandler implements BlockHandler {
           model,
           apiKey: modelInputs.apiKey,
           isPrimary: true,
-          ...(autoRouting ? { traceName: SIM_AUTO_MODEL_ID } : {}),
         },
         ...fallbackCandidates.map((candidate) => ({ ...candidate, isPrimary: false })),
       ]
@@ -605,13 +510,12 @@ export class AgentBlockHandler implements BlockHandler {
         retryPrimaryOnStreamStart:
           fallbacksHeld && configuredFallbacks.length > 0 && !modelInputs.previousInteractionId,
         primaryModel: model,
-        configuredModel: autoRouting ? SIM_AUTO_MODEL_ID : model,
+        configuredModel: model,
         primaryProviderId: providerId,
         messages: messagesWithInputFiles,
         hydratedByProvider,
         fileProjection,
         modelInputs,
-        fallbackSystemPrompt: autoRouting ? projectedSystemPrompt : undefined,
         formattedTools: formatted.tools,
         responseFormat,
         streaming: streamingConfig.shouldUseStreaming ?? false,
@@ -621,18 +525,6 @@ export class AgentBlockHandler implements BlockHandler {
         agentConversation,
       })
       if (servedRegistry) ctx.resolvedSecretTraceRegistry = servedRegistry
-
-      if (autoRouting && autoRouting.billableRoutingCost > 0) {
-        this.applyRoutingCost(result, autoRouting.billableRoutingCost)
-      }
-
-      /**
-       * A fallback the builder named explicitly is not a pool model, so it keeps
-       * its own name; only the routed pool model hides behind the auto label.
-       */
-      if (autoRouting && servedModel === model) {
-        this.applyAutoModelLabel(result, model)
-      }
 
       if (this.isStreamingExecution(result)) {
         const streamingResult = result as StreamingExecution
@@ -680,142 +572,6 @@ export class AgentBlockHandler implements BlockHandler {
       }
 
       return { ...tool, usageControl }
-    })
-  }
-
-  /**
-   * Derives the compact routing signals for sim-auto resolution from the
-   * block's resolved inputs. Excerpts only — the resolver truncates further
-   * and mothership re-clamps server-side.
-   */
-  private buildAutoRoutingSignals(inputs: AgentInputs, responseFormat: any): AutoRoutingSignals {
-    const lastMessage =
-      typeof inputs.userPrompt === 'string'
-        ? inputs.userPrompt
-        : inputs.userPrompt != null
-          ? stringifyJSON(inputs.userPrompt)
-          : (inputs.messages?.at(-1)?.content ?? '')
-    const systemPrompt = inputs.systemPrompt ?? ''
-    const normalizedFiles = normalizeFileInput(inputs.files)
-    const approxChars =
-      systemPrompt.length +
-      lastMessage.length +
-      (inputs.messages ? stringifyJSON(inputs.messages).length : 0)
-
-    return {
-      systemPrompt,
-      lastMessage,
-      messageCount: (inputs.messages?.length ?? 0) + (inputs.userPrompt ? 1 : 0),
-      toolNames: (inputs.tools ?? []).map((t) => t.title || t.type || 'tool'),
-      mediaKind: this.resolveMediaKind(inputs, normalizedFiles),
-      hasResponseFormat: Boolean(responseFormat),
-      approxInputTokens: Math.ceil(approxChars / 4),
-    }
-  }
-
-  /**
-   * Classifies what the block attaches, which decides the sim-auto pool column.
-   *
-   * Media reaches the provider by two routes — the block's `files` input and
-   * files already carried on inbound messages (chat deployments, memory, an
-   * upstream block feeding `messages`) — and both count. A file whose MIME type
-   * is missing or unrecognized counts as `file`, the column served by the
-   * providers that accept the most input types, because the alternative is
-   * handing a document to a model whose API models no such content part.
-   */
-  private resolveMediaKind(inputs: AgentInputs, normalizedFiles: unknown): AutoMediaKind {
-    const attached: Array<{ type?: string }> = [
-      ...(Array.isArray(normalizedFiles) ? (normalizedFiles as Array<{ type?: string }>) : []),
-      ...(inputs.messages ?? []).flatMap((message) => message.files ?? []),
-    ]
-
-    if (attached.length === 0) return 'none'
-
-    return attached.every((file) =>
-      MODEL_SUPPORTED_IMAGE_MIME_TYPES.has((file.type ?? '').toLowerCase())
-    )
-      ? 'image'
-      : 'file'
-  }
-
-  /**
-   * Reports a completed auto run under the `sim-auto` identity everywhere the
-   * run is observed — the block output, the trace span, and the usage-ledger
-   * row keyed on the model name — so the pool model that served the request
-   * stays an implementation detail (matching the block's configured model and
-   * the hidden identity preamble the models themselves run under).
-   *
-   * Runs after `executeProviderRequest`, whose billability gate and pricing
-   * key on the concrete pool model: tokens and cost are already settled here,
-   * only the label changes.
-   */
-  private applyAutoModelLabel(
-    result: BlockOutput | StreamingExecution,
-    resolvedModel: string
-  ): void {
-    const output = this.isStreamingExecution(result)
-      ? (result as StreamingExecution).execution?.output
-      : (result as BlockOutput)
-    if (!output || typeof output !== 'object') return
-
-    const target = output as {
-      model?: string
-      providerTiming?: {
-        timeSegments?: Array<{ type?: string; name?: string; provider?: string }>
-      }
-    }
-    target.model = SIM_AUTO_MODEL_ID
-
-    // Model segments name themselves after the model (every provider does) and
-    // carry the serving provider, which the log detail renders as that
-    // provider's icon — the same leak by two other routes.
-    for (const segment of target.providerTiming?.timeSegments ?? []) {
-      if (segment.type !== 'model') continue
-      if (segment.name?.toLowerCase() === resolvedModel.toLowerCase()) {
-        segment.name = SIM_AUTO_MODEL_ID
-      }
-      segment.provider = undefined
-    }
-  }
-
-  /**
-   * Adds the billable sim-auto routing charge to the output's cost breakdown
-   * as a distinct `routing` component.
-   *
-   * A non-streaming cost is final, so it is mutated in place. A streaming
-   * output's cost settles at stream end — written through the accessor
-   * `installStreamingCostPolicy` installed — so the charge is layered as a
-   * read-time overlay on the property instead: whatever the drain writes,
-   * every later read (trace spans, cost summary, usage ledger) sees the
-   * routing component on top.
-   */
-  private applyRoutingCost(result: BlockOutput | StreamingExecution, routingCost: number): void {
-    const output = this.isStreamingExecution(result)
-      ? (result as StreamingExecution).execution?.output
-      : (result as BlockOutput)
-    if (!output || typeof output !== 'object') return
-    const target = output as { cost?: Record<string, number> }
-
-    const withRouting = (cost: Record<string, number> | undefined): Record<string, number> =>
-      cost && typeof cost.total === 'number'
-        ? { ...cost, routing: routingCost, total: cost.total + routingCost }
-        : { input: 0, output: 0, routing: routingCost, total: routingCost }
-
-    if (!this.isStreamingExecution(result)) {
-      target.cost = withRouting(target.cost)
-      return
-    }
-
-    const prior = Object.getOwnPropertyDescriptor(target, 'cost')
-    let raw = prior?.get ? undefined : (target.cost as Record<string, number> | undefined)
-    Object.defineProperty(target, 'cost', {
-      get: () => withRouting(prior?.get ? (prior.get.call(target) as never) : raw),
-      set: (value: Record<string, number> | undefined) => {
-        if (prior?.set) prior.set.call(target, value)
-        else raw = value
-      },
-      configurable: true,
-      enumerable: true,
     })
   }
 
@@ -2665,9 +2421,7 @@ export class AgentBlockHandler implements BlockHandler {
         )
         const sameProvider = candidateProviderId === config.primaryProviderId
         inputs = {
-          ...(sameProvider
-            ? config.modelInputs
-            : omit(config.modelInputs, [...PROVIDER_FAMILY_CREDENTIAL_FIELDS, 'vertexCredential'])),
+          ...config.modelInputs,
           apiKey: resolveFallbackApiKey({
             candidate,
             configuredModel: config.configuredModel,
@@ -2677,9 +2431,6 @@ export class AgentBlockHandler implements BlockHandler {
             logger,
           }),
           previousInteractionId: undefined,
-          ...(config.fallbackSystemPrompt !== undefined
-            ? { systemPrompt: config.fallbackSystemPrompt }
-            : {}),
           ...tuning,
         }
         if (adjustments.length > 0) {
@@ -2698,10 +2449,7 @@ export class AgentBlockHandler implements BlockHandler {
         ctx,
         providerId: candidateProviderId,
         model: candidate.model,
-        messages:
-          !candidate.isPrimary && config.fallbackSystemPrompt !== undefined
-            ? stripAutoPreamble(messages)
-            : messages,
+        messages,
         inputs,
         formattedTools: config.formattedTools,
         responseFormat: config.responseFormat,
@@ -2729,7 +2477,7 @@ export class AgentBlockHandler implements BlockHandler {
         }
       } catch (error) {
         lastError = error
-        failedModels.push(candidate.traceName ?? candidate.model)
+        failedModels.push(candidate.model)
         if (!hasNext || ctx.abortSignal?.aborted || !isRetryableBlockError(error)) {
           recordModelFallbacks(ctx, block, failedModels.slice(0, -1))
           throw error
@@ -2873,14 +2621,6 @@ export class AgentBlockHandler implements BlockHandler {
       maxTokens:
         inputs.maxTokens != null && inputs.maxTokens !== '' ? Number(inputs.maxTokens) : undefined,
       apiKey: inputs.apiKey,
-      azureEndpoint: inputs.azureEndpoint,
-      azureApiVersion: inputs.azureApiVersion,
-      vertexProject: inputs.vertexProject,
-      vertexLocation: inputs.vertexLocation,
-      vertexCredential: inputs.vertexCredential,
-      bedrockAccessKeyId: inputs.bedrockAccessKeyId,
-      bedrockSecretKey: inputs.bedrockSecretKey,
-      bedrockRegion: inputs.bedrockRegion,
       responseFormat,
       workflowId: ctx.workflowId,
       workspaceId: ctx.workspaceId,
@@ -2942,18 +2682,6 @@ export class AgentBlockHandler implements BlockHandler {
     const providerStartTime = Date.now()
 
     try {
-      let finalApiKey: string | undefined = providerRequest.apiKey
-
-      if (providerId === 'vertex' && providerRequest.vertexCredential) {
-        finalApiKey = await resolveVertexCredential({
-          credentialId: providerRequest.vertexCredential,
-          actingUserId: ctx.userId,
-          workspaceId: ctx.workspaceId,
-          workflowId: ctx.workflowId,
-          callerLabel: 'vertex-agent',
-        })
-      }
-
       const { blockData, blockNameMapping } = collectBlockData(ctx)
       const agentMemoryRetrieval = agentConversation?.memoryId
         ? createAgentMemoryRetrievalTool({
@@ -2975,14 +2703,7 @@ export class AgentBlockHandler implements BlockHandler {
             : providerRequest.tools,
           temperature: providerRequest.temperature,
           maxTokens: providerRequest.maxTokens,
-          apiKey: finalApiKey,
-          azureEndpoint: providerRequest.azureEndpoint,
-          azureApiVersion: providerRequest.azureApiVersion,
-          vertexProject: providerRequest.vertexProject,
-          vertexLocation: providerRequest.vertexLocation,
-          bedrockAccessKeyId: providerRequest.bedrockAccessKeyId,
-          bedrockSecretKey: providerRequest.bedrockSecretKey,
-          bedrockRegion: providerRequest.bedrockRegion,
+          apiKey: providerRequest.apiKey,
           responseFormat: providerRequest.responseFormat,
           workflowId: providerRequest.workflowId,
           workspaceId: ctx.workspaceId,

@@ -91,10 +91,6 @@ vi.mock('@/app/workspace/[workspaceId]/providers/global-commands-provider', () =
   GlobalCommandsProvider: ({ children }: { children: ReactNode }) => children,
 }))
 
-vi.mock('@/app/workspace/[workspaceId]/providers/provider-models-loader', () => ({
-  ProviderModelsLoader: () => null,
-}))
-
 vi.mock('@/app/workspace/[workspaceId]/providers/settings-loader', () => ({
   SettingsLoader: () => null,
 }))

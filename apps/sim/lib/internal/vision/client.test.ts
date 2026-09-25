@@ -2,21 +2,18 @@
  * @vitest-environment node
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { MAX_BUFFERED_TRANSFER_BYTES } from '@/lib/uploads/shared/types'
 
-const mocks = vi.hoisted(() => ({
-  generateContent: vi.fn(),
-  secureFetchWithPinnedIP: vi.fn(),
+const clientConfig = vi.hoisted(() => ({
+  baseUrl: 'https://api.openai.com/v1',
+  extraHeaders: {} as Record<string, string>,
 }))
 
-vi.mock('@google/genai', () => ({
-  GoogleGenAI: class {
-    models = { generateContent: mocks.generateContent }
-  },
-}))
 vi.mock('@/lib/core/security/input-validation.server', () => ({
   MAX_JSON_API_RESPONSE_BYTES: 10 * 1024 * 1024,
-  secureFetchWithPinnedIP: mocks.secureFetchWithPinnedIP,
+}))
+vi.mock('@/providers/openai/client-config', () => ({
+  getOpenAIBaseUrl: () => clientConfig.baseUrl,
+  getOpenAIExtraHeaders: () => clientConfig.extraHeaders,
 }))
 
 import { analyzeVision } from '@/lib/internal/vision/client'
@@ -25,15 +22,17 @@ describe('Vision client', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.restoreAllMocks()
+    clientConfig.baseUrl = 'https://api.openai.com/v1'
+    clientConfig.extraHeaders = {}
   })
 
-  it('preserves the OpenAI request and usage projection with cancellation', async () => {
+  it('sends an OpenAI image_url request and projects usage, with cancellation', async () => {
     const controller = new AbortController()
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       Response.json({
-        model: 'gpt-5.2',
+        model: 'gpt-5-mini',
         choices: [{ message: { content: 'A lighthouse' } }],
-        usage: { input_tokens: 10, output_tokens: 4, total_tokens: 14 },
+        usage: { prompt_tokens: 10, completion_tokens: 4, total_tokens: 14 },
       })
     )
 
@@ -42,14 +41,14 @@ describe('Vision client', () => {
         {
           apiKey: 'secret',
           imageSource: 'https://images.example.com/a.png',
-          model: 'gpt-5.2',
+          model: 'gpt-5-mini',
           prompt: 'Describe it',
         },
         controller.signal
       )
     ).resolves.toEqual({
       content: 'A lighthouse',
-      model: 'gpt-5.2',
+      model: 'gpt-5-mini',
       tokens: 14,
       usage: { input_tokens: 10, output_tokens: 4, total_tokens: 14 },
     })
@@ -67,7 +66,7 @@ describe('Vision client', () => {
     )
     const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string)
     expect(body).toEqual({
-      model: 'gpt-5.2',
+      model: 'gpt-5-mini',
       messages: [
         {
           role: 'user',
@@ -80,106 +79,56 @@ describe('Vision client', () => {
           ],
         },
       ],
-      max_completion_tokens: 1000,
+      max_completion_tokens: 4096,
     })
   })
 
-  it('preserves Anthropic base64 payloads and token totals', async () => {
+  it.each([
+    ['claude-sonnet-4-5', 'gpt-5-mini'],
+    ['gemini-2.5-pro', 'gpt-5-mini'],
+    ['gpt-4.1-mini', 'gpt-4.1-mini'],
+  ])('runs a stored %s selection on the OpenAI model %s', async (stored, expected) => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      Response.json({
-        model: 'claude-3-opus-20240229',
-        content: [{ text: 'A lighthouse' }],
-        usage: { input_tokens: 8, output_tokens: 3 },
-      })
+      Response.json({ choices: [{ message: { content: 'ok' } }] })
     )
 
-    await expect(
-      analyzeVision({
-        apiKey: 'secret',
-        imageSource: 'data:image/png;base64,YQ==',
-        model: 'claude-3-opus-20240229',
-        prompt: 'Describe it',
-      })
-    ).resolves.toEqual({
-      content: 'A lighthouse',
-      model: 'claude-3-opus-20240229',
-      tokens: 11,
-      usage: { input_tokens: 8, output_tokens: 3, total_tokens: 11 },
+    const result = await analyzeVision({
+      apiKey: 'secret',
+      imageSource: 'data:image/png;base64,YQ==',
+      model: stored,
+      prompt: 'Describe it',
     })
 
-    expect(fetchMock.mock.calls[0][0]).toBe('https://api.anthropic.com/v1/messages')
-    expect(fetchMock.mock.calls[0][1]?.headers).toEqual({
-      'Content-Type': 'application/json',
-      'anthropic-version': '2023-06-01',
-      'x-api-key': 'secret',
+    expect(fetchMock.mock.calls[0][0]).toBe('https://api.openai.com/v1/chat/completions')
+    const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string)
+    expect(body.model).toBe(expected)
+    expect(body.messages[0].content[1]).toEqual({
+      type: 'image_url',
+      image_url: { url: 'data:image/png;base64,YQ==' },
     })
-    expect(JSON.parse(fetchMock.mock.calls[0][1]?.body as string)).toMatchObject({
-      max_tokens: 1024,
-      messages: [
-        {
-          content: [
-            { type: 'text', text: 'Describe it' },
-            {
-              type: 'image',
-              source: { type: 'base64', media_type: 'image/png', data: 'YQ==' },
-            },
-          ],
-        },
-      ],
-    })
+    expect(result.model).toBe(expected)
   })
 
-  it('pins and bounds Gemini remote image downloads and forwards cancellation', async () => {
-    const controller = new AbortController()
-    mocks.secureFetchWithPinnedIP.mockResolvedValue(
-      new Response(new Uint8Array([1, 2, 3]), {
-        status: 200,
-        headers: { 'content-type': 'image/png' },
-      })
+  it('uses OPENAI_BASE_URL and OPENAI_EXTRA_HEADERS without letting them replace the key', async () => {
+    clientConfig.baseUrl = 'https://gateway.example/v1'
+    clientConfig.extraHeaders = { 'x-gateway': 'yes', Authorization: 'Bearer other' }
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      Response.json({ choices: [{ message: { content: 'ok' } }] })
     )
-    mocks.generateContent.mockResolvedValue({
-      candidates: [{ content: { parts: [{ text: 'A lighthouse' }] } }],
-      usageMetadata: { promptTokenCount: 7, candidatesTokenCount: 2, totalTokenCount: 9 },
+
+    await analyzeVision({
+      apiKey: 'secret',
+      imageSource: 'data:image/png;base64,YQ==',
+      model: 'gpt-4.1-mini',
+      prompt: 'Describe it',
     })
 
-    await expect(
-      analyzeVision(
-        {
-          apiKey: 'secret',
-          imageSource: 'https://images.example.com/a.png',
-          model: 'gemini-2.5-pro',
-          prompt: 'Describe it',
-          remoteImageResolvedIP: '203.0.113.10',
-        },
-        controller.signal
-      )
-    ).resolves.toEqual({ content: 'A lighthouse', model: 'gemini-2.5-pro', tokens: 9 })
-
-    expect(mocks.secureFetchWithPinnedIP).toHaveBeenCalledWith(
-      'https://images.example.com/a.png',
-      '203.0.113.10',
-      {
-        profile: 'contentFetch',
-        method: 'GET',
-        maxResponseBytes: MAX_BUFFERED_TRANSFER_BYTES,
-        signal: controller.signal,
-      }
-    )
-    expect(mocks.generateContent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        model: 'gemini-2.5-pro',
-        config: { abortSignal: controller.signal },
-        contents: [
-          {
-            role: 'user',
-            parts: [
-              { text: 'Describe it' },
-              { inlineData: { mimeType: 'image/png', data: 'AQID' } },
-            ],
-          },
-        ],
-      })
-    )
+    expect(fetchMock.mock.calls[0][0]).toBe('https://gateway.example/v1/chat/completions')
+    expect(fetchMock.mock.calls[0][1]?.headers).toEqual({
+      'x-gateway': 'yes',
+      Authorization: 'Bearer secret',
+      'Content-Type': 'application/json',
+    })
   })
 
   it('preserves provider error status and message', async () => {
@@ -191,32 +140,12 @@ describe('Vision client', () => {
       analyzeVision({
         apiKey: 'bad',
         imageSource: 'https://images.example.com/a.png',
-        model: 'gpt-5.2',
+        model: 'gpt-5-mini',
         prompt: 'Describe it',
       })
     ).rejects.toMatchObject({
       status: 401,
       body: { success: false, error: 'Invalid API key' },
     })
-  })
-
-  it('rejects oversized Gemini images before buffering', async () => {
-    mocks.secureFetchWithPinnedIP.mockResolvedValue(
-      new Response(new Uint8Array([1]), {
-        status: 200,
-        headers: { 'content-length': String(MAX_BUFFERED_TRANSFER_BYTES + 1) },
-      })
-    )
-
-    await expect(
-      analyzeVision({
-        apiKey: 'secret',
-        imageSource: 'https://images.example.com/a.png',
-        model: 'gemini-2.5-pro',
-        prompt: 'Describe it',
-        remoteImageResolvedIP: '203.0.113.10',
-      })
-    ).rejects.toMatchObject({ name: 'PayloadSizeLimitError' })
-    expect(mocks.generateContent).not.toHaveBeenCalled()
   })
 })

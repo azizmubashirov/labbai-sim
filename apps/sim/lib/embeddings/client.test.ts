@@ -8,15 +8,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ProviderCapacityDeferredError } from '@/lib/core/rate-limiter/provider-capacity-error'
 import { EmbeddingAPIError } from '@/lib/embeddings/api-error'
 import {
-  assertKnowledgeEmbeddingCapacityForDeployment,
+  assertKnowledgeEmbeddingCapacity,
   clampEmbeddingConcurrency,
-  EMBEDDING_MAX_RETRIES,
   EMBEDDING_RETRY_BUDGET_MS,
   EmbeddingOutputLimitError,
   EmbeddingQuotaExhaustedError,
   embed,
-  embedKnowledgeForDeployment,
-  embedOpenRouter,
+  embedKnowledge,
   isBYOKEmbeddingCredentialRejection,
   isEmbeddingQuotaExhaustion,
   isTransientEmbeddingError,
@@ -139,16 +137,9 @@ beforeEach(() => {
   global.fetch = fetchMock as unknown as typeof fetch
   mockGetBYOKKey.mockResolvedValue(null)
   setEnv({
-    AZURE_OPENAI_API_KEY: undefined,
-    AZURE_OPENAI_ENDPOINT: undefined,
-    AZURE_OPENAI_API_VERSION: undefined,
-    GEMINI_API_KEY: undefined,
     OPENAI_API_KEY: undefined,
-    OPENAI_API_KEY_1: undefined,
-    OPENAI_API_KEY_2: undefined,
-    OPENAI_API_KEY_3: undefined,
-    OPENROUTER_API_KEY: undefined,
-    OLLAMA_URL: undefined,
+    OPENAI_BASE_URL: undefined,
+    OPENAI_EXTRA_HEADERS: undefined,
   })
 })
 
@@ -190,33 +181,6 @@ describe('embedding HTTP failure diagnostics', () => {
     expect(JSON.stringify(mockDiagnosticWarn.mock.calls)).not.toContain('private')
     expect(JSON.stringify(error)).not.toContain('req_test')
     expect(JSON.stringify(error)).not.toContain('model_not_found')
-  })
-
-  it('identifies the actual Azure transport and deployment selected for a catalog model', async () => {
-    setEnv({
-      AZURE_OPENAI_API_KEY: 'private-azure-key',
-      AZURE_OPENAI_ENDPOINT: 'https://azure.example',
-      AZURE_OPENAI_API_VERSION: '2024-02-01',
-      KB_OPENAI_MODEL_NAME: 'test-embedding-deployment',
-    })
-    fetchMock.mockResolvedValue(
-      jsonResponse({ error: { code: 'DeploymentNotFound' } }, 404, {
-        'apim-request-id': 'azure-request-test',
-      })
-    )
-    await expect(embed(['text'], options)).rejects.toThrow('Embedding API failed: 404')
-    expect(mockDiagnosticWarn).toHaveBeenCalledWith(
-      'Embedding provider request failed',
-      expect.objectContaining({
-        providerId: 'azure-openai',
-        modelName: 'test-embedding-deployment',
-        providerRequestId: 'azure-request-test',
-        providerErrorCode: 'DeploymentNotFound',
-      })
-    )
-    expect(JSON.stringify(mockDiagnosticWarn.mock.calls)).not.toContain('private-azure-key')
-    expect(JSON.stringify(mockDiagnosticWarn.mock.calls)).not.toContain('https://azure.example')
-    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
   it('keeps the HTTP failure diagnosable when its response body cannot be read', async () => {
@@ -333,9 +297,9 @@ describe('embedding cancellation', () => {
     expect(vi.getTimerCount()).toBe(0)
   })
 
-  it('does not start a fallback provider after cancellation', async () => {
+  it('cancels an in-flight knowledge embedding without retrying', async () => {
     vi.useFakeTimers()
-    setEnv({ OPENAI_API_KEY: 'openai-key', OPENROUTER_API_KEY: 'router-key' })
+    setEnv({ OPENAI_API_KEY: 'openai-key' })
     fetchMock.mockImplementation(
       (_url, init: RequestInit) =>
         new Promise((_resolve, reject) => {
@@ -343,7 +307,7 @@ describe('embedding cancellation', () => {
         })
     )
     const controller = new AbortController()
-    const pending = embedKnowledgeForDeployment(['text'], { signal: controller.signal }, false)
+    const pending = embedKnowledge(['text'], { signal: controller.signal, projectInputs: null })
     const rejected = expect(pending).rejects.toThrow()
     await vi.advanceTimersByTimeAsync(0)
     controller.abort(new DOMException('cancelled', 'AbortError'))
@@ -375,64 +339,15 @@ describe('embed', () => {
     expect(result.pricingId).toBe('text-embedding-3-small')
   })
 
-  it("splits past Gemini's 100-item cap and preserves input order across batches", async () => {
-    const inputs = Array.from({ length: 250 }, (_, i) => `text-${i}`)
-    let cursor = 0
-
-    fetchMock.mockImplementation(async (_url, init) => {
-      const body = JSON.parse((init as RequestInit).body as string)
-      const count = body.requests.length
-      // Each vector encodes its global input index so ordering is verifiable.
-      const embeddings = Array.from({ length: count }, (_, i) => ({
-        values: sizedVector([cursor + i], 3072),
-      }))
-      cursor += count
-      return jsonResponse({ embeddings })
-    })
-
-    const result = await embed(inputs, {
-      model: 'gemini-embedding-001',
-      apiKey: 'g-test',
-      taskType: 'document',
-    })
-
-    expect(fetchMock).toHaveBeenCalledTimes(3)
-    const sentCounts = fetchMock.mock.calls.map(
-      ([, init]) => JSON.parse((init as RequestInit).body as string).requests.length
-    )
-    expect(sentCounts).toEqual([100, 100, 50])
-    expect(result.embeddings).toHaveLength(250)
-    // Native dimensionality means no reduction, so values pass through unnormalized.
-    expect(result.embeddings.map((v) => v[0])).toEqual(inputs.map((_, i) => i))
-  })
-
   it('estimates tokens when the provider omits usage', async () => {
-    fetchMock.mockResolvedValue(
-      jsonResponse({ embeddings: [{ values: sizedVector([1, 2], 3072) }] })
-    )
+    fetchMock.mockResolvedValue(jsonResponse({ data: openAIBody([[1, 2]]).data }))
 
     const result = await embed(['some text to embed'], {
-      model: 'gemini-embedding-001',
-      apiKey: 'g-test',
+      model: 'text-embedding-3-small',
+      apiKey: 'sk-test',
     })
 
     expect(result.totalTokens).toBeGreaterThan(0)
-  })
-
-  it("bills Gemini on its reported token count rather than tiktoken's guess", async () => {
-    fetchMock.mockResolvedValue(
-      jsonResponse({
-        embeddings: [{ values: sizedVector([1, 2], 3072) }],
-        usageMetadata: { promptTokenCount: 4321 },
-      })
-    )
-
-    const result = await embed(['some text to embed'], {
-      model: 'gemini-embedding-001',
-      apiKey: 'g-test',
-    })
-
-    expect(result.totalTokens).toBe(4321)
   })
 
   it('splits a long input list into several bounded requests', async () => {
@@ -465,14 +380,14 @@ describe('embed', () => {
         openAIBody(
           inputs.map((input) => [Number(input.slice(1))]),
           inputs.length,
-          3072
+          1536
         )
       )
     })
     const inputs = Array.from({ length: 400 }, (_, index) => `i${index}`)
 
     const result = await embed(inputs, {
-      model: 'text-embedding-3-large',
+      model: 'text-embedding-3-small',
       apiKey: 'sk-test',
     })
 
@@ -480,38 +395,17 @@ describe('embed', () => {
       fetchMock.mock.calls.map(
         ([, init]) => JSON.parse((init as RequestInit).body as string).input.length
       )
-    ).toEqual([169, 169, 62])
+    ).toEqual([339, 61])
     expect(result.embeddings.map(([value]) => value)).toEqual(
       inputs.map((input) => Number(input.slice(1)))
     )
-  })
-
-  it('keeps a long Cohere input whole rather than cutting it to the batch budget', async () => {
-    fetchMock.mockImplementation(async (_url, init) => {
-      const body = JSON.parse((init as RequestInit).body as string)
-      return jsonResponse({
-        embeddings: { float: body.texts.map(() => sizedVector([1], 1536)) },
-        meta: { billed_units: { input_tokens: 1 } },
-      })
-    })
-
-    /**
-     * Cohere accepts 128k tokens in one text — far above the conservative
-     * default request budget. That budget floors at the per-input ceiling, or
-     * this input would be silently cut to a fraction of its length.
-     */
-    const long = 'word '.repeat(30_000)
-    await embed([long], { model: 'embed-v4.0', apiKey: 'co-test' })
-
-    const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)
-    expect(body.texts[0]).toBe(long)
   })
 
   it('forwards a supported dimension reduction and reports it back', async () => {
     fetchMock.mockResolvedValue(jsonResponse(openAIBody([[1, 2]], 5, 1024)))
 
     const result = await embed(['hello'], {
-      model: 'text-embedding-3-large',
+      model: 'text-embedding-3-small',
       apiKey: 'sk-test',
       dimensions: 1024,
     })
@@ -523,36 +417,20 @@ describe('embed', () => {
 
   /**
    * Regression: the resolved dimensionality is reported back to the caller but
-   * must not reach the wire unless the caller asked to reduce. `ada-002` and
-   * `mistral-embed` reject the parameter outright, so sending it populated with
-   * the native size made every unreduced request to those models a 400.
+   * must not reach the wire unless the caller asked to reduce: a model without
+   * Matryoshka support rejects the parameter outright.
    */
   it('omits the dimension field when no reduction was requested', async () => {
     fetchMock.mockResolvedValue(jsonResponse(openAIBody([[1, 2]])))
 
     const result = await embed(['hello'], {
-      model: 'text-embedding-ada-002',
+      model: 'text-embedding-3-small',
       apiKey: 'sk-test',
     })
 
     const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)
     expect(body).not.toHaveProperty('dimensions')
     expect(result.dimensions).toBe(1536)
-  })
-
-  it('omits the dimension field for a model without Matryoshka support', async () => {
-    fetchMock.mockResolvedValue(
-      jsonResponse({
-        data: [{ embedding: sizedVector([1, 2], 1024), index: 0 }],
-        usage: { total_tokens: 5 },
-      })
-    )
-
-    const result = await embed(['hello'], { model: 'mistral-embed', apiKey: 'key-test' })
-
-    const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)
-    expect(body).not.toHaveProperty('output_dimension')
-    expect(result.dimensions).toBe(1024)
   })
 
   it('rejects an unsupported dimension before making a request', async () => {
@@ -724,64 +602,6 @@ describe('embed', () => {
     expect(result.billableTokens).toBe(0)
   })
 
-  it('uses OpenRouter as an explicit transport for an OpenAI catalog model', async () => {
-    fetchMock.mockResolvedValue(jsonResponse(openAICompatibleBody([[1, 2]], 5, 1024)))
-
-    await embed(['hello'], {
-      model: 'text-embedding-3-large',
-      transport: 'openrouter',
-      apiKey: 'or-test',
-      dimensions: 1024,
-      projectInputs: null,
-    })
-
-    const [url, init] = fetchMock.mock.calls[0]
-    expect(url).toBe('https://openrouter.ai/api/v1/embeddings')
-    expect(JSON.parse((init as RequestInit).body as string)).toMatchObject({
-      model: 'openai/text-embedding-3-large',
-      dimensions: 1024,
-    })
-  })
-
-  /**
-   * `batchByTokenLimit` truncates any single text above the limit it is given,
-   * so the limit has to be the selected model's own. One shared constant sent
-   * oversized input to the models with a lower ceiling and silently dropped
-   * content the models with a higher one would have accepted.
-   */
-  describe('per-model token limits', () => {
-    it("truncates against Gemini's lower ceiling rather than a shared constant", async () => {
-      fetchMock.mockResolvedValue(
-        jsonResponse({ embeddings: [{ values: sizedVector([1], 3072) }] })
-      )
-      // ~10k tokens: over Gemini's 2048 ceiling, but under the old 8000 constant,
-      // so this used to reach the provider whole and come back a 502.
-      const long = 'word '.repeat(8000)
-
-      await embed([long], { model: 'gemini-embedding-001', apiKey: 'g-test' })
-
-      const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)
-      const sent = body.requests[0].content.parts[0].text
-      expect(sent.length).toBeLessThan(long.length)
-    })
-
-    it("keeps text intact up to Cohere's much higher ceiling", async () => {
-      fetchMock.mockResolvedValue(
-        jsonResponse({
-          embeddings: { float: [sizedVector([1], 1536)] },
-          meta: { billed_units: { input_tokens: 9 } },
-        })
-      )
-      // Over the old 8000 constant, well under Cohere's 128k, so it must survive.
-      const long = 'word '.repeat(8000)
-
-      await embed([long], { model: 'embed-v4.0', apiKey: 'c-test' })
-
-      const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)
-      expect(body.texts[0]).toBe(long)
-    })
-  })
-
   /**
    * The knowledge-base path rewrites resolved-secret plaintext back to
    * placeholders before inputs reach a provider. The block path projects
@@ -816,49 +636,6 @@ describe('embed', () => {
       expect(body.input).toEqual(['already projected'])
     })
 
-    it('estimates tokens from the projected values, not the originals', async () => {
-      // Gemini omits usage, so the token count is estimated from what was sent.
-      fetchMock.mockResolvedValue(
-        jsonResponse({ embeddings: [{ values: sizedVector([1, 2, 3], 3072) }] })
-      )
-
-      const result = await embed(['x'.repeat(400)], {
-        model: 'gemini-embedding-001',
-        apiKey: 'key-test',
-        projectInputs: () => ['tiny'],
-      })
-
-      const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)
-      expect(body.requests[0].content.parts[0].text).toBe('tiny')
-      // 400 chars would estimate far higher; 'tiny' lands in single digits.
-      expect(result.totalTokens).toBeLessThan(10)
-    })
-
-    /**
-     * Projection changes length, and batching truncates whatever it measures.
-     * Batching the pre-projection text sized against a string that was never
-     * sent: a lengthening projection then exceeded the model's ceiling, and a
-     * shortening one discarded content that would have fit.
-     */
-    it('batches the projected text, not the original', async () => {
-      fetchMock.mockResolvedValue(
-        jsonResponse({ embeddings: [{ values: sizedVector([1], 3072) }] })
-      )
-      // Under Gemini's 2048 ceiling before projection, far over it after.
-      const short = 'secret'
-
-      await embed([short], {
-        model: 'gemini-embedding-001',
-        apiKey: 'g-test',
-        projectInputs: () => ['word '.repeat(8000)],
-      })
-
-      const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)
-      const sent = body.requests[0].content.parts[0].text
-      // Truncated against the model ceiling, so the lengthened text cannot go out whole.
-      expect(sent.length).toBeLessThan('word '.repeat(8000).length)
-    })
-
     it('projects once even when the request is retried', async () => {
       vi.useFakeTimers()
       const projectInputs = vi.fn((values: readonly string[]) => values.map(() => 'projected'))
@@ -880,259 +657,6 @@ describe('embed', () => {
   })
 })
 
-describe('embedOpenRouter', () => {
-  it('uses a dynamic model and reports the returned native dimensions', async () => {
-    fetchMock.mockImplementation(async (_url, init) => {
-      const body = JSON.parse((init as RequestInit).body as string)
-      const inputs = body.input as string[]
-      return jsonResponse(
-        openAICompatibleBody(
-          inputs.map((input) => (input === 'alpha' ? [1, 2, 3] : [4, 5, 6])),
-          inputs[0] === 'alpha' ? 3 : 4,
-          null
-        )
-      )
-    })
-
-    const result = await embedOpenRouter(['alpha', 'beta'], {
-      model: 'openrouter/qwen/qwen3-embedding-8b',
-      apiKey: 'or-test',
-      maxInputTokens: 32768,
-      projectInputs: null,
-    })
-
-    const [url, init] = fetchMock.mock.calls[0]
-    expect(url).toBe('https://openrouter.ai/api/v1/embeddings')
-    expect(JSON.parse((init as RequestInit).body as string)).toMatchObject({
-      input: ['alpha'],
-      model: 'qwen/qwen3-embedding-8b',
-    })
-    expect(fetchMock).toHaveBeenCalledTimes(2)
-    expect(
-      JSON.parse((fetchMock.mock.calls[1][1] as RequestInit).body as string)
-    ).not.toHaveProperty('dimensions')
-    expect(result).toMatchObject({
-      embeddings: [
-        [1, 2, 3],
-        [4, 5, 6],
-      ],
-      dimensions: 3,
-      totalTokens: 7,
-      billableTokens: 0,
-      isBYOK: true,
-      modelName: 'openrouter/qwen/qwen3-embedding-8b',
-    })
-  })
-
-  it('fails when OpenRouter returns the wrong number of vectors', async () => {
-    fetchMock.mockResolvedValue(jsonResponse(openAICompatibleBody([[1, 2]], 5, null)))
-
-    await expect(
-      embedOpenRouter(['alpha', 'beta'], {
-        model: 'openrouter/qwen/qwen3-embedding-8b',
-        apiKey: 'or-test',
-        maxInputTokens: 32768,
-        dimensions: 2,
-        projectInputs: null,
-      })
-    ).rejects.toThrow('returned 1 embeddings for 2 inputs')
-  })
-
-  it('fails when OpenRouter returns inconsistent vector dimensions', async () => {
-    fetchMock
-      .mockResolvedValueOnce(jsonResponse(openAICompatibleBody([[1, 2]], 1, null)))
-      .mockResolvedValueOnce(jsonResponse(openAICompatibleBody([[3, 4], [5]], 2, null)))
-
-    await expect(
-      embedOpenRouter(['alpha', 'beta', 'gamma'], {
-        model: 'openrouter/qwen/qwen3-embedding-8b',
-        apiKey: 'or-test',
-        maxInputTokens: 32768,
-        projectInputs: null,
-      })
-    ).rejects.toThrow('vector 1 has 1 unexpected dimensions; expected 2')
-  })
-
-  it('fails when OpenRouter violates an explicitly requested dimension', async () => {
-    fetchMock.mockResolvedValue(jsonResponse(openAICompatibleBody([[1, 2]], 5, null)))
-
-    await expect(
-      embedOpenRouter(['alpha'], {
-        model: 'openrouter/qwen/qwen3-embedding-8b',
-        apiKey: 'or-test',
-        maxInputTokens: 32768,
-        dimensions: 3,
-        projectInputs: null,
-      })
-    ).rejects.toThrow('vector 0 has 2 unexpected dimensions; expected 3')
-    expect(fetchMock).toHaveBeenCalledTimes(1)
-  })
-
-  it('rejects a dynamic-model batch that differs from the learned dimension', async () => {
-    const inputs = Array.from({ length: 2049 }, (_, index) => `i${index}`)
-    fetchMock.mockImplementation(async (_url, init) => {
-      const body = JSON.parse((init as RequestInit).body as string)
-      const batch = body.input as string[]
-      const embedding = batch.length === 1 ? [2, 3, 4] : [1, 3]
-      return jsonResponse(
-        openAICompatibleBody(
-          batch.map(() => embedding),
-          batch.length,
-          null
-        )
-      )
-    })
-
-    await expect(
-      embedOpenRouter(inputs, {
-        model: 'openrouter/qwen/qwen3-embedding-8b',
-        apiKey: 'or-test',
-        maxInputTokens: 32768,
-        projectInputs: null,
-      })
-    ).rejects.toThrow('vector 0 has 2 unexpected dimensions; expected 3')
-    expect(fetchMock).toHaveBeenCalledTimes(2)
-  })
-
-  it('treats OpenRouter HTTP 402 as exhausted credit and opens the circuit', async () => {
-    fetchMock.mockResolvedValue(jsonResponse({ error: { message: 'Payment required' } }, 402))
-
-    const options = {
-      model: 'openrouter/qwen/qwen3-embedding-8b',
-      apiKey: 'or-exhausted',
-      maxInputTokens: 32768,
-      projectInputs: null,
-    } as const
-
-    await expect(embedOpenRouter(['alpha'], options)).rejects.toEqual(
-      expect.objectContaining({ name: 'EmbeddingQuotaExhaustedError', status: 402 })
-    )
-    await expect(embedOpenRouter(['beta'], options)).rejects.toBeInstanceOf(
-      EmbeddingQuotaExhaustedError
-    )
-    expect(fetchMock).toHaveBeenCalledTimes(1)
-  })
-
-  it('truncates inputs to the selected model context length', async () => {
-    fetchMock.mockResolvedValue(jsonResponse(openAICompatibleBody([[1, 2]], 5, null)))
-
-    await embedOpenRouter(['alpha beta gamma'], {
-      model: 'openrouter/thenlper/gte-base',
-      apiKey: 'or-test',
-      maxInputTokens: 1,
-      projectInputs: null,
-    })
-
-    const [, init] = fetchMock.mock.calls[0]
-    const body = JSON.parse((init as RequestInit).body as string)
-    expect(body.input).toHaveLength(1)
-    expect(body.input[0]).not.toBe('alpha beta gamma')
-  })
-
-  it('splits dynamic models at the provider item limit and recombines in order', async () => {
-    fetchMock.mockImplementation(async (_url, init) => {
-      const body = JSON.parse((init as RequestInit).body as string)
-      const inputs = body.input as string[]
-      return jsonResponse(
-        openAICompatibleBody(
-          inputs.map((input) => [Number(input.slice(1))]),
-          inputs.length,
-          null
-        )
-      )
-    })
-    const inputs = Array.from({ length: 2049 }, (_, index) => `i${index}`)
-
-    const result = await embedOpenRouter(inputs, {
-      model: 'openrouter/qwen/qwen3-embedding-8b',
-      apiKey: 'or-test',
-      maxInputTokens: 32768,
-      projectInputs: null,
-    })
-
-    expect(fetchMock).toHaveBeenCalledTimes(2)
-    expect(
-      fetchMock.mock.calls
-        .map(([, init]) => JSON.parse((init as RequestInit).body as string).input.length)
-        .sort((a, b) => a - b)
-    ).toEqual([1, 2048])
-    expect(result.embeddings).toHaveLength(2049)
-    expect(result.embeddings[0]).toEqual([0])
-    expect(result.embeddings[2048]).toEqual([2048])
-  })
-
-  it('learns a dynamic model dimension before response-safe batching', async () => {
-    const dimensions = 32_768
-    const inputs = Array.from({ length: 17 }, (_, index) => `i${index}`)
-    fetchMock.mockImplementation(async (_url, init) => {
-      const body = JSON.parse((init as RequestInit).body as string)
-      const batch = body.input as string[]
-      return jsonResponse(
-        openAICompatibleBody(
-          batch.map((input) => sizedVector([Number(input.slice(1))], dimensions)),
-          batch.length,
-          null
-        )
-      )
-    })
-
-    const result = await embedOpenRouter(inputs, {
-      model: 'openrouter/example/high-dimensional-model',
-      apiKey: 'or-test',
-      maxInputTokens: 32768,
-      projectInputs: null,
-    })
-
-    expect(
-      fetchMock.mock.calls
-        .map(([, init]) => JSON.parse((init as RequestInit).body as string).input.length)
-        .sort((a, b) => a - b)
-    ).toEqual([1, 1, 15])
-    expect(result.dimensions).toBe(dimensions)
-    expect(result.embeddings.map(([first]) => first)).toEqual(
-      Array.from({ length: 17 }, (_, index) => index)
-    )
-  })
-
-  it('rejects an oversized dynamic aggregate after discovery and before fan-out', async () => {
-    const dimensions = 32_768
-    fetchMock.mockResolvedValue(
-      jsonResponse(openAICompatibleBody([sizedVector([1], dimensions)], 1, null))
-    )
-
-    await expect(
-      embedOpenRouter(
-        Array.from({ length: 100 }, (_, index) => `i${index}`),
-        {
-          model: 'openrouter/example/high-dimensional-model',
-          apiKey: 'or-test',
-          maxInputTokens: 32768,
-          projectInputs: null,
-        }
-      )
-    ).rejects.toThrow('Embedding output')
-
-    expect(fetchMock).toHaveBeenCalledTimes(1)
-  })
-
-  it('rejects an oversized explicit-dimension aggregate before making a request', async () => {
-    await expect(
-      embedOpenRouter(
-        Array.from({ length: 1000 }, (_, index) => `i${index}`),
-        {
-          model: 'openrouter/example/high-dimensional-model',
-          apiKey: 'or-test',
-          maxInputTokens: 32768,
-          dimensions: 4096,
-          projectInputs: null,
-        }
-      )
-    ).rejects.toThrow('Embedding output')
-
-    expect(fetchMock).not.toHaveBeenCalled()
-  })
-})
-
 describe('embedding concurrency admission', () => {
   it.each([
     [Number.NaN, 8],
@@ -1145,7 +669,7 @@ describe('embedding concurrency admission', () => {
   })
 })
 
-describe('knowledge embedding transport fallback', () => {
+describe('knowledge embedding transport', () => {
   const options = {
     model: 'text-embedding-3-small',
     taskType: 'document' as const,
@@ -1153,81 +677,91 @@ describe('knowledge embedding transport fallback', () => {
     projectInputs: null,
   }
 
-  it('uses OpenRouter when it is the only configured self-hosted transport', async () => {
-    setEnv({ OPENROUTER_API_KEY: 'or-test' })
-    fetchMock.mockResolvedValue(jsonResponse(openAICompatibleBody([[1, 2]], 3)))
+  it('rejects aggregate output above the safe limit before resolving a key', async () => {
+    const texts = Array.from({ length: 5000 }, (_, index) => `input-${index}`)
+    const projectInputs = vi.fn((inputs: string[]) => inputs)
 
-    const result = await embedKnowledgeForDeployment(['hello'], options, false)
+    await expect(
+      embedKnowledge(texts, { ...options, projectInputs })
+    ).rejects.toBeInstanceOf(EmbeddingOutputLimitError)
+    expect(projectInputs).not.toHaveBeenCalled()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('embeds with the platform OpenAI key and bills its tokens', async () => {
+    setEnv({ OPENAI_API_KEY: 'openai-test' })
+    fetchMock.mockResolvedValue(jsonResponse(openAIBody([[1, 2]], 3)))
+
+    const result = await embedKnowledge(['hello'], options)
 
     expect(fetchMock).toHaveBeenCalledOnce()
     const [url, init] = fetchMock.mock.calls[0]
-    expect(url).toBe('https://openrouter.ai/api/v1/embeddings')
+    expect(url).toBe('https://api.openai.com/v1/embeddings')
+    expect((init as RequestInit).headers).toMatchObject({ Authorization: 'Bearer openai-test' })
     expect(JSON.parse((init as RequestInit).body as string)).toMatchObject({
-      model: 'openai/text-embedding-3-small',
+      model: 'text-embedding-3-small',
       dimensions: 1536,
     })
     expect(result).toMatchObject({
       billableTokens: 3,
       isBYOK: false,
       modelName: 'text-embedding-3-small',
+      pricingId: 'text-embedding-3-small',
       dimensions: 1536,
     })
-    expect(result.embeddings[0].slice(0, 2)).toEqual([1, 2])
-    expect(result.embeddings[0]).toHaveLength(1536)
   })
 
-  it('rejects aggregate output above the safe limit before selecting a transport', async () => {
-    setEnv({ OPENROUTER_API_KEY: 'or-test' })
-    const texts = Array.from({ length: 5000 }, (_, index) => `input-${index}`)
-    const projectInputs = vi.fn((inputs: string[]) => inputs)
+  it('resolves an openai/-prefixed model id recorded on a knowledge base', async () => {
+    setEnv({ OPENAI_API_KEY: 'openai-test' })
+    fetchMock.mockResolvedValue(jsonResponse(openAIBody([[1, 2]], 3)))
 
-    await expect(
-      embedKnowledgeForDeployment(texts, { ...options, projectInputs }, false)
-    ).rejects.toBeInstanceOf(EmbeddingOutputLimitError)
-    expect(projectInputs).not.toHaveBeenCalled()
+    const result = await embedKnowledge(['hello'], {
+      ...options,
+      model: 'openai/text-embedding-3-small',
+    })
+
+    const [, init] = fetchMock.mock.calls[0]
+    expect(JSON.parse((init as RequestInit).body as string)).toMatchObject({
+      model: 'text-embedding-3-small',
+    })
+    expect(result.modelName).toBe('text-embedding-3-small')
+  })
+
+  it('sends OpenAI requests to OPENAI_BASE_URL with OPENAI_EXTRA_HEADERS', async () => {
+    setEnv({
+      OPENAI_API_KEY: 'openai-test',
+      OPENAI_BASE_URL: 'https://gateway.example/v1/',
+      OPENAI_EXTRA_HEADERS: '{"x-gateway":"yes"}',
+    })
+    fetchMock.mockResolvedValue(jsonResponse(openAIBody([[1, 2]], 3)))
+
+    await embedKnowledge(['hello'], options)
+
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('https://gateway.example/v1/embeddings')
+    expect((init as RequestInit).headers).toMatchObject({
+      'x-gateway': 'yes',
+      Authorization: 'Bearer openai-test',
+    })
+  })
+
+  it('fails with a clear error when no OpenAI key is configured', async () => {
+    await expect(embedKnowledge(['hello'], options)).rejects.toThrow(
+      'OPENAI_API_KEY is not configured'
+    )
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('keeps the original OpenAI path when OpenRouter is not configured', async () => {
-    setEnv({ OPENAI_API_KEY: 'openai-test' })
-    fetchMock.mockResolvedValue(jsonResponse(openAIBody([[1, 2]])))
-
-    await embedKnowledgeForDeployment(['hello'], options, false)
-
-    expect(fetchMock).toHaveBeenCalledOnce()
-    expect(fetchMock.mock.calls[0][0]).toBe('https://api.openai.com/v1/embeddings')
-  })
-
-  it('uses Azure before OpenAI and OpenRouter when all are configured', async () => {
-    setEnv({
-      AZURE_OPENAI_API_KEY: 'azure-test',
-      AZURE_OPENAI_ENDPOINT: 'https://example.openai.azure.com',
-      AZURE_OPENAI_API_VERSION: '2024-10-21',
-      KB_OPENAI_MODEL_NAME: 'kb-embedding-deployment',
-      OPENAI_API_KEY: 'openai-test',
-      OPENROUTER_API_KEY: 'or-test',
+  it('uses a workspace OpenAI key before the platform key', async () => {
+    setEnv({ OPENAI_API_KEY: 'platform-openai-test' })
+    mockGetBYOKKey.mockResolvedValue({
+      apiKey: 'workspace-openai-test',
+      isBYOK: true,
+      scope: 'workspace',
     })
-    fetchMock.mockResolvedValue(jsonResponse(openAICompatibleBody([[1, 2]])))
-
-    const result = await embedKnowledgeForDeployment(['hello'], options, false)
-
-    expect(fetchMock).toHaveBeenCalledOnce()
-    expect(fetchMock.mock.calls[0][0]).toBe(
-      'https://example.openai.azure.com/openai/deployments/kb-embedding-deployment/embeddings?api-version=2024-10-21'
-    )
-    expect(result.modelName).toBe('kb-embedding-deployment')
-  })
-
-  it('uses a workspace OpenAI key before OpenRouter', async () => {
-    setEnv({ OPENROUTER_API_KEY: 'or-test' })
-    mockGetBYOKKey.mockResolvedValue({ apiKey: 'workspace-openai-test', isBYOK: true })
     fetchMock.mockResolvedValue(jsonResponse(openAIBody([[1, 2]])))
 
-    const result = await embedKnowledgeForDeployment(
-      ['hello'],
-      { ...options, workspaceId: 'workspace-1' },
-      false
-    )
+    const result = await embedKnowledge(['hello'], { ...options, workspaceId: 'workspace-1' })
 
     expect(mockGetBYOKKey).toHaveBeenCalledWith('workspace-1', 'openai')
     expect(fetchMock).toHaveBeenCalledOnce()
@@ -1243,152 +777,25 @@ describe('knowledge embedding transport fallback', () => {
     fetchMock.mockResolvedValue(jsonResponse({ error: 'invalid key' }, 401))
 
     setEnv({ OPENAI_API_KEY: 'platform-openai-test' })
-    const platformError = await embedKnowledgeForDeployment(['hello'], options, true).catch(
-      (error) => error
-    )
+    const platformError = await embedKnowledge(['hello'], options).catch((error) => error)
     expect(isBYOKEmbeddingCredentialRejection(platformError)).toBe(false)
 
     mockGetBYOKKey.mockResolvedValue({ apiKey: 'workspace-openai-test', isBYOK: true })
-    const workspaceError = await embedKnowledgeForDeployment(
-      ['hello'],
-      { ...options, workspaceId: 'workspace-1' },
-      true
-    ).catch((error) => error)
+    const workspaceError = await embedKnowledge(['hello'], {
+      ...options,
+      workspaceId: 'workspace-1',
+    }).catch((error) => error)
     expect(isBYOKEmbeddingCredentialRejection(workspaceError)).toBe(true)
   })
 
-  it('does not use OpenRouter for non-OpenAI knowledge models', async () => {
-    setEnv({ GEMINI_API_KEY: 'gemini-test', OPENROUTER_API_KEY: 'or-test' })
-    fetchMock.mockResolvedValue(
-      jsonResponse({ embeddings: [{ values: sizedVector([1, 2], 1536) }] })
-    )
-
-    await embedKnowledgeForDeployment(
-      ['hello'],
-      { ...options, model: 'gemini-embedding-001' },
-      false
-    )
-
-    expect(fetchMock).toHaveBeenCalledOnce()
-    expect(fetchMock.mock.calls[0][0]).toContain('generativelanguage.googleapis.com')
-  })
-
-  it('ignores OpenRouter on hosted deployments', async () => {
-    setEnv({ OPENAI_API_KEY: 'openai-test', OPENROUTER_API_KEY: 'or-test' })
-    fetchMock.mockResolvedValue(jsonResponse(openAIBody([[1, 2]])))
-
-    await embedKnowledgeForDeployment(['hello'], options, true)
-
-    expect(fetchMock).toHaveBeenCalledOnce()
-    expect(fetchMock.mock.calls[0][0]).toBe('https://api.openai.com/v1/embeddings')
-  })
-
-  it('does not fall back after a fatal provider error', async () => {
-    setEnv({ OPENAI_API_KEY: 'openai-test', OPENROUTER_API_KEY: 'or-test' })
+  it('does not retry a fatal provider error', async () => {
+    setEnv({ OPENAI_API_KEY: 'openai-test' })
     fetchMock.mockResolvedValue(jsonResponse({ error: 'invalid key' }, 401))
 
-    await expect(embedKnowledgeForDeployment(['hello'], options, false)).rejects.toThrow(
+    await expect(embedKnowledge(['hello'], options)).rejects.toThrow(
       /Embedding API failed: 401/
     )
     expect(fetchMock).toHaveBeenCalledOnce()
-  })
-
-  it('falls back once when a provider returns a malformed success body', async () => {
-    setEnv({ OPENAI_API_KEY: 'openai-test', OPENROUTER_API_KEY: 'or-test' })
-    fetchMock.mockImplementation(async (url) =>
-      url === 'https://api.openai.com/v1/embeddings'
-        ? jsonResponse({ data: [], usage: { total_tokens: 1 } })
-        : jsonResponse(openAICompatibleBody([[7, 8]], 2))
-    )
-
-    const result = await embedKnowledgeForDeployment(['hello'], options, false)
-
-    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
-      'https://api.openai.com/v1/embeddings',
-      'https://openrouter.ai/api/v1/embeddings',
-    ])
-    expect(result.embeddings[0].slice(0, 2)).toEqual([7, 8])
-  })
-
-  it('falls back immediately when the first provider credential has exhausted credit', async () => {
-    setEnv({ OPENAI_API_KEY: 'openai-test', OPENROUTER_API_KEY: 'or-test' })
-    fetchMock.mockImplementation(async (url) =>
-      url === 'https://api.openai.com/v1/embeddings'
-        ? jsonResponse({ error: { type: 'insufficient_quota', code: 'insufficient_quota' } }, 429)
-        : jsonResponse(openAICompatibleBody([[7, 8]], 2))
-    )
-
-    const result = await embedKnowledgeForDeployment(['hello'], options, false)
-
-    expect(fetchMock).toHaveBeenCalledTimes(2)
-    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
-      'https://api.openai.com/v1/embeddings',
-      'https://openrouter.ai/api/v1/embeddings',
-    ])
-    expect(result.embeddings[0].slice(0, 2)).toEqual([7, 8])
-  })
-
-  it('falls back after transient retries and projects inputs only once', async () => {
-    vi.useFakeTimers()
-    setEnv({ OPENAI_API_KEY: 'openai-test', OPENROUTER_API_KEY: 'or-test' })
-    const projectInputs = vi.fn(() => ['projected'])
-    fetchMock.mockImplementation(async (url) =>
-      url === 'https://api.openai.com/v1/embeddings'
-        ? jsonResponse({ error: 'unavailable' }, 503)
-        : jsonResponse(openAICompatibleBody([[7, 8]], 2))
-    )
-
-    const pending = embedKnowledgeForDeployment(['secret'], { ...options, projectInputs }, false)
-    await vi.runAllTimersAsync()
-    const result = await pending
-
-    const attempts = EMBEDDING_MAX_RETRIES + 1
-    expect(fetchMock).toHaveBeenCalledTimes(attempts + 1)
-    expect(
-      fetchMock.mock.calls.slice(0, attempts).every(([url]) => url.includes('api.openai.com'))
-    ).toBe(true)
-    expect(fetchMock.mock.calls[attempts][0]).toBe('https://openrouter.ai/api/v1/embeddings')
-    expect(projectInputs).toHaveBeenCalledOnce()
-    expect(result.embeddings[0].slice(0, 2)).toEqual([7, 8])
-  })
-
-  it('falls back only the failed batch and retains successful provider work', async () => {
-    vi.useFakeTimers()
-    setEnv({ OPENAI_API_KEY: 'openai-test', OPENROUTER_API_KEY: 'or-test' })
-    mockGetBYOKKey.mockResolvedValue({ apiKey: 'workspace-openai-test', isBYOK: true })
-    const firstInput = `first ${'word '.repeat(5000)}`
-    const secondInput = `second ${'word '.repeat(5000)}`
-    fetchMock.mockImplementation(async (url, init) => {
-      const body = JSON.parse((init as RequestInit).body as string)
-      const input = body.input[0] as string
-      if (url === 'https://api.openai.com/v1/embeddings' && input.startsWith('second')) {
-        return jsonResponse({ error: 'unavailable' }, 503)
-      }
-      return jsonResponse(
-        url === 'https://api.openai.com/v1/embeddings'
-          ? openAIBody([[1]], 3)
-          : openAICompatibleBody([[2]], 3)
-      )
-    })
-
-    const pending = embedKnowledgeForDeployment(
-      [firstInput, secondInput],
-      { ...options, workspaceId: 'workspace-1' },
-      false
-    )
-    await vi.runAllTimersAsync()
-    const result = await pending
-
-    const openRouterInputs = fetchMock.mock.calls
-      .filter(([url]) => url === 'https://openrouter.ai/api/v1/embeddings')
-      .flatMap(([, init]) => JSON.parse((init as RequestInit).body as string).input as string[])
-    expect(openRouterInputs).toEqual([secondInput])
-    // The succeeding batch, every attempt on the failing one, then its fallback.
-    expect(fetchMock).toHaveBeenCalledTimes(1 + (EMBEDDING_MAX_RETRIES + 1) + 1)
-    expect(result.embeddings.map(([value]) => value)).toEqual([1, 2])
-    expect(result.totalTokens).toBe(6)
-    expect(result.billableTokens).toBe(3)
-    expect(result.isBYOK).toBe(false)
   })
 
   /**
@@ -1420,37 +827,32 @@ describe('knowledge embedding transport fallback', () => {
   /**
    * A stated wait past the ceiling cannot be honoured, so retrying only clamps
    * every attempt below the reopen time and spends the budget for nothing. The
-   * error still classifies as transient, so the fallback chain takes over at
-   * once rather than after the retries burn down.
+   * error surfaces at once rather than after the retries burn down.
    */
-  it('does not retry a wait it cannot honour, falling back immediately', async () => {
+  it('does not retry a wait it cannot honour', async () => {
     vi.useFakeTimers()
-    setEnv({ OPENAI_API_KEY: 'openai-test', OPENROUTER_API_KEY: 'or-test' })
-    const fetchMock = vi.fn().mockImplementation(async (url: string) =>
-      url === 'https://api.openai.com/v1/embeddings'
-        ? ({
-            ok: false,
-            status: 429,
-            statusText: '429',
-            // Six minutes, far past EMBEDDING_MAX_RETRY_DELAY_MS.
-            headers: new Headers({
-              'x-ratelimit-remaining-tokens': '0',
-              'x-ratelimit-reset-tokens': '6m0s',
-            }),
-            json: async () => ({ error: 'rate limited' }),
-            text: async () => 'rate limited',
-          } as Response)
-        : jsonResponse(openAICompatibleBody([[9, 9]], 2))
-    )
+    setEnv({ OPENAI_API_KEY: 'openai-test' })
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 429,
+      statusText: '429',
+      // Six minutes, far past EMBEDDING_MAX_RETRY_DELAY_MS.
+      headers: new Headers({
+        'x-ratelimit-remaining-tokens': '0',
+        'x-ratelimit-reset-tokens': '6m0s',
+      }),
+      json: async () => ({ error: 'rate limited' }),
+      text: async () => 'rate limited',
+    } as Response)
     vi.stubGlobal('fetch', fetchMock)
 
-    const pending = embedKnowledgeForDeployment(['hello'], options, false)
+    const pending = embedKnowledge(['hello'], options).catch((error) => error)
     await vi.runAllTimersAsync()
-    const result = await pending
+    const error = await pending
 
-    const openAICalls = fetchMock.mock.calls.filter(([url]) => url.includes('api.openai.com'))
-    expect(openAICalls).toHaveLength(1)
-    expect(result.embeddings[0].slice(0, 2)).toEqual([9, 9])
+    expect(fetchMock).toHaveBeenCalledOnce()
+    expect(error).toBeInstanceOf(EmbeddingAPIError)
+    expect(error.status).toBe(429)
   })
 
   /**
@@ -1619,11 +1021,11 @@ describe('knowledge embedding transport fallback', () => {
     expect(isTransientEmbeddingError(error)).toBe(true)
   })
 
-  it('classifies aggregate quota exhaustion only when every fallback exhausted credit', () => {
+  it('classifies aggregate quota exhaustion only when every batch exhausted credit', () => {
     const openAIQuota = new EmbeddingQuotaExhaustedError('openai')
-    const openRouterQuota = new EmbeddingQuotaExhaustedError('openrouter')
+    const secondQuota = new EmbeddingQuotaExhaustedError('openai')
 
-    expect(isEmbeddingQuotaExhaustion(new AggregateError([openAIQuota, openRouterQuota]))).toBe(
+    expect(isEmbeddingQuotaExhaustion(new AggregateError([openAIQuota, secondQuota]))).toBe(
       true
     )
     expect(
@@ -1648,98 +1050,14 @@ describe('knowledge embedding transport fallback', () => {
   })
 })
 
-describe('ollama embeddings', () => {
-  function ollamaBody(vectors: number[][], dimensions: number, promptEvalCount = 3) {
-    return {
-      embeddings: vectors.map((vector) => sizedVector(vector, dimensions)),
-      prompt_eval_count: promptEvalCount,
-    }
-  }
-
-  it('embeds against the configured server with no credential and bills nothing', async () => {
-    setEnv({ OLLAMA_URL: 'http://ollama.internal:11434/' })
-    fetchMock.mockResolvedValue(jsonResponse(ollamaBody([[1, 2, 3]], 768)))
-
-    const result = await embed(['hello'], {
-      model: 'ollama/nomic-embed-text',
-      dimensions: 768,
-      projectInputs: null,
-    })
-
-    const [url, init] = fetchMock.mock.calls[0]
-    expect(url).toBe('http://ollama.internal:11434/api/embed')
-    expect((init as RequestInit).headers).not.toHaveProperty('Authorization')
-    expect(JSON.parse((init as RequestInit).body as string)).toEqual({
-      model: 'nomic-embed-text',
-      input: ['hello'],
-      truncate: true,
-    })
-    expect(result.dimensions).toBe(768)
-    expect(result.modelName).toBe('nomic-embed-text')
-    expect(result.isBYOK).toBe(true)
-    expect(result.billableTokens).toBe(0)
-    expect(result.totalTokens).toBe(3)
-  })
-
-  /**
-   * The width is the operator's to get right, so the failure has to name both
-   * numbers rather than storing a vector the knowledge base cannot query.
-   */
-  it('rejects a model that returns a different width than the base stores', async () => {
-    setEnv({ OLLAMA_URL: 'http://ollama.internal:11434' })
-    fetchMock.mockResolvedValue(jsonResponse(ollamaBody([[1, 2, 3]], 1024)))
-
-    await expect(
-      embed(['hello'], { model: 'ollama/mxbai-embed-large', dimensions: 768, projectInputs: null })
-    ).rejects.toThrow('has 1024 unexpected dimensions; expected 768')
-  })
-
-  /**
-   * A self-hosted deployment runs alongside its own Ollama, so the loopback
-   * default is a working configuration that needs no env var — the same rule
-   * the chat provider and the block's model selector apply. Requiring the
-   * variable here would make embedding stricter than the list that offers the
-   * models.
-   */
-  it('serves a self-hosted deployment from the loopback default', async () => {
-    fetchMock.mockResolvedValue(jsonResponse(ollamaBody([[1, 2, 3]], 768)))
-
-    const result = await embed(['hello'], {
-      model: 'ollama/nomic-embed-text',
-      dimensions: 768,
-      projectInputs: null,
-    })
-
-    expect(fetchMock.mock.calls[0][0]).toBe('http://localhost:11434/api/embed')
-    expect(result.dimensions).toBe(768)
-  })
-
-  it('ignores a caller-supplied key rather than sending one Ollama cannot use', async () => {
-    setEnv({ OLLAMA_URL: 'http://ollama.internal:11434' })
-    fetchMock.mockResolvedValue(jsonResponse(ollamaBody([[1, 2, 3]], 384)))
-
-    await embed(['hello'], {
-      model: 'ollama/all-minilm',
-      dimensions: 384,
-      apiKey: 'sk-not-applicable',
-      projectInputs: null,
-    })
-
-    const [, init] = fetchMock.mock.calls[0]
-    expect((init as RequestInit).headers).toEqual({ 'Content-Type': 'application/json' })
-  })
-})
-
 describe('knowledge embedding capacity preflight', () => {
   const options = { model: 'text-embedding-3-small', dimensions: 1536 }
 
   it('refuses a paused hosted pool without spending provider admission or making requests', async () => {
-    setEnv({ OPENAI_API_KEY: 'platform-key', OPENROUTER_API_KEY: 'fallback-key' })
+    setEnv({ OPENAI_API_KEY: 'platform-key' })
     quotaGates.add('hosted:openai')
 
-    await expect(
-      assertKnowledgeEmbeddingCapacityForDeployment(options, true)
-    ).rejects.toBeInstanceOf(EmbeddingQuotaExhaustedError)
+    await expect(assertKnowledgeEmbeddingCapacity(options)).rejects.toBeInstanceOf(EmbeddingQuotaExhaustedError)
     expect(mockAdmit).not.toHaveBeenCalled()
     expect(fetchMock).not.toHaveBeenCalled()
   })
@@ -1750,71 +1068,23 @@ describe('knowledge embedding capacity preflight', () => {
     quotaGates.add('hosted:openai')
 
     await expect(
-      assertKnowledgeEmbeddingCapacityForDeployment(
-        { ...options, workspaceId: 'workspace-1' },
-        true
-      )
+      assertKnowledgeEmbeddingCapacity({ ...options, workspaceId: 'workspace-1' })
     ).resolves.toBeUndefined()
     expect(mockGetBYOKKey).toHaveBeenCalledWith('workspace-1', 'openai')
     const identity = mockQuotaCheck.mock.calls[0][0]
     expect(identity.credentialFingerprint).not.toBe('hosted:openai')
     quotaGates.add(identity.credentialFingerprint)
     await expect(
-      assertKnowledgeEmbeddingCapacityForDeployment(
-        { ...options, workspaceId: 'workspace-1' },
-        true
-      )
+      assertKnowledgeEmbeddingCapacity({ ...options, workspaceId: 'workspace-1' })
     ).rejects.toBeInstanceOf(EmbeddingQuotaExhaustedError)
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('keeps an available self-hosted fallback eligible when primary quota is exhausted', async () => {
-    setEnv({ OPENAI_API_KEY: 'platform-key', OPENROUTER_API_KEY: 'fallback-key' })
-    quotaGates.add('hosted:openai')
-
-    await expect(
-      assertKnowledgeEmbeddingCapacityForDeployment(options, false)
-    ).resolves.toBeUndefined()
-    expect(mockQuotaCheck.mock.calls.map(([identity]) => identity.providerId)).toEqual([
-      'openai',
-      'openrouter',
-    ])
-    expect(fetchMock).not.toHaveBeenCalled()
-
-    fetchMock.mockResolvedValue(jsonResponse(openAICompatibleBody([[1, 2]])))
-    await embedKnowledgeForDeployment(['text'], options, false)
-    expect(fetchMock).toHaveBeenCalledOnce()
-    expect(fetchMock.mock.calls[0][0]).toBe('https://openrouter.ai/api/v1/embeddings')
-  })
-
-  it('defers only when every configured fallback is exhausted', async () => {
-    setEnv({
-      AZURE_OPENAI_API_KEY: 'azure-key',
-      AZURE_OPENAI_ENDPOINT: 'https://example.openai.azure.com',
-      AZURE_OPENAI_API_VERSION: '2024-10-21',
-      OPENAI_API_KEY: 'platform-key',
-      OPENROUTER_API_KEY: 'fallback-key',
-    })
-    for (const provider of ['azure-openai', 'openai', 'openrouter'])
-      quotaGates.add(`hosted:${provider}`)
-    const error = await assertKnowledgeEmbeddingCapacityForDeployment(options, false).catch(
-      (error) => error
-    )
-    expect(error).toBeInstanceOf(AggregateError)
-    expect(isEmbeddingQuotaExhaustion(error)).toBe(true)
-    expect(mockQuotaCheck.mock.calls.map(([identity]) => identity.providerId)).toEqual([
-      'azure-openai',
-      'openai',
-      'openrouter',
-    ])
-    expect(fetchMock).not.toHaveBeenCalled()
-  })
-
   it('propagates admission storage failure instead of treating an alternate as available', async () => {
-    setEnv({ OPENAI_API_KEY: 'platform-key', OPENROUTER_API_KEY: 'fallback-key' })
+    setEnv({ OPENAI_API_KEY: 'platform-key' })
     const failure = new Error('Quota storage unavailable')
     mockQuotaCheck.mockRejectedValueOnce(failure)
-    await expect(assertKnowledgeEmbeddingCapacityForDeployment(options, false)).rejects.toBe(
+    await expect(assertKnowledgeEmbeddingCapacity(options)).rejects.toBe(
       failure
     )
     expect(mockQuotaCheck).toHaveBeenCalledOnce()
@@ -1826,7 +1096,7 @@ describe('knowledge embedding capacity preflight', () => {
     const controller = new AbortController()
     controller.abort()
     await expect(
-      assertKnowledgeEmbeddingCapacityForDeployment({ ...options, signal: controller.signal }, true)
+      assertKnowledgeEmbeddingCapacity({ ...options, signal: controller.signal })
     ).rejects.toMatchObject({ name: 'AbortError' })
     expect(mockQuotaCheck).not.toHaveBeenCalled()
 
@@ -1836,7 +1106,7 @@ describe('knowledge embedding capacity preflight', () => {
       return false
     })
     await expect(
-      assertKnowledgeEmbeddingCapacityForDeployment({ ...options, signal: duringRead.signal }, true)
+      assertKnowledgeEmbeddingCapacity({ ...options, signal: duringRead.signal })
     ).rejects.toMatchObject({ name: 'AbortError' })
     expect(fetchMock).not.toHaveBeenCalled()
   })

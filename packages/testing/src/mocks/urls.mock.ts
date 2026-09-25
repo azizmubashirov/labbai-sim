@@ -14,7 +14,6 @@ export const LOCALHOST_HOSTNAMES_MOCK: ReadonlySet<string> = new Set([
 export const CANONICAL_SITE_HOST_MOCK = 'www.sim.ai'
 
 const DEFAULT_SOCKET_URL = 'http://localhost:3002'
-const DEFAULT_OLLAMA_URL = 'http://localhost:11434'
 
 function readEnv(key: string): string | undefined {
   return envMockFns.getEnv(key)
@@ -158,15 +157,6 @@ function getSocketUrlImpl(): string {
   return DEFAULT_SOCKET_URL
 }
 
-function getOllamaUrlImpl(): string {
-  const value = mockEnvObject.OLLAMA_URL
-  return (typeof value === 'string' && value) || DEFAULT_OLLAMA_URL
-}
-
-function isOllamaUrlConfiguredImpl(): boolean {
-  return Boolean(mockEnvObject.OLLAMA_URL)
-}
-
 /**
  * Controllable mock functions for `@/lib/core/utils/urls`. Each defaults to a
  * faithful implementation of the real module that reads through the shared env
@@ -194,8 +184,6 @@ export const urlsMockFns = {
   mockIsSafeHttpUrl: vi.fn(isSafeHttpUrlImpl),
   mockGetSocketServerUrl: vi.fn(getSocketServerUrlImpl),
   mockGetSocketUrl: vi.fn(getSocketUrlImpl),
-  mockGetOllamaUrl: vi.fn(getOllamaUrlImpl),
-  mockIsOllamaUrlConfigured: vi.fn(isOllamaUrlConfiguredImpl),
 }
 
 /**
@@ -216,8 +204,6 @@ export function resetUrlsMock(): void {
   urlsMockFns.mockIsSafeHttpUrl.mockReset().mockImplementation(isSafeHttpUrlImpl)
   urlsMockFns.mockGetSocketServerUrl.mockReset().mockImplementation(getSocketServerUrlImpl)
   urlsMockFns.mockGetSocketUrl.mockReset().mockImplementation(getSocketUrlImpl)
-  urlsMockFns.mockGetOllamaUrl.mockReset().mockImplementation(getOllamaUrlImpl)
-  urlsMockFns.mockIsOllamaUrlConfigured.mockReset().mockImplementation(isOllamaUrlConfiguredImpl)
 }
 
 /**
@@ -246,6 +232,4 @@ export const urlsMock = {
   isSafeHttpUrl: urlsMockFns.mockIsSafeHttpUrl,
   getSocketServerUrl: urlsMockFns.mockGetSocketServerUrl,
   getSocketUrl: urlsMockFns.mockGetSocketUrl,
-  getOllamaUrl: urlsMockFns.mockGetOllamaUrl,
-  isOllamaUrlConfigured: urlsMockFns.mockIsOllamaUrlConfigured,
 }

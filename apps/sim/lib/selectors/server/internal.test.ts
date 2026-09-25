@@ -5,7 +5,6 @@ import { environmentUtilsMockFns, resetEnvironmentUtilsMock } from '@sim/testing
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mockListWorkflows = vi.hoisted(() => vi.fn())
-const mockFetchOpenRouterEmbeddingModelCatalog = vi.hoisted(() => vi.fn())
 const mockGetWorkspaceOrganizationAccounts = vi.hoisted(() => vi.fn())
 
 vi.mock('@/lib/credential-groups/application/workspace-organization-accounts', () => ({
@@ -14,10 +13,6 @@ vi.mock('@/lib/credential-groups/application/workspace-organization-accounts', (
 
 vi.mock('@/lib/workflows/application/list-workflows', () => ({
   listWorkflows: { execute: mockListWorkflows },
-}))
-
-vi.mock('@/lib/embeddings/openrouter-model-catalog.server', () => ({
-  fetchOpenRouterEmbeddingModelCatalog: mockFetchOpenRouterEmbeddingModelCatalog,
 }))
 
 import { SelectorOptionsUnavailableError } from '@/lib/selectors/server/errors'
@@ -172,29 +167,12 @@ describe('providers.openrouterEmbeddingModels selector', () => {
     resetEnvironmentUtilsMock()
   })
 
-  it('passes the selector signal to the OpenRouter catalog fetch', async () => {
-    const controller = new AbortController()
-    mockFetchOpenRouterEmbeddingModelCatalog.mockResolvedValue([
-      { id: 'openai/text-embedding-3-small', maxInputTokens: 8_191 },
-    ])
-
+  it('lists nothing: Labbai embeds with OpenAI only', async () => {
     await expect(
       internalSelectorAttachments['providers.openrouterEmbeddingModels'].execute({
         ...workflowArgs(),
         selectorKey: 'providers.openrouterEmbeddingModels',
-        signal: controller.signal,
       })
-    ).resolves.toEqual({
-      kind: 'list',
-      items: [
-        {
-          id: 'openai/text-embedding-3-small',
-          label: 'openai/text-embedding-3-small',
-        },
-      ],
-    })
-
-    expect(mockFetchOpenRouterEmbeddingModelCatalog).toHaveBeenCalledOnce()
-    expect(mockFetchOpenRouterEmbeddingModelCatalog).toHaveBeenCalledWith(controller.signal)
+    ).resolves.toEqual({ kind: 'list', items: [] })
   })
 })

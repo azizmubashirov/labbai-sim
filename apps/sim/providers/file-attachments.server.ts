@@ -1,7 +1,4 @@
-import { FileState, GoogleGenAI } from '@google/genai'
 import { createLogger } from '@sim/logger'
-import { getErrorMessage } from '@sim/utils/errors'
-import { sleep } from '@sim/utils/helpers'
 import { assertUserFileContentAccess } from '@/lib/execution/payloads/materialization.server'
 import { resolveExecutorFileMaterializationContext } from '@/lib/internal/file/materialization-context'
 import { StorageService } from '@/lib/uploads'
@@ -18,16 +15,14 @@ import {
   LARGE_FILE_PATH_THRESHOLD_BYTES,
   shouldUseLargeFilePath,
 } from '@/providers/attachments'
+import { getOpenAIBaseUrl, getOpenAIExtraHeaders } from '@/providers/openai/client-config'
 import type { Message, ProviderId, ProviderRequest } from '@/providers/types'
 
 const logger = createLogger('ProviderFileAttachments')
 
-const OPENAI_FILES_ENDPOINT = 'https://api.openai.com/v1/files'
 const PRESIGNED_URL_EXPIRY_SECONDS = 60 * 60
 /** OpenAI auto-deletes uploaded files after this window — see the "rely on provider expiry" lifecycle. */
 const OPENAI_FILE_EXPIRY_SECONDS = 60 * 60
-const GEMINI_POLL_INTERVAL_MS = 1000
-const GEMINI_PROCESSING_TIMEOUT_MS = 5 * 60_000
 
 function* iterateRequestFiles(messages: Message[] | undefined): Generator<UserFile> {
   for (const message of messages ?? []) {
@@ -147,15 +142,12 @@ export async function uploadLargeFilesToProvider(
   if (groups.length === 0) return
 
   const maxBytes = getProviderAttachmentMaxBytes(providerId)
-  const ai = providerId === 'google' ? new GoogleGenAI({ apiKey: request.apiKey }) : null
 
   for (const group of groups) {
     const [representative] = group
     await assertFileAccessForUpload(representative, request.userId, executionContext)
     if (providerId === 'openai') {
       await uploadOpenAIFile(representative, request.apiKey, maxBytes, request.abortSignal)
-    } else if (ai) {
-      await uploadGeminiFile(representative, ai, maxBytes, request.abortSignal)
     }
     for (const file of group) {
       file.providerFileId = representative.providerFileId
@@ -249,9 +241,9 @@ async function uploadOpenAIFile(
   form.append('expires_after[seconds]', String(OPENAI_FILE_EXPIRY_SECONDS))
   form.append('file', blob, file.name)
 
-  const response = await fetch(OPENAI_FILES_ENDPOINT, {
+  const response = await fetch(`${getOpenAIBaseUrl()}/files`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}` },
+    headers: { ...getOpenAIExtraHeaders(), Authorization: `Bearer ${apiKey}` },
     body: form,
     signal,
   })
@@ -266,37 +258,4 @@ async function uploadOpenAIFile(
   }
   file.providerFileId = uploaded.id
   logger.info(`Uploaded "${file.name}" to OpenAI Files API`, { fileId: uploaded.id })
-}
-
-async function uploadGeminiFile(
-  file: UserFile,
-  ai: GoogleGenAI,
-  maxBytes: number,
-  signal?: AbortSignal
-): Promise<void> {
-  const mimeType = inferAttachmentMimeType(file)
-  const blob = await downloadFileForUpload(file, maxBytes)
-
-  let uploaded = await ai.files.upload({ file: blob, config: { mimeType, abortSignal: signal } })
-  if (!uploaded.name) {
-    throw new Error(`Gemini upload for "${file.name}" returned no file name`)
-  }
-  const uploadedName = uploaded.name
-
-  const deadline = Date.now() + GEMINI_PROCESSING_TIMEOUT_MS
-  while (uploaded.state === FileState.PROCESSING) {
-    if (Date.now() > deadline) {
-      throw new Error(`Gemini file processing timed out for "${file.name}"`)
-    }
-    await sleep(GEMINI_POLL_INTERVAL_MS)
-    uploaded = await ai.files.get({ name: uploadedName })
-  }
-
-  if (uploaded.state === FileState.FAILED || !uploaded.uri) {
-    throw new Error(
-      `Gemini file processing failed for "${file.name}": ${getErrorMessage(uploaded.error, 'unknown error')}`
-    )
-  }
-  file.providerFileUri = uploaded.uri
-  logger.info(`Uploaded "${file.name}" to Gemini File API`, { fileUri: uploaded.uri })
 }

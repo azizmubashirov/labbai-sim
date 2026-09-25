@@ -1,17 +1,17 @@
 /**
  * @vitest-environment node
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const {
-  mockGenerateContent,
+  mockImageFetch,
   mockGenerateFalAudio,
   mockIsOpaqueWorkspaceFileEgressSafe,
   mockResolveWorkspaceFileReference,
   mockReadWorkspaceFileContent,
   mockWriteWorkspaceFileByPath,
 } = vi.hoisted(() => ({
-  mockGenerateContent: vi.fn(),
+  mockImageFetch: vi.fn(),
   mockGenerateFalAudio: vi.fn(),
   mockIsOpaqueWorkspaceFileEgressSafe: vi.fn(),
   mockResolveWorkspaceFileReference: vi.fn(),
@@ -19,12 +19,22 @@ const {
   mockWriteWorkspaceFileByPath: vi.fn(),
 }))
 
-vi.mock('@google/genai', () => ({
-  GoogleGenAI: class GoogleGenAI {
-    models = { generateContent: mockGenerateContent }
-  },
+const mockEnv = vi.hoisted(() => ({ OPENAI_API_KEY: 'api-key' as string | undefined }))
+
+vi.mock('@/lib/core/config/env', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/core/config/env')>()
+  return {
+    ...actual,
+    env: new Proxy(actual.env, {
+      get: (target, prop) =>
+        prop === 'OPENAI_API_KEY' ? mockEnv.OPENAI_API_KEY : Reflect.get(target, prop),
+    }),
+  }
+})
+vi.mock('@/providers/openai/client-config', () => ({
+  getOpenAIBaseUrl: () => 'https://api.openai.com/v1',
+  getOpenAIExtraHeaders: () => ({}),
 }))
-vi.mock('@/lib/core/config/api-keys', () => ({ getRotatingApiKey: vi.fn(() => 'api-key') }))
 vi.mock('@/lib/copilot/vfs/resource-writer', () => ({
   writeCopilotWorkspaceFileByPath: mockWriteWorkspaceFileByPath,
 }))
@@ -77,8 +87,14 @@ function contextWithSecrets(
 }
 
 describe('Mothership media model boundaries', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
   beforeEach(() => {
     vi.clearAllMocks()
+    mockEnv.OPENAI_API_KEY = 'api-key'
+    vi.stubGlobal('fetch', mockImageFetch)
     mockIsOpaqueWorkspaceFileEgressSafe.mockResolvedValue(true)
     mockResolveWorkspaceFileReference.mockResolvedValue(file)
     mockReadWorkspaceFileContent.mockResolvedValue({ file, content: Buffer.from('opaque-media') })
@@ -90,11 +106,16 @@ describe('Mothership media model boundaries', () => {
       vfsPath: 'files/output.bin',
       mode: 'create',
     })
-    mockGenerateContent.mockResolvedValue({
-      candidates: [
-        { content: { parts: [{ inlineData: { data: 'aW1hZ2U=', mimeType: 'image/png' } }] } },
-      ],
-    })
+    mockImageFetch.mockResolvedValue(
+      Response.json({
+        data: [{ b64_json: 'aW1hZ2U=' }],
+        usage: {
+          input_tokens: 10,
+          output_tokens: 1000,
+          input_tokens_details: { text_tokens: 10, image_tokens: 0 },
+        },
+      })
+    )
     mockGenerateFalAudio.mockResolvedValue({
       buffer: Buffer.from('audio'),
       contentType: 'audio/mpeg',
@@ -107,19 +128,52 @@ describe('Mothership media model boundaries', () => {
   it('preserves image prompts that merely collide with ambient secret plaintext', async () => {
     const context = contextWithSecrets([{ name: 'PROMPT', plaintext: 'private prompt' }])
 
-    await generateImageServerTool.execute({ prompt: 'private prompt' }, context)
+    const result = await generateImageServerTool.execute({ prompt: 'private prompt' }, context)
 
-    expect(mockGenerateContent).toHaveBeenCalledWith(
+    expect(mockImageFetch).toHaveBeenCalledOnce()
+    const [url, init] = mockImageFetch.mock.calls[0]
+    expect(url).toBe('https://api.openai.com/v1/images/generations')
+    expect((init as RequestInit).headers).toMatchObject({ Authorization: 'Bearer api-key' })
+    const body = JSON.parse((init as RequestInit).body as string)
+    expect(body).toEqual({
+      model: 'gpt-image-1',
+      prompt: 'private prompt',
+      size: '1024x1024',
+      n: 1,
+    })
+    expect(JSON.stringify(body)).not.toContain('{{PROMPT}}')
+    expect(result).toMatchObject({
+      success: true,
+      _serviceCost: { service: 'gpt-image-1', cost: (10 * 5 + 1000 * 40) / 1_000_000 },
+    })
+  })
+
+  it('edits with reference images through the multipart edits endpoint', async () => {
+    await generateImageServerTool.execute(
+      { prompt: 'make it blue', inputs: { files: [{ path: 'files/reference.png' }] } },
+      contextWithSecrets([])
+    )
+
+    const [url, init] = mockImageFetch.mock.calls[0]
+    expect(url).toBe('https://api.openai.com/v1/images/edits')
+    const form = (init as RequestInit).body as FormData
+    expect(form.get('model')).toBe('gpt-image-1')
+    expect(form.get('prompt')).toBe('make it blue')
+    expect(form.getAll('image[]')).toHaveLength(1)
+  })
+
+  it('disables image generation when no OpenAI key is configured', async () => {
+    mockEnv.OPENAI_API_KEY = undefined
+
+    await expect(
+      generateImageServerTool.execute({ prompt: 'a cat' }, contextWithSecrets([]))
+    ).resolves.toEqual(
       expect.objectContaining({
-        contents: [
-          expect.objectContaining({
-            parts: [expect.objectContaining({ text: expect.stringContaining('private prompt') })],
-          }),
-        ],
+        success: false,
+        message: expect.stringContaining('no OpenAI API key'),
       })
     )
-    expect(JSON.stringify(mockGenerateContent.mock.calls[0]?.[0])).toContain('private prompt')
-    expect(JSON.stringify(mockGenerateContent.mock.calls[0]?.[0])).not.toContain('{{PROMPT}}')
+    expect(mockImageFetch).not.toHaveBeenCalled()
   })
 
   it('preserves audio prompt fields that merely collide with ambient secret plaintext', async () => {
@@ -168,7 +222,7 @@ describe('Mothership media model boundaries', () => {
       )
 
       expect(mockReadWorkspaceFileContent).not.toHaveBeenCalled()
-      expect(mockGenerateContent).not.toHaveBeenCalled()
+      expect(mockImageFetch).not.toHaveBeenCalled()
       expect(mockGenerateFalAudio).not.toHaveBeenCalled()
     }
   )

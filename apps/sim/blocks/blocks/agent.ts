@@ -26,15 +26,15 @@ import {
   getReasoningEffortValuesForModel,
   getThinkingLevelsForModel,
   getVerbosityValuesForModel,
-  isAutoModel,
   supportsTemperature,
 } from '@/providers/models'
+import { OPENAI_DEFAULT_MODEL } from '@/providers/openai/model-ids'
 import type { ToolResponse } from '@/tools/types'
 
 const logger = createLogger('AgentBlock')
 
-/** Model the agent block falls back to when `model` is unset or the auto pseudo-model. */
-const AGENT_FALLBACK_MODEL = 'claude-sonnet-5'
+/** Model the agent block falls back to when `model` is unset. */
+const AGENT_FALLBACK_MODEL = OPENAI_DEFAULT_MODEL
 
 const MODELS_WITH_REASONING_EFFORT = getModelsWithReasoningEffort()
 const MODELS_WITH_VERBOSITY = getModelsWithVerbosity()
@@ -154,7 +154,7 @@ Return ONLY the JSON array.`,
       type: 'combobox',
       placeholder: 'Type or select a model...',
       required: true,
-      defaultValue: 'claude-sonnet-5',
+      defaultValue: OPENAI_DEFAULT_MODEL,
       options: getAgentModelOptions,
       commandSearchable: true,
     },
@@ -475,18 +475,11 @@ Return ONLY the JSON array.`,
   tools: {
     access: [
       'openai_chat',
-      'anthropic_chat',
-      'google_chat',
-      'xai_chat',
-      'deepseek_chat',
-      'deepseek_reasoner',
     ],
     config: {
       tool: (params: Record<string, any>) => {
         const model = params.model || AGENT_FALLBACK_MODEL
-        // sim-auto has no provider of its own until the pool resolves it at execution time.
-        const lookupModel = isAutoModel(model) ? AGENT_FALLBACK_MODEL : model
-        return getSerializedModelProviderId(lookupModel, AGENT_FALLBACK_MODEL)
+        return getSerializedModelProviderId(model, AGENT_FALLBACK_MODEL)
       },
       params: (params: Record<string, any>) => {
         const normalizedFiles = normalizeFileInput(params.files)
@@ -574,14 +567,6 @@ Return ONLY the JSON array.`,
     },
     model: { type: 'string', description: 'AI model to use' },
     apiKey: { type: 'string', description: 'Provider API key' },
-    azureEndpoint: { type: 'string', description: 'Azure endpoint URL' },
-    azureApiVersion: { type: 'string', description: 'Azure API version' },
-    vertexCredential: { type: 'string', description: 'OAuth credential for Vertex AI' },
-    vertexProject: { type: 'string', description: 'Google Cloud project ID for Vertex AI' },
-    vertexLocation: { type: 'string', description: 'Google Cloud location for Vertex AI' },
-    bedrockAccessKeyId: { type: 'string', description: 'AWS Access Key ID for Bedrock' },
-    bedrockSecretKey: { type: 'string', description: 'AWS Secret Access Key for Bedrock' },
-    bedrockRegion: { type: 'string', description: 'AWS region for Bedrock' },
     responseFormat: {
       type: 'json',
       description: 'JSON response format schema',

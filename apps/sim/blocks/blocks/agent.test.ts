@@ -35,7 +35,6 @@ describe('AgentBlock', () => {
         model: 'gpt-4o',
         fallbackModels: [
           { id: 'a', model: ' claude-sonnet-5 ' },
-          { id: 'b', model: 'sim-auto' },
           { id: 'c', model: 'claude-sonnet-5' },
           { id: 'd', model: 'openrouter/x', apiKey: '{{OPENROUTER_API_KEY}}' },
           { id: 'e', model: 'openrouter/y', apiKey: '' },

@@ -7,7 +7,7 @@ export const visionOperationInputSchema = z.object({
   apiKey: z.string().min(1, 'API key is required'),
   imageUrl: z.string().optional().nullable(),
   imageFile: RawFileInputSchema.optional().nullable(),
-  model: z.string().optional().default('gpt-5.2'),
+  model: z.string().optional().default('gpt-5-mini'),
   prompt: z.string().optional().nullable(),
   [RESOLVED_SECRET_PROVENANCE_FIELD]: resolvedSecretTraceProvenanceSchema.optional(),
 })

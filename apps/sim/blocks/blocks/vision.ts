@@ -2,23 +2,21 @@ import { EyeIcon } from '@/components/icons'
 import type { BlockConfig } from '@/blocks/types'
 import { AuthMode, IntegrationType } from '@/blocks/types'
 import { createVersionedToolSelector, normalizeFileInput } from '@/blocks/utils'
+import {
+  OPENAI_DEFAULT_MODEL,
+  OPENAI_MODEL_GPT_4_1,
+  OPENAI_MODEL_GPT_4_1_MINI,
+  OPENAI_MODEL_GPT_5_5,
+  OPENAI_MODEL_GPT_5_MINI,
+} from '@/providers/openai/model-ids'
 import type { VisionResponse } from '@/tools/vision/types'
 
+/** Labbai: vision runs on OpenAI only; every curated id accepts image input. */
 const VISION_MODEL_OPTIONS = [
-  { label: 'GPT 5.2', id: 'gpt-5.2' },
-  { label: 'GPT 5.1', id: 'gpt-5.1' },
-  { label: 'GPT 5', id: 'gpt-5' },
-  { label: 'GPT 5 Mini', id: 'gpt-5-mini' },
-  { label: 'GPT 5 Nano', id: 'gpt-5-nano' },
-  { label: 'Claude Opus 4.5', id: 'claude-opus-4-5' },
-  { label: 'Claude Sonnet 4.5', id: 'claude-sonnet-4-5' },
-  { label: 'Claude Haiku 4.5', id: 'claude-haiku-4-5' },
-  { label: 'Gemini 3.1 Pro Preview', id: 'gemini-3.1-pro-preview' },
-  { label: 'Gemini 3 Pro Preview', id: 'gemini-3-pro-preview' },
-  { label: 'Gemini 3 Flash Preview', id: 'gemini-3-flash-preview' },
-  { label: 'Gemini 2.5 Pro', id: 'gemini-2.5-pro' },
-  { label: 'Gemini 2.5 Flash', id: 'gemini-2.5-flash' },
-  { label: 'Gemini 2.5 Flash Lite', id: 'gemini-2.5-flash-lite' },
+  { label: 'GPT 5 Mini', id: OPENAI_MODEL_GPT_5_MINI },
+  { label: 'GPT 5.5', id: OPENAI_MODEL_GPT_5_5 },
+  { label: 'GPT 4.1', id: OPENAI_MODEL_GPT_4_1 },
+  { label: 'GPT 4.1 Mini', id: OPENAI_MODEL_GPT_4_1_MINI },
 ]
 
 const IMAGE_FIELD = ['imageFile', 'imageFileReference', 'imageUrl'] as const
@@ -81,7 +79,7 @@ export const VisionBlock: BlockConfig<VisionResponse> = {
       title: 'Vision Model',
       type: 'dropdown',
       options: VISION_MODEL_OPTIONS,
-      value: () => 'gpt-5.2',
+      value: () => OPENAI_DEFAULT_MODEL,
     },
     {
       id: 'prompt',
@@ -94,7 +92,7 @@ export const VisionBlock: BlockConfig<VisionResponse> = {
       id: 'apiKey',
       title: 'API Key',
       type: 'short-input',
-      placeholder: 'Enter your API key',
+      placeholder: 'Enter your OpenAI API key',
       password: true,
       required: true,
     },
@@ -103,7 +101,7 @@ export const VisionBlock: BlockConfig<VisionResponse> = {
     access: ['vision_tool'],
   },
   inputs: {
-    apiKey: { type: 'string', description: 'Provider API key' },
+    apiKey: { type: 'string', description: 'OpenAI API key' },
     imageUrl: { type: 'string', description: 'Image URL' },
     imageFile: { type: 'json', description: 'Image file (UserFile)' },
     model: { type: 'string', description: 'Vision model' },
@@ -177,7 +175,7 @@ export const VisionV2Block: BlockConfig<VisionResponse> = {
       title: 'Vision Model',
       type: 'dropdown',
       options: VISION_MODEL_OPTIONS,
-      value: () => 'gpt-5.2',
+      value: () => OPENAI_DEFAULT_MODEL,
     },
     {
       id: 'prompt',
@@ -190,13 +188,13 @@ export const VisionV2Block: BlockConfig<VisionResponse> = {
       id: 'apiKey',
       title: 'API Key',
       type: 'short-input',
-      placeholder: 'Enter your API key',
+      placeholder: 'Enter your OpenAI API key',
       password: true,
       required: true,
     },
   ],
   inputs: {
-    apiKey: { type: 'string', description: 'Provider API key' },
+    apiKey: { type: 'string', description: 'OpenAI API key' },
     imageFile: { type: 'json', description: 'Image file (UserFile)' },
     model: { type: 'string', description: 'Vision model' },
     prompt: { type: 'string', description: 'Analysis prompt' },

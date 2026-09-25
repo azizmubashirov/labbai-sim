@@ -5,157 +5,42 @@ import { EmbeddingsIcon } from '@/components/icons'
  * `@sim/db`. Block configs are bundled for the browser, so only the pure
  * catalog data may cross this boundary.
  */
-import {
-  DEFAULT_MODEL_BY_PROVIDER,
-  EMBEDDING_CATALOG_PROVIDERS,
-  EMBEDDING_MODELS,
-  getModelsForProvider,
-} from '@/lib/embeddings/catalog'
-import {
-  DEFAULT_OPENROUTER_EMBEDDING_MODEL,
-  normalizeOpenRouterEmbeddingModelId,
-} from '@/lib/embeddings/openrouter-models'
-import type { EmbeddingTaskType } from '@/lib/embeddings/types'
+import { DEFAULT_EMBEDDING_MODEL, EMBEDDING_MODELS } from '@/lib/embeddings/catalog'
 import type { BlockConfig, BlockMeta, SubBlockConfig } from '@/blocks/types'
 import { AuthMode, IntegrationType } from '@/blocks/types'
 import type { EmbeddingsResponse } from '@/tools/embeddings/types'
 
-export const EMBEDDING_BLOCK_PROVIDERS = [
-  ...EMBEDDING_CATALOG_PROVIDERS,
-  'openrouter',
-  'ollama',
-] as const
+/**
+ * Labbai: embeddings run on OpenAI only. The provider dropdown keeps its one
+ * option so saved blocks keep a valid shape; the Gemini / Cohere / Mistral /
+ * OpenRouter / Ollama variants were removed.
+ */
+export const EMBEDDING_BLOCK_PROVIDERS = ['openai'] as const
 
 type EmbeddingBlockProvider = (typeof EMBEDDING_BLOCK_PROVIDERS)[number]
 
 const TOOL_ID_BY_PROVIDER: Record<EmbeddingBlockProvider, string> = {
   openai: 'embeddings_openai',
-  openrouter: 'embeddings_openrouter',
-  gemini: 'embeddings_gemini',
-  cohere: 'embeddings_cohere',
-  mistral: 'embeddings_mistral',
-  ollama: 'embeddings_ollama',
 }
 
-const PROVIDER_LABELS: Record<EmbeddingBlockProvider, string> = {
-  openai: 'OpenAI',
-  openrouter: 'OpenRouter',
-  gemini: 'Google Gemini',
-  cohere: 'Cohere',
-  mistral: 'Mistral',
-  ollama: 'Ollama',
-}
-
-/** Providers whose models are the deployment's to install, not Sim's to catalogue. */
-const KEYLESS_PROVIDERS = ['ollama'] as const satisfies readonly EmbeddingBlockProvider[]
-
-const TASK_TYPE_LABELS: Record<EmbeddingTaskType, string> = {
-  document: 'Document',
-  query: 'Query',
-  similarity: 'Semantic Similarity',
-  classification: 'Classification',
-  clustering: 'Clustering',
-}
-
-/**
- * Dropdowns are derived from the catalog rather than hand-copied, so adding a
- * catalog model cannot leave this block stale. Every variant shares one
- * sub-block id, so each is scoped by a `condition` naming the provider.
- */
-const MODEL_SUB_BLOCKS: SubBlockConfig[] = EMBEDDING_CATALOG_PROVIDERS.map((provider) => {
-  return {
-    id: 'model',
-    title: 'Model',
-    type: 'dropdown',
-    options: getModelsForProvider(provider).map((id) => ({
-      label: EMBEDDING_MODELS[id].label,
-      id,
-    })),
-    value: () => DEFAULT_MODEL_BY_PROVIDER[provider],
-    condition: { field: 'provider', value: provider },
-    dependsOn: ['provider'],
-  }
-})
-
-MODEL_SUB_BLOCKS.push({
-  id: 'model',
-  title: 'Model',
-  type: 'combobox',
-  selectorKey: 'providers.openrouterEmbeddingModels',
-  value: () => DEFAULT_OPENROUTER_EMBEDDING_MODEL,
-  condition: { field: 'provider', value: 'openrouter' },
-  dependsOn: ['provider'],
-})
-
-/**
- * Ollama's catalog is whatever the operator pulled onto their own server, so the
- * list is read from it at open time rather than declared here, and there is no
- * default to pre-select. Each option carries the width the model emits, because
- * that is the one thing a user has to match when the same base is also indexed
- * by a knowledge base.
- */
-MODEL_SUB_BLOCKS.push({
-  id: 'model',
-  title: 'Model',
-  type: 'combobox',
-  selectorKey: 'providers.ollamaEmbeddingModels',
-  placeholder: 'Select a model on your Ollama server',
-  required: true,
-  /**
-   * Suppresses the combobox's auto-select-first-option behaviour. Without it,
-   * opening the block persists whichever model the server happens to list
-   * first — and since each one emits a different width, that is a silent wrong
-   * answer rather than a harmless default. `required` still stands: the user
-   * must choose, they just are not chosen for.
-   */
-  emptyIsValid: true,
-  condition: { field: 'provider', value: 'ollama' },
-  dependsOn: ['provider'],
-})
-
-/**
- * Task-type and dimension dropdowns, which are per-model rather than
- * per-provider: the `condition` names both, and a model contributes a dropdown
- * only for the capabilities the catalog says it has.
- */
+/** Dimension dropdowns are derived from the catalog, one per model. */
 const CAPABILITY_SUB_BLOCKS: SubBlockConfig[] = Object.entries(EMBEDDING_MODELS).flatMap(
   ([model, info]) => {
-    return [info.provider].flatMap((provider) => {
-      const scope = { field: 'provider', value: provider, and: { field: 'model', value: model } }
-      const subBlocks: SubBlockConfig[] = []
-
-      if (info.supportedTaskTypes) {
-        subBlocks.push({
-          id: 'taskType',
-          title: 'Task Type',
-          type: 'dropdown',
-          options: info.supportedTaskTypes.map((task) => ({
-            label: TASK_TYPE_LABELS[task],
-            id: task,
-          })),
-          value: () => 'document',
-          condition: scope,
-          dependsOn: ['provider', 'model'],
-        })
-      }
-
-      if (info.supportedDimensions) {
-        subBlocks.push({
-          id: 'dimensions',
-          title: 'Dimensions',
-          type: 'dropdown',
-          options: info.supportedDimensions.map((size) => ({
-            label: size === info.nativeDimensions ? `${size} (default)` : String(size),
-            id: String(size),
-          })),
-          value: () => String(info.nativeDimensions),
-          condition: scope,
-          dependsOn: ['provider', 'model'],
-        })
-      }
-
-      return subBlocks
-    })
+    if (!info.supportedDimensions) return []
+    return [
+      {
+        id: 'dimensions',
+        title: 'Dimensions',
+        type: 'dropdown',
+        options: info.supportedDimensions.map((size) => ({
+          label: size === info.nativeDimensions ? `${size} (default)` : String(size),
+          id: String(size),
+        })),
+        value: () => String(info.nativeDimensions),
+        condition: { field: 'model', value: model },
+        dependsOn: ['model'],
+      } satisfies SubBlockConfig,
+    ]
   }
 )
 
@@ -165,7 +50,7 @@ export const EmbeddingsBlock: BlockConfig<EmbeddingsResponse> = {
   description: 'Generate embeddings',
   authMode: AuthMode.ApiKey,
   longDescription:
-    'Turn text into embedding vectors for semantic search, clustering, and similarity. Supports OpenAI, OpenRouter, Google Gemini, Cohere, and Mistral embedding models, plus embedding models on a self-hosted Ollama.',
+    'Turn text into embedding vectors for semantic search, clustering, and similarity with OpenAI embedding models.',
   category: 'tools',
   integrationType: IntegrationType.AI,
   docsLink: 'https://docs.sim.ai/integrations/embeddings',
@@ -174,9 +59,6 @@ export const EmbeddingsBlock: BlockConfig<EmbeddingsResponse> = {
   canvasPresentation: {
     defaultTitle: 'Embeddings',
     sentences: {
-      /* Anchored on `input`: it is the one required field every provider shows.
-         `model` is scoped by a per-provider `condition`, so it carries the
-         clause but cannot be what keeps the sentence on the card. */
       default: [
         { text: 'Embed', field: 'input', core: true },
         { text: 'with', field: 'model' },
@@ -195,140 +77,48 @@ export const EmbeddingsBlock: BlockConfig<EmbeddingsResponse> = {
       id: 'provider',
       title: 'Provider',
       type: 'dropdown',
-      options: EMBEDDING_BLOCK_PROVIDERS.map((provider) => ({
-        label: PROVIDER_LABELS[provider],
-        id: provider,
-      })),
-      commandSearchable: true,
+      options: [{ label: 'OpenAI', id: 'openai' }],
+      hidden: true,
       value: () => 'openai',
     },
-    ...MODEL_SUB_BLOCKS,
+    {
+      id: 'model',
+      title: 'Model',
+      type: 'dropdown',
+      options: Object.entries(EMBEDDING_MODELS).map(([id, info]) => ({ label: info.label, id })),
+      value: () => DEFAULT_EMBEDDING_MODEL,
+    },
     ...CAPABILITY_SUB_BLOCKS,
-    /**
-     * Sim stocks a hosted key for each catalog provider, so none of those
-     * fields needs the user to supply one on hosted Sim. OpenRouter is always
-     * explicit BYOK for this block.
-     */
+    /** Sim stocks the hosted OpenAI key, so the field is hidden on hosted Sim. */
     {
       id: 'apiKey',
       title: 'API Key',
       type: 'short-input',
-      placeholder: 'Enter your provider API key',
+      placeholder: 'Enter your OpenAI API key',
       password: true,
       required: true,
-      condition: { field: 'provider', value: [...KEYLESS_PROVIDERS, 'openrouter'], not: true },
       connectionDroppable: false,
       hideWhenHosted: true,
     },
-    {
-      id: 'openRouterApiKey',
-      title: 'OpenRouter API Key',
-      type: 'short-input',
-      placeholder: 'Enter your OpenRouter API key',
-      password: true,
-      required: true,
-      condition: { field: 'provider', value: 'openrouter' },
-      connectionDroppable: false,
-    },
   ],
   tools: {
-    access: [
-      'embeddings_openai',
-      'embeddings_openrouter',
-      'embeddings_gemini',
-      'embeddings_cohere',
-      'embeddings_mistral',
-      'embeddings_ollama',
-    ],
+    access: ['embeddings_openai'],
     config: {
+      tool: () => TOOL_ID_BY_PROVIDER.openai,
       /**
-       * Runs at serialization, before variable resolution, so this only ever
-       * does plain lookups — never coercion, which would destroy dynamic
-       * `<Block.output>` references.
-       */
-      tool: (params) => {
-        const provider = (params.provider as EmbeddingBlockProvider | undefined) ?? 'openai'
-        const toolId = TOOL_ID_BY_PROVIDER[provider]
-        if (!toolId) throw new Error(`Unsupported embedding provider: ${String(params.provider)}`)
-        return toolId
-      },
-      /**
-       * Every per-provider dropdown shares one subblock id (`model`,
-       * `taskType`, `dimensions`) and nothing clears a stored value when its
-       * `dependsOn` fields change, so a choice made for one provider or model
-       * outlives a switch away from it.
-       *
-       * Each stale field is therefore rewritten to an explicit `undefined`
-       * rather than omitted. The generic handler merges this result over the
-       * original inputs (`{ ...inputs, ...transformedParams }`), so an omitted
-       * key leaves the stale value untouched — only an explicit `undefined`
-       * overrides it.
+       * A model or dimension saved before the OpenAI-only switch (another
+       * provider's model, or a width it cannot emit) is rewritten to an explicit
+       * `undefined` / the default rather than forwarded.
        */
       params: (params) => {
-        const provider = (params.provider as EmbeddingBlockProvider) || 'openai'
         if (!params.input) {
           throw new Error('Input text is required')
         }
-
-        /**
-         * Ollama takes no credential and offers no task or dimension
-         * conditioning, so a value stored under a previous provider is cleared
-         * rather than forwarded. The model is passed as the bare name the
-         * server lists; the routing prefix is added server-side.
-         */
-        if (provider === 'ollama') {
-          const model = typeof params.model === 'string' ? params.model.trim() : ''
-          if (!model) {
-            throw new Error('An Ollama embedding model is required')
-          }
-          return {
-            input: params.input,
-            model,
-            /**
-             * Explicitly cleared, not omitted: the executor merges this over the
-             * saved inputs, so an omitted key leaves the previous provider's
-             * credential in place and serializes it into a request that has no
-             * use for one.
-             */
-            apiKey: undefined,
-            openRouterApiKey: undefined,
-            taskType: undefined,
-            dimensions: undefined,
-          }
-        }
-
-        if (provider === 'openrouter') {
-          if (typeof params.openRouterApiKey !== 'string' || !params.openRouterApiKey.trim()) {
-            throw new Error('OpenRouter API key is required')
-          }
-          const savedModel =
-            typeof params.model === 'string' && params.model ? params.model : undefined
-          const savedCatalogProvider = savedModel
-            ? EMBEDDING_MODELS[savedModel]?.provider
-            : undefined
-          const model = normalizeOpenRouterEmbeddingModelId(
-            savedCatalogProvider && savedCatalogProvider !== 'openai'
-              ? DEFAULT_OPENROUTER_EMBEDDING_MODEL
-              : (savedModel ?? DEFAULT_OPENROUTER_EMBEDDING_MODEL)
-          )
-          return {
-            apiKey: params.openRouterApiKey,
-            input: params.input,
-            model,
-            taskType: undefined,
-            dimensions: undefined,
-          }
-        }
-
-        const catalogProvider = provider
-
-        /** A model saved under a previous provider must not survive the switch. */
-        const savedModel = params.model as string | undefined
+        const savedModel = typeof params.model === 'string' ? params.model : undefined
         const model =
-          savedModel && EMBEDDING_MODELS[savedModel]?.provider === catalogProvider
+          savedModel && Object.hasOwn(EMBEDDING_MODELS, savedModel)
             ? savedModel
-            : DEFAULT_MODEL_BY_PROVIDER[catalogProvider]
-
+            : DEFAULT_EMBEDDING_MODEL
         const info = EMBEDDING_MODELS[model]
         const requested =
           params.dimensions !== undefined && params.dimensions !== ''
@@ -340,33 +130,24 @@ export const EmbeddingsBlock: BlockConfig<EmbeddingsResponse> = {
           info?.supportedDimensions?.includes(requested)
             ? requested
             : undefined
-        const taskType =
-          params.taskType &&
-          info?.supportedTaskTypes?.includes(params.taskType as EmbeddingTaskType)
-            ? (params.taskType as EmbeddingTaskType)
-            : undefined
 
         return {
           apiKey: params.apiKey,
           input: params.input,
           model,
-          taskType,
+          taskType: undefined,
           dimensions,
+          openRouterApiKey: undefined,
         }
       },
     },
   },
   inputs: {
     input: { type: 'string', description: 'Text to embed, or an array of texts' },
-    provider: { type: 'string', description: 'Embedding provider' },
+    provider: { type: 'string', description: 'Embedding provider (always openai)' },
     model: { type: 'string', description: 'Embedding model' },
-    taskType: { type: 'string', description: 'What the embedding will be used for' },
     dimensions: { type: 'number', description: 'Output vector dimensions' },
-    apiKey: { type: 'string', description: 'Provider API key' },
-    openRouterApiKey: {
-      type: 'string',
-      description: 'OpenRouter API key',
-    },
+    apiKey: { type: 'string', description: 'OpenAI API key' },
   },
   outputs: {
     embeddings: { type: 'json', description: 'Generated embeddings' },
@@ -417,14 +198,14 @@ export const EmbeddingsBlockMeta = {
       description:
         'Generate an embedding vector for a piece of text to use in semantic search or similarity.',
       content:
-        '# Embed Text\n\nConvert text into an embedding vector.\n\n## Steps\n1. Take the input text. If it is long, ensure it fits the model context; otherwise chunk it first.\n2. Choose a provider and model — text-embedding-3-small for cost-efficient general use, gemini-embedding-001 for the highest retrieval quality, embed-v4.0 for multilingual work, or codestral-embed for code. Keep the model consistent with any existing vectors it will be compared against.\n3. Set the task type to Query or Document when the model supports it, so the vector is conditioned for how it will be used.\n4. Generate the embedding.\n\n## Output\nReturn the embedding vector, the provider and model used, the dimensionality, and token usage. Vectors are only comparable when they come from the same model at the same dimensionality.',
+        '# Embed Text\n\nConvert text into an embedding vector.\n\n## Steps\n1. Take the input text. If it is long, ensure it fits the model context; otherwise chunk it first.\n2. Use OpenAI text-embedding-3-small, and keep the dimensionality consistent with any existing vectors it will be compared against.\n3. Generate the embedding.\n\n## Output\nReturn the embedding vector, the provider and model used, the dimensionality, and token usage. Vectors are only comparable when they come from the same model at the same dimensionality.',
     },
     {
       name: 'embed-documents-for-retrieval',
       description:
         'Chunk and embed a set of documents so they can be upserted into a vector store for retrieval.',
       content:
-        '# Embed Documents for Retrieval\n\nPrepare documents for semantic retrieval by chunking and embedding them.\n\n## Steps\n1. Split each document into reasonably sized chunks with light overlap so context is preserved.\n2. Embed each chunk with a single consistent model, using the Document task type where the model supports it.\n3. Pair each vector with its source metadata (document ID, chunk index, title) ready for upsert into the vector store.\n\n## Output\nReturn the embeddings with their associated metadata, the model used, and the dimensionality. Report how many chunks were produced and flag any chunk that failed to embed.',
+        '# Embed Documents for Retrieval\n\nPrepare documents for semantic retrieval by chunking and embedding them.\n\n## Steps\n1. Split each document into reasonably sized chunks with light overlap so context is preserved.\n2. Embed each chunk with a single consistent model.\n3. Pair each vector with its source metadata (document ID, chunk index, title) ready for upsert into the vector store.\n\n## Output\nReturn the embeddings with their associated metadata, the model used, and the dimensionality. Report how many chunks were produced and flag any chunk that failed to embed.',
     },
     {
       name: 'find-semantic-duplicates',

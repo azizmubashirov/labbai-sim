@@ -12,17 +12,6 @@ import type { SerializedBlock } from '@/serializer/types'
 
 type Logger = ReturnType<typeof createLogger>
 
-/** Credentials scoped to one provider family, never forwarded across providers. */
-export const PROVIDER_FAMILY_CREDENTIAL_FIELDS = [
-  'azureEndpoint',
-  'azureApiVersion',
-  'vertexProject',
-  'vertexLocation',
-  'bedrockAccessKeyId',
-  'bedrockSecretKey',
-  'bedrockRegion',
-] as const
-
 /** Validates stored key references before admitting their resolved values to a provider. */
 export function getModelFallbacks(
   ctx: ExecutionContext,
