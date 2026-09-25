@@ -34,10 +34,8 @@ export type ToolParamValueShape = 'string' | 'number' | 'boolean' | 'json'
 /**
  * The sub-block that collects a value of the given type.
  *
- * Shared by the two places a value type has to become a control: a tool param the block
- * does not surface as a sub-block of its own, and a custom block's Start input field.
- * Those vocabularies overlap entirely, and the two maps have to agree — a `boolean`
- * cannot be a switch on one path and a text box on the other.
+ * Used where a value type has to become a control: a tool param the block does not
+ * surface as a sub-block of its own.
  *
  * Each entry is the simplest control whose required configuration the declaration
  * actually carries. `dropdown` (needs `options`), `slider` (needs `min`/`max`), the

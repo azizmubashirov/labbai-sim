@@ -8,8 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ToolActivityGroup } from '@/app/workspace/[workspaceId]/home/components/message-content/components/agent-group/tool-activity-group'
 import { ToolCallItem } from '@/app/workspace/[workspaceId]/home/components/message-content/components/agent-group/tool-call-item'
 import type { ToolCallData } from '@/app/workspace/[workspaceId]/home/types'
-import { notifyBlockOverlayChanged } from '@/blocks/custom/client-overlay'
-import { getBlock, getBlockByToolName } from '@/blocks/registry'
+import { getBlockByToolName } from '@/blocks/registry'
 
 vi.mock('@/components/ui', () => ({
   ShimmerText: ({ children }: { children: ReactNode }) => <span>{children}</span>,
@@ -231,35 +230,5 @@ describe('ToolCallItem', () => {
       vi.mocked(getBlockByToolName).mockReset()
       vi.useRealTimers()
     }
-  })
-
-  it('refreshes the read icon when custom blocks hydrate after mount', () => {
-    vi.mocked(getBlock).mockReturnValue(undefined)
-    const container = document.createElement('div')
-    const root: Root = createRoot(container)
-
-    act(() => {
-      root.render(
-        <ToolCallItem
-          toolName='read'
-          displayTitle='Read Custom block invoice parser'
-          status='success'
-          params={{
-            path: 'organization/custom-blocks/custom_block_invoice_parser.json',
-          }}
-        />
-      )
-    })
-    expect(container.querySelector('[data-testid="custom-block-icon"]')).toBeNull()
-
-    vi.mocked(getBlock).mockReturnValue({
-      type: 'custom_block_invoice_parser',
-      name: 'Invoice Parser',
-      icon: (props: SVGProps<SVGSVGElement>) => <svg {...props} data-testid='custom-block-icon' />,
-    } as ReturnType<typeof getBlock>)
-    act(() => notifyBlockOverlayChanged())
-
-    expect(container.querySelector('[data-testid="custom-block-icon"]')).not.toBeNull()
-    act(() => root.unmount())
   })
 })

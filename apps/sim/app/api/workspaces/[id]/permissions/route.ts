@@ -18,6 +18,7 @@ import { withRouteHandler } from '@/lib/core/utils/with-route-handler'
 import { syncWorkspaceEnvCredentials } from '@/lib/credentials/environment'
 import { isRetryableTransactionError, withTransactionRetry } from '@/lib/db/transaction'
 import type { DbOrTx } from '@/lib/db/types'
+import { assertMembershipNotScimManaged } from '@/lib/labbai/scim/managed-membership'
 import { captureServerEvent } from '@/lib/posthog/server'
 import {
   getEffectiveWorkspacePermission,
@@ -25,7 +26,6 @@ import {
   getWorkspaceWithOwner,
   hasWorkspaceAdminAccess,
 } from '@/lib/workspaces/permissions/utils'
-import { assertMembershipNotScimManaged } from '@/lib/labbai/scim/managed-membership'
 
 const logger = createLogger('WorkspacesPermissionsAPI')
 

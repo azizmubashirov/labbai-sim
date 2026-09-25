@@ -60,11 +60,31 @@ interface AccessRequestUseCaseDefinition<O extends AccessRequestOperation, I, R>
    * is written.
    */
   mutation?: boolean
+  /**
+   * The answer for an authorized caller in a personal workspace. Without it
+   * such a call is refused with `ACCESS_REQUEST_ORGANIZATION_REQUIRED`.
+   */
+  personalWorkspaceResult?(): R
   execute(args: AccessRequestUseCaseContext<I>): Promise<R>
   projectAudit?(
     args: AccessRequestUseCaseContext<I> & { result: NoInfer<R> }
   ): WorkspaceUseCaseAuditEntry | WorkspaceUseCaseAuditEntry[]
   afterSuccess?(args: AccessRequestUseCaseContext<I> & { result: NoInfer<R> }): void | Promise<void>
+}
+
+/**
+ * The workspace exists and the caller may use it, but it belongs to no
+ * organization, so there is nobody to ask. Raised only after workspace access
+ * was authorized, which is what lets a use case answer it with an empty result.
+ */
+export class PersonalWorkspaceAccessRequestError extends ForbiddenOperationError {
+  constructor() {
+    super(
+      'ACCESS_REQUEST_ORGANIZATION_REQUIRED',
+      'Access requests are available only in organization workspaces'
+    )
+    this.name = 'PersonalWorkspaceAccessRequestError'
+  }
 }
 
 interface AuthorizeOptions {
@@ -143,12 +163,7 @@ async function authorizeWorkspaceScope(
     },
     { executor: options.executor, forUpdate: options.forUpdate }
   )
-  if (!target.organizationId) {
-    throw new ForbiddenOperationError(
-      'ACCESS_REQUEST_ORGANIZATION_REQUIRED',
-      'Access requests are available only in organization workspaces'
-    )
-  }
+  if (!target.organizationId) throw new PersonalWorkspaceAccessRequestError()
 
   const organizationMember = await findOrganizationMember(
     target.organizationId,
@@ -267,7 +282,18 @@ export function defineAuthorizedAccessRequestUseCase<
       await preflight(args)
     },
     async execute(args) {
-      const checked = await preflight(args)
+      let checked: AccessRequestUseCaseContext<I>
+      try {
+        checked = await preflight(args)
+      } catch (error) {
+        if (
+          error instanceof PersonalWorkspaceAccessRequestError &&
+          definition.personalWorkspaceResult
+        ) {
+          return definition.personalWorkspaceResult()
+        }
+        throw error
+      }
       return runWithOutboundOrganization(checked.actor.organizationId, async () => {
         let context = checked
         let result: R

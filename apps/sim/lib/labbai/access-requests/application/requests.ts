@@ -109,6 +109,13 @@ export type DiscoverAccessRequestsInput = ScopeInput & {
 export const discoverAccessRequests = defineAuthorizedAccessRequestUseCase({
   operation: accessRequestOperations.discover,
   scope: (input: DiscoverAccessRequestsInput) => toScope(input),
+  personalWorkspaceResult: (): DiscoverAccessRequestsResponse => ({
+    enabled: false,
+    organizationId: null,
+    entries: [],
+    total: 0,
+    hasMore: false,
+  }),
   async execute({ input, scope, actor, executor }): Promise<DiscoverAccessRequestsResponse> {
     const disabled = {
       enabled: false,

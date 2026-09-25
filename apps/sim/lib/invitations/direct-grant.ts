@@ -31,6 +31,7 @@ import {
 } from '@/lib/invitations/direct-grant-event'
 import { acquireInvitationMutationLocks } from '@/lib/invitations/locks'
 import { sendWorkspaceAddedEmail } from '@/lib/invitations/send'
+import { assertMembershipNotScimManaged } from '@/lib/labbai/scim/managed-membership'
 import { captureServerEvent } from '@/lib/posthog/server'
 import {
   getEffectiveWorkspacePermission,
@@ -39,7 +40,6 @@ import {
   type WorkspaceWithOwner,
 } from '@/lib/workspaces/permissions/utils'
 import type { WorkspaceInvitePolicy } from '@/lib/workspaces/policy'
-import { assertMembershipNotScimManaged } from '@/lib/labbai/scim/managed-membership'
 
 const logger = createLogger('InvitationDirectGrant')
 

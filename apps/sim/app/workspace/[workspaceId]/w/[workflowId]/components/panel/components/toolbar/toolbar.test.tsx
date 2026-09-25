@@ -45,10 +45,7 @@ vi.mock('@sim/emcn/icons', () => ({
   Search: () => null,
 }))
 vi.mock('@/blocks/block-tile', () => ({ BlockTile: () => null }))
-vi.mock('@/blocks/custom/build-config', () => ({
-  isCustomBlockType: () => false,
-}))
-vi.mock('@/blocks/custom/client-overlay', () => ({ useCustomBlockOverlayVersion: () => 1 }))
+vi.mock('@/blocks/visibility/version', () => ({ useBlockVisibilityVersion: () => 1 }))
 vi.mock('@/blocks/registry', () => ({
   getCanonicalBlocksByCategory: (category: string) =>
     category === 'blocks'

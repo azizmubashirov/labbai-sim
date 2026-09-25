@@ -74,7 +74,7 @@ export function useServiceAccountConnectTarget({
     if (!gatingBlockType) return false
     const gatingBlock = getBlock(gatingBlockType)
     return !gatingBlock || isHiddenUnder(overlayVisibility(), gatingBlock)
-    // blockVisibilityVersion is read to re-evaluate when the overlay changes.
+    // blockVisibilityVersion is read to re-evaluate when visibility changes.
   }, [serviceAccountProviderId, blockVisibilityVersion])
 
   return useMemo(() => {

@@ -104,7 +104,6 @@ import {
   SELECTOR_TYPES_HYDRATION_REQUIRED,
   type SubBlockConfig,
 } from '@/blocks/types'
-import { useBlockVisibilityVersion } from '@/blocks/visibility/version'
 import { useKnowledgeBase } from '@/hooks/kb/use-knowledge'
 import { useCustomTools } from '@/hooks/queries/custom-tools'
 import { useDeployWorkflow } from '@/hooks/queries/deployments'
@@ -542,16 +541,11 @@ const SubBlockRow = memo(function SubBlockRow({
     [subBlock, rawValue, workflowVariables]
   )
 
-  /**
-   * Hydrates tool references to display names. The overlay version is a dep
-   * because resolveToolsLabel reads getBlock, whose custom-block results
-   * change when the client overlay hydrates (see client-overlay.ts).
-   */
+  /** Hydrates tool references to display names. */
   const { data: customTools = [] } = useCustomTools(workspaceId || '')
-  const blockVisibilityVersion = useBlockVisibilityVersion()
   const toolsDisplayValue = useMemo(
     () => resolveToolsLabel(subBlock, rawValue, customTools, mcpToolNamesById),
-    [subBlock, rawValue, customTools, mcpToolNamesById, blockVisibilityVersion]
+    [subBlock, rawValue, customTools, mcpToolNamesById]
   )
 
   const filterDisplayValue = useMemo(

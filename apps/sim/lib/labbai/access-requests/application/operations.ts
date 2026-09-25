@@ -29,12 +29,17 @@ export interface AccessRequestOperation<Id extends string = string>
   readonly organization: OrganizationOperation
 }
 
-function defineAccessRequestOperation<const Id extends string>(operation: {
+/** What each access-request operation declares; both authority branches are derived from it. */
+interface AccessRequestOperationSpec<Id extends string> {
   id: Id
   capability: 'none'
   oauthScope: 'api:read' | 'api:write'
   organizationRole: 'member' | 'admin'
-}): AccessRequestOperation<Id> {
+}
+
+function defineAccessRequestOperation<const Id extends string>(
+  operation: AccessRequestOperationSpec<Id>
+): AccessRequestOperation<Id> {
   const principalKinds = ['session', 'personal_api_key', 'oauth_access_token'] as const
   const workspace = defineWorkspaceOperation({
     id: operation.id,

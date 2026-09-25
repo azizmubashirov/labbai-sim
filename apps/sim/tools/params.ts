@@ -10,7 +10,6 @@ import {
   resolveCanonicalMode,
   type SubBlockCondition,
 } from '@/lib/workflows/subblocks/visibility'
-import { isCustomBlockType, RESERVED_PARAMS } from '@/blocks/custom/build-config'
 import type {
   BlockConfig as AppBlockConfig,
   SubBlockConfig as BlockSubBlockConfig,
@@ -118,10 +117,8 @@ function getBlockConfigurations(): Record<string, ToolInputBlockConfig> {
 /**
  * Gets the correct tool ID for a block operation.
  *
- * Pass `blockOverride` (a fresh, overlay-aware config) for custom (deploy-as-block)
- * blocks — the module `getBlockConfigurations()` cache can miss async-hydrated
- * custom blocks, which would return `undefined` here and make "add tool" silently
- * no-op.
+ * Pass `blockOverride` to resolve against a specific (possibly visibility-projected)
+ * block config instead of the module `getBlockConfigurations()` cache.
  */
 export function getToolIdForOperation(
   blockType: string,
@@ -757,21 +754,6 @@ export function getSubBlocksForToolInput(
 
     const blockConfigs = getBlockConfigurations()
     const blockConfig = blockConfigOverride ?? blockConfigs[blockType]
-
-    // Custom (deploy-as-block) blocks: render their own editable field sub-blocks
-    // as `user-or-llm` (the hidden workflowId/inputMapping wiring is filtered by
-    // RESERVED_PARAMS — `isSubBlockHidden` does NOT honor `hidden: true`, so the
-    // explicit reserved filter is what keeps them out).
-    if (blockType && isCustomBlockType(blockType)) {
-      const fieldSubBlocks = ((blockConfig?.subBlocks ?? []) as BlockSubBlockConfig[])
-        .filter((sb) => !sb.hidden && !RESERVED_PARAMS.has(sb.id))
-        .map((sb) => ({ ...sb, paramVisibility: 'user-or-llm' as ParameterVisibility }))
-      return {
-        toolConfig,
-        subBlocks: fieldSubBlocks,
-        oauthConfig: toolConfig.oauth,
-      }
-    }
 
     const allSubBlocks = (blockConfig?.subBlocks ?? []) as BlockSubBlockConfig[]
     const canonicalIndex = buildCanonicalIndex(allSubBlocks)

@@ -9,9 +9,6 @@ describe('normalizeToolId', () => {
     expect(normalizeToolId('table_query_rows_tbl_1a2c1741')).toBe('table_query_rows')
     expect(normalizeToolId('knowledge_search_5cc56998-3e1d-4d91')).toBe('knowledge_search')
     expect(normalizeToolId('workflow_executor_f3d81b32')).toBe('workflow_executor')
-    expect(normalizeToolId('deployed_block_executor_custom_block_9')).toBe(
-      'deployed_block_executor'
-    )
   })
 
   it('leaves a bare tool id alone', () => {

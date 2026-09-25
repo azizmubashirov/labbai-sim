@@ -34,7 +34,6 @@ import { useToolbarItemInteractions } from '@/app/workspace/[workspaceId]/w/[wor
 import { LoopTool } from '@/app/workspace/[workspaceId]/w/[workflowId]/components/subflows/loop/loop-config'
 import { ParallelTool } from '@/app/workspace/[workspaceId]/w/[workflowId]/components/subflows/parallel/parallel-config'
 import { BlockTile } from '@/blocks/block-tile'
-import { isCustomBlockType } from '@/blocks/custom/build-config'
 import { getCanonicalBlocksByCategory } from '@/blocks/registry'
 import type { BlockConfig } from '@/blocks/types'
 import { useBlockVisibilityVersion } from '@/blocks/visibility/version'
@@ -151,29 +150,29 @@ const ToolbarItem = memo(function ToolbarItem({
 let cachedTriggers: BlockItem[] | null = null
 
 /**
- * Block-overlay version the caches below were built against. The registry's
+ * Block-visibility version the caches below were built against. The registry's
  * output is no longer static — a block-visibility hydrate (preview reveal /
- * kill switch) bumps the shared overlay version — so the caches are keyed to
+ * kill switch) bumps the shared visibility version — so the caches are keyed to
  * it and dropped when it moves. -1 = never built.
  */
-let cachedAtOverlayVersion = -1
+let cachedAtVisibilityVersion = -1
 
-/** Drop all three caches when the overlay version moved since they were built. */
-function syncCachesToOverlayVersion(version: number) {
-  if (cachedAtOverlayVersion === version) return
-  cachedAtOverlayVersion = version
+/** Drop all three caches when the visibility version moved since they were built. */
+function syncCachesToVisibilityVersion(version: number) {
+  if (cachedAtVisibilityVersion === version) return
+  cachedAtVisibilityVersion = version
   cachedTriggers = null
   cachedBlocks = null
   cachedTools = null
 }
 
 /**
- * Gets triggers data, computing it once per overlay version and caching for
+ * Gets triggers data, computing it once per visibility version and caching for
  * subsequent calls. Non-integration triggers (Start, Schedule, Webhook Trigger) are
  * prioritized first, followed by all other triggers sorted alphabetically.
  */
-function getTriggers(overlayVersion: number): BlockItem[] {
-  syncCachesToOverlayVersion(overlayVersion)
+function getTriggers(visibilityVersion: number): BlockItem[] {
+  syncCachesToVisibilityVersion(visibilityVersion)
   if (cachedTriggers === null) {
     const allTriggers = getTriggersForSidebar()
     const priorityOrder = ['Start', 'Schedule', 'Webhook Trigger']
@@ -217,13 +216,8 @@ let cachedTools: BlockItem[] | null = null
 function ensureBlockCaches() {
   if (cachedBlocks !== null && cachedTools !== null) return
 
-  // Exclude custom (deploy-as-block) blocks — they are never offered in the palette.
-  const regularBlockConfigs = getCanonicalBlocksByCategory('blocks').filter(
-    (b) => !isCustomBlockType(b.type)
-  )
-  const toolConfigs = getCanonicalBlocksByCategory('tools').filter(
-    (b) => !isCustomBlockType(b.type)
-  )
+  const regularBlockConfigs = getCanonicalBlocksByCategory('blocks')
+  const toolConfigs = getCanonicalBlocksByCategory('tools')
 
   const regularBlockItems: BlockItem[] = regularBlockConfigs.map((block) => ({
     name: block.name,
@@ -264,14 +258,14 @@ function ensureBlockCaches() {
   cachedTools = toolItems
 }
 
-function getBlocks(overlayVersion: number): BlockItem[] {
-  syncCachesToOverlayVersion(overlayVersion)
+function getBlocks(visibilityVersion: number): BlockItem[] {
+  syncCachesToVisibilityVersion(visibilityVersion)
   ensureBlockCaches()
   return cachedBlocks as BlockItem[]
 }
 
-function getTools(overlayVersion: number): BlockItem[] {
-  syncCachesToOverlayVersion(overlayVersion)
+function getTools(visibilityVersion: number): BlockItem[] {
+  syncCachesToVisibilityVersion(visibilityVersion)
   ensureBlockCaches()
   return cachedTools as BlockItem[]
 }
@@ -469,8 +463,7 @@ export const Toolbar = memo(
     const params = useParams()
     const workspaceId = params?.workspaceId as string | undefined
 
-    // Re-read the block lists whenever the overlay version bumps (block-visibility
-    // hydrate) — the module caches are keyed to it.
+    // Re-read the block lists whenever the block-visibility version bumps — the module caches are keyed to it.
     const blockVisibilityVersion = useBlockVisibilityVersion()
     const allTriggers = getTriggers(blockVisibilityVersion)
     const allBlocks = getBlocks(blockVisibilityVersion)
@@ -523,7 +516,6 @@ export const Toolbar = memo(
         items
           .filter(
             (item) =>
-              !isCustomBlockType(item.type) &&
               isBlockRequestable(item.type) &&
               (sandboxAllowedBlocks === null || sandboxAllowedBlocks.includes(item.type))
           )

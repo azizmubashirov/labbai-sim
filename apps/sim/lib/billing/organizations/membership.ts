@@ -39,6 +39,7 @@ import { revokeWorkspaceCredentialMembershipsTx } from '@/lib/credentials/access
 import { isRetryableTransactionError } from '@/lib/db/transaction'
 import type { DbOrTx } from '@/lib/db/types'
 import { acquireInvitationMutationLocks } from '@/lib/invitations/locks'
+import { endDirectoryMembershipTx } from '@/lib/labbai/scim/identity/end-directory-membership'
 import { requireMemberManagementAuthority } from '@/lib/organizations/members/authority'
 import {
   revokePersonalApiKeysTx,
@@ -49,7 +50,6 @@ import {
   reassignWorkflowOwnershipForWorkspaceMemberRemovalTx,
   WorkspaceBillingAccountRemovalError,
 } from '@/lib/workspaces/utils'
-import { endDirectoryMembershipTx } from '@/lib/labbai/scim/identity/end-directory-membership'
 
 export { acquireUserBillingIdentityLock } from '@/lib/billing/organizations/billing-identity-lock'
 export { WORKSPACE_BILLING_ACCOUNT_REMOVAL_ERROR } from '@/lib/workspaces/utils'

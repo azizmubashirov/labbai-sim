@@ -8,10 +8,10 @@ import {
   WORKSPACE_BILLING_ACCOUNT_REMOVAL_ERROR,
 } from '@/lib/billing/organizations/membership'
 import { OrchestrationError } from '@/lib/core/orchestration/types'
+import { assertMembershipNotScimManaged } from '@/lib/labbai/scim/managed-membership'
 import { requireMemberManagementAuthority } from '@/lib/organizations/members/authority'
 import { changeMemberRoleTx } from '@/lib/organizations/members/lifecycle'
 import { findOrganizationMemberRecord } from '@/lib/organizations/queries'
-import { assertMembershipNotScimManaged } from '@/lib/labbai/scim/managed-membership'
 
 export async function updateOrganizationMemberRecord(input: {
   organizationId: string

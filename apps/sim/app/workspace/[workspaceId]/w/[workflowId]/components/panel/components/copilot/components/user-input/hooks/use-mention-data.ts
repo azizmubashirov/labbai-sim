@@ -131,8 +131,7 @@ export function useMentionData(props: UseMentionDataProps): MentionDataReturn {
   const [blocksList, setBlocksList] = useState<BlockItem[]>([])
   const [isLoadingBlocks, setIsLoadingBlocks] = useState(false)
 
-  // Reset on permission changes and on block-overlay bumps (custom-block or
-  // block-visibility hydrate) so late preview reveals refresh the folder.
+  // Reset on permission changes and on block-visibility hydrate so late preview reveals refresh the folder.
   const blockVisibilityVersion = useBlockVisibilityVersion()
   useEffect(() => {
     setBlocksList([])

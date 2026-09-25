@@ -38,17 +38,14 @@ function useWorkspacePolicy(workspaceId: string) {
 }
 
 /**
- * Discovery of the workspace's feature access, polled only in organization
- * workspaces. Navigation reads `data.enabled` to decide whether a restricted
- * surface stays visible (so its members can ask for it) or is hidden.
+ * Discovery of the workspace's feature access. Navigation reads `data.enabled`
+ * to decide whether a restricted surface stays visible (so its members can ask
+ * for it) or is hidden. Personal workspaces answer `enabled: false`, which also
+ * stops the poll.
  */
 export function useWorkspaceAccessRequestFeatures() {
   const workspaceId = useRouteWorkspaceId()
-  const policy = useWorkspacePolicy(workspaceId)
-  return useDiscoverAccessRequests(
-    workspaceFeatureDiscoveryQuery(workspaceId),
-    Boolean(workspaceId && policy.data?.organizationId)
-  )
+  return useDiscoverAccessRequests(workspaceFeatureDiscoveryQuery(workspaceId), Boolean(workspaceId))
 }
 
 interface PermissionAccessBoundaryProps {

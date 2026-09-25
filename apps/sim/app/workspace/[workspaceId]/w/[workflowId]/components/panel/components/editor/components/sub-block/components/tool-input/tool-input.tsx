@@ -63,7 +63,6 @@ import {
   useActiveSearchTarget,
 } from '@/app/workspace/[workspaceId]/w/[workflowId]/components/panel/components/editor/providers/active-search-target-provider'
 import { getAllBlocks, getBlock } from '@/blocks'
-import { isCustomBlockType } from '@/blocks/custom/build-config'
 import { getTileIconColorClass } from '@/blocks/icon-color'
 import type { BlockConfig, SubBlockConfig as BlockSubBlockConfig } from '@/blocks/types'
 import { BUILT_IN_TOOL_TYPES } from '@/blocks/utils'
@@ -721,9 +720,7 @@ export const ToolInput = memo(function ToolInput({
     if (hasMultipleOperations(getBlock(blockType))) {
       return false
     }
-    // Custom blocks all share toolId `workflow_executor`, so dedup-by-toolId would
-    // block a second (distinct) custom block — allow multiple like workflow/knowledge.
-    if (blockType === 'workflow' || blockType === 'knowledge' || isCustomBlockType(blockType)) {
+    if (blockType === 'workflow' || blockType === 'knowledge') {
       return false
     }
     return selectedTools.some((tool) => tool.toolId === toolId)

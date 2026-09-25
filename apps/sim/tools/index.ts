@@ -2015,11 +2015,6 @@ async function executeToolImplementation(
       }
     }
 
-    // Custom blocks (deploy-as-block) run in-process through WorkflowBlockHandler.
-    // The runner is dynamic-imported from a server-only module so the client-bundled
-    // tool registry never pulls in the executor/db dependency graph (a static or
-    // dynamic executor import in the tool descriptor itself would break the client
-    // build — and with it `getTool('workflow_executor')`).
     // Workflow-as-agent-tool runs in-process through WorkflowBlockHandler —
     // the same invocation boundary canvas child workflows use. Replaces the
     // historical HTTP hop to /api/workflows/{id}/execute (double admission
@@ -2062,51 +2057,6 @@ async function executeToolImplementation(
       const endTime = new Date()
       return {
         ...result,
-        output: postProcessToolOutput(normalizedToolId, result.output ?? {}),
-        timing: {
-          startTime: startTimeISO,
-          endTime: endTime.toISOString(),
-          duration: endTime.getTime() - startTime.getTime(),
-        },
-      }
-    }
-
-    if (normalizedToolId === 'deployed_block_executor') {
-      logger.info(`[${requestId}] Running custom block tool ${toolId}`)
-      const { runCustomBlockTool } = await import(
-        '@/executor/handlers/workflow/custom-block-tool-runner'
-      )
-      // Forward the INVOKING run's identifiers so the child's log correlation
-      // names a real execution instead of a freshly-minted phantom id. Taken
-      // from the server-resolved scope, never from model-supplied params.
-      const result = await runCustomBlockTool(
-        {
-          ...contextParams,
-          _context: {
-            ...(contextParams._context as Record<string, unknown> | undefined),
-            ...(scope.workspaceId ? { workspaceId: scope.workspaceId } : {}),
-            ...(scope.workflowId ? { workflowId: scope.workflowId } : {}),
-            ...(scope.userId ? { userId: scope.userId } : {}),
-            ...(scope.executionId ? { executionId: scope.executionId } : {}),
-            ...(scope.callChain ? { callChain: scope.callChain } : {}),
-            ...(scope.isDeployedContext !== undefined
-              ? { isDeployedContext: scope.isDeployedContext }
-              : {}),
-            ...(scope.billingAttribution ? { billingAttribution: scope.billingAttribution } : {}),
-            requestId,
-          },
-        },
-        {
-          abortSignal: effectiveSignal,
-          resolvedSecretTraceRegistry,
-          principal: executionContext?.principal,
-        }
-      )
-      const endTime = new Date()
-      return {
-        ...result,
-        // Strip internal `__`-prefixed fields the same way every other tool path does,
-        // so child-workflow internals never reach the agent's tool result.
         output: postProcessToolOutput(normalizedToolId, result.output ?? {}),
         timing: {
           startTime: startTimeISO,
