@@ -41,8 +41,8 @@ const ENTITLEMENT_EVALUATORS: Record<
 /**
  * True when this workspace belongs to an organization, which is exactly when
  * the copilot's `organization/` VFS namespace has anything in it. Advertising
- * it keeps a personal workspace's agents from ever hearing that org standing,
- * access-control groups, or fork topology exist.
+ * it keeps a personal workspace's agents from ever hearing that org standing
+ * or access-control groups exist.
  */
 async function isOrganizationContextAvailable(workspaceId: string): Promise<boolean> {
   const workspace = await getWorkspaceWithOwner(workspaceId)

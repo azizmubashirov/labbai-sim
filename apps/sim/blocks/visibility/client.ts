@@ -1,8 +1,8 @@
 'use client'
 
 import type { BlockVisibilityState } from '@/lib/core/config/block-visibility'
-import { notifyBlockOverlayChanged } from '@/blocks/custom/client-overlay'
 import { invalidateBlockCaches, registerBlockVisibilityResolver } from '@/blocks/visibility/context'
+import { notifyBlockVisibilityChanged } from '@/blocks/visibility/version'
 
 /**
  * Client-side visibility state, hydrated from `useBlockVisibility` by
@@ -27,7 +27,7 @@ function isEmptyState(vis: BlockVisibilityState): boolean {
 
 /**
  * Replace the in-scope visibility state, reset registered module caches, and
- * bump the shared block-overlay version so every subscribed consumer re-reads
+ * bump the shared block-visibility version so every subscribed consumer re-reads
  * `getAllBlocks()`.
  *
  * No-ops when the change cannot alter the projection: an incoming state
@@ -49,7 +49,7 @@ export function hydrateBlockVisibility(next: BlockVisibilityState): void {
   }
   state = next
   invalidateBlockCaches()
-  notifyBlockOverlayChanged()
+  notifyBlockVisibilityChanged()
 }
 
 /**

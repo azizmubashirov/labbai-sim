@@ -80,7 +80,7 @@ describe('organization settings navigation', () => {
         {
           ...enterprise,
           hosted: false,
-          selfHosted: { sso: true },
+          selfHosted: { security: true },
         },
         available
       ).map(({ id }) => id)
@@ -88,7 +88,7 @@ describe('organization settings navigation', () => {
       'members',
       'recently-deleted',
       'requests',
-      'sso',
+      'security',
       'integrations',
       'search-mcp',
       'search-slack',
@@ -99,7 +99,6 @@ describe('organization settings navigation', () => {
     expect(resolveOrganizationSettingsSection('/o/one/settings/organization?query=person')).toBe(
       'members'
     )
-    expect(resolveOrganizationSettingsSection('domains')).toBe('sso')
     expect(resolveOrganizationSettingsSection('sessions')).toBe('security')
     expect(resolveOrganizationSettingsSection('/o/one/settings/network')).toBeNull()
     expect(resolveOrganizationSettingsSection('skills')).toBeNull()
@@ -114,16 +113,11 @@ describe('organization settings navigation', () => {
     expect(ORGANIZATION_SETTINGS_ITEMS.map(({ id, group }) => `${group}:${id}`)).toEqual([
       'organization:members',
       'organization:connected-accounts',
-      'organization:usage',
-      'organization:whitelabeling',
       'organization:recently-deleted',
       'organization:requests',
       'governance:audit-logs',
       'governance:access-control',
-      'governance:sso',
       'governance:security',
-      'governance:data-retention',
-      'governance:data-drains',
       'sim-search:integrations',
       'sim-search:search-mcp',
       'sim-search:search-slack',

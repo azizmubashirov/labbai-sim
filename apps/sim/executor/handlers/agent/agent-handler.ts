@@ -51,7 +51,7 @@ import {
   assertPermissionsAllowed,
   validateBlockType,
   validateModelProvider,
-} from '@/ee/access-control/utils/permission-check'
+} from '@/lib/labbai/access-control/permission-check'
 import { AGENT, BlockType, DEFAULTS, stripCustomToolPrefix } from '@/executor/constants'
 import { isRetryableBlockError } from '@/executor/execution/block-retry'
 import {

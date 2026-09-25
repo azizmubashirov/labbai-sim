@@ -33,7 +33,7 @@ import { getServerSelectorAttachment } from '@/lib/selectors/server/registry'
 import { sanitizeSelectorResult } from '@/lib/selectors/server/sanitize'
 import type { ResolvedSelectorReference, SelectorPrincipal } from '@/lib/selectors/server/types'
 import type { SelectorExecutionResult, SelectorRequest } from '@/lib/selectors/types'
-import { IntegrationNotAllowedError } from '@/ee/access-control/utils/permission-check'
+import { IntegrationNotAllowedError } from '@/lib/labbai/access-control/permission-check'
 
 const logger = createLogger('ExecuteSelector')
 

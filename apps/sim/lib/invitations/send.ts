@@ -20,6 +20,7 @@ import {
   renderWorkspaceAddedEmail,
   renderWorkspaceInvitationEmail,
 } from '@/components/emails'
+import { getBrandConfig } from '@/lib/branding'
 import { OrchestrationError } from '@/lib/core/orchestration/types'
 import { getBaseUrl } from '@/lib/core/utils/urls'
 import type { DbOrTx } from '@/lib/db/types'
@@ -29,7 +30,6 @@ import { acquireInvitationMutationLocks } from '@/lib/invitations/locks'
 import { lockInvitationResendPolicy } from '@/lib/invitations/resend-policy'
 import { sendEmail } from '@/lib/messaging/email/mailer'
 import { getFromEmailAddress } from '@/lib/messaging/email/utils'
-import { getBrandConfig } from '@/ee/whitelabeling'
 
 const logger = createLogger('InvitationSend')
 

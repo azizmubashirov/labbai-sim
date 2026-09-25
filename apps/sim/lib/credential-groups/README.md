@@ -39,7 +39,7 @@ The Providers tab lists only added providers. **Add provider** opens a searchabl
 
 Search approval and source setup are managed through **Organization settings → Integrations**. Approval alone does not create a credential or start indexing. Support for indexing connected accounts comes from the existing Search connector registry's permission-scoped OAuth ingestion capabilities: Gmail, Google Drive, Google Calendar, GitHub repositories, Jira, Confluence, and Slack. Source setup collects any required repository, domain, space, or other settings. Reconnecting an OAuth account queues the existing active sources for that option; it never enables paused indexing.
 
-Both `CREDENTIAL_GROUPS` and `KNOWLEDGE_MEMBER_ACCESS` must be enabled locally. Hosted deployments additionally enforce the routed org's feature rules and Enterprise availability. Owners and admins manage indexing; existing Knowledge permission-group rules still apply. Managed MCP account connections remain available for live tool calls only and have no indexing switch. Separate API-key KB connectors for Fireflies, Granola, and Databricks do not consume these managed MCP connections.
+Credential Groups are always on for organization workspaces in Labbai; `KNOWLEDGE_MEMBER_ACCESS` must be enabled locally. Owners and admins manage indexing; existing Knowledge permission-group rules still apply. Managed MCP account connections remain available for live tool calls only and have no indexing switch. Separate API-key KB connectors for Fireflies, Granola, and Databricks do not consume these managed MCP connections.
 
 ### Feature gates
 
@@ -61,7 +61,7 @@ For a targeted hosted rollout, configure both existing flags in AppConfig's `fea
 }
 ```
 
-`enabled: true` enables a flag globally; it is not needed alongside an org allowlist. Off AppConfig, `CREDENTIAL_GROUPS=true` and `KNOWLEDGE_MEMBER_ACCESS=true` are deployment-wide switches and cannot target individual organizations. Both flag checks still apply the organization's hosted Enterprise/billing requirements and normal membership, permission-group, and document access checks. These examples document configuration only; this change does not update a deployed AppConfig document.
+`enabled: true` enables a flag globally; it is not needed alongside an org allowlist. Off AppConfig, `KNOWLEDGE_MEMBER_ACCESS=true` is a deployment-wide switch and cannot target individual organizations. The flag check still applies normal membership, permission-group, and document access checks. These examples document configuration only; this change does not update a deployed AppConfig document.
 
 Credential-groups rollout never evaluates `workspaceIds`. Existing workspace-scoped callers resolve their owning organization and use its `orgId`; personal workspaces cannot enable connected accounts. This flag rollout is separate from the organization's workspace access allowlist, which still controls which workflows may use the pool. Normal settings no longer prefetch the legacy workspace-owned account container.
 
@@ -74,7 +74,7 @@ OAuth attempt state changes at this release boundary (OAuth v5 and managed MCP v
 1. Apply `0328_organization_connected_accounts.sql` before deploying code that reads the new columns. It expands ownership columns and checks, adds stable enrollment identity and MCP configuration versions, and builds indexes concurrently. No grants, enrollments, or Search data are moved or deleted. Constraints are added `NOT VALID` to avoid scanning existing tables while holding the DDL lock; validate them separately after auditing existing rows.
 2. Inventory existing groups and their Search dependencies before enabling the feature. The queries below read IDs/counts only. Review archived/deleted sources too because a reset must account for retained documents and cleanup work.
 3. Existing org groups without the new v2 workspace policy stop with a migration-review error. Do not insert a v2 policy over legacy contributions. Resolve Search dependencies explicitly, retire the old group through an audited maintenance procedure, create a fresh org pool, and invite people to reconnect. No reset command is supplied or run by this change.
-4. Enable the existing `credential-groups` feature flag for the target org (`orgIds`), then set up providers and allow specific same-org workspaces. A previous workspace-only feature-flag allowlist does not enable the org surface. Sim Cloud also requires an active Enterprise entitlement.
+4. Set up providers for the organization and allow specific same-org workspaces.
 5. Replace legacy workflow blocks, reconfigure credential references, and redeploy event subscribers. Verify one manual run, one deployed run, and one revocation before widening the workspace allowlist.
 
 ```sql

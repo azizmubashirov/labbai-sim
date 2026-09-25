@@ -8,7 +8,7 @@ import { platformContextDelegationPolicy } from '@/lib/platform-context/applicat
 import { resolvePlatformContextWorkspace } from '@/lib/platform-context/application/context'
 import { platformContextOperations } from '@/lib/platform-context/application/operations'
 import { getWorkspaceHostContextForViewer } from '@/lib/workspaces/host-context'
-import { resolveVerifiedUserAccessControlContext } from '@/ee/access-control/utils/permission-check'
+import { resolveVerifiedUserAccessControlContext } from '@/lib/labbai/access-control/permission-check'
 
 const ENTERPRISE_PERMISSION_DOCUMENTATION = [
   {

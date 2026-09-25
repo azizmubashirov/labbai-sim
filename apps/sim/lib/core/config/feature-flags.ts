@@ -73,18 +73,10 @@ const FEATURE_FLAGS = {
       'Global on/off only; existing TTL data remains readable when disabled.',
     fallback: 'TABLE_ROW_TTL',
   },
-  'credential-groups': {
-    description:
-      'Managed connected accounts, including organization account pools and their settings UI. ' +
-      'Uses orgId targeting only; workspace callers resolve their canonical organization. Hosted ' +
-      'owners also require an active Enterprise subscription. Organization Search additionally ' +
-      'requires knowledge-member-access. Off-AppConfig falls back to CREDENTIAL_GROUPS.',
-    fallback: 'CREDENTIAL_GROUPS',
-  },
   'knowledge-member-access': {
     description:
       'Permission-aware indexing and retrieval. Organization Search UI, MCP, and search APIs ' +
-      'require this flag and credential-groups for the canonical orgId; user/admin/workspace ' +
+      'require this flag for the canonical orgId; user/admin/workspace ' +
       'targeting cannot enable another organization. Workspace member sync uses workspaceId; ' +
       'workspace retrieval defaults may additionally use user/admin targeting. Source ACL ' +
       'mirroring remains independent of managed identities. Off-AppConfig falls back to ' +

@@ -19,7 +19,7 @@ import {
   assertPermissionsAllowed,
   ModelNotAllowedError,
   ProviderNotAllowedError,
-} from '@/ee/access-control/utils/permission-check'
+} from '@/lib/labbai/access-control/permission-check'
 import type { ResolvedSecretTraceRegistry } from '@/executor/utils/resolved-secret-trace-registry'
 import { isAbortError } from '@/providers/streaming-tool-loop-shared'
 

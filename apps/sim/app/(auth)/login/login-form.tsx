@@ -17,7 +17,6 @@ import { requestJson } from '@/lib/api/client/request'
 import { forgetPasswordContract } from '@/lib/api/contracts'
 import { client } from '@/lib/auth/auth-client'
 import { getEnv, isFalsy } from '@/lib/core/config/env'
-import { isSsoEnabled } from '@/lib/core/config/env-flags'
 import { validateCallbackUrl } from '@/lib/core/security/input-validation'
 import { getBaseUrl } from '@/lib/core/utils/urls'
 import { quickValidateEmail } from '@/lib/messaging/email/validation'
@@ -35,7 +34,6 @@ import {
   AuthTextLink,
   PasswordInput,
   SocialLoginButtons,
-  SSOLoginButton,
 } from '@/app/(auth)/components'
 
 const logger = createLogger('LoginForm')
@@ -362,13 +360,10 @@ export default function LoginPage({
     }
   }
 
-  const ssoEnabled = isSsoEnabled
   const emailEnabled = !isFalsy(getEnv('NEXT_PUBLIC_EMAIL_PASSWORD_SIGNUP_ENABLED'))
   const hasSocial = githubAvailable || googleAvailable || microsoftAvailable
-  const hasOnlySSO = ssoEnabled && !emailEnabled && !hasSocial
-  const showTopSSO = hasOnlySSO
-  const showBottomSection = hasSocial || (ssoEnabled && !hasOnlySSO)
-  const showDivider = (emailEnabled || showTopSSO) && showBottomSection
+  const showBottomSection = hasSocial
+  const showDivider = emailEnabled && showBottomSection
 
   const emailFieldErrors = showEmailValidationError && emailErrors.length > 0 ? emailErrors : []
   const passwordFieldErrors = showValidationError && passwordErrors.length > 0 ? passwordErrors : []
@@ -378,8 +373,6 @@ export default function LoginPage({
     <>
       <div className='space-y-6'>
         <AuthHeader title='Sign in' description='Enter your details' />
-
-        {showTopSSO && <SSOLoginButton callbackURL={callbackUrl} variant='primary' />}
 
         {emailEnabled && (
           <form onSubmit={onSubmit} className='space-y-6'>
@@ -452,11 +445,7 @@ export default function LoginPage({
             githubAvailable={githubAvailable}
             microsoftAvailable={microsoftAvailable}
             callbackURL={callbackUrl}
-          >
-            {ssoEnabled && !hasOnlySSO && (
-              <SSOLoginButton callbackURL={callbackUrl} variant='outline' />
-            )}
-          </SocialLoginButtons>
+          />
         )}
 
         {emailEnabled && !registrationDisabled && (

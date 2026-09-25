@@ -1,6 +1,5 @@
 import type { PersistedMessage } from '@/lib/copilot/chat/persisted-message'
 import type { MothershipResource } from '@/lib/copilot/resources/types'
-import { rewriteForkContentRefs } from '@/ee/workspace-forking/lib/remap/remap-content-refs'
 
 /**
  * Old->new translation tables produced while copying a chat's files
@@ -16,15 +15,36 @@ function hasMappings(maps: ChatFileRefMaps): boolean {
   return maps.fileIds.size > 0 || maps.fileKeys.size > 0
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/**
+ * Replaces every occurrence of a mapped file id or storage key in free text with its copy.
+ * All tokens are matched in a single pass (longest first) so a replacement is never rewritten
+ * again by another mapping.
+ */
 function rewriteText(text: string, maps: ChatFileRefMaps): string {
-  return rewriteForkContentRefs(text, { fileIds: maps.fileIds, fileKeys: maps.fileKeys })
+  if (!text) return text
+  const replacements = new Map<string, string>()
+  for (const [from, to] of maps.fileKeys) if (from) replacements.set(from, to)
+  for (const [from, to] of maps.fileIds) if (from) replacements.set(from, to)
+  if (replacements.size === 0) return text
+  const pattern = new RegExp(
+    Array.from(replacements.keys())
+      .sort((a, b) => b.length - a.length)
+      .map(escapeRegExp)
+      .join('|'),
+    'g'
+  )
+  return text.replace(pattern, (match) => replacements.get(match) ?? match)
 }
 
 /**
  * Re-point every file reference in a copied transcript at the copied files, so
  * the fork is self-contained (it survives the original chat's deletion).
  * Rewrites: free-text URLs in `content` and text content blocks (serve/view/
- * in-app/`sim:file` forms, via the shared fork grammar), attachment chip
+ * in-app/`sim:file` forms, by exact id/key substitution), attachment chip
  * ids+keys, and `@`-mention context chip file ids. References to anything not
  * in the maps (shared workspace files, workflows, other chats) pass through
  * unchanged. Pure; returns the input array untouched when there is nothing to

@@ -194,7 +194,6 @@ export const buildTimeCSPDirectives: CSPDirectives = {
       : isDev
         ? [DEFAULT_SOCKET_URL, toWebSocketUrl(DEFAULT_SOCKET_URL)]
         : []),
-    ...getHostnameFromUrl(env.NEXT_PUBLIC_BRAND_LOGO_URL),
     ...getHostnameFromUrl(env.NEXT_PUBLIC_PRIVACY_URL),
     ...getHostnameFromUrl(env.NEXT_PUBLIC_TERMS_URL),
   ],
@@ -241,7 +240,6 @@ export function generateRuntimeCSP(): string {
     getEnv('NEXT_PUBLIC_SOCKET_URL') || (isDev || isLocalhostUrl(appUrl) ? DEFAULT_SOCKET_URL : '')
   const socketWsUrl = socketUrl ? toWebSocketUrl(socketUrl) : ''
 
-  const brandLogoDomains = getHostnameFromUrl(getEnv('NEXT_PUBLIC_BRAND_LOGO_URL'))
   const privacyDomains = getHostnameFromUrl(getEnv('NEXT_PUBLIC_PRIVACY_URL'))
   const termsDomains = getHostnameFromUrl(getEnv('NEXT_PUBLIC_TERMS_URL'))
 
@@ -255,7 +253,6 @@ export function generateRuntimeCSP(): string {
       appUrl,
       socketUrl,
       socketWsUrl,
-      ...brandLogoDomains,
       ...privacyDomains,
       ...termsDomains,
     ],

@@ -27,7 +27,6 @@ import {
   serializePermissionGroupRoster,
   serializeTableMeta,
   serializeWorkflowMeta,
-  serializeWorkspaceForks,
 } from '@/lib/copilot/vfs/serializers'
 import type { BlockConfig } from '@/blocks/types'
 import { hostedKeyEnabledWhen } from '@/tools/hosting'
@@ -626,13 +625,12 @@ describe('serializeConnectors — cloneable references, never key material', () 
 })
 
 describe('account and organization namespace serializers', () => {
-  it('references the files that own org and fork detail instead of restating them', () => {
+  it('references the file that owns org detail instead of restating it', () => {
     const workspace = JSON.parse(
       serializeAccountWorkspace({
         workspace: { id: 'ws-1', name: 'Elder', workspaceMode: 'standard' },
         viewer: { permission: 'admin', organizationRole: 'owner' },
         organization: { id: 'org-1', name: 'Acme' },
-        forkedFrom: { id: 'ws-0', name: 'Elder (parent)' },
         entitlements: ['custom-blocks'],
       })
     )
@@ -644,25 +642,22 @@ describe('account and organization namespace serializers', () => {
       yourRole: 'owner',
       detail: 'organization/organization.json',
     })
-    expect(workspace.forkedFrom.detail).toBe('organization/forks.json')
     // The org record itself (plan, restrictions, members) must not be inlined —
     // one relation per file is what keeps the two from disagreeing.
     expect(workspace.organization.plan).toBeUndefined()
   })
 
-  it('omits organization and fork stubs for a personal, unforked workspace', () => {
+  it('omits the organization stub for a personal workspace', () => {
     const workspace = JSON.parse(
       serializeAccountWorkspace({
         workspace: { id: 'ws-1', name: 'Personal' },
         viewer: { permission: 'admin' },
         organization: null,
-        forkedFrom: null,
         entitlements: [],
       })
     )
 
     expect(workspace.organization).toBeNull()
-    expect(workspace.forkedFrom).toBeNull()
   })
 
   it('withholds member emails from a non-admin viewer and says so', () => {
@@ -806,7 +801,6 @@ describe('account and organization namespace serializers', () => {
         },
         { type: 'acme_retired', name: 'Retired', enabled: false },
       ],
-      forksMounted: false,
       permissionGroupsMounted: false,
       connectedAccountsMounted: true,
     })
@@ -816,7 +810,6 @@ describe('account and organization namespace serializers', () => {
     expect(readme).toContain('**Acme Scorer** (`acme_scorer`) — published from Scorer in Platform')
     expect(readme).toContain('**Retired** (`acme_retired`) — disabled')
     // Gated files must not be advertised when unmounted for this viewer.
-    expect(readme).not.toContain('forks.json')
     expect(readme).not.toContain('permission-groups.json')
     expect(readme).toContain('connected-accounts.json')
   })
@@ -863,18 +856,17 @@ describe('account and organization namespace serializers', () => {
     expect(catalog.note).toContain('no container selection is required')
   })
 
-  it('maps the org workspace directory with access flags and fork parentage', () => {
+  it('maps the org workspace directory with access flags', () => {
     const dir = JSON.parse(
       serializeOrganizationWorkspaces([
-        { id: 'ws-1', name: 'Platform', hasAccess: true, forkedFromWorkspaceId: null },
-        { id: 'ws-2', name: 'Client Fork', hasAccess: false, forkedFromWorkspaceId: 'ws-1' },
+        { id: 'ws-1', name: 'Platform', hasAccess: true },
+        { id: 'ws-2', name: 'Client', hasAccess: false },
       ])
     )
     expect(dir.workspaces[1]).toEqual({
       id: 'ws-2',
-      name: 'Client Fork',
+      name: 'Client',
       hasAccess: false,
-      forkedFromWorkspaceId: 'ws-1',
     })
     expect(dir.note).toContain('nameable, not readable')
   })
@@ -898,46 +890,16 @@ describe('account and organization namespace serializers', () => {
     expect(roster.note).toContain('access-control.json')
   })
 
-  it('summarizes fork mappings by resource type and omits them at the root', () => {
-    const forked = JSON.parse(
-      serializeWorkspaceForks({
-        parent: { id: 'ws-0', name: 'Template' },
-        children: [{ id: 'ws-2', name: 'Child', createdAt: new Date('2026-08-01T00:00:00.000Z') }],
-        resourceMappingCounts: { workflow: 3, table: 1 },
-        blockMappingCount: 12,
-      })
-    )
-    expect(forked.mappedFromParent).toEqual({ resources: { workflow: 3, table: 1 }, blocks: 12 })
-    expect(forked.children[0].createdAt).toBe('2026-08-01T00:00:00.000Z')
-
-    const root = JSON.parse(
-      serializeWorkspaceForks({
-        parent: null,
-        children: [],
-        resourceMappingCounts: {},
-        blockMappingCount: 0,
-      })
-    )
-    expect(root.mappedFromParent).toBeUndefined()
-  })
-
   it('marks the current workspace and never implies the others are readable', () => {
     const roster = JSON.parse(
       serializeAccountWorkspaces([
         { id: 'ws-1', name: 'Elder', role: 'admin', isCurrent: true, organizationId: 'org-1' },
-        {
-          id: 'ws-2',
-          name: 'Other',
-          role: 'read',
-          isCurrent: false,
-          forkedFromWorkspaceId: 'ws-1',
-        },
+        { id: 'ws-2', name: 'Other', role: 'read', isCurrent: false },
       ])
     )
 
     expect(roster.workspaces[0].isCurrent).toBe(true)
     expect(roster.workspaces[1].isCurrent).toBeUndefined()
-    expect(roster.workspaces[1].forkedFromWorkspaceId).toBe('ws-1')
     expect(roster.note).toContain('isCurrent')
   })
 })

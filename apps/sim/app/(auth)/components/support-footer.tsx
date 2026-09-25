@@ -1,7 +1,7 @@
 'use client'
 
 import { cn } from '@sim/emcn'
-import { useBrandConfig } from '@/ee/whitelabeling'
+import { useBrandConfig } from '@/lib/branding'
 
 export interface SupportFooterProps {
   /**

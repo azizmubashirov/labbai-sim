@@ -224,27 +224,3 @@ export const verifyPublicFileOtpContract = defineRouteContract({
     schema: verifyPublicFileOtpResponseSchema,
   },
 })
-
-const publicFileSSOBodySchema = z.object({
-  email: z.string().email('Invalid email address'),
-})
-
-export type PublicFileSSOBody = z.input<typeof publicFileSSOBodySchema>
-
-const publicFileSSOResponseSchema = z.object({
-  eligible: z.boolean(),
-})
-
-export type PublicFileSSOResponse = z.output<typeof publicFileSSOResponseSchema>
-
-/** Reports whether an email is on the allow-list for an SSO-gated share. */
-export const publicFileSSOContract = defineRouteContract({
-  method: 'POST',
-  path: '/api/files/public/[token]/sso',
-  params: publicFileTokenParamsSchema,
-  body: publicFileSSOBodySchema,
-  response: {
-    mode: 'json',
-    schema: publicFileSSOResponseSchema,
-  },
-})

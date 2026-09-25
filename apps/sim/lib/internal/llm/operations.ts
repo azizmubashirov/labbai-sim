@@ -19,7 +19,7 @@ import {
   IntegrationNotAllowedError,
   ModelNotAllowedError,
   ProviderNotAllowedError,
-} from '@/ee/access-control/utils/permission-check'
+} from '@/lib/labbai/access-control/permission-check'
 import type { StreamingExecution } from '@/executor/types'
 import { projectResolvedSecretModelContent } from '@/executor/utils/resolved-secret-content-projection'
 import { executeProviderRequest } from '@/providers'

@@ -22,7 +22,7 @@ import {
 } from '@/app/workspace/[workspaceId]/settings/components/settings-resource-row'
 import { SettingsSection } from '@/app/workspace/[workspaceId]/settings/components/settings-section/settings-section'
 import { useSettingsSearch } from '@/app/workspace/[workspaceId]/settings/components/use-settings-search'
-import { useUserPermissionConfig } from '@/ee/access-control/hooks/permission-groups'
+import { useUserPermissionConfig } from '@/hooks/queries/permission-groups'
 import type { ApiKeyScope } from '@/hooks/queries/api-key-list'
 import {
   useApiKeys,

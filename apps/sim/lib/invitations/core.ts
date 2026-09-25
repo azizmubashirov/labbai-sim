@@ -18,7 +18,7 @@ import { isOrgAdminRole, PERMISSION_RANK, type PermissionType } from '@sim/platf
 import { generateId } from '@sim/utils/id'
 import { normalizeEmail } from '@sim/utils/string'
 import { and, asc, count, eq, inArray, lte, sql } from 'drizzle-orm'
-import { applySessionPolicyToNewMember } from '@/lib/auth/session-policy'
+import { invalidateMembershipCache } from '@/lib/auth/security-policy'
 import { syncUsageLimitsFromSubscription } from '@/lib/billing/core/usage'
 import {
   acquireOrganizationMutationLock,
@@ -1240,9 +1240,8 @@ async function runInvitationAcceptancePostCommitEffects(
   }
 
   if (effects.organizationId && effects.memberRole) {
-    // Pre-join sessions keep their old expiry until the next sliding refresh;
-    // apply the org's session policy to them now (best-effort, never throws).
-    await applySessionPolicyToNewMember(input.userId, effects.organizationId)
+    // The new member's cached org membership must resolve to this org immediately.
+    invalidateMembershipCache(input.userId)
 
     recordAudit({
       workspaceId: null,

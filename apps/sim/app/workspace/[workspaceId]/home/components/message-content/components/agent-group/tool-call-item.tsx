@@ -16,8 +16,8 @@ import {
 } from '@/app/workspace/[workspaceId]/home/components/message-content/utils'
 import type { ToolCallData, ToolCallStatus } from '@/app/workspace/[workspaceId]/home/types'
 import { BrandIcon } from '@/blocks/brand-icon'
-import { useCustomBlockOverlayVersion } from '@/blocks/custom/client-overlay'
 import { getBlockByToolName } from '@/blocks/registry'
+import { useBlockVisibilityVersion } from '@/blocks/visibility/version'
 
 export interface ToolCallItemProps {
   toolName: string
@@ -94,7 +94,7 @@ export function ToolCallItem({
   startedAt,
   renderStatus,
 }: ToolCallItemProps) {
-  useCustomBlockOverlayVersion()
+  useBlockVisibilityVersion()
   const readPath = params?.path
   const readBlock =
     toolName === ReadTool.id && typeof readPath === 'string'

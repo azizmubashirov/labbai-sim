@@ -81,7 +81,7 @@ import {
   SelectorOptionsUnavailableError,
 } from '@/lib/selectors/server/errors'
 import type { ExecuteServerSelectorArgs } from '@/lib/selectors/server/types'
-import { IntegrationNotAllowedError } from '@/ee/access-control/utils/permission-check'
+import { IntegrationNotAllowedError } from '@/lib/labbai/access-control/permission-check'
 
 const principal = { kind: 'session' as const, userId: 'user-1', sessionId: 'session-1' }
 const scope = { kind: 'workspace' as const, workspaceId: 'workspace-1' }

@@ -79,7 +79,7 @@ import {
   tablesSortParams,
   tablesUrlKeys,
 } from '@/app/workspace/[workspaceId]/tables/search-params'
-import { PermissionAccessBoundary } from '@/ee/access-requests/components/permission-access-boundary'
+import { PermissionAccessBoundary } from '@/components/access-requests/permission-access-boundary'
 import { useCreateFolder, useDeleteFolderMutation, useUpdateFolder } from '@/hooks/queries/folders'
 import { usePinItem, usePinnedIds, useUnpinItem } from '@/hooks/queries/pinned-items'
 import {

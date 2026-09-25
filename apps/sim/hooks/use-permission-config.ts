@@ -20,9 +20,9 @@ import {
 import { createModelAccessGate } from '@/lib/permission-groups/model-access'
 import { createToolAccessGate } from '@/lib/permission-groups/operation-access'
 import { useOptionalWorkspaceHostContext } from '@/app/workspace/[workspaceId]/providers/workspace-host-provider'
-import { useCustomBlockOverlayVersion } from '@/blocks/custom/client-overlay'
 import { overlayVisibility } from '@/blocks/visibility/context'
-import { useUserPermissionConfig } from '@/ee/access-control/hooks/permission-groups'
+import { useBlockVisibilityVersion } from '@/blocks/visibility/version'
+import { useUserPermissionConfig } from '@/hooks/queries/permission-groups'
 import { useIntegrationAvailability } from '@/hooks/queries/integration-availability'
 
 export interface PermissionConfigResult {
@@ -55,7 +55,7 @@ export interface PermissionConfigResult {
 export function usePermissionConfig(): PermissionConfigResult {
   const params = useParams()
   const workspaceId = typeof params?.workspaceId === 'string' ? params.workspaceId : undefined
-  const blockOverlayVersion = useCustomBlockOverlayVersion()
+  const blockVisibilityVersion = useBlockVisibilityVersion()
   const hostContext = useOptionalWorkspaceHostContext()
 
   const { data: permissionData, isLoading: isPermissionLoading } =
@@ -117,7 +117,7 @@ export function usePermissionConfig(): PermissionConfigResult {
         },
       ])
     )
-  }, [envAllowlistData?.integrationAvailability, blockOverlayVersion])
+  }, [envAllowlistData?.integrationAvailability, blockVisibilityVersion])
 
   const oauthServiceAvailability = useMemo(
     () =>

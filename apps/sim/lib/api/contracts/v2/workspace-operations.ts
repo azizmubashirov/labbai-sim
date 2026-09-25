@@ -6,7 +6,6 @@ import {
   v2DataResponse,
   v2PaginationFields,
 } from '@/lib/api/contracts/v2/shared'
-import { forkTriggerUrlChangeSchema } from '@/lib/api/contracts/workspace-fork'
 
 export const v2OperationIssueSchema = z.object({
   code: z.string().min(1).max(128).describe('Stable machine-readable issue code.'),
@@ -105,11 +104,6 @@ export const v2OperationReportSchema = z
       .max(1000)
       .optional()
       .describe('Readiness of the exact admitted deployment attempts.'),
-    triggerUrlChanges: z
-      .array(forkTriggerUrlChangeSchema)
-      .max(1000)
-      .optional()
-      .describe('Public trigger paths changed by this sync, with the affected workflow names.'),
     backgroundWorkId: z
       .string()
       .max(256)

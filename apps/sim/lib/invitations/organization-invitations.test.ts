@@ -35,7 +35,7 @@ vi.mock('@/lib/billing/organizations/membership', () => ({
 vi.mock('@/lib/billing/validation/seat-management', () => ({
   validateSeatAvailability: mocks.seats,
 }))
-vi.mock('@/ee/access-control/utils/permission-check', () => ({
+vi.mock('@/lib/labbai/access-control/permission-check', () => ({
   validateInvitationsAllowed: mocks.policy,
 }))
 vi.mock('@/lib/invitations/send', () => ({

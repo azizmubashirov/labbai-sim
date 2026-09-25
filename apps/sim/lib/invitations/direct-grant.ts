@@ -39,7 +39,7 @@ import {
   type WorkspaceWithOwner,
 } from '@/lib/workspaces/permissions/utils'
 import type { WorkspaceInvitePolicy } from '@/lib/workspaces/policy'
-import { assertMembershipNotScimManaged } from '@/ee/scim/lib/managed-membership'
+import { assertMembershipNotScimManaged } from '@/lib/labbai/scim/managed-membership'
 
 const logger = createLogger('InvitationDirectGrant')
 

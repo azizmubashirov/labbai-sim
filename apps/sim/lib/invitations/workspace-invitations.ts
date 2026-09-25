@@ -48,12 +48,12 @@ import {
   getWorkspaceInvitePolicy,
   type WorkspaceInvitePolicy,
 } from '@/lib/workspaces/policy'
-import { validateInvitationsAllowed } from '@/ee/access-control/utils/permission-check'
-import { isScimDeploymentEnabled } from '@/ee/scim/lib/entitlement'
+import { validateInvitationsAllowed } from '@/lib/labbai/access-control/permission-check'
+import { isScimDeploymentEnabled } from '@/lib/labbai/scim/entitlement'
 import {
   assertInviteeNotScimManaged,
   scimManagedUserPredicate,
-} from '@/ee/scim/lib/managed-membership'
+} from '@/lib/labbai/scim/managed-membership'
 
 /**
  * What the invitee becomes in the organization. `member` and `admin` are

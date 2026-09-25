@@ -2,8 +2,8 @@ import { Text } from '@react-email/components'
 import { createLogger } from '@sim/logger'
 import { baseStyles } from '@/components/emails/_styles'
 import { EmailButton, EmailLayout, EmailStrong } from '@/components/emails/components'
+import { getBrandConfig } from '@/lib/branding'
 import { getBaseUrl } from '@/lib/core/utils/urls'
-import { getBrandConfig } from '@/ee/whitelabeling'
 
 interface InvitationEmailProps {
   inviterName?: string

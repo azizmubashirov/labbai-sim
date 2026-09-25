@@ -6,14 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   process: vi.fn(),
   recover: vi.fn(),
-  reap: vi.fn(),
 }))
 vi.mock('@/lib/core/outbox/service', () => ({ processOutboxEvents: mocks.process }))
 vi.mock('@/lib/knowledge/documents/processing-recovery', () => ({
   recoverKnowledgeDocumentProcessing: mocks.recover,
-}))
-vi.mock('@/ee/workspace-forking/lib/background-work/store', () => ({
-  reapStaleBackgroundWork: mocks.reap,
 }))
 vi.mock('@/lib/knowledge/connectors/connector-error', () => ({
   getConnectorFailureDiagnostic: () => undefined,
@@ -25,7 +21,7 @@ vi.mock('@/lib/knowledge/documents/processing-outbox-handler', () => ({
 vi.mock('@/lib/organizations/resource-cleanup', () => ({
   organizationResourceCleanupOutboxHandlers: {},
 }))
-vi.mock('@/ee/access-requests/lib/notifications', () => ({
+vi.mock('@/lib/labbai/access-requests/notifications', () => ({
   permissionAccessRequestOutboxHandlers: {},
 }))
 vi.mock('@/lib/uploads/contexts/workspace/workspace-file-live-doc-outbox', () => ({
@@ -37,9 +33,6 @@ vi.mock('@/lib/uploads/contexts/workspace/workspace-file-storage-cleanup-outbox'
 vi.mock('@/lib/workflows/deployment-outbox', () => ({ workflowDeploymentOutboxHandlers: {} }))
 vi.mock('@/lib/workspaces/admin-move', () => ({ invitationMigrationOutboxHandlers: {} }))
 vi.mock('@/lib/workspaces/operations/outbox', () => ({ workspaceOperationOutboxHandlers: {} }))
-vi.mock('@/ee/workspace-forking/application/content-outbox', () => ({
-  forkContentOutboxHandlers: {},
-}))
 
 import { runOutboxProcessor } from '@/lib/core/outbox/processor'
 
@@ -51,7 +44,6 @@ describe('outbox processor recovery', () => {
     vi.useFakeTimers()
     mocks.process.mockResolvedValue(result)
     mocks.recover.mockResolvedValue(2)
-    mocks.reap.mockResolvedValue(3)
   })
   afterEach(() => vi.useRealTimers())
 
@@ -59,7 +51,6 @@ describe('outbox processor recovery', () => {
     await expect(runOutboxProcessor()).resolves.toEqual({
       result,
       recoveredDocuments: 2,
-      reapedBackgroundWork: 3,
     })
     expect(mocks.process).toHaveBeenCalledWith(expect.any(Object), {
       batchSize: 500,
@@ -68,21 +59,11 @@ describe('outbox processor recovery', () => {
     })
   })
 
-  it('still reaps expired background work when document recovery fails', async () => {
+  it('retains delivery results when document recovery fails', async () => {
     mocks.recover.mockRejectedValueOnce(new Error('document recovery unavailable'))
     await expect(runOutboxProcessor()).resolves.toEqual({
       result,
       recoveredDocuments: 0,
-      reapedBackgroundWork: 3,
-    })
-  })
-
-  it('retains successful delivery results when the background-work reaper fails', async () => {
-    mocks.reap.mockRejectedValueOnce(new Error('reaper unavailable'))
-    await expect(runOutboxProcessor()).resolves.toEqual({
-      result,
-      recoveredDocuments: 2,
-      reapedBackgroundWork: 0,
     })
   })
 
@@ -94,7 +75,6 @@ describe('outbox processor recovery', () => {
     await expect(runOutboxProcessor()).resolves.toEqual({
       result,
       recoveredDocuments: 0,
-      reapedBackgroundWork: 3,
     })
     expect(mocks.recover).not.toHaveBeenCalled()
   })
@@ -103,6 +83,5 @@ describe('outbox processor recovery', () => {
     mocks.process.mockRejectedValueOnce(new Error('database unavailable'))
     await expect(runOutboxProcessor()).rejects.toThrow('database unavailable')
     expect(mocks.recover).not.toHaveBeenCalled()
-    expect(mocks.reap).not.toHaveBeenCalled()
   })
 })

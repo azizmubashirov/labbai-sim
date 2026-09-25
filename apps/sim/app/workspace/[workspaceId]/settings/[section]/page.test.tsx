@@ -28,7 +28,7 @@ const {
 
 vi.mock('next/navigation', () => ({ notFound: mockNotFound, redirect: mockRedirect }))
 vi.mock('@/lib/auth', () => ({ getSession: mockGetSession }))
-vi.mock('@/ee/access-requests/components/permission-access-boundary', () => ({
+vi.mock('@/components/access-requests/permission-access-boundary', () => ({
   PermissionAccessBoundary: vi.fn(() => null),
 }))
 vi.mock('@/lib/settings/application/workspace-section-access', () => ({
@@ -48,15 +48,10 @@ vi.mock('@/app/workspace/[workspaceId]/settings/navigation', () => ({
       'secrets',
       'connected-accounts',
       'organization',
-      'usage',
       'access-control',
       'requests',
       'audit-logs',
-      'sso',
       'security',
-      'data-retention',
-      'data-drains',
-      'whitelabeling',
     ].includes(id)
       ? { id, meta: { title: id } }
       : null
@@ -104,11 +99,11 @@ describe('WorkspaceSettingsSectionPage', () => {
     })
     await expect(
       WorkspaceSettingsSectionPage({
-        ...pageProps('usage'),
+        ...pageProps('audit-logs'),
         searchParams: Promise.resolve({ window: 'month', source: ['search', 'chat'] }),
       })
     ).rejects.toThrow(
-      'NEXT_REDIRECT:/o/org-target/settings/usage?window=month&source=search&source=chat'
+      'NEXT_REDIRECT:/o/org-target/settings/audit-logs?window=month&source=search&source=chat'
     )
     expect(mockSectionPrefetch).not.toHaveBeenCalled()
   })

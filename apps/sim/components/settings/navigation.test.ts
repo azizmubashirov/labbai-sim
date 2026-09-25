@@ -32,13 +32,7 @@ const SELF_HOSTED: DeploymentShape = {
   features: {
     accessControl: false,
     auditLogs: false,
-    customBlocks: false,
-    dataDrains: false,
-    dataRetention: false,
-    sessionPolicies: true,
-    sso: false,
-    usageMonitoring: false,
-    whitelabeling: true,
+    scim: true,
   },
 }
 
@@ -47,38 +41,20 @@ const HOSTED: DeploymentShape = { ...SELF_HOSTED, hosted: true }
 /** A self-hosted deployment with every feature override on. */
 const SELF_HOSTED_ALL_FEATURES: DeploymentShape = {
   ...SELF_HOSTED,
-  features: { ...SELF_HOSTED.features, customBlocks: true },
+  features: { accessControl: true, auditLogs: true, scim: true },
 }
 
 /** Every workspace-plane section a self-hosted deployment offers. */
 const SELF_HOSTED_WORKSPACE_SECTIONS = WORKSPACE_SETTINGS_ITEMS.map(({ id }) => id)
 
-const ALL_ENTITLEMENTS = {
-  customBlocks: true,
-  forks: true,
-}
-
 describe('settings navigation boundaries', () => {
-  it('keeps Custom Blocks opt-in on self-hosted deployments', () => {
-    const customBlocks = buildUnifiedSettingsCatalog().find(({ id }) => id === 'custom-blocks')
-
-    expect(customBlocks?.selfHostedOverride).toBe('customBlocks')
-    expect(isSelfHostedOverrideEnabled(customBlocks?.selfHostedOverride, SELF_HOSTED)).toBe(false)
-    expect(
-      isSelfHostedOverrideEnabled(customBlocks?.selfHostedOverride, {
-        ...SELF_HOSTED,
-        features: { ...SELF_HOSTED.features, customBlocks: true },
-      })
-    ).toBe(true)
-  })
-
   it('resolves self-hosted overrides against the deployment shape, never on Sim Cloud', () => {
     expect(isSelfHostedOverrideEnabled(undefined, SELF_HOSTED)).toBe(false)
     expect(isSelfHostedOverrideEnabled('always', SELF_HOSTED)).toBe(true)
     expect(isSelfHostedOverrideEnabled('always', HOSTED)).toBe(false)
-    expect(isSelfHostedOverrideEnabled('sessionPolicies', SELF_HOSTED)).toBe(true)
-    expect(isSelfHostedOverrideEnabled('sessionPolicies', HOSTED)).toBe(false)
-    expect(isSelfHostedOverrideEnabled('sso', SELF_HOSTED)).toBe(false)
+    expect(isSelfHostedOverrideEnabled('scim', SELF_HOSTED)).toBe(true)
+    expect(isSelfHostedOverrideEnabled('scim', HOSTED)).toBe(false)
+    expect(isSelfHostedOverrideEnabled('accessControl', SELF_HOSTED)).toBe(false)
   })
 
   it('preserves the order of all four settings catalogs', () => {
@@ -87,10 +63,8 @@ describe('settings navigation boundaries', () => {
       'requests',
       'access-control',
       'audit-logs',
-      'forks',
       'teammates',
       'organization',
-      'usage',
       'secrets',
       'connected-accounts',
       'custom-tools',
@@ -98,12 +72,7 @@ describe('settings navigation boundaries', () => {
       'apikeys',
       'workflow-mcp-servers',
       'recently-deleted',
-      'sso',
       'security',
-      'data-retention',
-      'data-drains',
-      'whitelabeling',
-      'custom-blocks',
       'admin',
     ])
     expect(ACCOUNT_SETTINGS_ITEMS.map(({ id }) => id)).toEqual([
@@ -119,8 +88,6 @@ describe('settings navigation boundaries', () => {
       'workflow-mcp-servers',
       'api-keys',
       'recently-deleted',
-      'forks',
-      'custom-blocks',
       'requests',
     ])
   })
@@ -129,7 +96,7 @@ describe('settings navigation boundaries', () => {
     expect(
       getOrganizationSettingsFeatures(true, {
         ...SELF_HOSTED,
-        features: { ...SELF_HOSTED.features, sso: true, usageMonitoring: true },
+        features: { ...SELF_HOSTED.features, auditLogs: true },
       })
     ).toEqual({
       hasEnterprisePlan: true,
@@ -138,13 +105,8 @@ describe('settings navigation boundaries', () => {
       selfHosted: {
         'connected-accounts': true,
         'access-control': false,
-        'audit-logs': false,
-        sso: true,
+        'audit-logs': true,
         security: true,
-        'data-retention': false,
-        'data-drains': false,
-        usage: true,
-        whitelabeling: true,
       },
     })
     expect(getOrganizationSettingsFeatures(false, HOSTED)).toMatchObject({
@@ -180,13 +142,8 @@ describe('settings navigation boundaries', () => {
       'access-control',
       'audit-logs',
       'connected-accounts',
-      'data-drains',
-      'data-retention',
       'organization',
       'security',
-      'sso',
-      'usage',
-      'whitelabeling',
     ])
   })
 
@@ -199,12 +156,7 @@ describe('settings navigation boundaries', () => {
       'connected-accounts': 'connected-accounts',
       'access-control': 'access-control',
       'audit-logs': 'audit-logs',
-      sso: 'sso',
       security: 'security',
-      'data-retention': 'data-retention',
-      'data-drains': 'data-drains',
-      whitelabeling: 'whitelabeling',
-      usage: 'usage',
     })
     expect(Object.keys(UNIFIED_TO_ORGANIZATION_SECTION).sort()).toEqual(
       [...ORGANIZATION_PLANE_UNIFIED_SECTIONS].sort()
@@ -221,8 +173,6 @@ describe('settings navigation boundaries', () => {
       'workflow-mcp-servers': 'workflow-mcp-servers',
       apikeys: 'api-keys',
       'recently-deleted': 'recently-deleted',
-      forks: 'forks',
-      'custom-blocks': 'custom-blocks',
     })
   })
 
@@ -304,14 +254,14 @@ describe('settings navigation boundaries', () => {
     ).toBe('view')
     expect(
       resolveOrganizationSectionAccess({
-        section: 'sso',
+        section: 'security',
         isTargetOrganizationMember: true,
         isTargetOrganizationAdmin: false,
       })
     ).toBe('unavailable')
     expect(
       resolveOrganizationSectionAccess({
-        section: 'sso',
+        section: 'security',
         isTargetOrganizationMember: true,
         isTargetOrganizationAdmin: true,
       })
@@ -346,9 +296,9 @@ describe('settings navigation boundaries', () => {
     expect(isOrganizationSettingsSectionAvailable('members', hostedFree)).toBe(true)
     expect(isOrganizationSettingsSectionAvailable('recently-deleted', hostedFree)).toBe(true)
     expect(isOrganizationSettingsSectionAvailable('requests', hostedFree)).toBe(true)
-    expect(isOrganizationSettingsSectionAvailable('sso', hostedFree)).toBe(false)
+    expect(isOrganizationSettingsSectionAvailable('security', hostedFree)).toBe(false)
     expect(
-      isOrganizationSettingsSectionAvailable('sso', {
+      isOrganizationSettingsSectionAvailable('security', {
         ...hostedFree,
         hasEnterprisePlan: true,
       })
@@ -405,7 +355,6 @@ describe('settings navigation boundaries', () => {
         'workflow-mcp-servers',
         'api-keys',
         'recently-deleted',
-        'custom-blocks',
         'requests',
       ],
       mutable: ['requests'],
@@ -420,7 +369,6 @@ describe('settings navigation boundaries', () => {
         'workflow-mcp-servers',
         'api-keys',
         'recently-deleted',
-        'custom-blocks',
         'requests',
       ],
       mutable: [
@@ -443,7 +391,6 @@ describe('settings navigation boundaries', () => {
       const items = resolveWorkspaceNavigation({
         permission,
         permissionConfig: {},
-        entitlements: ALL_ENTITLEMENTS,
         deployment: SELF_HOSTED_ALL_FEATURES,
       })
 
@@ -461,7 +408,6 @@ describe('settings navigation boundaries', () => {
         disableMcpTools: true,
         disableCustomTools: true,
       },
-      entitlements: ALL_ENTITLEMENTS,
       deployment: SELF_HOSTED_ALL_FEATURES,
     })
 
@@ -469,8 +415,6 @@ describe('settings navigation boundaries', () => {
       'teammates',
       'workflow-mcp-servers',
       'recently-deleted',
-      'forks',
-      'custom-blocks',
       'requests',
     ])
   })

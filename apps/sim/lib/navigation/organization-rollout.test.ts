@@ -43,19 +43,12 @@ describe('organization rollout during impersonation', () => {
   })
 
   it.each([
-    { knowledge: false, groups: false },
-    { knowledge: false, groups: true },
-    { knowledge: true, groups: false },
-    { knowledge: true, groups: true },
-  ])('uses the customer organization for both gates: %j', async ({ knowledge, groups }) => {
+    { knowledge: false },
+    { knowledge: true },
+  ])('uses the customer organization for the knowledge gate: %j', async ({ knowledge }) => {
     const flags: FeatureFlagsConfig = {
       'knowledge-member-access': {
         orgIds: ['admin-org', ...(knowledge ? ['customer-org'] : [])],
-        userIds: ['platform-admin'],
-        adminEnabled: true,
-      },
-      'credential-groups': {
-        orgIds: ['admin-org', ...(groups ? ['customer-org'] : [])],
         userIds: ['platform-admin'],
         adminEnabled: true,
       },
@@ -71,12 +64,12 @@ describe('organization rollout during impersonation', () => {
       session: { impersonatedBy: 'platform-admin', activeOrganizationId: 'customer-org' },
     }
     await expect(resolveAppEntryPath(impersonatedSession)).resolves.toBe(
-      knowledge && groups ? '/o/customer-org/home' : '/workspace'
+      knowledge ? '/o/customer-org/home' : '/workspace'
     )
     expect(mocks.landing).toHaveBeenLastCalledWith('customer-member', 'customer-org')
     expect(mocks.platformAdmin).not.toHaveBeenCalled()
 
-    if (knowledge && groups) {
+    if (knowledge) {
       await expect(requireOrganizationSearchAvailable('customer-org')).resolves.toBeUndefined()
     } else {
       await expect(requireOrganizationSearchAvailable('customer-org')).rejects.toMatchObject({

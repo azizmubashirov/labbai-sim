@@ -14,8 +14,8 @@ export interface EnterpriseAuditContext {
 
 /**
  * A refusal names its cause as well as its wording. This resolver distinguishes
- * four of them — not a member, not an admin, no enterprise plan, audit logging
- * switched off — and each has a different remedy, so collapsing them into one
+ * three of them — not a member, not an admin, audit logging switched off — and
+ * each has a different remedy, so collapsing them into one
  * status forced callers to match on the message text.
  */
 export type EnterpriseAuditAccessResult =
@@ -93,8 +93,7 @@ export async function resolveEnterpriseAuditAccess(
       success: false,
       status: 403,
       code: 'AUDIT_LOGS_DISABLED',
-      message:
-        'Audit logs are disabled. Set ENTERPRISE_ENABLED or AUDIT_LOGS_ENABLED to enable them.',
+      message: 'Audit logs are disabled on this deployment.',
     }
   }
 

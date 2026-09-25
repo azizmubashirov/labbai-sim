@@ -394,22 +394,6 @@ describe('listCredentialGroupCredentials', () => {
     expect(mocks.listCredentials).not.toHaveBeenCalled()
   })
 
-  it('identifies the Enterprise requirement for unavailable hosted workspaces', async () => {
-    mocks.getWorkspaceOwnerSubscriptionAccess.mockResolvedValue({ isEnterprise: false })
-    mocks.resolveCredentialGroupsAvailability.mockResolvedValue({
-      available: false,
-      reason: 'enterprise_plan_required',
-    })
-
-    await expect(
-      listCredentialGroupCredentials.execute({ principal: executorPrincipal(), input })
-    ).rejects.toMatchObject({
-      code: 'not_found',
-      message: 'Organization connected accounts are not available',
-    })
-    expect(mocks.listCredentials).not.toHaveBeenCalled()
-  })
-
   it('rejects limits outside the bounded page size', async () => {
     await expect(
       listCredentialGroupCredentials.execute({

@@ -111,11 +111,8 @@ describe('resolveMoveEntitlements', () => {
     expect(result.capabilitiesLost).toEqual(
       expect.arrayContaining([
         'permission groups',
-        'organization usage monitoring',
         'audit logs',
-        'data drains',
-        'whitelabel branding',
-        'workspace forking',
+        'organization connected accounts',
         'custom blocks',
       ])
     )

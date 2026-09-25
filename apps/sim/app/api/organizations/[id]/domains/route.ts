@@ -14,8 +14,8 @@ import {
 } from '@/lib/api/contracts/organization'
 import { parseRequest, validationErrorResponse } from '@/lib/api/server'
 import { getSession } from '@/lib/auth'
-import { generateVerificationToken, toDomainResponse } from '@/lib/auth/sso/domain-verification'
 import { withRouteHandler } from '@/lib/core/utils/with-route-handler'
+import { generateVerificationToken, toDomainResponse } from '@/lib/organizations/domain-verification'
 
 const logger = createLogger('OrgDomainsAPI')
 

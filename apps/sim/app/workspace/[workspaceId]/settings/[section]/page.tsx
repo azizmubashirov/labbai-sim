@@ -12,8 +12,8 @@ import { authorizeWorkspaceSettingsSection } from '@/lib/settings/application/wo
 import { getWorkspaceHostContextForViewer } from '@/lib/workspaces/host-context'
 import { getQueryClient } from '@/app/_shell/providers/get-query-client'
 import { resolveSettingsSection } from '@/app/workspace/[workspaceId]/settings/navigation'
-import { PermissionAccessBoundary } from '@/ee/access-requests/components/permission-access-boundary'
-import { getLegacyAccessRequestsQuery } from '@/ee/access-requests/lib/navigation'
+import { PermissionAccessBoundary } from '@/components/access-requests/permission-access-boundary'
+import { getLegacyAccessRequestsQuery } from '@/lib/labbai/access-requests/navigation'
 import { SECTION_PREFETCHERS } from './prefetch'
 import { SettingsPage } from './settings'
 

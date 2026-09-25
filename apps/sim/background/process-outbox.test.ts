@@ -19,7 +19,7 @@ describe('outbox processor task', () => {
       retry: { maxAttempts: 1 },
       queue: { name: 'process-outbox', concurrencyLimit: 15 },
     })
-    const output = { result: { processed: 3 }, recoveredDocuments: 0, reapedBackgroundWork: 0 }
+    const output = { result: { processed: 3 }, recoveredDocuments: 0 }
     mocks.processor.mockResolvedValueOnce(output)
     await expect(processOutboxTask.run()).resolves.toEqual(output)
   })

@@ -1489,7 +1489,7 @@ export const workflowsOpenApiDocument = defineOpenApiDocument({
     {
       name: 'Workspace Sync',
       description:
-        'Portable workflow configuration, workspace forks, push and pull, and durable operation status.',
+        'Portable workflow configuration, configuration selectors, and durable operation status.',
     },
     {
       name: 'Workflows',

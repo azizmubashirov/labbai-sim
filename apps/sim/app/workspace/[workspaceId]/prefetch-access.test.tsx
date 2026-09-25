@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/lib/permission-groups/application/read-user-config', () => ({
   readUserPermissionConfig: { execute: mocks.policy },
 }))
-vi.mock('@/ee/access-requests/lib/application/requests', () => ({
+vi.mock('@/lib/labbai/access-requests/application/requests', () => ({
   discoverAccessRequests: { execute: mocks.discovery },
 }))
 vi.mock('@/lib/api/client/request', () => ({ requestJson: mocks.requestJson }))
@@ -39,7 +39,7 @@ vi.mock('@sim/emcn/icons', () => ({
   Upload: () => null,
   BookOpen: () => null,
 }))
-vi.mock('@/ee/access-requests/components/request-access-action', () => ({
+vi.mock('@/components/access-requests/request-access-action', () => ({
   RequestAccessAction: ({ pendingRequestId }: { pendingRequestId: string | null }) => (
     <button type='button'>{pendingRequestId ? 'Pending' : 'Request access'}</button>
   ),
@@ -49,7 +49,7 @@ import { ApiClientError } from '@/lib/api/client/errors'
 import { getUserPermissionConfigContract } from '@/lib/api/contracts/permission-groups'
 import { DEFAULT_PERMISSION_GROUP_CONFIG } from '@/lib/permission-groups/fields'
 import { prefetchWorkspaceAccess } from '@/app/workspace/[workspaceId]/prefetch-access'
-import { PermissionAccessBoundary } from '@/ee/access-requests/components/permission-access-boundary'
+import { PermissionAccessBoundary } from '@/components/access-requests/permission-access-boundary'
 import {
   accessRequestKeys,
   workspaceFeatureDiscoveryQuery,

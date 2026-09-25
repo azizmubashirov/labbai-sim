@@ -1,10 +1,10 @@
 /**
  * Resolves the permission group governing a user, and its config.
  *
- * Lives here rather than in `ee/access-control` because the authorization
+ * Lives here rather than in `lib/labbai/access-control` because the authorization
  * funnel reads it: `capability-assertions.ts` and `config-scope.server.ts` sit
  * under `@/lib/core/application`, which ~24 domain `operations.ts` modules
- * import. `ee/access-control/utils/permission-check.ts` also holds the model,
+ * import. `lib/labbai/access-control/permission-check.ts` also holds the model,
  * block and tool gates, and those reach the provider registry, the block
  * registry and the billing barrel — a graph no authorization decision should
  * load. Splitting resolution out is what keeps the funnel light;

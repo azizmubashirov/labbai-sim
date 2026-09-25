@@ -1,4 +1,4 @@
-import { getBrandConfig } from '@/ee/whitelabeling'
+import { getBrandConfig } from '@/lib/branding'
 
 /** Email subject type for all supported email templates */
 export type EmailSubjectType =

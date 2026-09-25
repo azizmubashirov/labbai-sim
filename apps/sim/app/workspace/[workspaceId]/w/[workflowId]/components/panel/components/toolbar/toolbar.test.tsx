@@ -10,7 +10,7 @@ const { addBlock, dragBlock, discovery, toolbarState } = vi.hoisted(() => ({
   dragBlock: vi.fn(),
   discovery: vi.fn(),
   toolbarState: {
-    expandedSections: { triggers: true, blocks: true, customBlocks: true, tools: true },
+    expandedSections: { triggers: true, blocks: true, tools: true },
     setSectionExpanded: vi.fn(),
   },
 }))
@@ -47,10 +47,8 @@ vi.mock('@sim/emcn/icons', () => ({
 vi.mock('@/blocks/block-tile', () => ({ BlockTile: () => null }))
 vi.mock('@/blocks/custom/build-config', () => ({
   isCustomBlockType: () => false,
-  buildCustomBlockConfig: vi.fn(),
 }))
 vi.mock('@/blocks/custom/client-overlay', () => ({ useCustomBlockOverlayVersion: () => 1 }))
-vi.mock('@/blocks/custom/custom-block-icon', () => ({ getCustomBlockTile: vi.fn() }))
 vi.mock('@/blocks/registry', () => ({
   getCanonicalBlocksByCategory: (category: string) =>
     category === 'blocks'
@@ -70,10 +68,6 @@ vi.mock('@/lib/workflows/triggers/trigger-utils', () => ({
   ],
   hasTriggerCapability: () => true,
 }))
-vi.mock('@/ee/whitelabeling/components/branding-provider', () => ({
-  useOrgBrandConfig: () => ({}),
-}))
-vi.mock('@/hooks/queries/custom-blocks', () => ({ useCustomBlocks: () => ({ data: [] }) }))
 vi.mock('@/hooks/use-sandbox-block-constraints', () => ({ useSandboxBlockConstraints: () => null }))
 vi.mock('@/hooks/use-permission-config', () => ({
   usePermissionConfig: () => ({
@@ -82,10 +76,10 @@ vi.mock('@/hooks/use-permission-config', () => ({
     isBlockRequestable: (type: string) => type.startsWith('locked-'),
   }),
 }))
-vi.mock('@/ee/access-requests/components/permission-access-boundary', () => ({
+vi.mock('@/components/access-requests/permission-access-boundary', () => ({
   useWorkspaceAccessRequestFeatures: discovery,
 }))
-vi.mock('@/ee/access-requests/components/request-access-action', () => ({
+vi.mock('@/components/access-requests/request-access-action', () => ({
   RequestAccessModal: ({ label, onClose }: { label: string; onClose: () => void }) => (
     <div role='dialog'>
       Request {label}

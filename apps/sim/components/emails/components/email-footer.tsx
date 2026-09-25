@@ -1,8 +1,8 @@
 import { Container, Img, Link, Section } from '@react-email/components'
 import { baseStyles, colors, spacing } from '@/components/emails/_styles'
+import { getBrandConfig } from '@/lib/branding'
 import { isHosted } from '@/lib/core/config/env-flags'
 import { getBaseUrl } from '@/lib/core/utils/urls'
-import { getBrandConfig } from '@/ee/whitelabeling'
 
 /**
  * Social mark display size. Every `static/*-icon.png` is 40×40, so 20px is a

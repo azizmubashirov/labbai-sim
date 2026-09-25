@@ -20,7 +20,6 @@ import { Check, TriangleAlert } from '@sim/emcn/icons'
 import { createLogger } from '@sim/logger'
 import { getErrorMessage } from '@sim/utils/errors'
 import { GeneratedPasswordInput } from '@/components/ui'
-import { useDeploymentShape } from '@/lib/core/config/deployment-shape'
 import { getBaseUrl, getEmailDomain } from '@/lib/core/utils/urls'
 import { validateAllowlistEntry } from '@/lib/messaging/email/validation'
 import { formatInternalOutputSelector } from '@/lib/workflows/streaming/output-selector'
@@ -162,11 +161,10 @@ export function ChatDeploy({
       newErrors.password = 'Password cannot contain only whitespace'
     }
 
-    if (
-      (formData.authType === 'email' || formData.authType === 'sso') &&
-      formData.emails.length === 0
-    ) {
-      newErrors.emails = `At least one email or domain is required when using ${formData.authType === 'sso' ? 'SSO' : 'email'} access control`
+    if (formData.authType === 'sso') {
+      newErrors.emails = 'SSO access control is no longer supported. Choose another access method.'
+    } else if (formData.authType === 'email' && formData.emails.length === 0) {
+      newErrors.emails = 'At least one email or domain is required when using email access control'
     }
 
     if (formData.selectedOutputBlocks.length === 0) {
@@ -183,7 +181,8 @@ export function ChatDeploy({
     formData.selectedOutputBlocks.length > 0 &&
     !isPasswordRequired(formData.authType, formData.password, existingPassword) &&
     (formData.authType !== 'password' || !isWhitespaceOnlyPassword(formData.password)) &&
-    ((formData.authType !== 'email' && formData.authType !== 'sso') || formData.emails.length > 0)
+    formData.authType !== 'sso' &&
+    (formData.authType !== 'email' || formData.emails.length > 0)
 
   useEffect(() => {
     onValidationChange?.(isFormValid)
@@ -697,8 +696,6 @@ function AuthSelector({
   error,
 }: AuthSelectorProps) {
   const revealPasswordMutation = useRevealChatPassword()
-  const { features } = useDeploymentShape()
-
   /**
    * Editing or regenerating the password clears a failed reveal. The mutation
    * only drops its error on the next attempt, so it would otherwise keep
@@ -712,11 +709,11 @@ function AuthSelector({
   const { config: permissionConfig } = usePermissionConfig()
   const allowedAuthTypes = permissionConfig.allowedChatDeployAuthTypes
 
-  const ssoAvailable =
-    features.sso || savedAuthType === 'sso' || (allowedAuthTypes?.includes('sso') ?? false)
-  const baseAuthOptions: AuthType[] = ssoAvailable
-    ? ['public', 'password', 'email', 'sso']
-    : ['public', 'password', 'email']
+  /** SSO access is retired; a chat still saved as `sso` shows it only so it can be switched away. */
+  const baseAuthOptions: AuthType[] =
+    savedAuthType === 'sso'
+      ? ['public', 'password', 'email', 'sso']
+      : ['public', 'password', 'email']
 
   const authOptions = baseAuthOptions.filter(
     (type) => allowedAuthTypes === null || allowedAuthTypes.includes(type) || type === savedAuthType

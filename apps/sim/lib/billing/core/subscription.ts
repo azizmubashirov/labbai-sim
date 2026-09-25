@@ -13,9 +13,7 @@ import type { DbOrTx } from '@/lib/db/types'
  * Plan and entitlement resolution.
  *
  * Labbai has no payments: every user, organization, and workspace resolves to a
- * single permissive plan, so every plan-gated feature is available. Features
- * that a deployment turns on explicitly (SSO, audit logs, whitelabeling, …) are
- * still decided by their own env flags through {@link isOrganizationFeatureEntitled}.
+ * single permissive plan, so every plan-gated feature is available.
  *
  * The `subscription` table stays in the schema; nothing writes it anymore.
  */
@@ -150,27 +148,6 @@ export async function isOrganizationGovernanceActive(
   _organizationId: string,
   _executor: DbOrTx = db
 ): Promise<boolean> {
-  return true
-}
-
-/**
- * Entitlement for a single org-scoped feature that a deployment turns on
- * explicitly. There is no plan to read, so the deployment configuration decides.
- *
- * Pass the matching flag from `@/lib/core/config/env-flags` as
- * `selfHostEntitlement`.
- */
-export async function isOrganizationFeatureEntitled(
-  _organizationId: string,
-  selfHostEntitlement: boolean,
-  _executor: DbOrTx = db,
-  _options: { onError?: EnterprisePlanErrorPolicy } = {}
-): Promise<boolean> {
-  return selfHostEntitlement
-}
-
-/** Every user may use SSO settings (still gated on the deployment's SSO setup). */
-export async function hasSSOAccess(_userId: string): Promise<boolean> {
   return true
 }
 

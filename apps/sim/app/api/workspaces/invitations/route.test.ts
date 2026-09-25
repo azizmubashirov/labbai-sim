@@ -96,7 +96,7 @@ vi.mock('@/lib/workspaces/utils', () => ({
   listAccessibleWorkspaceRowsForUser: mockListAccessibleWorkspaceRowsForUser,
 }))
 
-vi.mock('@/ee/access-control/utils/permission-check', () => ({
+vi.mock('@/lib/labbai/access-control/permission-check', () => ({
   validateInvitationsAllowed: mockValidateInvitationsAllowed,
   InvitationsNotAllowedError: class InvitationsNotAllowedError extends Error {},
 }))

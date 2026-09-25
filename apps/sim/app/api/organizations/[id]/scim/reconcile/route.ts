@@ -5,7 +5,7 @@ import {
   internalRateLimits,
   internalSessionAuth,
 } from '@/lib/api/server/routes'
-import { reconcileScimConnection } from '@/ee/scim/lib/application/admin/connection'
+import { reconcileScimConnection } from '@/lib/labbai/scim/application/admin/connection'
 
 /**
  * Re-applies every group mapping to every provisioned user.

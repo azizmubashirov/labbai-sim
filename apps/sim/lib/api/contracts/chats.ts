@@ -191,15 +191,6 @@ export const deployedChatPostBodySchema = z.object({
 })
 export type DeployedChatPostBody = z.input<typeof deployedChatPostBodySchema>
 
-export const chatSSOBodySchema = z.object({
-  email: z.string().email('Invalid email address'),
-})
-
-export const chatSSOResponseSchema = z.object({
-  eligible: z.boolean(),
-})
-export type ChatSSOResponse = z.output<typeof chatSSOResponseSchema>
-
 export const chatEmailOtpRequestBodySchema = z.object({
   email: z.string().email('Invalid email address'),
 })
@@ -269,17 +260,6 @@ export const deployedChatPostContract = defineRouteContract({
      * policies; both require the protocol header.
      */
     mode: 'stream',
-  },
-})
-
-export const chatSSOContract = defineRouteContract({
-  method: 'POST',
-  path: '/api/chat/[identifier]/sso',
-  params: chatIdentifierParamsSchema,
-  body: chatSSOBodySchema,
-  response: {
-    mode: 'json',
-    schema: chatSSOResponseSchema,
   },
 })
 

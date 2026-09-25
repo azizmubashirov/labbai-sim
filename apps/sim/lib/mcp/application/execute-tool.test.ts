@@ -29,7 +29,7 @@ vi.mock('@sim/platform-authz/workspace', () => ({
     actual === 'admin' || actual === required || (actual === 'write' && required === 'read'),
   resolveEffectiveWorkspacePermission: mocks.resolvePermission,
 }))
-vi.mock('@/ee/access-control/utils/permission-check', () => ({
+vi.mock('@/lib/labbai/access-control/permission-check', () => ({
   assertPermissionsAllowed: mocks.assertPermissionsAllowed,
   McpToolsNotAllowedError: class McpToolsNotAllowedError extends Error {},
 }))

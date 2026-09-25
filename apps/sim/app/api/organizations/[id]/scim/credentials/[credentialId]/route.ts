@@ -5,7 +5,7 @@ import {
   internalRateLimits,
   internalSessionAuth,
 } from '@/lib/api/server/routes'
-import { revokeScimCredential } from '@/ee/scim/lib/application/admin/credentials'
+import { revokeScimCredential } from '@/lib/labbai/scim/application/admin/credentials'
 
 export const DELETE = defineInternalJsonRoute({
   contract: revokeScimCredentialContract,

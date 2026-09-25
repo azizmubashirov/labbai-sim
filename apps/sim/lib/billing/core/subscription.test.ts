@@ -4,12 +4,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   getBillingInterval,
-  hasSSOAccess,
   hasWorkspaceLiveSyncAccess,
   hasWorkspaceSandboxRetentionAccess,
   isEnterpriseOrgAdminOrOwner,
   isEnterprisePlan,
-  isOrganizationFeatureEntitled,
   isOrganizationGovernanceActive,
   isOrganizationOnEnterprisePlan,
   isProPlan,
@@ -26,7 +24,6 @@ describe('plan resolution (no payments)', () => {
     await expect(isTeamPlan('user-1')).resolves.toBe(true)
     await expect(isEnterprisePlan('user-1')).resolves.toBe(true)
     await expect(isEnterpriseOrgAdminOrOwner('user-1')).resolves.toBe(true)
-    await expect(hasSSOAccess('user-1')).resolves.toBe(true)
   })
 
   it('grants every organization the permissive plan', async () => {
@@ -43,11 +40,6 @@ describe('plan resolution (no payments)', () => {
 
   it('never reads entitlement from a subscription row', () => {
     expect(isSubscriptionBackedEntitlement()).toBe(false)
-  })
-
-  it('lets deployment configuration decide explicitly enabled features', async () => {
-    await expect(isOrganizationFeatureEntitled('org-1', true)).resolves.toBe(true)
-    await expect(isOrganizationFeatureEntitled('org-1', false)).resolves.toBe(false)
   })
 
   it('resolves billing intervals from the column or metadata', () => {

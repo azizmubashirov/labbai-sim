@@ -11,7 +11,7 @@ vi.mock('next/navigation', () => ({ redirect }))
 vi.mock('@/lib/organizations/surface', () => ({
   getOrganizationSurfaceContext: organizationContext,
 }))
-vi.mock('@/ee/access-requests/components/access-requests-settings', () => ({
+vi.mock('@/components/access-requests/access-requests-settings', () => ({
   AccessRequestsSettings: () => null,
 }))
 vi.mock('@/lib/organizations/settings-access', () => ({
@@ -19,7 +19,7 @@ vi.mock('@/lib/organizations/settings-access', () => ({
 }))
 
 import AccessRequestsPage from '@/app/access-requests/page'
-import { AccessRequestsSettings } from '@/ee/access-requests/components/access-requests-settings'
+import { AccessRequestsSettings } from '@/components/access-requests/access-requests-settings'
 
 describe('access request sign-in redirect', () => {
   beforeEach(() => {

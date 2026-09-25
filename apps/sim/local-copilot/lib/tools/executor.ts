@@ -213,7 +213,7 @@ async function runLoadUserSkill(
   ctx: ToolExecutionContext
 ): Promise<ToolExecutionResult> {
   try {
-    const { assertPermissionsAllowed } = await import('@/ee/access-control/utils/permission-check')
+    const { assertPermissionsAllowed } = await import('@/lib/labbai/access-control/permission-check')
     await assertPermissionsAllowed({
       userId: ctx.userId,
       workspaceId: ctx.workspaceId,

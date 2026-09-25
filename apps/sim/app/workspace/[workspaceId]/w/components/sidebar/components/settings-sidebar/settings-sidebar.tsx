@@ -27,7 +27,6 @@ import { useSession } from '@/lib/auth/auth-client'
 import { getSubscriptionAccessState } from '@/lib/billing/client'
 import { useDeploymentShape } from '@/lib/core/config/deployment-shape'
 import { useWorkspaceHostContext } from '@/app/workspace/[workspaceId]/providers/workspace-host-provider'
-import { useUserPermissionsContext } from '@/app/workspace/[workspaceId]/providers/workspace-permissions-provider'
 import type { SettingsSection } from '@/app/workspace/[workspaceId]/settings/navigation'
 import {
   allNavigationItems,
@@ -43,9 +42,7 @@ import {
   SIDEBAR_RAIL_CHIP_CLASS,
   SIDEBAR_SECTION_GAP_CLASS,
 } from '@/app/workspace/[workspaceId]/w/components/sidebar/constants'
-import { useWorkspaceAccessRequestFeatures } from '@/ee/access-requests/components/permission-access-boundary'
-import { useSSOProviders } from '@/ee/sso/hooks/sso'
-import { useForkingAvailable } from '@/ee/workspace-forking/hooks/use-forking-available'
+import { useWorkspaceAccessRequestFeatures } from '@/components/access-requests/permission-access-boundary'
 import { useGeneralSettings } from '@/hooks/queries/general-settings'
 import { usePermissionConfig } from '@/hooks/use-permission-config'
 import { useSettingsNavigation } from '@/hooks/use-settings-navigation'
@@ -107,17 +104,10 @@ export function SettingsSidebar({
   const deployment = useDeploymentShape()
   const { hosted } = deployment
   const { data: generalSettings } = useGeneralSettings()
-  const { data: ssoProvidersData, isLoading: isLoadingSSO } = useSSOProviders({
-    enabled: !hosted,
-  })
 
   const { config: permissionConfig } = usePermissionConfig()
   const accessRequests = useWorkspaceAccessRequestFeatures()
   const accessRequestsEnabled = accessRequests.data?.enabled === true
-  const forkingAvailable = useForkingAvailable(workspaceId)
-  const { canAdmin: canAdminWorkspace } = useUserPermissionsContext()
-
-  const userId = session?.user?.id
 
   const isOrgAdminOrOwner = hostContext.viewer.isHostOrganizationAdmin
   const organizationSettingsId =
@@ -129,11 +119,6 @@ export function SettingsSidebar({
   const isEnterprisePlan = subscriptionAccess.isEnterprise
 
   const isSuperUser = session?.user?.role === 'admin'
-
-  const isSSOProviderOwner =
-    hosted || !userId || isLoadingSSO
-      ? null
-      : (ssoProvidersData?.providers?.some((provider) => provider.userId === userId) ?? false)
 
   const navigationItems = useMemo(() => {
     return allNavigationItems.filter((item) => {
@@ -183,12 +168,6 @@ export function SettingsSidebar({
       ) {
         return false
       }
-      if (item.id === 'forks' && !(forkingAvailable && canAdminWorkspace)) {
-        return false
-      }
-      if (item.id === 'custom-blocks' && !hostContext.hostOrganizationId) {
-        return false
-      }
 
       if (isSelfHostedOverrideEnabled(item.selfHostedOverride, deployment)) {
         /**
@@ -199,10 +178,6 @@ export function SettingsSidebar({
          */
         if (ORGANIZATION_PLANE_UNIFIED_SECTIONS.has(item.id) && !isOrgAdminOrOwner) {
           return false
-        }
-        if (item.id === 'sso') {
-          const hasProviders = (ssoProvidersData?.providers?.length ?? 0) > 0
-          return !hasProviders || isSSOProviderOwner === true
         }
         return true
       }
@@ -244,17 +219,12 @@ export function SettingsSidebar({
     isEnterprisePlan,
     subscriptionAccess.hasUsableMaxAccess,
     hostContext,
-    userId,
     isOrgAdminOrOwner,
     organizationSettingsId,
-    isSSOProviderOwner,
-    ssoProvidersData?.providers?.length,
     permissionConfig,
     accessRequestsEnabled,
     isSuperUser,
     generalSettings?.superUserModeEnabled,
-    forkingAvailable,
-    canAdminWorkspace,
   ])
 
   const segments = pathname?.split('/') ?? []

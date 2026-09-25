@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import {
   getAccessRequestsSettingsHref,
   getLegacyAccessRequestsSettingsQuery,
-} from '@/ee/access-requests/lib/navigation'
+} from '@/lib/labbai/access-requests/navigation'
 
 interface AccessRequestsPageProps {
   params: Promise<{ organizationId: string }>

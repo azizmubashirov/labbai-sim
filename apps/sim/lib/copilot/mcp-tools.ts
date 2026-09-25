@@ -7,7 +7,7 @@ import { discoverMcpServerToolsUseCase } from '@/lib/mcp/application/use-cases'
 import { resolveMcpToolBinding } from '@/lib/mcp/tool-binding'
 import type { McpTool, McpToolSchema } from '@/lib/mcp/types'
 import { createMcpToolId } from '@/lib/mcp/utils'
-import { assertPermissionsAllowed } from '@/ee/access-control/utils/permission-check'
+import { assertPermissionsAllowed } from '@/lib/labbai/access-control/permission-check'
 import type { ToolInput } from '@/executor/handlers/agent/types'
 
 function toMothershipMcpTool(tool: {

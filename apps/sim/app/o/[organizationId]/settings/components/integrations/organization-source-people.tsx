@@ -3,10 +3,10 @@
 import type { ComponentProps, ReactNode } from 'react'
 import { ChipSelect } from '@sim/emcn'
 import { useQueryState } from 'nuqs'
+import { OrganizationAccountPeople } from '@/components/settings/credential-groups/organization-account-people'
 import type { CredentialGroupOption } from '@/lib/api/contracts/credential-groups'
 import { getCredentialGroupIndexingConnector } from '@/lib/credential-groups/indexing'
 import { organizationPeopleIntegrationParam } from '@/app/o/[organizationId]/settings/components/integrations/search-params'
-import { OrganizationAccountPeople } from '@/ee/credential-groups/components/organization-account-people'
 
 interface OrganizationSourcePeopleProps
   extends Omit<ComponentProps<typeof OrganizationAccountPeople>, 'searchConnection' | 'filters'> {

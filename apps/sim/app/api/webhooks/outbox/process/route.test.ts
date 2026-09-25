@@ -38,7 +38,6 @@ describe('outbox cron route', () => {
   it('preserves the existing 200 response for synchronous self-hosted runs', async () => {
     const output = {
       result: { processed: 1, retried: 0, deadLettered: 0, leaseLost: 0, reaped: 0 },
-      reapedBackgroundWork: 0,
       recoveredDocuments: 0,
     }
     mocks.enqueue.mockResolvedValue({ backend: 'inline', output })

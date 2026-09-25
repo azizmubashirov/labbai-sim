@@ -6,23 +6,23 @@ import { type ParsedRequest, parseRequest } from '@/lib/api/server/validation'
 import type { ApplicationOperation, OperationUseCase } from '@/lib/core/application/operation'
 import { enforceIpRateLimit, RateLimiter } from '@/lib/core/rate-limiter'
 import { withRouteHandler } from '@/lib/core/utils/with-route-handler'
-import type { ScimConnectionAuthenticator } from '@/ee/scim/lib/authenticate'
-import { scimBaseUrl } from '@/ee/scim/lib/base-url'
-import { isScimDeploymentEnabled } from '@/ee/scim/lib/entitlement'
+import type { ScimConnectionAuthenticator } from '@/lib/labbai/scim/authenticate'
+import { scimBaseUrl } from '@/lib/labbai/scim/base-url'
+import { isScimDeploymentEnabled } from '@/lib/labbai/scim/entitlement'
 import {
   SCIM_ACCEPTED_MEDIA_TYPES,
   SCIM_MAX_BODY_BYTES,
   SCIM_MEDIA_TYPE,
   SCIM_RATE_LIMIT,
-} from '@/ee/scim/lib/protocol/constants'
+} from '@/lib/labbai/scim/protocol/constants'
 import {
   ScimError,
   type ScimErrorBody,
   type ScimType,
   scimErrorBody,
   toScimError,
-} from '@/ee/scim/lib/protocol/errors'
-import type { ScimRequestLogEntry } from '@/ee/scim/lib/request-log'
+} from '@/lib/labbai/scim/protocol/errors'
+import type { ScimRequestLogEntry } from '@/lib/labbai/scim/request-log'
 
 const logger = createLogger('ScimRoute')
 const rateLimiter = new RateLimiter()

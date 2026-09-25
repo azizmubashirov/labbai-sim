@@ -35,7 +35,7 @@ import {
 } from '@/app/workspace/[workspaceId]/w/[workflowId]/hooks/float'
 import { useCurrentWorkflow } from '@/app/workspace/[workspaceId]/w/[workflowId]/hooks/use-current-workflow'
 import { getBlock } from '@/blocks'
-import { useCustomBlockOverlayVersion } from '@/blocks/custom/client-overlay'
+import { useBlockVisibilityVersion } from '@/blocks/visibility/version'
 import { useMcpTools } from '@/hooks/mcp/use-mcp-tools'
 import { useWorkspaceCredentials } from '@/hooks/queries/credentials'
 import { useCustomTools } from '@/hooks/queries/custom-tools'
@@ -221,7 +221,7 @@ function WorkflowSearchReplacePanel({ focusRef }: WorkflowSearchReplacePanelProp
   )
 
   /** Overlay version invalidates getBlock-resolved tool names in the index. */
-  const customBlockOverlayVersion = useCustomBlockOverlayVersion()
+  const blockVisibilityVersion = useBlockVisibilityVersion()
   const matches = useMemo(
     () =>
       indexWorkflowSearchMatches({
@@ -241,7 +241,7 @@ function WorkflowSearchReplacePanel({ focusRef }: WorkflowSearchReplacePanelProp
     [
       currentWorkflow.isSnapshotView,
       credentialTypeById,
-      customBlockOverlayVersion,
+      blockVisibilityVersion,
       customTools,
       mcpToolNamesById,
       query,

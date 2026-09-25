@@ -14,7 +14,7 @@ const { request, validateModel } = vi.hoisted(() => ({
 }))
 
 vi.mock('@/executor/utils/provider-request', () => ({ executeBlockProviderRequest: request }))
-vi.mock('@/ee/access-control/utils/permission-check', () => ({
+vi.mock('@/lib/labbai/access-control/permission-check', () => ({
   validateModelProvider: validateModel,
 }))
 vi.mock('@/providers/utils', () => ({

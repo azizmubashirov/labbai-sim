@@ -25,23 +25,16 @@ describe('unified settings navigation', () => {
       { id: 'requests', label: 'Requests', section: 'workspace' },
       { id: 'access-control', label: 'Permission groups', section: 'organization' },
       { id: 'audit-logs', label: 'Audit logs', section: 'organization' },
-      { id: 'forks', label: 'Workspace forks', section: 'workspace' },
       { id: 'teammates', label: 'Teammates', section: 'workspace' },
       { id: 'organization', label: 'Members', section: 'organization' },
-      { id: 'usage', label: 'Insights', section: 'organization' },
       { id: 'secrets', label: 'Secrets', section: 'workspace' },
-      { id: 'connected-accounts', label: 'Credential Groups', section: 'organization' },
+      { id: 'connected-accounts', label: 'Credential groups', section: 'organization' },
       { id: 'custom-tools', label: 'Custom tools', section: 'workspace' },
       { id: 'mcp', label: 'MCP tools', section: 'workspace' },
       { id: 'apikeys', label: 'Sim API keys', section: 'workspace' },
       { id: 'workflow-mcp-servers', label: 'MCP servers', section: 'workspace' },
       { id: 'recently-deleted', label: 'Recently deleted', section: 'workspace' },
-      { id: 'sso', label: 'Single sign-on', section: 'organization' },
       { id: 'security', label: 'Security', section: 'organization' },
-      { id: 'data-retention', label: 'Data retention', section: 'organization' },
-      { id: 'data-drains', label: 'Data drains', section: 'organization' },
-      { id: 'whitelabeling', label: 'White-labeling', section: 'organization' },
-      { id: 'custom-blocks', label: 'Custom blocks', section: 'workspace' },
       { id: 'admin', label: 'Admin', section: 'platform' },
     ])
   })
@@ -58,8 +51,6 @@ describe('unified settings navigation', () => {
       'teammates',
       'secrets',
       'mcp',
-      'custom-blocks',
-      'forks',
       'custom-tools',
       'workflow-mcp-servers',
       'apikeys',
@@ -68,15 +59,10 @@ describe('unified settings navigation', () => {
     ])
     expect(idsForSection('organization')).toEqual([
       'organization',
-      'usage',
       'connected-accounts',
       'access-control',
       'audit-logs',
-      'whitelabeling',
-      'sso',
       'security',
-      'data-retention',
-      'data-drains',
     ])
     expect(idsForSection('platform')).toEqual(['admin'])
   })
@@ -93,12 +79,12 @@ describe('unified settings navigation', () => {
   })
 
   it('shares labels, icons, and docs links with plane projections', () => {
-    const unifiedForks = allNavigationItems.find(({ id }) => id === 'forks')
-    const workspaceForks = WORKSPACE_SETTINGS_ITEMS.find(({ id }) => id === 'forks')
+    const unifiedSecrets = allNavigationItems.find(({ id }) => id === 'secrets')
+    const workspaceSecrets = WORKSPACE_SETTINGS_ITEMS.find(({ id }) => id === 'secrets')
 
-    expect(workspaceForks?.label).toBe(unifiedForks?.label)
-    expect(workspaceForks?.icon).toBe(unifiedForks?.icon)
-    expect(workspaceForks?.docsLink).toBe(unifiedForks?.docsLink)
+    expect(workspaceSecrets?.label).toBe(unifiedSecrets?.label)
+    expect(workspaceSecrets?.icon).toBe(unifiedSecrets?.icon)
+    expect(workspaceSecrets?.docsLink).toBe(unifiedSecrets?.docsLink)
   })
 })
 
@@ -106,7 +92,6 @@ describe('resolveSettingsSection', () => {
   const LEGACY_SEGMENTS = {
     team: 'organization',
     'api-keys': 'apikeys',
-    domains: 'sso',
     sessions: 'security',
   } as const
 

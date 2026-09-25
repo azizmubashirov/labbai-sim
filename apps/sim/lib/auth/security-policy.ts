@@ -39,10 +39,9 @@ const versionCache = new LRUCache<string, number>({
 
 /**
  * Resolves the org's security-policy version — the shared monotonic counter
- * behind the Better Auth cookie-cache version. It backs ALL org security
- * policies (session policies today; IP allowlisting and MFA enforcement are
- * planned consumers): any feature that needs cached session cookies to
- * re-validate bumps this one counter.
+ * behind the Better Auth cookie-cache version. Any org security feature that
+ * needs cached session cookies to re-validate (organization-wide session
+ * revocation today) bumps this one counter.
  */
 export async function getSecurityPolicyVersion(
   organizationId: string | null | undefined,

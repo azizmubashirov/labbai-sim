@@ -18,7 +18,7 @@ vi.mock('@/blocks/visibility/context', () => ({
   overlayVisibility: () => null,
   isHiddenUnder: () => false,
 }))
-vi.mock('@/ee/access-control/hooks/permission-groups', () => ({
+vi.mock('@/hooks/queries/permission-groups', () => ({
   useUserPermissionConfig: mockUseUserPermissionConfig,
 }))
 vi.mock('@/app/workspace/[workspaceId]/providers/workspace-host-provider', () => ({

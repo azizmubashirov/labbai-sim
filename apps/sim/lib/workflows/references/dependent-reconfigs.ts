@@ -1,13 +1,13 @@
 import { isRecordLike, toRecord } from '@sim/utils/object'
-import type { ForkDependentReconfig, ForkResourceUsage } from '@/lib/api/contracts/workspace-fork'
 import { coerceObjectArray } from '@/lib/workflows/persistence/remap-internal-ids'
-import { toScannerBlocks } from '@/lib/workflows/references/reference-scan'
 import {
   createCanonicalModeGates,
   reconfigurableDependentIds,
-  scanWorkflowReferences,
 } from '@/lib/workflows/references/remap-references'
-import type { WorkflowBlockIdResolver } from '@/lib/workflows/references/types'
+import type {
+  ForkDependentReconfig,
+  WorkflowBlockIdResolver,
+} from '@/lib/workflows/references/types'
 import { getToolInputParamConfigs } from '@/lib/workflows/search-replace/indexer'
 import {
   buildSelectorContextFromBlock,
@@ -463,48 +463,4 @@ export function collectForkDependentReconfigs(
     }
   }
   return out
-}
-
-interface ResourceUsageItem {
-  sourceWorkflowId: string
-  targetWorkflowId: string
-  mode: 'create' | 'replace'
-  /** Source workflow name, shown as the (renamed-aware) target name in the listing. */
-  sourceMeta: { name: string }
-}
-
-/**
- * Every workflow each mapped resource (any kind) is used in - the spine of the always-on
- * reconfigure listing under a mapping entry. Scans each source workflow's references
- * (deduped per workflow, so a resource used by several blocks is one workflow usage) and
- * groups them by `(kind, sourceId)`. Unlike {@link collectForkDependentReconfigs} this is
- * NOT anchor-limited: it includes resources with no configurable dependent (env vars, files,
- * a Gmail block with no active label) so the modal can still list - greyed - the workflows
- * they appear in. Covers EVERY deployed source workflow - replace targets and creates
- * (never-synced workflows) alike - so the listing accounts for the full next sync.
- */
-export function collectForkResourceUsages(
-  items: ResourceUsageItem[],
-  sourceStates: Map<string, WorkflowState>
-): ForkResourceUsage[] {
-  const byResource = new Map<string, ForkResourceUsage>()
-  for (const item of items) {
-    const state = sourceStates.get(item.sourceWorkflowId)
-    if (!state) continue
-    // scanWorkflowReferences already dedups by `${kind}:${sourceId}` across the workflow,
-    // so each resource appears once per workflow here.
-    for (const reference of scanWorkflowReferences(toScannerBlocks(state), () => null).references) {
-      const key = `${reference.kind}\u0000${reference.sourceId}`
-      let usage = byResource.get(key)
-      if (!usage) {
-        usage = { parentKind: reference.kind, parentSourceId: reference.sourceId, workflows: [] }
-        byResource.set(key, usage)
-      }
-      usage.workflows.push({
-        workflowId: item.targetWorkflowId,
-        workflowName: item.sourceMeta.name,
-      })
-    }
-  }
-  return Array.from(byResource.values())
 }

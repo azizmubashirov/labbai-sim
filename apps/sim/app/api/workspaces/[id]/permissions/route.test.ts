@@ -26,7 +26,7 @@ const {
   mockAssertMembershipNotScimManaged: vi.fn(),
 }))
 
-vi.mock('@/ee/scim/lib/managed-membership', () => ({
+vi.mock('@/lib/labbai/scim/managed-membership', () => ({
   assertMembershipNotScimManaged: mockAssertMembershipNotScimManaged,
 }))
 

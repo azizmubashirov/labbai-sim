@@ -14,7 +14,7 @@ import {
 } from '@/lib/uploads/utils/user-file-base64.server'
 import { sanitizeInputFormat, sanitizeTools } from '@/lib/workflows/comparison/normalize'
 import { isCustomBlockType } from '@/blocks/custom/build-config'
-import { validateBlockType } from '@/ee/access-control/utils/permission-check'
+import { validateBlockType } from '@/lib/labbai/access-control/permission-check'
 import {
   BlockType,
   buildResumeApiUrl,

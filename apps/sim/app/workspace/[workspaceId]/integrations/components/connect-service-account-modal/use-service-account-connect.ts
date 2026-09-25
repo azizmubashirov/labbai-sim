@@ -18,8 +18,8 @@ import {
 import { SLACK_CUSTOM_BOT_PROVIDER_ID } from '@/lib/oauth/types'
 import type { ServiceAccountProviderId } from '@/app/workspace/[workspaceId]/integrations/components/connect-service-account-modal/connect-service-account-modal'
 import { getBlock } from '@/blocks'
-import { useCustomBlockOverlayVersion } from '@/blocks/custom/client-overlay'
 import { isHiddenUnder, overlayVisibility } from '@/blocks/visibility/context'
+import { useBlockVisibilityVersion } from '@/blocks/visibility/version'
 
 /**
  * Everything a caller needs to render a service-account connect control:
@@ -63,7 +63,7 @@ export function useServiceAccountConnectTarget({
   serviceName,
   serviceIcon,
 }: UseServiceAccountConnectTargetArgs): ServiceAccountConnectTarget | null {
-  const blockOverlayVersion = useCustomBlockOverlayVersion()
+  const blockVisibilityVersion = useBlockVisibilityVersion()
 
   const isSlackBot = serviceAccountProviderId === SLACK_CUSTOM_BOT_PROVIDER_ID
 
@@ -74,8 +74,8 @@ export function useServiceAccountConnectTarget({
     if (!gatingBlockType) return false
     const gatingBlock = getBlock(gatingBlockType)
     return !gatingBlock || isHiddenUnder(overlayVisibility(), gatingBlock)
-    // blockOverlayVersion is read to re-evaluate when the overlay changes.
-  }, [serviceAccountProviderId, blockOverlayVersion])
+    // blockVisibilityVersion is read to re-evaluate when the overlay changes.
+  }, [serviceAccountProviderId, blockVisibilityVersion])
 
   return useMemo(() => {
     if (!serviceAccountProviderId || !serviceName || !serviceIcon) return null

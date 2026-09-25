@@ -15,7 +15,6 @@ import {
 } from '@/app/workspace/[workspaceId]/prefetch'
 import { prefetchWorkspaceAccess } from '@/app/workspace/[workspaceId]/prefetch-access'
 import { BlockVisibilityLoader } from '@/app/workspace/[workspaceId]/providers/block-visibility-loader'
-import { CustomBlocksLoader } from '@/app/workspace/[workspaceId]/providers/custom-blocks-loader'
 import { FeatureFlagsProvider } from '@/app/workspace/[workspaceId]/providers/feature-flags-provider'
 import { GlobalCommandsProvider } from '@/app/workspace/[workspaceId]/providers/global-commands-provider'
 import { SettingsLoader } from '@/app/workspace/[workspaceId]/providers/settings-loader'
@@ -23,8 +22,6 @@ import { WorkspaceHostProvider } from '@/app/workspace/[workspaceId]/providers/w
 import { WorkspacePermissionsProvider } from '@/app/workspace/[workspaceId]/providers/workspace-permissions-provider'
 import { WorkspaceScopeSync } from '@/app/workspace/[workspaceId]/providers/workspace-scope-sync'
 import { Sidebar } from '@/app/workspace/[workspaceId]/w/components/sidebar/sidebar'
-import { BrandingProvider } from '@/ee/whitelabeling/components/branding-provider'
-import { getOrgWhitelabelSettings } from '@/ee/whitelabeling/org-branding'
 
 export default async function WorkspaceLayout({
   children,
@@ -46,11 +43,8 @@ export default async function WorkspaceLayout({
   }
 
   const activeOrganizationId = getActiveOrganizationId(session)
-  const [cookieStore, initialOrgSettings, , tableRowTtlEnabled] = await Promise.all([
+  const [cookieStore, , tableRowTtlEnabled] = await Promise.all([
     cookies(),
-    hostContext.hostOrganizationId
-      ? getOrgWhitelabelSettings(hostContext.hostOrganizationId)
-      : Promise.resolve(null),
     prefetchWorkspaceSidebar(
       queryClient,
       workspaceId,
@@ -71,30 +65,23 @@ export default async function WorkspaceLayout({
     <HydrationBoundary state={dehydrate(queryClient)}>
       <FeatureFlagsProvider flags={{ 'table-row-ttl': tableRowTtlEnabled }}>
         <WorkspaceHostProvider workspaceId={workspaceId} initialContext={hostContext}>
-          <BrandingProvider
-            hostOrganizationId={hostContext.hostOrganizationId}
-            viewerIsHostOrganizationMember={hostContext.viewer.isHostOrganizationMember}
-            initialOrgSettings={initialOrgSettings}
-          >
-            <SettingsLoader />
-            <CustomBlocksLoader />
-            <BlockVisibilityLoader />
-            <GlobalCommandsProvider>
-              <div className='flex h-screen w-full flex-col overflow-hidden bg-[var(--surface-1)]'>
-                <ImpersonationBanner />
-                <SessionExpired />
-                <WorkspacePermissionsProvider>
-                  <WorkspaceScopeSync />
-                  <WorkspaceChrome
-                    sidebar={<Sidebar />}
-                    initialSidebarCollapsed={initialSidebarCollapsed}
-                  >
-                    {children}
-                  </WorkspaceChrome>
-                </WorkspacePermissionsProvider>
-              </div>
-            </GlobalCommandsProvider>
-          </BrandingProvider>
+          <SettingsLoader />
+          <BlockVisibilityLoader />
+          <GlobalCommandsProvider>
+            <div className='flex h-screen w-full flex-col overflow-hidden bg-[var(--surface-1)]'>
+              <ImpersonationBanner />
+              <SessionExpired />
+              <WorkspacePermissionsProvider>
+                <WorkspaceScopeSync />
+                <WorkspaceChrome
+                  sidebar={<Sidebar />}
+                  initialSidebarCollapsed={initialSidebarCollapsed}
+                >
+                  {children}
+                </WorkspaceChrome>
+              </WorkspacePermissionsProvider>
+            </div>
+          </GlobalCommandsProvider>
         </WorkspaceHostProvider>
       </FeatureFlagsProvider>
     </HydrationBoundary>

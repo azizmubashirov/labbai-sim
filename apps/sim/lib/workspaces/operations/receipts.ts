@@ -6,8 +6,6 @@ import { and, eq, sql } from 'drizzle-orm'
 import { OrchestrationError } from '@/lib/core/orchestration/types'
 import type { DbOrTx } from '@/lib/db/types'
 import type { DeploymentOperationStatus } from '@/lib/workflows/deployment-lifecycle'
-import type { CreateForkResult } from '@/ee/workspace-forking/lib/create-fork'
-import type { PromoteForkResult } from '@/ee/workspace-forking/lib/promote/promote'
 
 export type WorkspaceOperationKind =
   | 'workflow_import'
@@ -41,7 +39,6 @@ export interface WorkspaceOperationReport {
   idMap?: Record<string, string>
   deploymentOperationIds?: string[]
   effectEventIds?: string[]
-  triggerUrlChanges?: PromoteForkResult['triggerUrlChanges']
   completionRecorded?: boolean
   deployments?: Array<{
     operationId: string
@@ -54,8 +51,6 @@ export interface WorkspaceOperationReport {
   backgroundWorkId?: string
   contentOutboxEventId?: string
   copyProgress?: { status: 'pending' | 'completed' | 'failed'; copied: number; failed: number }
-  forkResult?: Omit<CreateForkResult, 'operation' | 'replayed'>
-  syncResult?: Omit<PromoteForkResult, 'operation' | 'replayed'>
   importedWorkflow?: {
     id: string
     name: string

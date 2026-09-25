@@ -50,7 +50,7 @@ vi.mock('@/lib/invitations/workspace-invitations', () => ({
     }
   },
 }))
-vi.mock('@/ee/access-control/utils/permission-check', () => ({
+vi.mock('@/lib/labbai/access-control/permission-check', () => ({
   InvitationsNotAllowedError: class extends Error {},
 }))
 

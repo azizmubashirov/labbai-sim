@@ -36,7 +36,7 @@ vi.mock('@/lib/workspaces/permissions/utils', () => ({
 vi.mock('@/executor/utils/resolved-secret-content-projection', () => ({
   projectResolvedSecretModelContent: vi.fn(),
 }))
-vi.mock('@/ee/access-control/utils/permission-check', () => ({
+vi.mock('@/lib/labbai/access-control/permission-check', () => ({
   assertPermissionsAllowed: mocks.assertPermissionsAllowed,
   IntegrationNotAllowedError: class IntegrationNotAllowedError extends Error {},
   ModelNotAllowedError: class ModelNotAllowedError extends Error {},

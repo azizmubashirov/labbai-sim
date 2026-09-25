@@ -231,21 +231,13 @@ export const workspaceOwnerBillingSchema = z.object({
 export type WorkspaceOwnerBilling = z.output<typeof workspaceOwnerBillingSchema>
 
 /**
- * Enterprise features as this deployment's configuration resolves them (see
- * `enterpriseFeatureEnabled` in `@/lib/core/config/env-flags`). The browser consults
- * these only off-hosted, where no subscription plan exists to decide entitlement.
+ * Governance features this deployment offers. Labbai always enables them; the
+ * record stays so client code reads one server-resolved shape.
  */
 export const deploymentFeaturesSchema = z.object({
   accessControl: z.boolean(),
   auditLogs: z.boolean(),
-  customBlocks: z.boolean(),
-  dataDrains: z.boolean(),
-  dataRetention: z.boolean(),
   scim: z.boolean(),
-  sessionPolicies: z.boolean(),
-  sso: z.boolean(),
-  usageMonitoring: z.boolean(),
-  whitelabeling: z.boolean(),
 })
 
 export type DeploymentFeatures = z.output<typeof deploymentFeaturesSchema>

@@ -19,7 +19,7 @@ import type { McpTool, McpToolCall, McpToolResult } from '@/lib/mcp/types'
 import {
   assertPermissionsAllowed,
   McpToolsNotAllowedError,
-} from '@/ee/access-control/utils/permission-check'
+} from '@/lib/labbai/access-control/permission-check'
 import type { ResolvedSecretTraceProvenanceV1 } from '@/executor/utils/resolved-secret-trace-registry'
 
 const logger = createLogger('McpToolExecution')

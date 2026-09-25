@@ -11,7 +11,7 @@ import { OrchestrationError } from '@/lib/core/orchestration/types'
 import { requireMemberManagementAuthority } from '@/lib/organizations/members/authority'
 import { changeMemberRoleTx } from '@/lib/organizations/members/lifecycle'
 import { findOrganizationMemberRecord } from '@/lib/organizations/queries'
-import { assertMembershipNotScimManaged } from '@/ee/scim/lib/managed-membership'
+import { assertMembershipNotScimManaged } from '@/lib/labbai/scim/managed-membership'
 
 export async function updateOrganizationMemberRecord(input: {
   organizationId: string

@@ -29,7 +29,6 @@ import {
   invalidateMembershipCache,
   invalidateSecurityPolicyVersionCache,
 } from '@/lib/auth/security-policy'
-import { applySessionPolicyToNewMember } from '@/lib/auth/session-policy'
 import { acquireUserBillingIdentityLock } from '@/lib/billing/organizations/billing-identity-lock'
 import { setOrgMemberUsageLimit } from '@/lib/billing/organizations/member-limits'
 import { changeOrganizationWorkspaceBilledAccountsInTx } from '@/lib/billing/storage/payer-transfer'
@@ -50,7 +49,7 @@ import {
   reassignWorkflowOwnershipForWorkspaceMemberRemovalTx,
   WorkspaceBillingAccountRemovalError,
 } from '@/lib/workspaces/utils'
-import { endDirectoryMembershipTx } from '@/ee/scim/lib/identity/end-directory-membership'
+import { endDirectoryMembershipTx } from '@/lib/labbai/scim/identity/end-directory-membership'
 
 export { acquireUserBillingIdentityLock } from '@/lib/billing/organizations/billing-identity-lock'
 export { WORKSPACE_BILLING_ACCOUNT_REMOVAL_ERROR } from '@/lib/workspaces/utils'
@@ -739,9 +738,8 @@ export async function transferUserBetweenOrganizations(
       }
     )
     // The transferred member's fallbacks must resolve to the destination org
-    // immediately, and their sessions clamp to its policy — same treatment as
-    // invite acceptance. Best-effort.
-    await applySessionPolicyToNewMember(params.userId, params.destinationOrganizationId)
+    // immediately — same treatment as invite acceptance.
+    invalidateMembershipCache(params.userId)
     return transferResult
   } catch (error) {
     logger.error('Failed to transfer organization member', { ...params, error })
@@ -1442,9 +1440,9 @@ export async function ensureUserInOrganization(
   const result = await addUserToOrganization(params)
 
   if (result.success) {
-    // Invalidates the membership cache and clamps pre-join sessions to the
-    // org policy — same treatment as invite acceptance. Best-effort.
-    await applySessionPolicyToNewMember(params.userId, params.organizationId)
+    // The new member's cached org membership must resolve to this org
+    // immediately — same treatment as invite acceptance.
+    invalidateMembershipCache(params.userId)
   }
 
   return {

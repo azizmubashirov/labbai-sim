@@ -59,22 +59,17 @@ const ENTERPRISE_GATED_SECTION_LABELS: Record<OrganizationSettingsSection, strin
   'search-mcp': null,
   'connected-accounts': 'organization connected accounts',
   members: null,
-  usage: 'organization usage monitoring',
   'access-control': 'permission groups',
   requests: null,
   'audit-logs': 'audit logs',
-  sso: 'SSO settings and domains',
-  security: 'session policies, organization session revocation, and outbound IP settings',
-  'data-retention': 'data retention policies',
-  'data-drains': 'data drains',
-  whitelabeling: 'whitelabel branding',
+  security: 'SCIM provisioning and outbound IP settings',
 }
 
 /**
  * Enterprise-gated capabilities that are not organization settings sections,
  * and so cannot be derived from the section union above.
  */
-const ENTERPRISE_GATED_NON_SECTION_CAPABILITIES = ['workspace forking', 'custom blocks'] as const
+const ENTERPRISE_GATED_NON_SECTION_CAPABILITIES = ['custom blocks'] as const
 
 /** Capabilities gated on the owning organization holding an Enterprise plan. */
 const ENTERPRISE_GATED_CAPABILITIES: readonly string[] = [
@@ -416,7 +411,7 @@ export async function resolveMoveEntitlements(
    * That helper is really "on a paid organization plan" — `isOrgPlan = isTeam
    * || isEnterprise` — so it reports a Team destination as entitled. The API
    * gates it backs do accept Team, but the surfaces a user actually reaches do
-   * not: whitelabeling, SSO settings and access control each gate on
+   * not: access control and audit logs each gate on
    * `isEnterprise` directly. An Enterprise → Team move therefore does lose
    * capability, and a downgrade blocker built on the looser predicate would
    * wave exactly that case through.
@@ -625,28 +620,4 @@ export async function cleanupSourceOrganizationArtifactsTx(
   }
 
   return { detachedPermissionGroupIds: detached.map((row) => row.permissionGroupId) }
-}
-
-/** True when the two organizations present different whitelabel branding. */
-export async function willBrandingChange(
-  sourceOrganizationId: string,
-  destinationOrganizationId: string,
-  executor: DbOrTx = db
-): Promise<boolean> {
-  const rows = await executor
-    .select({ id: organization.id, whitelabelSettings: organization.whitelabelSettings })
-    .from(organization)
-    .where(inArray(organization.id, [sourceOrganizationId, destinationOrganizationId]))
-
-  /** An absent settings object and an empty one both mean default branding. */
-  const normalize = (settings: unknown): string => {
-    if (!settings || typeof settings !== 'object') return ''
-    const entries = Object.entries(settings as Record<string, unknown>)
-      .filter(([, value]) => value !== null && value !== undefined && value !== '')
-      .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
-    return entries.length === 0 ? '' : JSON.stringify(entries)
-  }
-  const source = rows.find((row) => row.id === sourceOrganizationId)?.whitelabelSettings
-  const destination = rows.find((row) => row.id === destinationOrganizationId)?.whitelabelSettings
-  return normalize(source) !== normalize(destination)
 }

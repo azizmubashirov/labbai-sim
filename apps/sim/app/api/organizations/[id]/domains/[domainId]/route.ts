@@ -9,7 +9,6 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { removeOrganizationDomainContract } from '@/lib/api/contracts/organization'
 import { parseRequest } from '@/lib/api/server'
 import { getSession } from '@/lib/auth'
-import { invalidateSsoPolicyCache } from '@/lib/auth/sso-policy'
 import { withRouteHandler } from '@/lib/core/utils/with-route-handler'
 
 const logger = createLogger('OrgDomainDeleteAPI')
@@ -81,9 +80,6 @@ export const DELETE = withRouteHandler(
     if (!removed) {
       return NextResponse.json({ error: 'Domain not found' }, { status: 404 })
     }
-
-    /** Providers on the removed domain no longer satisfy the sign-in requirement. */
-    invalidateSsoPolicyCache(organizationId)
 
     logger.info('Domain removed', { organizationId, domain: removed.domain })
     recordAudit({

@@ -11,7 +11,7 @@ import { InvitationNotPendingError } from '@/lib/invitations/errors'
 import { WorkspaceInvitationError } from '@/lib/invitations/workspace-invitations'
 import { CAPABILITY_RULES, capabilityRefusal } from '@/lib/permission-groups/capabilities'
 import { v2CaughtOrchestrationError, v2Error } from '@/app/api/v2/lib/response'
-import { InvitationsNotAllowedError } from '@/ee/access-control/utils/permission-check'
+import { InvitationsNotAllowedError } from '@/lib/labbai/access-control/permission-check'
 
 export const internalOrganizationErrorPolicy = extendInternalErrorPolicy(
   internalOrchestrationErrorPolicy,

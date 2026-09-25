@@ -103,7 +103,6 @@ import {
   serializeTriggerSchema,
   serializeVersions,
   serializeWorkflowMeta,
-  serializeWorkspaceForks,
 } from '@/lib/copilot/vfs/serializers'
 import type { BlockVisibilityState } from '@/lib/core/config/block-visibility'
 import {
@@ -198,11 +197,7 @@ import { BLOCK_REGISTRY } from '@/blocks/registry-maps'
 import type { BlockConfig, BlockIcon } from '@/blocks/types'
 import { isHiddenUnder, overlayVisibility } from '@/blocks/visibility/context'
 import { CONNECTOR_REGISTRY } from '@/connectors/registry.server'
-import { resolveVerifiedUserAccessControlContext } from '@/ee/access-control/utils/permission-check'
-import { isForkingAvailableForWorkspace } from '@/ee/workspace-forking/lib/lineage/authz'
-import { getForkChildren, getForkParent } from '@/ee/workspace-forking/lib/lineage/lineage'
-import { loadForkBlockMap } from '@/ee/workspace-forking/lib/mapping/block-map-store'
-import { getEdgeMappingRows } from '@/ee/workspace-forking/lib/mapping/mapping-store'
+import { resolveVerifiedUserAccessControlContext } from '@/lib/labbai/access-control/permission-check'
 import type { ExecutableToolConfig } from '@/tools/types'
 import { TRIGGER_REGISTRY } from '@/triggers/registry'
 
@@ -686,7 +681,6 @@ function getStaticComponentFiles(): Map<string, string> {
  *   organization/organization.json                   (org standing; only when org-hosted)
  *   organization/access-control.json                 (your governing group + restrictions)
  *   organization/custom-blocks.json                  (org-published block provenance)
- *   organization/forks.json                          (fork topology; workspace admins only)
  *   environment/credentials.json
  *   environment/api-keys.json
  *   environment/variables.json
@@ -2515,10 +2509,6 @@ export class WorkspaceVFS {
       ])
 
       const current = rows.find((row) => row.workspace.id === workspaceId)
-      const parentId = current?.workspace.forkedFromWorkspaceId ?? null
-      // Name the parent only when the viewer can reach it; otherwise the id
-      // stands alone rather than leaking a workspace name they cannot open.
-      const parentRow = parentId ? rows.find((row) => row.workspace.id === parentId) : undefined
       const isAdmin = hostContext?.viewer.permission === 'admin'
 
       this.files.set(
@@ -2536,9 +2526,6 @@ export class WorkspaceVFS {
           organization: hostContext?.hostOrganizationId
             ? { id: hostContext.hostOrganizationId }
             : null,
-          forkedFrom: parentId
-            ? { id: parentId, name: parentRow?.workspace.name ?? parentId }
-            : null,
           entitlements,
         })
       )
@@ -2551,7 +2538,6 @@ export class WorkspaceVFS {
             name: row.workspace.name,
             role: row.permissionType,
             organizationId: row.workspace.organizationId,
-            forkedFromWorkspaceId: row.workspace.forkedFromWorkspaceId,
             isCurrent: row.workspace.id === workspaceId,
           }))
         )
@@ -2612,13 +2598,10 @@ export class WorkspaceVFS {
 
   /**
    * Materialize `organization/` — org standing, the access-control rules that
-   * actually bind this viewer, org-published block provenance, and fork
-   * topology.
+   * actually bind this viewer, and org-published block provenance.
    *
    * The namespace exists only when the workspace belongs to an organization, so
-   * its absence is itself the answer for a personal workspace. Fork detail is
-   * mounted only for a workspace admin of a forking-enabled org, matching the
-   * gate the fork routes apply.
+   * its absence is itself the answer for a personal workspace.
    */
   private async materializeOrganization(
     workspaceId: string,
@@ -2723,15 +2706,11 @@ export class WorkspaceVFS {
               listAccessibleWorkspaceRowsForUser(userId).catch(() => []),
             ])
             const accessibleIds = new Set(accessible.map((row) => row.workspace.id))
-            const forkParents = new Map(
-              accessible.map((row) => [row.workspace.id, row.workspace.forkedFromWorkspaceId])
-            )
             return serializeOrganizationWorkspaces(
               refs.map((ref) => ({
                 id: ref.id,
                 name: ref.name,
                 hasAccess: accessibleIds.has(ref.id),
-                forkedFromWorkspaceId: forkParents.get(ref.id) ?? null,
               }))
             )
           } catch (err) {
@@ -2762,64 +2741,16 @@ export class WorkspaceVFS {
 
       const connectedAccountsAvailable = this.materializeConnectedAccounts(hostContext)
 
-      const forksAvailable =
-        hostContext.viewer.permission === 'admin' &&
-        (await isForkingAvailableForWorkspace(organizationId, userId).catch(() => false))
-
       this.files.set(
         'organization/README.md',
         buildOrganizationReadme({
           organizationId,
           isEnterprise: hostContext.ownerBilling.isEnterprise,
           customBlocks: orgBlocks,
-          forksMounted: forksAvailable,
           permissionGroupsMounted: hostContext.viewer.isHostOrganizationAdmin,
           connectedAccountsMounted: connectedAccountsAvailable,
         })
       )
-
-      if (!forksAvailable) return
-
-      this.registerLazy('organization/forks.json', async () => {
-        try {
-          const [parent, children] = await Promise.all([
-            getForkParent(workspaceId),
-            getForkChildren(workspaceId),
-          ])
-          if (!parent && children.length === 0) return null
-
-          const resourceMappingCounts: Record<string, number> = {}
-          let blockMappingCount = 0
-          if (parent) {
-            const [resourceRows, blockMap] = await Promise.all([
-              getEdgeMappingRows(db, workspaceId),
-              loadForkBlockMap(db, workspaceId),
-            ])
-            for (const row of resourceRows) {
-              resourceMappingCounts[row.resourceType] =
-                (resourceMappingCounts[row.resourceType] ?? 0) + 1
-            }
-            blockMappingCount = blockMap.parentToChild.size
-          }
-
-          return serializeWorkspaceForks({
-            parent: parent ? { id: parent.id, name: parent.name } : null,
-            children: children.map((child) => ({
-              id: child.id,
-              name: child.name,
-              createdAt: child.createdAt,
-            })),
-            resourceMappingCounts,
-            blockMappingCount,
-          })
-        } catch (err) {
-          logger.warn('Failed to load fork topology', {
-            workspaceId,
-            error: toError(err).message,
-          })
-          return null
-        }
-      })
     } catch (err) {
       logger.warn('Failed to materialize organization namespace', {
         workspaceId,

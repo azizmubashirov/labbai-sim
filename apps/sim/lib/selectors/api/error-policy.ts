@@ -5,7 +5,7 @@ import {
   SelectorOptionsUnavailableError,
 } from '@/lib/selectors/server/errors'
 import { v2CaughtOrchestrationError, v2Error } from '@/app/api/v2/lib/response'
-import { IntegrationNotAllowedError } from '@/ee/access-control/utils/permission-check'
+import { IntegrationNotAllowedError } from '@/lib/labbai/access-control/permission-check'
 
 export const v2SelectorErrorPolicy = createV2ResourceConcealmentPolicy({
   notFoundMessage: 'Selector scope not found',

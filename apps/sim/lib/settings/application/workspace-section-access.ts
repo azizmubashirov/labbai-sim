@@ -16,11 +16,9 @@ import type { BooleanPermissionGroupConfigKey } from '@/lib/permission-groups/fe
 import { isOrganizationPermissionRegimeActive } from '@/lib/permission-groups/resolve.server'
 import { isPlatformAdmin } from '@/lib/permissions/super-user'
 import { authorizeOrganizationSettingsSection } from '@/lib/settings/application/organization-section-access'
-import { isCustomBlocksEligibleForOrganization } from '@/lib/workflows/custom-blocks/operations'
 import { checkWorkspaceAccess } from '@/lib/workspaces/permissions/utils'
-import { resolveVerifiedUserAccessControlContext } from '@/ee/access-control/utils/permission-check'
-import { isAccessRequestEnabled } from '@/ee/access-requests/lib/settings'
-import { isForkingAvailableForWorkspace } from '@/ee/workspace-forking/lib/lineage/authz'
+import { resolveVerifiedUserAccessControlContext } from '@/lib/labbai/access-control/permission-check'
+import { isAccessRequestEnabled } from '@/lib/labbai/access-requests/settings'
 
 export type WorkspaceSettingsSectionAccess =
   | { allowed: true }
@@ -44,31 +42,19 @@ async function authorizeWorkspaceSection(
   if (section === 'requests' && !workspace.organizationId) {
     return { allowed: false, disposition: 'redirect-general' }
   }
-  const [accessControl, forksAvailable, customBlocksAvailable] = await Promise.all([
-    workspaceSectionUsesPermissionConfig(section)
-      ? resolveVerifiedUserAccessControlContext(
-          input.userId,
-          input.workspaceId,
-          workspace.organizationId
-        )
-      : null,
-    section === 'forks'
-      ? isForkingAvailableForWorkspace(workspace.organizationId, input.userId)
-      : false,
-    section === 'custom-blocks' && workspace.organizationId
-      ? isCustomBlocksEligibleForOrganization(workspace.organizationId)
-      : false,
-  ])
+  const accessControl = workspaceSectionUsesPermissionConfig(section)
+    ? await resolveVerifiedUserAccessControlContext(
+        input.userId,
+        input.workspaceId,
+        workspace.organizationId
+      )
+    : null
 
   const deployment = getDeploymentShape()
   const navigationOptions = {
     permission,
     permissionConfig: accessControl?.config ?? {},
     deployment,
-    entitlements: {
-      customBlocks: customBlocksAvailable,
-      forks: forksAvailable,
-    },
   }
   if (resolveWorkspaceNavigation(navigationOptions).some((item) => item.id === section)) {
     return { allowed: true }

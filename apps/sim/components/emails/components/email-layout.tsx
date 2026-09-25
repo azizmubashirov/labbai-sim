@@ -1,9 +1,9 @@
 import { Body, Container, Font, Head, Html, Img, Preview, Section } from '@react-email/components'
 import { baseStyles } from '@/components/emails/_styles'
 import { EmailFooter } from '@/components/emails/components/email-footer'
+import { getBrandConfig } from '@/lib/branding'
 import { EMAIL_WORDMARK_SIZE } from '@/lib/branding/wordmark'
 import { getBaseUrl } from '@/lib/core/utils/urls'
-import { getBrandConfig } from '@/ee/whitelabeling'
 
 /**
  * Sim's own wordmark: a committed raster export of the brand outlines in

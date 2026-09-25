@@ -6,7 +6,7 @@ import { vi } from 'vitest'
  * `mockResolvePermissionGroupConfig` is the one seam every capability gate reads
  * — `assertWorkspaceCapability`, `isWorkspaceCapabilityWithheld`, and the
  * authorization funnel all resolve the governing config through it. Mock this
- * rather than `@/ee/access-control/utils/permission-check`, which sits a layer
+ * rather than `@/lib/labbai/access-control/permission-check`, which sits a layer
  * below the memo and is not what the gates call.
  *
  * Resolve `null` for the ungoverned case (a personal workspace, or any

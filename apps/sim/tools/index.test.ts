@@ -108,7 +108,7 @@ vi.mock('@/lib/core/security/encryption', () => ({
   encryptSecret: encryptionMockFns.mockEncryptSecret,
 }))
 
-vi.mock('@/ee/access-control/utils/permission-check', () => ({
+vi.mock('@/lib/labbai/access-control/permission-check', () => ({
   assertPermissionsAllowed: mockAssertPermissionsAllowed,
   validateBlockType: vi.fn().mockResolvedValue(undefined),
   validateModelProvider: vi.fn().mockResolvedValue(undefined),

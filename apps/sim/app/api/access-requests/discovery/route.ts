@@ -5,8 +5,8 @@ import {
   internalRateLimits,
   internalSessionAuth,
 } from '@/lib/api/server/routes'
-import { accessRequestOperations } from '@/ee/access-requests/lib/application/operations'
-import { discoverAccessRequests } from '@/ee/access-requests/lib/application/requests'
+import { accessRequestOperations } from '@/lib/labbai/access-requests/application/operations'
+import { discoverAccessRequests } from '@/lib/labbai/access-requests/application/requests'
 
 export const GET = defineInternalJsonRoute({
   contract: discoverAccessRequestsContract,

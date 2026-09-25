@@ -1,23 +1,16 @@
 import type { ComponentType } from 'react'
 import {
-  ChartColumn,
   ClipboardList,
-  Database,
   GridOffset,
-  HexSimple,
   Integration,
   Key,
   ListChecks,
   Lock,
-  LogIn,
-  Palette,
   Server,
   Settings,
   ShieldCheck,
-  Shuffle,
   TerminalWindow,
   Trash,
-  Upload,
   Users,
   Wrench,
 } from '@sim/emcn/icons'
@@ -37,15 +30,10 @@ export type OrganizationSettingsSection =
   | 'connected-accounts'
   | 'search-mcp'
   | 'members'
-  | 'usage'
   | 'access-control'
   | 'requests'
   | 'audit-logs'
-  | 'sso'
   | 'security'
-  | 'data-retention'
-  | 'data-drains'
-  | 'whitelabeling'
 
 export type WorkspaceSettingsSection =
   | 'requests'
@@ -56,8 +44,6 @@ export type WorkspaceSettingsSection =
   | 'workflow-mcp-servers'
   | 'api-keys'
   | 'recently-deleted'
-  | 'forks'
-  | 'custom-blocks'
 
 export type SettingsSection =
   | AccountSettingsSection
@@ -79,22 +65,15 @@ export type UnifiedSettingsSection =
   | 'secrets'
   | 'access-control'
   | 'requests'
-  | 'custom-blocks'
   | 'audit-logs'
   | 'apikeys'
   | 'teammates'
   | 'organization'
-  | 'usage'
-  | 'sso'
-  | 'whitelabeling'
-  | 'forks'
   | 'mcp'
   | 'custom-tools'
   | 'workflow-mcp-servers'
   | 'admin'
   | 'security'
-  | 'data-retention'
-  | 'data-drains'
   | 'recently-deleted'
 
 export type UnifiedNavigationSection = 'account' | 'workspace' | 'organization' | 'platform'
@@ -313,45 +292,23 @@ export const SETTINGS_SECTION_REGISTRY: readonly SettingsSectionRegistryEntry[] 
   {
     label: 'Permission groups',
     icon: ShieldCheck,
-    docsLink: 'https://docs.sim.ai/platform/enterprise/access-control',
     unified: {
       id: 'access-control',
       description: 'Manage permission groups across your organization.',
       group: 'organization',
       order: 4,
-      requiresHosted: true,
-      requiresEnterprise: true,
-      selfHostedOverride: 'accessControl',
       organizationSection: 'access-control',
     },
   },
   {
     label: 'Audit logs',
     icon: ClipboardList,
-    docsLink: 'https://docs.sim.ai/platform/enterprise/audit-logs',
     unified: {
       id: 'audit-logs',
       description: 'Review activity and changes across your organization.',
       group: 'organization',
       order: 5,
-      requiresHosted: true,
-      requiresEnterprise: true,
-      selfHostedOverride: 'auditLogs',
       organizationSection: 'audit-logs',
-    },
-  },
-  {
-    label: 'Workspace forks',
-    icon: Shuffle,
-    docsLink: 'https://docs.sim.ai/platform/enterprise/forks',
-    unified: {
-      id: 'forks',
-      description: 'Fork this workspace and sync changes with its parent.',
-      group: 'workspace',
-      order: 3,
-    },
-    planes: {
-      workspace: { id: 'forks', group: 'enterprise', order: 10 },
     },
   },
   {
@@ -379,21 +336,6 @@ export const SETTINGS_SECTION_REGISTRY: readonly SettingsSectionRegistryEntry[] 
     },
   },
   {
-    label: 'Insights',
-    icon: ChartColumn,
-    unified: {
-      id: 'usage',
-      description: 'Explore usage and activity across your organization.',
-      group: 'organization',
-      order: 1,
-      /** Hosted deployments require the plan; self-hosted deployments require the feature flag. */
-      requiresHosted: true,
-      requiresEnterprise: true,
-      selfHostedOverride: 'usageMonitoring',
-      organizationSection: 'usage',
-    },
-  },
-  {
     label: 'Secrets',
     icon: Key,
     unified: {
@@ -407,7 +349,7 @@ export const SETTINGS_SECTION_REGISTRY: readonly SettingsSectionRegistryEntry[] 
     },
   },
   {
-    label: 'Credential Groups',
+    label: 'Credential groups',
     icon: GridOffset,
     unified: {
       id: 'connected-accounts',
@@ -494,97 +436,14 @@ export const SETTINGS_SECTION_REGISTRY: readonly SettingsSectionRegistryEntry[] 
     },
   },
   {
-    label: 'Single sign-on',
-    icon: LogIn,
-    docsLink: 'https://docs.sim.ai/platform/enterprise/sso',
-    unified: {
-      id: 'sso',
-      description: 'Manage sign-in, verified domains, and provisioning.',
-      group: 'organization',
-      order: 7,
-      requiresHosted: true,
-      requiresEnterprise: true,
-      selfHostedOverride: 'sso',
-      organizationSection: 'sso',
-    },
-  },
-  {
     label: 'Security',
     icon: Lock,
-    docsLink: 'https://docs.sim.ai/platform/enterprise/security',
     unified: {
       id: 'security',
-      description: 'Manage session policies and view outbound IP addresses.',
+      description: 'Manage SCIM provisioning and view outbound IP addresses.',
       group: 'organization',
       order: 8,
-      requiresHosted: true,
-      requiresEnterprise: true,
-      selfHostedOverride: 'always',
       organizationSection: 'security',
-    },
-  },
-  {
-    label: 'Data retention',
-    icon: Database,
-    docsLink: 'https://docs.sim.ai/platform/enterprise/data-retention',
-    unified: {
-      id: 'data-retention',
-      description:
-        'Control data retention windows. Workspaces without an override inherit the organization defaults.',
-      group: 'organization',
-      order: 9,
-      requiresHosted: true,
-      requiresEnterprise: true,
-      selfHostedOverride: 'dataRetention',
-      organizationSection: 'data-retention',
-    },
-  },
-  {
-    label: 'Data drains',
-    icon: Upload,
-    docsLink: 'https://docs.sim.ai/platform/enterprise/data-drains',
-    unified: {
-      id: 'data-drains',
-      description: 'Stream your logs and events to external destinations.',
-      group: 'organization',
-      order: 10,
-      requiresHosted: true,
-      requiresEnterprise: true,
-      selfHostedOverride: 'dataDrains',
-      organizationSection: 'data-drains',
-    },
-  },
-  {
-    label: 'White-labeling',
-    icon: Palette,
-    docsLink: 'https://docs.sim.ai/platform/enterprise/whitelabeling',
-    unified: {
-      id: 'whitelabeling',
-      description: 'Customize your workspace branding and appearance.',
-      group: 'organization',
-      order: 6,
-      requiresHosted: true,
-      requiresEnterprise: true,
-      selfHostedOverride: 'whitelabeling',
-      organizationSection: 'whitelabeling',
-    },
-  },
-  {
-    label: 'Custom blocks',
-    icon: HexSimple,
-    docsLink: 'https://docs.sim.ai/platform/enterprise/custom-blocks',
-    unified: {
-      id: 'custom-blocks',
-      description: 'Publish workflows as reusable blocks for your organization.',
-      group: 'workspace',
-      order: 2,
-      requiresHosted: true,
-      requiresEnterprise: true,
-      allowNonOrgAdmin: true,
-      selfHostedOverride: 'customBlocks',
-    },
-    planes: {
-      workspace: { id: 'custom-blocks', group: 'enterprise', order: 11 },
     },
   },
   {
@@ -688,16 +547,11 @@ const ORGANIZATION_SECTION_GROUPS: Record<OrganizationSettingsSection, Organizat
   {
     members: 'organization',
     'connected-accounts': 'organization',
-    usage: 'organization',
-    whitelabeling: 'organization',
     'recently-deleted': 'organization',
     requests: 'organization',
     'audit-logs': 'governance',
     'access-control': 'governance',
-    sso: 'governance',
     security: 'governance',
-    'data-retention': 'governance',
-    'data-drains': 'governance',
     integrations: 'sim-search',
     'search-mcp': 'sim-search',
   }
@@ -718,7 +572,7 @@ export const ORGANIZATION_SETTINGS_ITEMS: SettingsNavigationItem<OrganizationSet
   if (id === 'connected-accounts') {
     return {
       id,
-      label: 'Credential Groups',
+      label: 'Credential groups',
       description: 'Manage integrations and workspace access for workflows and Chat.',
       icon: GridOffset,
       group,
@@ -738,7 +592,6 @@ export const ORGANIZATION_SETTINGS_ITEMS: SettingsNavigationItem<OrganizationSet
       id,
       label: 'Search MCP',
       description: 'Search your sources from other apps.',
-      docsLink: 'https://docs.sim.ai/search/mcp',
       icon: Server,
       group,
     }
@@ -835,12 +688,7 @@ export function getOrganizationSettingsFeatures(
       'connected-accounts': true,
       'access-control': features.accessControl,
       'audit-logs': features.auditLogs,
-      sso: features.sso,
       security: true,
-      'data-retention': features.dataRetention,
-      'data-drains': features.dataDrains,
-      usage: features.usageMonitoring,
-      whitelabeling: features.whitelabeling,
     },
   }
 }
@@ -898,25 +746,9 @@ export function getSettingsPermissionConfigKey(section: UnifiedSettingsSection) 
   return workspaceSection ? WORKSPACE_PERMISSION_CONFIG_KEYS[workspaceSection] : undefined
 }
 
-export interface WorkspaceSettingsEntitlements {
-  customBlocks: boolean
-  forks: boolean
-}
-
-/**
- * Sections that stay visible without their entitlement, rendering a locked
- * upgrade prompt instead of disappearing from the nav. Keyed by the entitlement
- * that unlocks them, so adding a gated section is one entry rather than another
- * hardcoded id check in {@link resolveWorkspaceNavigation}.
- */
-const LOCKABLE_WORKSPACE_SECTIONS: Partial<
-  Record<WorkspaceSettingsSection, keyof WorkspaceSettingsEntitlements>
-> = {}
-
 interface ResolveWorkspaceNavigationOptions {
   permission: PermissionType
   permissionConfig: WorkspacePermissionConfig
-  entitlements: WorkspaceSettingsEntitlements
   /** Resolves the catalog's deployment gates the same way the sidebar does. */
   deployment: DeploymentShape
 }
@@ -968,8 +800,6 @@ const WORKSPACE_MUTATION_PERMISSION: Record<WorkspaceSettingsSection, Permission
   'workflow-mcp-servers': 'write',
   'api-keys': 'admin',
   'recently-deleted': 'write',
-  forks: 'admin',
-  'custom-blocks': 'admin',
 }
 
 export interface WorkspaceMutationCapabilities {
@@ -989,24 +819,17 @@ export function canMutateWorkspaceSettingsSection(
 export function resolveWorkspaceNavigation({
   permission,
   permissionConfig,
-  entitlements,
   deployment,
 }: ResolveWorkspaceNavigationOptions): ResolvedWorkspaceNavigationItem[] {
   return WORKSPACE_SETTINGS_ITEMS.flatMap((item) => {
     if (!isWorkspaceSectionOfferedByDeployment(item.id, deployment)) return []
     const permissionConfigKey = WORKSPACE_PERMISSION_CONFIG_KEYS[item.id]
     if (permissionConfigKey && permissionConfig[permissionConfigKey]) return []
-    if (item.id === 'forks' && (permission !== 'admin' || !entitlements.forks)) return []
-    if (item.id === 'custom-blocks' && !entitlements.customBlocks) return []
-
-    const lockedBy = LOCKABLE_WORKSPACE_SECTIONS[item.id]
-    const locked = lockedBy !== undefined && !entitlements[lockedBy]
-    const canMutate =
-      !locked &&
-      canMutateWorkspaceSettingsSection(item.id, {
-        canEdit: permissionSatisfies(permission, 'write'),
-        canAdmin: permissionSatisfies(permission, 'admin'),
-      })
+    const locked = false
+    const canMutate = canMutateWorkspaceSettingsSection(item.id, {
+      canEdit: permissionSatisfies(permission, 'write'),
+      canAdmin: permissionSatisfies(permission, 'admin'),
+    })
 
     return [{ ...item, canMutate, locked }]
   })

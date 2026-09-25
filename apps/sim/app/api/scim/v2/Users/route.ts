@@ -1,16 +1,15 @@
 import { createScimUserContract, listScimUsersContract } from '@/lib/api/contracts/scim'
-import { provisionScimUser } from '@/ee/scim/lib/application/users/provision-user'
-import { listScimUsers } from '@/ee/scim/lib/application/users/read-users'
-import { toCanonicalUser } from '@/ee/scim/lib/protocol/canonical'
-import { parseAttributeProjection, toListResponse } from '@/ee/scim/lib/protocol/resources'
-import { defineScimRoute } from '@/ee/scim/lib/route'
+import { listScimUsers, provisionScimUser } from '@/lib/labbai/scim/application/users'
+import { toCanonicalUser } from '@/lib/labbai/scim/protocol/canonical'
+import { parseAttributeProjection, toListResponse } from '@/lib/labbai/scim/protocol/resources'
+import { defineScimRoute } from '@/lib/labbai/scim/route'
 
 /**
  * The User collection.
  *
  * Adapters only: authentication, rate policy, contract parsing, and rendering
  * live in the route builder, and every decision about identity, membership, and
- * access lives in `ee/scim/lib/application`.
+ * access lives in `lib/labbai/scim/application`.
  */
 
 export const GET = defineScimRoute({

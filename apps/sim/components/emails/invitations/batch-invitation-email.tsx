@@ -2,7 +2,7 @@ import { Fragment } from 'react'
 import { Section, Text } from '@react-email/components'
 import { baseStyles } from '@/components/emails/_styles'
 import { EmailButton, EmailLayout, EmailStrong } from '@/components/emails/components'
-import { getBrandConfig } from '@/ee/whitelabeling'
+import { getBrandConfig } from '@/lib/branding'
 
 interface WorkspaceInvitation {
   workspaceId: string

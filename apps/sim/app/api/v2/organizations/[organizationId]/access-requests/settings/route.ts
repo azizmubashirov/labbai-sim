@@ -4,11 +4,11 @@ import {
 } from '@/lib/api/contracts/v2/access-requests'
 import { defineV2JsonRoute, v2ApiKeyAuth, v2RateLimits } from '@/lib/api/server/routes'
 import { v2AccessRequestErrorPolicy } from '@/lib/api/server/routes/access-requests'
-import { accessRequestOperations } from '@/ee/access-requests/lib/application/operations'
+import { accessRequestOperations } from '@/lib/labbai/access-requests/application/operations'
 import {
   getAccessRequestSettings,
   updateAccessRequestSettings,
-} from '@/ee/access-requests/lib/application/requests'
+} from '@/lib/labbai/access-requests/application/requests'
 
 export const GET = defineV2JsonRoute({
   contract: v2GetOrganizationAccessRequestSettingsContract,

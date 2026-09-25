@@ -154,7 +154,7 @@ import { withCustomBlockOverlay } from '@/blocks/custom/server-overlay'
 import {
   PublicApiNotAllowedError,
   validatePublicApiAllowed,
-} from '@/ee/access-control/utils/permission-check'
+} from '@/lib/labbai/access-control/permission-check'
 import { ExecutionSnapshot } from '@/executor/execution/snapshot'
 import type {
   BlockCompletionCallbackData,

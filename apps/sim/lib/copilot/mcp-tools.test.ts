@@ -16,7 +16,7 @@ vi.mock('@/lib/mcp/application/use-cases', () => ({
     execute: async (args: unknown) => ({ tools: await discoverServerTools(args) }),
   },
 }))
-vi.mock('@/ee/access-control/utils/permission-check', () => ({ assertPermissionsAllowed }))
+vi.mock('@/lib/labbai/access-control/permission-check', () => ({ assertPermissionsAllowed }))
 
 import { buildSelectedMcpToolSchemas, buildTaggedMcpToolSchemas } from '@/lib/copilot/mcp-tools'
 

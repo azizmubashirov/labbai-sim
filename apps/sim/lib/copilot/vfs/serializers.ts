@@ -1251,18 +1251,16 @@ export function serializeTableViews(
 
 /**
  * `account/workspace.json` — the current workspace as this viewer sees it:
- * identity, the viewer's effective permission, org linkage, and fork parentage.
+ * identity, the viewer's effective permission, and org linkage.
  *
  * Owns the current-workspace record. Org detail lives in
- * `organization/organization.json` and fork topology in
- * `organization/forks.json`; both are referenced here by id-and-name stub only,
+ * `organization/organization.json` and is referenced here by id stub only,
  * so a fact can never disagree with the file that owns it.
  */
 export function serializeAccountWorkspace(input: {
   workspace: { id: string; name: string; workspaceMode?: string | null }
   viewer: { permission: string | null; organizationRole?: string | null }
   organization: { id: string; name?: string | null } | null
-  forkedFrom: { id: string; name: string } | null
   entitlements: string[]
 }): string {
   return JSON.stringify(
@@ -1279,13 +1277,6 @@ export function serializeAccountWorkspace(input: {
             detail: 'organization/organization.json',
           }
         : null,
-      forkedFrom: input.forkedFrom
-        ? {
-            id: input.forkedFrom.id,
-            name: input.forkedFrom.name,
-            detail: 'organization/forks.json',
-          }
-        : null,
       entitlements: input.entitlements,
       note: 'Read-only. Your accessible workspaces are in account/workspaces.json; members in account/members.json; plan and usage in account/billing.json.',
     },
@@ -1298,7 +1289,7 @@ export function serializeAccountWorkspace(input: {
  * `account/workspaces.json` — every workspace the viewer can reach, as stubs.
  *
  * Deliberately a roster, not a set of records: id, name, the viewer's role, and
- * org/fork parentage by id. Anything richer about the *current* workspace is in
+ * org linkage by id. Anything richer about the *current* workspace is in
  * `account/workspace.json`; other workspaces are not readable from here at all.
  */
 export function serializeAccountWorkspaces(
@@ -1307,7 +1298,6 @@ export function serializeAccountWorkspaces(
     name: string
     role: string
     organizationId?: string | null
-    forkedFromWorkspaceId?: string | null
     isCurrent: boolean
   }>
 ): string {
@@ -1318,9 +1308,6 @@ export function serializeAccountWorkspaces(
         name: workspace.name,
         yourRole: workspace.role,
         ...(workspace.organizationId ? { organizationId: workspace.organizationId } : {}),
-        ...(workspace.forkedFromWorkspaceId
-          ? { forkedFromWorkspaceId: workspace.forkedFromWorkspaceId }
-          : {}),
         ...(workspace.isCurrent ? { isCurrent: true } : {}),
       })),
       note: 'Only the current workspace (isCurrent) is mounted in this VFS — the others are listed so you can name them, not read them. Switching workspaces is the user’s action, not yours.',
@@ -1563,14 +1550,13 @@ export function buildOrganizationReadme(input: {
     workflowName?: string | null
     workspaceName?: string | null
   }>
-  forksMounted: boolean
   permissionGroupsMounted: boolean
   connectedAccountsMounted: boolean
 }): string {
   const lines: string[] = [
     '# Organization',
     '',
-    `Read-only truth about organization \`${input.organizationId}\` as the acting user sees it. Nothing here is writable — org membership, permission groups, block publishing, and forking are all managed in the Sim UI.`,
+    `Read-only truth about organization \`${input.organizationId}\` as the acting user sees it. Nothing here is writable — org membership, permission groups, and block publishing are all managed in the Sim UI.`,
     '',
     '## Files',
     '',
@@ -1578,7 +1564,7 @@ export function buildOrganizationReadme(input: {
     '- `access-control.json` — the permission group governing YOU and the restrictions it enforces. Restrictions are enforced server-side on every action, so consult this before promising an action is possible. It describes this user only.',
     '- `custom-blocks.json` — names-only index of org-published blocks.',
     '- `custom-blocks/{type}.json` — one block in depth: provenance and a read-only view of the DEPLOYED workflow graph backing it (org members only). To add the block to a workflow, use its callable schema at `components/blocks/{type}.json`; the deployed graph is for understanding what the block does, not for editing.',
-    '- `workspaces.json` — every workspace in the organization with your access flag and fork parentage (org members only).',
+    '- `workspaces.json` — every workspace in the organization with your access flag (org members only).',
   ]
   if (input.permissionGroupsMounted) {
     lines.push(
@@ -1588,11 +1574,6 @@ export function buildOrganizationReadme(input: {
   if (input.connectedAccountsMounted) {
     lines.push(
       '- `connected-accounts.json` — the workspace’s account configuration and provider readiness (workspace admins only). Use the Connected Accounts block in workflows.'
-    )
-  }
-  if (input.forksMounted) {
-    lines.push(
-      "- `forks.json` — this workspace's place in the fork tree and what was mapped from the parent. Forking, promoting, and rolling back are admin actions in the UI."
     )
   }
   lines.push('', '## Published custom blocks', '')
@@ -1612,8 +1593,7 @@ export function buildOrganizationReadme(input: {
 
 /**
  * `organization/workspaces.json` — the org's workspace map: every workspace in
- * the organization, with whether the viewer can open it and its fork
- * parentage. Broader than `account/workspaces.json`, which lists only what the
+ * the organization, with whether the viewer can open it. Broader than `account/workspaces.json`, which lists only what the
  * viewer can reach.
  */
 export function serializeOrganizationWorkspaces(
@@ -1621,7 +1601,6 @@ export function serializeOrganizationWorkspaces(
     id: string
     name: string
     hasAccess: boolean
-    forkedFromWorkspaceId?: string | null
   }>
 ): string {
   return JSON.stringify(
@@ -1630,9 +1609,6 @@ export function serializeOrganizationWorkspaces(
         id: entry.id,
         name: entry.name,
         hasAccess: entry.hasAccess,
-        ...(entry.forkedFromWorkspaceId
-          ? { forkedFromWorkspaceId: entry.forkedFromWorkspaceId }
-          : {}),
       })),
       note: 'Every workspace in the organization. hasAccess is YOUR access; workspaces without it are nameable, not readable, and only the current workspace is mounted in this VFS.',
     },
@@ -1698,44 +1674,6 @@ export function serializeConnectedAccounts(accounts: {
         configurationStatus: option.configurationStatus,
       })),
       note: 'Manage these accounts in Settings > Connected accounts. Workflows use the Connected Accounts block in their own workspace; no container selection is required. Search uses each person’s connected account to determine document access. Account configuration does not grant access to another person’s credentials or documents.',
-    },
-    null,
-    2
-  )
-}
-
-/**
- * `organization/forks.json` — this workspace's place in the fork tree plus the
- * parent/child resource and block mappings.
- *
- * Owns fork topology; rosters elsewhere carry only `forkedFromWorkspaceId`.
- * Mapping counts are summarized per resource type — the raw id pairs are an
- * implementation detail of promote/rollback, not workspace context.
- */
-export function serializeWorkspaceForks(input: {
-  parent: { id: string; name: string } | null
-  children: Array<{ id: string; name: string; createdAt: Date | string }>
-  resourceMappingCounts: Record<string, number>
-  blockMappingCount: number
-}): string {
-  return JSON.stringify(
-    {
-      parent: input.parent,
-      children: input.children.map((child) => ({
-        id: child.id,
-        name: child.name,
-        createdAt:
-          child.createdAt instanceof Date ? child.createdAt.toISOString() : child.createdAt,
-      })),
-      ...(input.parent
-        ? {
-            mappedFromParent: {
-              resources: input.resourceMappingCounts,
-              blocks: input.blockMappingCount,
-            },
-          }
-        : {}),
-      note: 'A forked workspace keeps a mapping back to the resources it was copied from, which is what promote and rollback follow. Forking, promoting, and rolling back are workspace-admin actions in the UI — you cannot perform them.',
     },
     null,
     2

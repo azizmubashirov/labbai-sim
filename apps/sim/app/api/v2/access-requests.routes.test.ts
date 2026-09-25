@@ -22,7 +22,7 @@ const mocks = vi.hoisted(() => ({
 }))
 vi.mock('@/lib/api/server/routes/v2-api-key-auth', () => v2ApiKeyAuthModuleMock)
 vi.mock('@/lib/core/rate-limiter', () => v2RateLimiterModuleMock)
-vi.mock('@/ee/access-requests/lib/application/requests', () => ({
+vi.mock('@/lib/labbai/access-requests/application/requests', () => ({
   discoverAccessRequests: {
     operation: { id: 'access_requests.discover' },
     execute: mocks.discover,
@@ -46,7 +46,7 @@ vi.mock('@/ee/access-requests/lib/application/requests', () => ({
     execute: mocks.updateSettings,
   },
 }))
-vi.mock('@/ee/access-requests/lib/application/review', () => ({
+vi.mock('@/lib/labbai/access-requests/application/review', () => ({
   previewAccessRequest: {
     operation: { id: 'access_requests.preview' },
     execute: mocks.preview,

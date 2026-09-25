@@ -114,7 +114,7 @@ vi.mock('@/lib/workspaces/policy', () => ({
   getWorkspaceInvitePolicy: vi.fn(),
 }))
 
-vi.mock('@/ee/access-control/utils/permission-check', () => ({
+vi.mock('@/lib/labbai/access-control/permission-check', () => ({
   validateInvitationsAllowed: vi.fn(),
 }))
 
@@ -124,7 +124,7 @@ import {
 } from '@/lib/invitations/workspace-invitations'
 import { hasWorkspaceAdminAccess } from '@/lib/workspaces/permissions/utils'
 import { getWorkspaceInvitePolicy } from '@/lib/workspaces/policy'
-import { validateInvitationsAllowed } from '@/ee/access-control/utils/permission-check'
+import { validateInvitationsAllowed } from '@/lib/labbai/access-control/permission-check'
 
 function queueWhereResponses(responses: unknown[][]) {
   const queue = [...responses]

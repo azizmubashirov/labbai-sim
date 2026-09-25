@@ -25,7 +25,6 @@ vi.mock('@/lib/consent/tracking-consent', () => ({
   useTrackingConsent: () => ({ measurement: false }),
 }))
 vi.mock('@/lib/core/config/env', () => ({ getEnv: () => undefined, isFalsy: () => false }))
-vi.mock('@/lib/core/config/env-flags', () => ({ isSsoEnabled: false }))
 vi.mock('@/lib/core/security/input-validation', () => ({ validateCallbackUrl: () => false }))
 vi.mock('@/lib/messaging/email/validation', () => ({
   quickValidateEmail: () => ({ isValid: true }),
@@ -49,7 +48,6 @@ vi.mock('@/app/(auth)/components', () => ({
     ...props
   }: InputHTMLAttributes<HTMLInputElement> & { error?: boolean }) => <input {...props} />,
   SocialLoginButtons: () => null,
-  SSOLoginButton: () => null,
 }))
 
 let root: Root

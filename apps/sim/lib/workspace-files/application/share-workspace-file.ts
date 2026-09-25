@@ -17,7 +17,7 @@ import { defineAuthorizedWorkspaceFileUseCase } from '@/lib/workspace-files/appl
 import { fileOperations } from '@/lib/workspace-files/application/operations'
 import { resolveActiveWorkspaceFileContext } from '@/lib/workspace-files/application/workspace-file-context'
 import { MAX_WORKSPACE_FILE_BULK_AFFECTED_ITEMS } from '@/lib/workspace-files/limits'
-import { validatePublicFileSharing } from '@/ee/access-control/utils/permission-check'
+import { validatePublicFileSharing } from '@/lib/labbai/access-control/permission-check'
 
 const logger = createLogger('WorkspaceFileShare')
 

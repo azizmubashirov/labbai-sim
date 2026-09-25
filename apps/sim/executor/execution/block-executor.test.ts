@@ -9,7 +9,7 @@ import { isLargeArrayManifest } from '@/lib/execution/payloads/large-array-manif
 import { isLargeValueRef } from '@/lib/execution/payloads/large-value-ref'
 import { projectTraceSpansForSecrets } from '@/lib/logs/execution/trace-secret-projection'
 import { buildTraceSpans } from '@/lib/logs/execution/trace-spans/trace-spans'
-import { validateBlockType } from '@/ee/access-control/utils/permission-check'
+import { validateBlockType } from '@/lib/labbai/access-control/permission-check'
 import { BlockType, EDGE } from '@/executor/constants'
 import type { DAGNode } from '@/executor/dag/builder'
 import { BlockExecutor } from '@/executor/execution/block-executor'
@@ -31,7 +31,7 @@ const { mockUploadFile, mockDownloadFile } = vi.hoisted(() => ({
   mockDownloadFile: vi.fn(),
 }))
 
-vi.mock('@/ee/access-control/utils/permission-check', () => ({
+vi.mock('@/lib/labbai/access-control/permission-check', () => ({
   validateBlockType: vi.fn(),
 }))
 

@@ -43,7 +43,6 @@ import {
   scanWorkflowReferences,
 } from '@/lib/workflows/references/remap-references'
 import { getBlock } from '@/blocks/registry'
-import { createForkBootstrapTransform } from '@/ee/workspace-forking/lib/remap/fork-bootstrap'
 
 const blockConfigs: Record<string, { subBlocks: SubBlockConfig[] }> = {
   testblock: {
@@ -436,48 +435,6 @@ describe('workspace file-folder fork remap', () => {
   })
 })
 
-describe('createForkBootstrapTransform document-selector remap', () => {
-  const docBlock = () =>
-    blockWith([
-      { id: 'knowledgeBaseId', title: 'KB', type: 'knowledge-base-selector' },
-      { id: 'documentId', title: 'Doc', type: 'document-selector', dependsOn: ['knowledgeBaseId'] },
-    ])
-  const subBlocks = (): SubBlockRecord => ({
-    knowledgeBaseId: { id: 'knowledgeBaseId', type: 'knowledge-base-selector', value: 'kb-src' },
-    documentId: { id: 'documentId', type: 'document-selector', value: 'doc-src' },
-  })
-
-  it('remaps documentId to the copied document (not cleared as a KB dependent)', () => {
-    vi.mocked(getBlock).mockReturnValue(docBlock())
-    const map: Record<string, string> = {
-      'knowledge-base:kb-src': 'kb-dst',
-      'knowledge-document:doc-src': 'doc-dst',
-    }
-    const transform = createForkBootstrapTransform((kind, id) => map[`${kind}:${id}`] ?? null)
-    const result = transform(subBlocks(), 'knowledge')
-    expect(result.knowledgeBaseId.value).toBe('kb-dst')
-    expect(result.documentId.value).toBe('doc-dst')
-  })
-
-  it('clears documentId when its parent KB was not copied', () => {
-    vi.mocked(getBlock).mockReturnValue(docBlock())
-    const transform = createForkBootstrapTransform(() => null)
-    const result = transform(subBlocks(), 'knowledge')
-    expect(result.knowledgeBaseId.value).toBe('')
-    expect(result.documentId.value).toBe('')
-  })
-
-  it('clears documentId when its KB was copied but the document was not', () => {
-    vi.mocked(getBlock).mockReturnValue(docBlock())
-    const transform = createForkBootstrapTransform((kind, id) =>
-      kind === 'knowledge-base' && id === 'kb-src' ? 'kb-dst' : null
-    )
-    const result = transform(subBlocks(), 'knowledge')
-    expect(result.knowledgeBaseId.value).toBe('kb-dst')
-    expect(result.documentId.value).toBe('')
-  })
-})
-
 describe('MCP block server remap follows the tool selection (optimistic verbatim)', () => {
   // Shape of the real MCP block: tool depends on server, arguments depend on tool.
   const mcpBlock = () =>
@@ -626,92 +583,6 @@ describe('MCP block server remap follows the tool selection (optimistic verbatim
     expect(result.tool.value).toBe('')
     expect(result.arguments.value).toBe('')
   })
-
-  it('fork-create: an UNSELECTED server clears, and its tool + arguments clear with it', () => {
-    vi.mocked(getBlock).mockReturnValue(mcpBlock())
-    const transform = createForkBootstrapTransform(() => null)
-    const result = transform(mcpSubBlocks(), 'mcp')
-    expect(result.server.value).toBe('')
-    expect(result.tool.value).toBe('')
-    expect(result.arguments.value).toBe('')
-  })
-
-  it('fork-create: a COPIED server remaps and the tool selection + arguments follow it', () => {
-    // The fork resolver now carries `mcp-server` entries for copied external servers, so the
-    // MCP block is preserved end-to-end: server -> copied id, tool -> embedded id swapped
-    // (name verbatim, re-resolved by the child's first discovery), arguments untouched.
-    vi.mocked(getBlock).mockReturnValue(mcpBlock())
-    const transform = createForkBootstrapTransform(mapServer as never)
-    const result = transform(mcpSubBlocks(), 'mcp')
-    expect(result.server.value).toBe('mcp-tgt9')
-    expect(result.tool.value).toBe('mcp-tgt9-search_docs')
-    expect(result.arguments.value).toBe('{"query":"hello"}')
-  })
-
-  it('fork-create: a COPIED server rewrites an agent tool-input MCP entry (serverId + toolId)', () => {
-    vi.mocked(getBlock).mockReturnValue(
-      blockWith([{ id: 'tools', title: 'Tools', type: 'tool-input' }])
-    )
-    const transform = createForkBootstrapTransform(mapServer as never)
-    const result = transform(
-      {
-        tools: {
-          id: 'tools',
-          type: 'tool-input',
-          value: [
-            {
-              type: 'mcp',
-              title: 'Search Docs',
-              params: { serverId: 'mcp-src1', toolName: 'search_docs' },
-              toolId: 'mcp-src1-search_docs',
-            },
-          ],
-        },
-      },
-      'agent'
-    )
-    const [tool] = result.tools.value as Array<{ params: Record<string, unknown>; toolId: string }>
-    expect(tool.params.serverId).toBe('mcp-tgt9')
-    expect(tool.params.toolName).toBe('search_docs')
-    expect(tool.toolId).toBe('mcp-tgt9-search_docs')
-  })
-
-  it(
-    'regression: dropping an unresolved custom-tool reindexes the surviving tool ' +
-      "canonicalModes so it doesn't inherit the dropped tool's old-index mode",
-    () => {
-      vi.mocked(getBlock).mockImplementation((type) => {
-        if (type === 'agent')
-          return blockWith([{ id: 'tools', title: 'Tools', type: 'tool-input' }])
-        if (type === 'table') return blockWith([])
-        return undefined as unknown as BlockConfig
-      })
-      const transform = createForkBootstrapTransform(() => null)
-      const onCanonicalModesChanged = vi.fn()
-      const result = transform(
-        {
-          tools: {
-            id: 'tools',
-            type: 'tool-input',
-            value: [
-              // Index 0: unresolved custom-tool - fork-create always clears unresolved, so
-              // this entry is dropped, shifting every later tool down by one.
-              { type: 'custom-tool', title: 'Missing', customToolId: 'missing-tool' },
-              // Index 1 -> 0 after the drop.
-              { type: 'table', operation: 'query_rows', params: {} },
-            ],
-          },
-        },
-        'agent',
-        { '1:tableId': 'advanced' },
-        onCanonicalModesChanged
-      )
-      const tools = result.tools.value as Array<{ type: string }>
-      expect(tools).toHaveLength(1)
-      expect(tools[0].type).toBe('table')
-      expect(onCanonicalModesChanged).toHaveBeenCalledWith({ '0:tableId': 'advanced' })
-    }
-  )
 
   it('remap layer: the tool follow-rewrite is not registered as a remapped parent key', () => {
     // Only `server` may drive dependent clears; the followed tool must not (its own
@@ -1635,57 +1506,6 @@ const knowledgePairBlock = () =>
   ])
 
 describe('canonical mode policy (fork/promote)', () => {
-  const copyMap: Record<string, string> = {
-    'knowledge-base:kb-src': 'kb-copy',
-    'knowledge-document:doc-src': 'doc-copy',
-  }
-  const resolveCopy = (kind: string, id: string) => copyMap[`${kind}:${id}`] ?? null
-
-  it('basic mode: remaps the selector + document, preserves tag fields, clears the dormant manual member', () => {
-    vi.mocked(getBlock).mockReturnValue(knowledgePairBlock())
-    const transform = createForkBootstrapTransform(resolveCopy as never)
-    const result = transform(
-      {
-        knowledgeBaseSelector: entry('knowledgeBaseSelector', 'knowledge-base-selector', 'kb-src'),
-        manualKnowledgeBaseId: entry('manualKnowledgeBaseId', 'short-input', 'stale-manual-kb'),
-        documentSelector: entry('documentSelector', 'document-selector', 'doc-src'),
-        tagFilters: entry('tagFilters', 'knowledge-tag-filters', '[{"tagName":"team"}]'),
-        documentTags: entry('documentTags', 'document-tag-entry', '[{"tagName":"team"}]'),
-      },
-      'knowledge',
-      { knowledgeBaseId: 'basic' }
-    )
-    expect(result.knowledgeBaseSelector.value).toBe('kb-copy')
-    expect(result.documentSelector.value).toBe('doc-copy')
-    // Name/slot-based tag fields stay valid on the copy (tag definitions copy verbatim).
-    expect(result.tagFilters.value).toBe('[{"tagName":"team"}]')
-    expect(result.documentTags.value).toBe('[{"tagName":"team"}]')
-    // Only the active mode matters: the dormant manual member's stale value is cleared.
-    expect(result.manualKnowledgeBaseId.value).toBe('')
-  })
-
-  it('advanced (manual) mode: passes the manual value + its dependents through verbatim, clears the dormant selector', () => {
-    vi.mocked(getBlock).mockReturnValue(knowledgePairBlock())
-    const transform = createForkBootstrapTransform(resolveCopy as never)
-    const result = transform(
-      {
-        knowledgeBaseSelector: entry('knowledgeBaseSelector', 'knowledge-base-selector', 'kb-src'),
-        manualKnowledgeBaseId: entry('manualKnowledgeBaseId', 'short-input', 'kb-manual'),
-        documentSelector: entry('documentSelector', 'document-selector', 'doc-src'),
-        tagFilters: entry('tagFilters', 'knowledge-tag-filters', '[{"tagName":"team"}]'),
-      },
-      'knowledge',
-      { knowledgeBaseId: 'advanced' }
-    )
-    // The manual value is user-owned: kept verbatim, never remapped.
-    expect(result.manualKnowledgeBaseId.value).toBe('kb-manual')
-    // Its dependents ride along verbatim too - no remap, no clear.
-    expect(result.documentSelector.value).toBe('doc-src')
-    expect(result.tagFilters.value).toBe('[{"tagName":"team"}]')
-    // The dormant basic selector is cleared outright (not remapped to the copy).
-    expect(result.knowledgeBaseSelector.value).toBe('')
-  })
-
   it('advanced mode: nothing is detected as a reference (no mapping requirement)', () => {
     vi.mocked(getBlock).mockReturnValue(knowledgePairBlock())
     const scan = scanWorkflowReferences(
@@ -1704,64 +1524,6 @@ describe('canonical mode policy (fork/promote)', () => {
             documentSelector: entry('documentSelector', 'document-selector', 'doc-src'),
           },
           canonicalModes: { knowledgeBaseId: 'advanced' },
-        },
-      ],
-      () => null
-    )
-    expect(scan.references).toEqual([])
-  })
-
-  /**
-   * Every shipped canonical pair's advanced member is a plain `short-input`, which carries no
-   * resource definition — so the "advanced is user-owned, verbatim" policy has never been
-   * exercised against an advanced member that IS a resource selector. Pin it here so the
-   * policy holds by enforcement rather than by the accident of the current block configs.
-   */
-  const selectorPairBlock = () =>
-    blockWith([
-      {
-        id: 'tableSelector',
-        title: 'Table',
-        type: 'table-selector',
-        canonicalParamId: 'tableId',
-        mode: 'basic',
-      },
-      {
-        id: 'advancedTableSelector',
-        title: 'Table (advanced)',
-        type: 'table-selector',
-        canonicalParamId: 'tableId',
-        mode: 'advanced',
-      },
-    ])
-
-  it('advanced mode: a selector-typed manual member is neither remapped nor detected', () => {
-    vi.mocked(getBlock).mockReturnValue(selectorPairBlock())
-    const resolveTable = (kind: string, id: string) =>
-      kind === 'table' && id === 'tbl-manual' ? 'tbl-copy' : null
-    const transform = createForkBootstrapTransform(resolveTable as never)
-    const result = transform(
-      {
-        tableSelector: entry('tableSelector', 'table-selector', 'tbl-basic'),
-        advancedTableSelector: entry('advancedTableSelector', 'table-selector', 'tbl-manual'),
-      },
-      'table',
-      { tableId: 'advanced' }
-    )
-    expect(result.advancedTableSelector.value).toBe('tbl-manual')
-    expect(result.tableSelector.value).toBe('')
-
-    const scan = scanWorkflowReferences(
-      [
-        {
-          id: 'b1',
-          name: 'Table',
-          type: 'table',
-          subBlocks: {
-            tableSelector: entry('tableSelector', 'table-selector', 'tbl-basic'),
-            advancedTableSelector: entry('advancedTableSelector', 'table-selector', 'tbl-manual'),
-          },
-          canonicalModes: { tableId: 'advanced' },
         },
       ],
       () => null
@@ -2137,96 +1899,6 @@ describe('canonical mode policy (fork/promote)', () => {
       blockConfigs: kbToolConfigs,
     })
     expect(cleared.params).toEqual({ knowledgeBaseId: '', tagFilters: '' })
-  })
-
-  it('preserves a column selection under a COPIED table, clears it under a mapped one', () => {
-    const tableBlock = () =>
-      blockWith([
-        {
-          id: 'tableSelector',
-          title: 'Table',
-          type: 'table-selector',
-          canonicalParamId: 'tableId',
-          mode: 'basic',
-        },
-        {
-          id: 'manualTableId',
-          title: 'Table ID',
-          type: 'short-input',
-          canonicalParamId: 'tableId',
-          mode: 'advanced',
-        },
-        {
-          id: 'conflictColumnSelector',
-          title: 'Conflict Column',
-          type: 'column-selector',
-          dependsOn: ['tableSelector'],
-        },
-      ])
-    const subBlocks = (): SubBlockRecord => ({
-      tableSelector: entry('tableSelector', 'table-selector', 'tbl-src'),
-      conflictColumnSelector: entry('conflictColumnSelector', 'column-selector', 'col_a'),
-    })
-    vi.mocked(getBlock).mockReturnValue(tableBlock())
-    // Fork-create: the table is a COPY (identical column ids) - the column pick survives.
-    const forkTransform = createForkBootstrapTransform(((kind: string, id: string) =>
-      kind === 'table' && id === 'tbl-src' ? 'tbl-copy' : null) as never)
-    const forked = forkTransform(subBlocks(), 'table')
-    expect(forked.tableSelector.value).toBe('tbl-copy')
-    expect(forked.conflictColumnSelector.value).toBe('col_a')
-    // Promote onto a MAPPED (different) table: column ids differ - the pick clears (re-pick flow).
-    const mappedTransform = createForkSubBlockTransform((kind, id) =>
-      kind === 'table' && id === 'tbl-src' ? 'tbl-mapped' : null
-    )
-    const mapped = mappedTransform(subBlocks(), 'table')
-    expect(mapped.tableSelector.value).toBe('tbl-mapped')
-    expect(mapped.conflictColumnSelector.value).toBe('')
-  })
-
-  it('preserves a selector-backed multi-column pick under a COPIED table like a column-selector', () => {
-    const tableBlock = () =>
-      blockWith([
-        {
-          id: 'tableSelector',
-          title: 'Table',
-          type: 'table-selector',
-          canonicalParamId: 'tableId',
-          mode: 'basic',
-        },
-        {
-          id: 'manualTableId',
-          title: 'Table ID',
-          type: 'short-input',
-          canonicalParamId: 'tableId',
-          mode: 'advanced',
-        },
-        {
-          id: 'outputColumns',
-          title: 'Columns to Return',
-          type: 'dropdown',
-          selectorKey: 'table.outputColumns',
-          multiSelect: true,
-          dependsOn: { any: ['tableSelector', 'manualTableId'] },
-        },
-      ])
-    const subBlocks = (): SubBlockRecord => ({
-      tableSelector: entry('tableSelector', 'table-selector', 'tbl-src'),
-      outputColumns: entry('outputColumns', 'dropdown', ['col_a', 'col_b']),
-    })
-    vi.mocked(getBlock).mockReturnValue(tableBlock())
-    // Fork-create: the copy keeps the same column ids, so the pick survives verbatim.
-    const forkTransform = createForkBootstrapTransform(((kind: string, id: string) =>
-      kind === 'table' && id === 'tbl-src' ? 'tbl-copy' : null) as never)
-    const forked = forkTransform(subBlocks(), 'table')
-    expect(forked.tableSelector.value).toBe('tbl-copy')
-    expect(forked.outputColumns.value).toEqual(['col_a', 'col_b'])
-    // Promote onto a MAPPED (different) table: column ids differ - the pick clears.
-    const mappedTransform = createForkSubBlockTransform((kind, id) =>
-      kind === 'table' && id === 'tbl-src' ? 'tbl-mapped' : null
-    )
-    const mapped = mappedTransform(subBlocks(), 'table')
-    expect(mapped.tableSelector.value).toBe('tbl-mapped')
-    expect(mapped.outputColumns.value).toBe('')
   })
 
   it('collectClearedDependents skips a dormant canonical member (only the active mode matters)', () => {

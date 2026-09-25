@@ -39,9 +39,9 @@ import { defineWorkspaceOperation } from '@/lib/core/application/workspace-opera
 import { resolvePermissionGroupConfig } from '@/lib/permission-groups/config-scope.server'
 import { DEFAULT_PERMISSION_GROUP_CONFIG } from '@/lib/permission-groups/fields'
 import { withPermissionGroupScope } from '@/lib/permission-groups/request-scope.server'
-import { defineAuthorizedAccessRequestUseCase } from '@/ee/access-requests/lib/application/authorized-use-case'
-import { accessRequestOperations } from '@/ee/access-requests/lib/application/operations'
-import type { AccessRequestScope } from '@/ee/access-requests/lib/targets'
+import { defineAuthorizedAccessRequestUseCase } from '@/lib/labbai/access-requests/application/authorized-use-case'
+import { accessRequestOperations } from '@/lib/labbai/access-requests/application/operations'
+import type { AccessRequestScope } from '@/lib/labbai/access-requests/targets'
 
 const personal: PersonalApiKeyPrincipal = {
   kind: 'personal_api_key',

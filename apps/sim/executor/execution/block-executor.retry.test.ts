@@ -15,7 +15,7 @@ import { attachTrustedExecutionCost } from '@/executor/utils/errors'
 import { VariableResolver } from '@/executor/variables/resolver'
 import type { SerializedBlock, SerializedWorkflow } from '@/serializer/types'
 
-vi.mock('@/ee/access-control/utils/permission-check', () => ({
+vi.mock('@/lib/labbai/access-control/permission-check', () => ({
   validateBlockType: vi.fn(),
 }))
 

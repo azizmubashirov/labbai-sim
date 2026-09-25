@@ -11,7 +11,7 @@ import {
 import {
   configureScimConnection,
   getScimConnection,
-} from '@/ee/scim/lib/application/admin/connection'
+} from '@/lib/labbai/scim/application/admin/connection'
 
 /**
  * The organization's directory-provisioning connection.

@@ -98,13 +98,13 @@ import {
   isEdgeHighlighted,
 } from '@/app/workspace/[workspaceId]/w/[workflowId]/utils/edge-highlight'
 import { hasBlockAccent } from '@/blocks/accent'
-import { useCustomBlockOverlayVersion } from '@/blocks/custom/client-overlay'
 import { getBlock } from '@/blocks/registry'
 import {
   type BlockConfig,
   SELECTOR_TYPES_HYDRATION_REQUIRED,
   type SubBlockConfig,
 } from '@/blocks/types'
+import { useBlockVisibilityVersion } from '@/blocks/visibility/version'
 import { useKnowledgeBase } from '@/hooks/kb/use-knowledge'
 import { useCustomTools } from '@/hooks/queries/custom-tools'
 import { useDeployWorkflow } from '@/hooks/queries/deployments'
@@ -548,10 +548,10 @@ const SubBlockRow = memo(function SubBlockRow({
    * change when the client overlay hydrates (see client-overlay.ts).
    */
   const { data: customTools = [] } = useCustomTools(workspaceId || '')
-  const customBlockOverlayVersion = useCustomBlockOverlayVersion()
+  const blockVisibilityVersion = useBlockVisibilityVersion()
   const toolsDisplayValue = useMemo(
     () => resolveToolsLabel(subBlock, rawValue, customTools, mcpToolNamesById),
-    [subBlock, rawValue, customTools, mcpToolNamesById, customBlockOverlayVersion]
+    [subBlock, rawValue, customTools, mcpToolNamesById, blockVisibilityVersion]
   )
 
   const filterDisplayValue = useMemo(

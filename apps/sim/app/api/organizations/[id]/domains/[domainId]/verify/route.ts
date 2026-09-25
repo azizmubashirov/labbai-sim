@@ -10,9 +10,8 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { verifyOrganizationDomainContract } from '@/lib/api/contracts/organization'
 import { parseRequest } from '@/lib/api/server'
 import { getSession } from '@/lib/auth'
-import { checkDomainTxtRecord, toDomainResponse } from '@/lib/auth/sso/domain-verification'
-import { invalidateSsoPolicyCache } from '@/lib/auth/sso-policy'
 import { withRouteHandler } from '@/lib/core/utils/with-route-handler'
+import { checkDomainTxtRecord, toDomainResponse } from '@/lib/organizations/domain-verification'
 
 const logger = createLogger('OrgDomainVerifyAPI')
 
@@ -180,9 +179,6 @@ export const POST = withRouteHandler(
         { status: 409 }
       )
     }
-
-    /** A newly verified domain can make the organization able to require single sign-on. */
-    invalidateSsoPolicyCache(organizationId)
 
     logger.info('Domain verified', { organizationId, domain: row.domain })
     recordAudit({

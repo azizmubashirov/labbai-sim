@@ -1,6 +1,6 @@
 import type { MetadataRoute } from 'next'
+import { getBrandConfig } from '@/lib/branding'
 import { WORKSPACES_PATH } from '@/lib/navigation/paths'
-import { getBrandConfig } from '@/ee/whitelabeling'
 
 export const dynamic = 'force-dynamic'
 

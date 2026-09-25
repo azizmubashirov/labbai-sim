@@ -39,3 +39,44 @@ export interface WorkflowReferenceManifest {
 
 /** Resolves a block identity in the destination graph; imports may use an identity resolver. */
 export type WorkflowBlockIdResolver = (targetWorkflowId: string, sourceBlockId: string) => string
+
+/**
+ * A configured field that depends on a remappable parent resource (credential, knowledge base,
+ * table, custom block or MCP server) and must be re-picked when that parent changes in the
+ * destination workspace, e.g. during a workflow import.
+ */
+export interface ForkDependentReconfig {
+  /** The remappable parent whose change makes this field reconfigurable. */
+  parentKind: 'credential' | 'knowledge-base' | 'table' | 'custom-block' | 'mcp-server'
+  /** Source id of that parent. */
+  parentSourceId: string
+  /** Selector context key the new parent value is supplied under (absent for custom blocks). */
+  parentContextKey?: string
+  targetWorkflowId: string
+  targetBlockId: string
+  blockName: string
+  subBlockKey: string
+  /** Selector key; absent for typed custom-block inputs. */
+  selectorKey?: string
+  multiSelect?: boolean
+  /** Declared field type of a custom-block input. */
+  fieldType?: string
+  /** Plain field title. */
+  title: string
+  /** Display name of the nested tool this field belongs to, if any. */
+  toolName?: string
+  /** Stable scope for one nested tool instance (e.g. `tools[0]`). */
+  dependencyScope?: string
+  /** Currently stored value, or empty string when unset. */
+  currentValue: string
+  /** Raw value in the source workflow state. */
+  sourceValue: string
+  /** Whether the field is required. */
+  required: boolean
+  /** Selector context key this field supplies to its in-block descendants. */
+  providesContextKey?: string
+  /** Selector context keys this field needs from in-block siblings. */
+  consumesContextKeys: string[]
+  /** Source-derived selector context. */
+  context: Record<string, string>
+}
