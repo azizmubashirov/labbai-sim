@@ -15,8 +15,10 @@ ported in. We do not sync with upstream Sim; we develop it ourselves from here.
   stay off; the internal cost ledger (`usage_log`) keeps recording what runs cost.
 - Integrations: keep ~10% (list below), remove the rest with their tools, triggers,
   OAuth providers and knowledge connectors
-- LLM providers: replace all with a single Cloudflare AI Gateway provider (Unified Billing,
-  one account). Keep a short curated model list.
+- LLM providers: keep only OpenAI for now (owner has OpenAI budget); remove all others.
+  Cloudflare AI Gateway (Unified Billing, one account) comes later, when the OpenAI budget
+  runs out — the OpenAI provider takes an optional base URL / extra header so the switch
+  is a config change.
 - Sim cloud copilot path (Go mothership client) and the Local/Cloud switch — local copilot only
 - Copilot providers other than the OpenAI-compatible one (Bedrock, Vertex, Gemini)
 - PII service (`apps/pii`), Pi / A2A / Mothership blocks, video generation,
@@ -57,11 +59,11 @@ Commerce: Shopify, WordPress · Voice: ElevenLabs.
 Knowledge connectors: Google Drive, Google Docs, Notion.
 Later: amoCRM, Bitrix24, Exely (not in Sim) — our own integrations.
 
-## Models (via Cloudflare AI Gateway)
+## Models (OpenAI only for now)
 
-Strong: `openai/gpt-5.5`, `anthropic/claude-sonnet` · Fast: `openai/gpt-5-mini`,
-`google/gemini-flash` · Cheap bulk: Workers AI (Llama/Qwen) ·
-Embeddings: `openai/text-embedding-3-small`.
+Strong: `gpt-5.5` · Fast (default for Agent blocks): `gpt-5-mini` ·
+Embeddings: `text-embedding-3-small`. Later via Cloudflare AI Gateway: add Claude /
+Gemini / Workers AI.
 
 ## Build (new, after cleanup)
 
@@ -70,8 +72,8 @@ Embeddings: `openai/text-embedding-3-small`.
   Telegram-like list + thread view, operator reply from the UI, per-conversation
   AI on/off (when off, the agent workflow skips that customer). Copilot-built channel
   agents feed this section automatically.
-- **Cloudflare AI Gateway provider** for Agent blocks + copilot (`cf-aig-authorization`
-  header); needs Account ID, Gateway ID, API token in server `.env`.
+- **Cloudflare AI Gateway** (later, when the OpenAI budget runs out): point the OpenAI
+  provider at the gateway; needs Account ID, Gateway ID, API token in server `.env`.
 - **Branding** — Labbai name, logo, colors, emails; UZ / RU interface.
 - Own integrations: amoCRM, Bitrix24, Exely.
 
@@ -93,5 +95,5 @@ Embeddings: `openai/text-embedding-3-small`.
 ## Order of work
 
 Each step is its own commit, verified by CI (type check + tests) before the next:
-small safe removals → integrations → Stripe → LLM providers → Cloudflare →
+small safe removals → integrations → Stripe → LLM providers (OpenAI only) →
 `ee` removal + Labbai re-implementations → organization UI → branding (Labbai, UZ/RU).
