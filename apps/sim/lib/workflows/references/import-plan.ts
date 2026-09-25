@@ -13,9 +13,7 @@ import { buildWorkflowReferenceManifest } from '@/lib/workflows/references/manif
 import {
   applyDependentOverrides,
   clearDependentsOnRemap,
-  remapForkBlockType,
   remapSubBlocks,
-  replaceCustomBlockInputs,
 } from '@/lib/workflows/references/remap-references'
 import type {
   PortableReference,
@@ -84,12 +82,6 @@ function writeOccurrence(
 ): void {
   const block = Object.hasOwn(blocks, occurrence.blockId) ? blocks[occurrence.blockId] : undefined
   if (!block) throw new OrchestrationError('validation', 'Reference block does not exist')
-  if (occurrence.subBlockKey === 'type' && occurrence.valuePath.length === 0) {
-    if (typeof value !== 'string')
-      throw new OrchestrationError('validation', 'Invalid custom block binding')
-    block.type = value
-    return
-  }
   const field = Object.hasOwn(block.subBlocks, occurrence.subBlockKey)
     ? block.subBlocks[occurrence.subBlockKey]
     : undefined
@@ -497,12 +489,7 @@ export function buildWorkflowImportPlan(
         .filter((value) => value.blockId === block.id)
         .map((value) => [value.subBlockKey, value.value])
     )
-    const targetType = remapForkBlockType(block.type, resolve).type
-    const applied =
-      targetType !== block.type
-        ? replaceCustomBlockInputs(cleared, dependentValues, targetType)
-        : applyDependentOverrides(cleared, block.type, dependentValues)
-    block.type = targetType
+    const applied = applyDependentOverrides(cleared, block.type, dependentValues)
     if (remapped.canonicalModes) {
       const canonicalModes: Record<string, 'basic' | 'advanced'> = {}
       for (const [key, mode] of Object.entries(remapped.canonicalModes))

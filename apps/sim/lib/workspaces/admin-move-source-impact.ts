@@ -3,7 +3,6 @@ import {
   account,
   credential,
   credentialGroup,
-  customBlock,
   type DataRetentionSettings,
   member,
   organization,
@@ -14,7 +13,6 @@ import {
   subscription,
   user,
   userStats,
-  workflow,
   workspace,
   workspaceBYOKKeys,
   workspaceEnvironment,
@@ -26,7 +24,6 @@ import { isSubscriptionBackedEntitlement } from '@/lib/billing/core/subscription
 import { isEnterprise } from '@/lib/billing/plan-helpers'
 import { USABLE_SUBSCRIPTION_STATUSES } from '@/lib/billing/subscriptions/utils'
 import type { DbOrTx } from '@/lib/db/types'
-import { getCustomBlockUsageCounts } from '@/lib/workflows/custom-blocks/operations'
 
 /**
  * Everything the source organization loses when a workspace leaves it, plus the
@@ -65,18 +62,11 @@ const ENTERPRISE_GATED_SECTION_LABELS: Record<OrganizationSettingsSection, strin
   security: 'SCIM provisioning and outbound IP settings',
 }
 
-/**
- * Enterprise-gated capabilities that are not organization settings sections,
- * and so cannot be derived from the section union above.
- */
-const ENTERPRISE_GATED_NON_SECTION_CAPABILITIES = ['custom blocks'] as const
-
 /** Capabilities gated on the owning organization holding an Enterprise plan. */
 const ENTERPRISE_GATED_CAPABILITIES: readonly string[] = [
   ...Object.values(ENTERPRISE_GATED_SECTION_LABELS).filter(
     (label): label is string => label !== null
   ),
-  ...ENTERPRISE_GATED_NON_SECTION_CAPABILITIES,
 ]
 
 export interface WorkspaceMoveSourceOrganizationRow {
@@ -173,128 +163,6 @@ export async function findCrossOrgForkEdges(
     ...parentRows.map((row) => ({ ...row, direction: 'parent' as const })),
     ...childRows.map((row) => ({ ...row, direction: 'child' as const })),
   ]
-}
-
-export interface UnpublishableCustomBlock {
-  id: string
-  type: string
-  name: string
-  movingWorkspaceUsage: { live: number; deployed: number }
-  sourceOrgElsewhereUsage: { live: number; deployed: number }
-}
-
-/**
- * Source-org custom blocks bound to a workflow inside the moving workspace.
- *
- * Usage is reported as two separate numbers because they mean different things
- * to the admin confirming the move: placements inside the moving workspace
- * leave with it, while placements elsewhere in the source org are collateral
- * that stays behind and breaks. `getCustomBlockUsageCounts` counts the whole
- * org, so the moving workspace's own share is measured and subtracted.
- */
-export interface SourceOrgCustomBlockRow {
-  id: string
-  type: string
-  name: string
-}
-
-/**
- * The source-org custom blocks bound to this workspace's workflows, and nothing
- * more.
- *
- * Separate from {@link findUnpublishableCustomBlocks} because the move runs
- * inside a transaction and must stay on its executor: the usage counts that
- * enrich the preflight report come from `getCustomBlockUsageCounts`, which
- * reads through the global client with no executor seam. The move only needs
- * the ids to delete and the names for the audit entry, so it takes this.
- */
-export async function findSourceOrgCustomBlocksForWorkspace(
-  workspaceId: string,
-  sourceOrganizationId: string,
-  executor: DbOrTx = db
-): Promise<SourceOrgCustomBlockRow[]> {
-  return executor
-    .select({
-      id: customBlock.id,
-      type: customBlock.type,
-      name: customBlock.name,
-    })
-    .from(customBlock)
-    .innerJoin(workflow, eq(workflow.id, customBlock.workflowId))
-    .where(
-      and(
-        eq(workflow.workspaceId, workspaceId),
-        eq(customBlock.organizationId, sourceOrganizationId)
-      )
-    )
-}
-
-/**
- * Preflight-only: the blocks above, enriched with how much breaks. Never call
- * this from inside a transaction — `getCustomBlockUsageCounts` reads through
- * the global client.
- */
-export async function findUnpublishableCustomBlocks(
-  workspaceId: string,
-  sourceOrganizationId: string,
-  executor: DbOrTx = db
-): Promise<{ items: UnpublishableCustomBlock[]; total: number }> {
-  const rows = await findSourceOrgCustomBlocksForWorkspace(
-    workspaceId,
-    sourceOrganizationId,
-    executor
-  )
-
-  if (rows.length === 0) return { items: [], total: 0 }
-
-  /**
-   * Cap BEFORE the fan-out. Each surviving row costs two more queries, so
-   * enriching an unbounded set would let one admin preflight open hundreds of
-   * concurrent connections and exhaust the pool. The caller bounds the list for
-   * the contract anyway; bounding here makes the query cost bounded too.
-   */
-  const MAX_ENRICHED_BLOCKS = 500
-  const enrichable = rows.slice(0, MAX_ENRICHED_BLOCKS)
-
-  /**
-   * Both scopes are measured with the SAME predicates rather than derived by
-   * subtraction. `getCustomBlockUsageCounts` returns `usageCount` as the union
-   * of live-editor and active-deployment placements, so subtracting a
-   * live-only count from it misattributes a block that appears solely in the
-   * moving workspace's deployment to the source organization's collateral.
-   */
-  /**
-   * Bounded concurrency. Each row costs two queries, so a flat `Promise.all`
-   * over the cap would open a thousand at once and saturate the pool for an
-   * admin preflight. Chunked keeps the ceiling at `ENRICHMENT_CONCURRENCY * 2`.
-   */
-  const ENRICHMENT_CONCURRENCY = 10
-  const items: UnpublishableCustomBlock[] = []
-  for (let index = 0; index < enrichable.length; index += ENRICHMENT_CONCURRENCY) {
-    const chunk = await Promise.all(
-      enrichable.slice(index, index + ENRICHMENT_CONCURRENCY).map(async (row) => {
-        const [moving, elsewhere] = await Promise.all([
-          getCustomBlockUsageCounts(sourceOrganizationId, row.type, {
-            onlyWorkspaceId: workspaceId,
-          }),
-          getCustomBlockUsageCounts(sourceOrganizationId, row.type, {
-            excludeWorkspaceId: workspaceId,
-          }),
-        ])
-        return {
-          ...row,
-          movingWorkspaceUsage: { live: moving.usageCount, deployed: moving.deployedUsageCount },
-          sourceOrgElsewhereUsage: {
-            live: elsewhere.usageCount,
-            deployed: elsewhere.deployedUsageCount,
-          },
-        }
-      })
-    )
-    items.push(...chunk)
-  }
-  /** `total` is the untruncated row count so the caller can disclose the gap. */
-  return { items, total: rows.length }
 }
 
 export interface WorkspaceMoveCredentialSummaryRow {

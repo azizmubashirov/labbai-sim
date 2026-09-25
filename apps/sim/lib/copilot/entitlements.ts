@@ -1,7 +1,6 @@
 import { createLogger } from '@sim/logger'
 import { getErrorMessage } from '@sim/utils/errors'
 import { LRUCache } from 'lru-cache'
-import { isCustomBlocksEligible } from '@/lib/workflows/custom-blocks/operations'
 import { getWorkspaceWithOwner } from '@/lib/workspaces/permissions/utils'
 
 const logger = createLogger('CopilotEntitlements')
@@ -10,7 +9,6 @@ const logger = createLogger('CopilotEntitlements')
  * Cross-repo contract: the mothership (Go) matches these exact strings against
  * its `core.Entitlement*` constants to gate agent surfaces.
  */
-export const CUSTOM_BLOCKS_ENTITLEMENT = 'custom-blocks'
 export const ORGANIZATION_CONTEXT_ENTITLEMENT = 'organization-context'
 
 /**
@@ -34,7 +32,6 @@ const ENTITLEMENT_EVALUATORS: Record<
   string,
   (workspaceId: string, userId?: string) => Promise<boolean>
 > = {
-  [CUSTOM_BLOCKS_ENTITLEMENT]: isCustomBlocksEligible,
   [ORGANIZATION_CONTEXT_ENTITLEMENT]: isOrganizationContextAvailable,
 }
 

@@ -49,9 +49,13 @@ Done on the branch:
 - SCIM 2.0 re-implemented: `lib/labbai/scim/*`, `components/settings/scim/*`, `hooks/queries/scim.ts`,
   Security page section (gaps: new accounts skip signup hooks, eq-only filters, no
   verified-domain check; `isScimEnabled` flag must stay).
+- Custom blocks fully removed (registry, executor, copilot tool, VFS, logs, catalog `source=builtin` only).
+  Leftover: remove `isCustomBlocksEnabled` (env-flags.ts + testing mock), `CUSTOM_BLOCKS_ENABLED`
+  (+ NEXT_PUBLIC) from env.ts/.env.example; `settings-sidebar.test.tsx` and
+  `workspace-section-access.test.ts` feature fixtures still list removed keys (dataDrains, sso, …).
 
 Possibly unfinished (helpers were stopped / may have been mid-edit — verify each):
-- Removal of data retention, data drains, custom blocks, organization usage/search stats.
+- Removal of data retention, data drains, organization usage/search stats (custom blocks: done).
 
 Leftover TODOs reported by helpers:
 - Navigation (`components/settings/navigation.ts` + tests): remove section ids `forks`,

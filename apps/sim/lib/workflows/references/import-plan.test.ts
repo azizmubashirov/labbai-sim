@@ -436,11 +436,11 @@ describe('portable workflow references', () => {
               version: 1,
               references: [
                 {
-                  kind: 'custom-block',
-                  sourceId: 'custom_block_attacker',
+                  kind: 'table',
+                  sourceId: 'tbl_attacker',
                   required: true,
                   occurrences: [
-                    { blockId, subBlockKey: 'type', valuePath: [], encoding: 'scalar' },
+                    { blockId, subBlockKey: 'tableId', valuePath: [], encoding: 'scalar' },
                   ],
                 },
               ],

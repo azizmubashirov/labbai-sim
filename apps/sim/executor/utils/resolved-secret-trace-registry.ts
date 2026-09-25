@@ -2635,9 +2635,8 @@ export class ResolvedSecretTraceRegistry {
      * Exempt entries are omitted from every envelope — that is what lets per-span display
      * projection show the plaintext, durable sidecars leave files unlocked, and opaque
      * model-input validation accept the value. EXCEPT under forced anonymity: that envelope
-     * crosses into a scope where the flagging workspace's decision carries no authority (the
-     * custom-block crossing runs the child in the source workflow's workspace), so exempt
-     * entries are kept — anonymized — rather than dropped. The protected set is computed over
+     * crosses into a scope where the flagging workspace's decision carries no authority, so
+     * exempt entries are kept — anonymized — rather than dropped. The protected set is computed over
      * the full active set, not the caller's selection, so a colliding non-exempt owner keeps
      * the entry no matter which paths vouched for the value.
      */

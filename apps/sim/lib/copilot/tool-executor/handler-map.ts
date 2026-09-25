@@ -31,7 +31,6 @@ import {
   OauthRequestAccess,
   OpenResource,
   PromoteToLive,
-  PublishCustomBlock,
   Read as ReadTool,
   Redeploy,
   RestoreResource,
@@ -50,7 +49,6 @@ import {
 } from '@/lib/copilot/generated/tool-catalog-v1'
 import { createServerToolHandler } from '@/lib/copilot/tools/registry/server-tool-adapter'
 import { getRegisteredServerToolNames } from '@/lib/copilot/tools/server/router'
-import { executeDeployCustomBlock } from '../tools/handlers/deployment/custom-block'
 import {
   executeDeployApi,
   executeDeployChat,
@@ -142,7 +140,6 @@ export function buildHandlerMap(): Record<string, ToolHandler> {
     [DeployAsApi.id]: h(executeDeployApi),
     [DeployAsChat.id]: h(executeDeployChat),
     [DeployAsMcp.id]: h(executeDeployMcp),
-    [PublishCustomBlock.id]: h(executeDeployCustomBlock),
     [Redeploy.id]: h(executeRedeploy),
     [GetDeploymentStatus.id]: h(executeCheckDeploymentStatus),
     [ListWorkspaceMcpServers.id]: h(executeListWorkspaceMcpServers),

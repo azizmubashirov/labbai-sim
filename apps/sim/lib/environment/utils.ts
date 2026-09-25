@@ -495,12 +495,9 @@ export async function getExecutionEnvironment(
    *
    * Checked before the single-identity shortcut below rather than alongside the
    * access lookups, because "the caller already cleared this identity" does not
-   * hold everywhere: a custom-block child is admitted by
-   * `admitCustomBlockChildExecution`, which checks usage limits and nothing
-   * else, and a provider URL-validation challenge resolves with no admission at
-   * all. Behind the shortcut, a publisher who is also their workspace's billing
-   * account made both identities equal and skipped the gate entirely — the one
-   * arrangement where suspension was silently ignored.
+   * hold everywhere: a provider URL-validation challenge resolves with no
+   * admission at all. Behind the shortcut, a user who is also their workspace's
+   * billing account made both identities equal and skipped the gate entirely.
    *
    * Only the personal namespace is withheld. Workspace variables belong to the
    * workspace rather than to a person, so they keep resolving and the runs a

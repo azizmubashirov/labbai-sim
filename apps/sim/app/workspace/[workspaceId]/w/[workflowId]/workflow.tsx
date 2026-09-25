@@ -2823,8 +2823,7 @@ const WorkflowContent = React.memo(
     const getBlockConfig = useCallback((type: string) => {
       const cached = blockConfigCache.current.get(type)
       if (cached) return cached
-      // Don't cache a miss: custom (deploy-as-block) blocks resolve only once the
-      // client overlay hydrates, so an early miss must re-resolve on a later render.
+      // Don't cache a miss, so an unknown type re-resolves on a later render.
       const config = getBlock(type)
       if (config) blockConfigCache.current.set(type, config)
       return config

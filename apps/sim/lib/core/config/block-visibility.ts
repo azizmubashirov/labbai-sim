@@ -11,14 +11,6 @@ import { getPreviewBlocksFromEnv, isAppConfigEnabled } from '@/lib/core/config/e
  */
 const BLOCK_VISIBILITY_PROFILE = 'block-visibility'
 
-/**
- * Custom (deploy-as-block) block types are org-scoped and managed by their own
- * enabled/disabled lifecycle — the visibility document must never gate them.
- * Literal mirrors `CUSTOM_BLOCK_TYPE_PREFIX` in `@/blocks/custom/build-config`,
- * not imported to keep the blocks graph out of this config module.
- */
-const CUSTOM_BLOCK_KEY_PREFIX = 'custom_block_'
-
 /** Per-request evaluation context; same shape as the feature-flag context. */
 export type BlockVisibilityContext = AppConfigGateContext
 
@@ -42,11 +34,7 @@ export interface BlockVisibilityState {
 }
 
 function parseVisibilityConfig(json: unknown): Record<string, AppConfigGateRule> {
-  const rules = parseGateConfig(json)
-  for (const key of Object.keys(rules)) {
-    if (key.startsWith(CUSTOM_BLOCK_KEY_PREFIX)) delete rules[key]
-  }
-  return rules
+  return parseGateConfig(json)
 }
 
 /**

@@ -130,10 +130,10 @@ describe('resolveToolsLabel', () => {
 
   it('falls back to the stored title, then the raw type id, for unresolvable block types', () => {
     expect(
-      resolveToolsLabel(toolInput, [{ type: 'custom_block_gone', title: 'Invoice Parser' }], [])
+      resolveToolsLabel(toolInput, [{ type: 'unknown_block_gone', title: 'Invoice Parser' }], [])
     ).toBe('Invoice Parser')
-    expect(resolveToolsLabel(toolInput, [{ type: 'custom_block_gone' }], [])).toBe(
-      'custom_block_gone'
+    expect(resolveToolsLabel(toolInput, [{ type: 'unknown_block_gone' }], [])).toBe(
+      'unknown_block_gone'
     )
   })
 

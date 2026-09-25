@@ -10,7 +10,6 @@ const mocks = vi.hoisted(() => ({
   resolvePermission: vi.fn(),
   allowedIntegrationTypes: vi.fn(),
   getBlockVisibility: vi.fn(),
-  listCustomBlocks: vi.fn(),
   isDeploymentAvailable: vi.fn(),
   recordAudit: vi.fn(),
   getAllBlocks: vi.fn(),
@@ -47,16 +46,8 @@ vi.mock('@/lib/core/config/block-visibility', () => ({
   getBlockVisibility: mocks.getBlockVisibility,
 }))
 
-vi.mock('@/lib/workflows/custom-blocks/operations', () => ({
-  listCustomBlocksWithInputsForWorkspace: mocks.listCustomBlocks,
-}))
-
 vi.mock('@/lib/integrations/availability.server', () => ({
   isIntegrationDeploymentAvailableForVisibility: mocks.isDeploymentAvailable,
-}))
-
-vi.mock('@/blocks/custom/server-overlay', () => ({
-  withCustomBlockOverlay: <T>(_rows: unknown, run: () => Promise<T>) => run(),
 }))
 
 vi.mock('@/blocks/visibility/server-context', () => ({
@@ -213,7 +204,6 @@ describe('executeToolForCaller', () => {
     mocks.resolvePermission.mockResolvedValue('write')
     mocks.allowedIntegrationTypes.mockResolvedValue(null)
     mocks.getBlockVisibility.mockResolvedValue({ revealed: new Set(), disabled: new Set() })
-    mocks.listCustomBlocks.mockResolvedValue([])
     mocks.isDeploymentAvailable.mockReturnValue(true)
     mocks.getAllBlocks.mockReturnValue([
       slackBlock,

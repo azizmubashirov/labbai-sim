@@ -53,7 +53,6 @@ export type AsyncExecutionCorrelationSource =
   | 'workflow'
   | 'schedule'
   | 'webhook'
-  | 'custom_block'
   | 'workflow_group'
 
 export interface AsyncExecutionCorrelation {
@@ -72,11 +71,6 @@ export interface AsyncExecutionCorrelation {
   tableId?: string
   rowId?: string
   groupId?: string
-  /**
-   * Workspace of the invoking run. Set for custom-block children, whose invoker
-   * lives in a different workspace than the log row this correlation lands on.
-   */
-  invokerWorkspaceId?: string
 }
 
 export interface WorkflowGroupExecutionCorrelation extends AsyncExecutionCorrelation {

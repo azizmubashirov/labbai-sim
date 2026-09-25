@@ -126,14 +126,6 @@ vi.mock('@/background/workflow-execution', () => ({
   executeWorkflowJob: vi.fn(),
 }))
 
-vi.mock('@/lib/workflows/custom-blocks/operations', () => ({
-  getCustomBlockRowsForWorkspace: vi.fn().mockResolvedValue([]),
-}))
-
-vi.mock('@/blocks/custom/server-overlay', () => ({
-  withCustomBlockOverlay: vi.fn(async (_rows: unknown, fn: () => unknown) => fn()),
-}))
-
 vi.mock('@/serializer', () => ({
   Serializer: class {
     serializeWorkflow() {

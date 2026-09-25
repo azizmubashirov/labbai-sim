@@ -11,7 +11,6 @@ import { type IsToolAllowed, OPERATION_SUBBLOCK_ID } from '@/lib/permission-grou
 import { isRetryEligibleBlock } from '@/lib/workflows/blocks/retry-eligibility'
 import { isSubBlockHidden } from '@/lib/workflows/subblocks/visibility'
 import { getBlock } from '@/blocks'
-import { isCustomBlockType } from '@/blocks/custom/build-config'
 import type { BlockConfig, SubBlockConfig } from '@/blocks/types'
 import { isHiddenUnder } from '@/blocks/visibility/context'
 import { PROVIDER_DEFINITIONS } from '@/providers/models'
@@ -592,17 +591,13 @@ export function serializeBlockSchema(
   block: BlockConfig,
   options?: ComponentSerializationOptions
 ): string {
-  // Custom blocks bake their `workflowId`/`inputMapping` as `hidden` sub-blocks;
-  // treat `hidden` as hidden for them so those never reach the agent's schema.
-  const customBlock = isCustomBlockType(block.type)
   const hosted = options?.hosted ?? isHosted
   const explicitlyHidden = options?.hiddenInputIds ?? new Set<string>()
   const visibleSubBlocks = block.subBlocks.filter(
     (sb) =>
       !explicitlyHidden.has(sb.id) &&
       !sb.hideFromCopilot &&
-      !isSubBlockHidden(sb, { hosted }) &&
-      !(customBlock && sb.hidden)
+      !isSubBlockHidden(sb, { hosted })
   )
   const visibleIds = new Set(visibleSubBlocks.map((sb) => sb.id))
   const hiddenIds = new Set(
@@ -611,8 +606,7 @@ export function serializeBlockSchema(
         (sb) =>
           explicitlyHidden.has(sb.id) ||
           sb.hideFromCopilot ||
-          isSubBlockHidden(sb, { hosted }) ||
-          (customBlock && sb.hidden)
+          isSubBlockHidden(sb, { hosted })
       )
       .map((sb) => sb.id)
       .filter((id) => !visibleIds.has(id))
@@ -700,12 +694,7 @@ export function serializeBlockSchema(
         }) || undefined,
       singleInstance: block.singleInstance || undefined,
       authMode: block.authMode || undefined,
-      // Custom (deploy-as-block) blocks execute via a baked `workflow_executor`
-      // internally; that's implementation plumbing, not something the agent
-      // configures. Hiding it keeps the block self-contained (fields in, outputs
-      // out) so the agent doesn't treat it like the generic workflow block and
-      // ask for a workflowId/inputMapping.
-      tools: isCustomBlockType(block.type) ? [] : accessibleTools,
+      tools: accessibleTools,
       toolAuth: Object.keys(toolAuth).length > 0 ? toolAuth : undefined,
       subBlocks,
       inputs,
@@ -1462,108 +1451,24 @@ export function serializeAccessControl(input: {
 }
 
 /**
- * `organization/custom-blocks.json` — names-only index of org-published
- * blocks, mirroring the root pattern: the index lists, the per-item file
- * carries depth. Everything beyond name/enabled lives in
- * `organization/custom-blocks/{type}.json`.
- */
-export function serializeOrganizationCustomBlocks(
-  blocks: Array<{
-    type: string
-    name: string
-    description?: string | null
-    enabled: boolean
-    workflowId: string
-    workflowName?: string | null
-    workspaceId: string | null
-    workspaceName?: string | null
-  }>
-): string {
-  return JSON.stringify(
-    {
-      customBlocks: blocks.map((block) => ({
-        type: block.type,
-        name: block.name,
-        enabled: block.enabled,
-        detail: `organization/custom-blocks/${block.type}.json`,
-      })),
-      note: 'Names only — provenance and the deployed workflow graph are in each detail file. Start at organization/README.md.',
-    },
-    null,
-    2
-  )
-}
-
-/**
- * `organization/custom-blocks/{type}.json` — one published block in depth:
- * provenance, the callable-schema pointer, and a READ-ONLY view of the
- * deployed workflow graph backing it (blocks/edges as deployed, not the
- * publishing workspace's live editor state). Publishing a block org-wide is
- * the act of sharing it, which is what justifies this cross-workspace read.
- */
-export function serializeOrgCustomBlockDetail(
-  block: {
-    type: string
-    name: string
-    description?: string | null
-    enabled: boolean
-    workflowId: string
-    workflowName?: string | null
-    workspaceId: string | null
-    workspaceName?: string | null
-  },
-  deployedState: unknown
-): string {
-  return JSON.stringify(
-    {
-      type: block.type,
-      name: block.name,
-      ...(block.description ? { description: block.description } : {}),
-      enabled: block.enabled,
-      publishedFrom: {
-        workflowId: block.workflowId,
-        ...(block.workflowName ? { workflowName: block.workflowName } : {}),
-        ...(block.workspaceId ? { workspaceId: block.workspaceId } : {}),
-        ...(block.workspaceName ? { workspaceName: block.workspaceName } : {}),
-      },
-      ...(block.enabled ? { schema: `components/blocks/${block.type}.json` } : {}),
-      deployedWorkflowState: deployedState,
-      note: 'Read-only: this is the DEPLOYED graph the block executes, not live editor state, and it cannot be edited from here. Credential ids and {{ENV_VAR}} references inside it belong to the publishing workspace and resolve only there. To wire the block into a workflow, use its schema under components/blocks/.',
-    },
-    null,
-    2
-  )
-}
-
-/**
  * `organization/README.md` — the namespace guide, playing the role
- * WORKSPACE.md plays at the root: what each file is for and how to use it,
- * plus the in-depth custom-block inventory the names-only index defers.
+ * WORKSPACE.md plays at the root: what each file is for and how to use it.
  */
 export function buildOrganizationReadme(input: {
   organizationId: string
   isEnterprise: boolean
-  customBlocks: Array<{
-    type: string
-    name: string
-    enabled: boolean
-    workflowName?: string | null
-    workspaceName?: string | null
-  }>
   permissionGroupsMounted: boolean
   connectedAccountsMounted: boolean
 }): string {
   const lines: string[] = [
     '# Organization',
     '',
-    `Read-only truth about organization \`${input.organizationId}\` as the acting user sees it. Nothing here is writable — org membership, permission groups, and block publishing are all managed in the Sim UI.`,
+    `Read-only truth about organization \`${input.organizationId}\` as the acting user sees it. Nothing here is writable — org membership and permission groups are managed in the Sim UI.`,
     '',
     '## Files',
     '',
     '- `organization.json` — org identity, your relationship (internal/external) and role, who can manage it. Plan usage and credits live in `account/billing.json`, not here.',
     '- `access-control.json` — the permission group governing YOU and the restrictions it enforces. Restrictions are enforced server-side on every action, so consult this before promising an action is possible. It describes this user only.',
-    '- `custom-blocks.json` — names-only index of org-published blocks.',
-    '- `custom-blocks/{type}.json` — one block in depth: provenance and a read-only view of the DEPLOYED workflow graph backing it (org members only). To add the block to a workflow, use its callable schema at `components/blocks/{type}.json`; the deployed graph is for understanding what the block does, not for editing.',
     '- `workspaces.json` — every workspace in the organization with your access flag (org members only).',
   ]
   if (input.permissionGroupsMounted) {
@@ -1575,17 +1480,6 @@ export function buildOrganizationReadme(input: {
     lines.push(
       '- `connected-accounts.json` — the workspace’s account configuration and provider readiness (workspace admins only). Use the Connected Accounts block in workflows.'
     )
-  }
-  lines.push('', '## Published custom blocks', '')
-  if (input.customBlocks.length === 0) {
-    lines.push('None published yet.')
-  } else {
-    for (const block of input.customBlocks) {
-      const from = [block.workflowName, block.workspaceName].filter(Boolean).join(' in ')
-      lines.push(
-        `- **${block.name}** (\`${block.type}\`)${block.enabled ? '' : ' — disabled'}${from ? ` — published from ${from}` : ''}`
-      )
-    }
   }
   lines.push('')
   return lines.join('\n')

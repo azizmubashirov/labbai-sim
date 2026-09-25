@@ -474,12 +474,12 @@ export interface ResolveStoredToolNameOptions {
 
 /**
  * Resolves one stored tool entry to its display name. Canonical sources win —
- * the block registry (including the custom-block overlay), the custom-tool
- * record, live MCP server data — so edits to the entry's mutable `title` in
- * workflow state cannot relabel a tool that has a canonical name. The stored
- * title is the fallback for entries with no resolvable source (deleted custom
- * blocks, MCP entries while server data is unavailable, legacy inline custom
- * tools where the title is the identity), ahead of the raw type id.
+ * the block registry, the custom-tool record, live MCP server data — so edits
+ * to the entry's mutable `title` in workflow state cannot relabel a tool that
+ * has a canonical name. The stored title is the fallback for entries with no
+ * resolvable source (unknown block types, MCP entries while server data is
+ * unavailable, legacy inline custom tools where the title is the identity),
+ * ahead of the raw type id.
  */
 export function resolveStoredToolName(
   tool: unknown,

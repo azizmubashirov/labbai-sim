@@ -641,11 +641,9 @@ describe('getExecutionEnvironment', () => {
   })
 
   /**
-   * The arrangement that slipped past a split-path-only check: a custom-block
-   * publisher who is also their workspace's billing account makes both
-   * identities equal, taking the single-identity shortcut. That path has no
-   * admission gate at all — `admitCustomBlockChildExecution` checks usage limits
-   * and nothing else — so the suspension has to be enforced here.
+   * The arrangement that slipped past a split-path-only check: a user who is
+   * also their workspace's billing account makes both identities equal, taking
+   * the single-identity shortcut, so the suspension has to be enforced here.
    */
   it('withholds the personal namespace when both identities are the same suspended user', async () => {
     grantAdminTo('publisher-1')

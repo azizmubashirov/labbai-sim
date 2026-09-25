@@ -26,8 +26,6 @@ import { parseLargeExecutionValue } from '@/lib/execution/payloads/large-executi
 import type { LoggingSession } from '@/lib/logs/execution/logging-session'
 import { buildTraceSpans } from '@/lib/logs/execution/trace-spans/trace-spans'
 import { resolveActiveWorkflowApplicationContext } from '@/lib/workflows/application/context'
-import { waitForChildRuns } from '@/lib/workflows/custom-blocks/child-execution'
-import { getCustomBlockRowsForWorkspace } from '@/lib/workflows/custom-blocks/operations'
 import { resolveStartBlockRunIdentity } from '@/lib/workflows/executor/start-run-identity'
 import {
   loadDeployedWorkflowState,
@@ -36,7 +34,6 @@ import {
 } from '@/lib/workflows/persistence/utils'
 import { TriggerUtils } from '@/lib/workflows/triggers/triggers'
 import { updateWorkflowRunCounts } from '@/lib/workflows/utils'
-import { withCustomBlockOverlay } from '@/blocks/custom/server-overlay'
 import { Executor } from '@/executor'
 import type { ExecutionSnapshot } from '@/executor/execution/snapshot'
 import type {
@@ -354,11 +351,7 @@ async function finalizeExecutionError(params: {
 }
 
 /**
- * Establish the custom-block registry overlay for the execution's organization,
- * then run the core. Wrapping here — the shared choke point for the sync route and
- * the background job — puts `custom_block_*` types in scope for serialization,
- * execution, and any nested child-workflow serialization (ALS propagates to the
- * whole async subtree).
+ * Run the core — the shared choke point for the sync route and the background job.
  *
  * Also begins the execution-signal subscriber's connection first: every
  * execution subscribes to cancellation signals once its engine starts, so
@@ -373,12 +366,7 @@ export async function executeWorkflowCore(
 ): Promise<ExecutionResult> {
   connectExecutionSignalHub()
   const workspaceId = options.snapshot.metadata.workspaceId
-  const rows = workspaceId
-    ? await withDatabaseReadRetry(() => getCustomBlockRowsForWorkspace(workspaceId), {
-        label: 'getCustomBlockRowsForWorkspace',
-      })
-    : []
-  const execute = () => withCustomBlockOverlay(rows, () => executeWorkflowCoreImpl(options))
+  const execute = () => executeWorkflowCoreImpl(options)
   if (!isOutboundRoutingEnabled()) return execute()
   const context = await resolveActiveWorkflowApplicationContext({
     workflowId: options.snapshot.metadata.workflowId,
@@ -442,11 +430,6 @@ async function executeWorkflowCoreImpl(
     while (pendingLifecycleCallbacks.size > 0) {
       await Promise.allSettled([...pendingLifecycleCallbacks])
     }
-    // A custom block's child is a separate execution with its own log row, and
-    // the engine does not drain in-flight nodes on cancel/timeout — await it here
-    // (bounded) so the row is not left `running` when this run finishes or the
-    // worker exits.
-    await waitForChildRuns(executionId)
   }
 
   try {
@@ -937,11 +920,10 @@ async function executeWorkflowCoreImpl(
       // a client session — the execute route rejects `isClientSession` for API-key
       // and public-API callers, so it implies an authenticated session. Every other
       // surface (chat deployments, webhooks, schedules, background jobs) leaves this
-      // unset, which is what keeps a custom block from streaming its SOURCE
-      // workspace's block events to a consumer who may be an anonymous visitor.
+      // unset, since their stream consumer may be an anonymous visitor.
       ...(metadata.isClientSession ? { liveTraceViewerUserId: userId } : {}),
       // The RAW callbacks, not the `wrapped*` composites above: these emit to the stream
-      // without writing this run's progress markers. Only a custom block's child uses them.
+      // without writing this run's progress markers.
       liveStreamCallbacks: { onBlockStart, onBlockComplete },
     }
 

@@ -232,7 +232,6 @@ const WORKFLOW_SCOPED_TOOL_IDS = new Set<string>([
   'deploy_as_api',
   'diff_workflows',
   'list_deployment_versions',
-  'publish_custom_block',
   'deploy_as_chat',
   'deploy_as_mcp',
   'get_block_outputs',

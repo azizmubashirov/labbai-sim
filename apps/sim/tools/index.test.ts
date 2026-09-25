@@ -42,7 +42,7 @@ import { buildFunctionExecuteBody } from '@/tools/function/execute'
 import { memoryAddTool } from '@/tools/memory/add'
 import { createInternalToolOperationInput } from '@/tools/operation-input'
 import { tableBatchInsertRowsTool } from '@/tools/table/batch_insert_rows'
-import type { InternalToolConfig, ToolResponse } from '@/tools/types'
+import type { InternalToolConfig } from '@/tools/types'
 import { workflowExecutorTool } from '@/tools/workflow/executor'
 
 // Hoisted mock state - these are available to vi.mock factories

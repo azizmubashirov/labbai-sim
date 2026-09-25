@@ -8,7 +8,7 @@ import { defineWorkspaceOperation } from '@/lib/core/application/workspace-opera
  * shipped precedent for "a code-defined registry whose availability is evaluated
  * per workspace", and these catalogs are the same thing — filtered by the
  * workspace's integration allowlist, the organization's revealed preview blocks,
- * the deployment's allowlist, and the workspace's own deployed custom blocks.
+ * and the deployment's allowlist.
  *
  * No `delegated` principal kind: Copilot reads these catalogs through its own
  * tools, which share the projection rather than the use case, so adding one

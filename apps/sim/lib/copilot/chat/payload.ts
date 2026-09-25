@@ -61,7 +61,7 @@ interface BuildPayloadParams {
   workspaceContext?: string
   vfs?: VfsSnapshotV1
   userPermission?: string
-  /** Plan/flag-gated org capabilities (e.g. "custom-blocks") the mothership gates tools/prompts on. */
+  /** Plan/flag-gated org capabilities (e.g. "organization-context") the mothership gates tools/prompts on. */
   entitlements?: string[]
   userTimezone?: string
   userMetadata?: {

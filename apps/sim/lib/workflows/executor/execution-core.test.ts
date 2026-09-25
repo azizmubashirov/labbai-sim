@@ -104,10 +104,6 @@ vi.mock('@/lib/logs/execution/trace-spans/trace-spans', () => ({
 
 vi.mock('@/lib/workflows/persistence/utils', () => workflowsPersistenceUtilsMock)
 
-vi.mock('@/lib/workflows/custom-blocks/operations', () => ({
-  getCustomBlockRowsForWorkspace: vi.fn().mockResolvedValue([]),
-}))
-
 vi.mock('@sim/workflow-persistence/subblocks', () => ({
   mergeSubblockStateWithValues: mergeSubblockStateWithValuesMock,
 }))
@@ -381,8 +377,8 @@ describe('executeWorkflowCore terminal finalization sequencing', () => {
     })
 
     // Asserted with no await in between: the handshake has to start ahead of
-    // the custom-block read, or it stops overlapping the work that precedes the
-    // cancellation subscribe and is paid inside that subscribe's budget instead.
+    // the reads that precede the cancellation subscribe, or it is paid inside
+    // that subscribe's budget instead.
     expect(connectExecutionSignalHubMock).toHaveBeenCalledOnce()
 
     await executionPromise

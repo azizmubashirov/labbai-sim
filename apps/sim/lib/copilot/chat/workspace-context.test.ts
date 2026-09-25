@@ -242,28 +242,3 @@ describe('buildWorkspaceMd - determinism (prompt-cache stability)', () => {
     expect(a).not.toContain('rows')
   })
 })
-
-describe('custom blocks', () => {
-  const customBlocks = [
-    { type: 'custom_block_abc', name: 'Invoice Parser', description: 'Parses invoices' },
-  ]
-
-  it('renders a Custom Blocks section in the workspace markdown', () => {
-    const md = buildWorkspaceMd(baseData({ customBlocks }))
-    expect(md).toContain('## Custom Blocks (1)')
-    expect(md).toContain('- **Invoice Parser** (custom_block_abc) — Parses invoices')
-  })
-
-  it('omits the section when there are no custom blocks', () => {
-    expect(buildWorkspaceMd(baseData())).not.toContain('## Custom Blocks')
-  })
-
-  it('carries custom blocks in the typed snapshot keyed by type (Go diffs the customBlocks kind)', () => {
-    const withBlocks = buildVfsSnapshot(baseData({ customBlocks }))
-    expect(withBlocks.customBlocks).toEqual([
-      { type: 'custom_block_abc', name: 'Invoice Parser', description: 'Parses invoices' },
-    ])
-    const without = buildVfsSnapshot(baseData())
-    expect(without.customBlocks).toEqual([])
-  })
-})

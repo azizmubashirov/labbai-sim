@@ -1,7 +1,6 @@
 import type { Principal } from '@sim/auth/principal'
 import {
   credential,
-  customBlock,
   customTools,
   document,
   folder,
@@ -10,7 +9,6 @@ import {
   skill,
   userTableDefinitions,
   workflow,
-  workflowDeploymentVersion,
   workspace,
   workspaceEnvironment,
   workspaceFiles,
@@ -241,23 +239,6 @@ async function loadTargetRevisions(
     ids.add(targetId)
     groups.set(kind, ids)
   }
-  const customTypes = [...(groups.get('custom-block') ?? [])]
-  const customBlocks = customTypes.length
-    ? await executor
-        .select({ id: customBlock.id, workflowId: customBlock.workflowId })
-        .from(customBlock)
-        .innerJoin(workspace, eq(workspace.organizationId, customBlock.organizationId))
-        .where(and(eq(workspace.id, workspaceId), inArray(customBlock.type, customTypes)))
-    : []
-  if (lock && customBlocks.length) {
-    const backingIds = [...new Set(customBlocks.map((row) => row.workflowId))].sort()
-    await executor.execute(
-      sql`SELECT id FROM ${workflow} WHERE id IN (${sql.join(
-        backingIds.map((id) => sql`${id}`),
-        sql`, `
-      )}) ORDER BY id FOR SHARE`
-    )
-  }
   for (const [kind, ids] of [...groups].sort(([a], [b]) => a.localeCompare(b))) {
     const values = sql.join(
       [...ids].map((id) => sql`${id}`),
@@ -279,16 +260,6 @@ async function loadTargetRevisions(
         break
       case 'sandbox':
         rows = sql`SELECT r.id, to_jsonb(r) AS state FROM ${workspaceSandbox} r WHERE r.id IN (${values})`
-        break
-      case 'custom-block':
-        rows = sql`SELECT r.id, to_jsonb(r) || jsonb_build_object('deployment', d.state) AS state FROM ${customBlock} r LEFT JOIN ${workflowDeploymentVersion} d ON d.workflow_id = r.workflow_id AND d.is_active = true WHERE r.id IN (${
-          customBlocks.length
-            ? sql.join(
-                customBlocks.map((row) => sql`${row.id}`),
-                sql`, `
-              )
-            : sql`NULL`
-        })`
         break
       case 'custom-tool':
         rows = sql`SELECT r.id, to_jsonb(r) AS state FROM ${customTools} r WHERE r.id IN (${values})`

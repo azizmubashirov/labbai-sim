@@ -6,7 +6,6 @@ import {
 import { fileUploadReferencePositions } from '@/lib/workflows/references/remap-files'
 import {
   createCanonicalModeGates,
-  remapForkBlockType,
   remapSubBlocks,
 } from '@/lib/workflows/references/remap-references'
 import type {
@@ -65,14 +64,6 @@ export function buildWorkflowReferenceManifest(
     references.set(key, entry)
   }
   for (const block of Object.values(blocks)) {
-    const custom = remapForkBlockType(block.type, (_kind, id) => id)
-    if (custom.reference)
-      record('custom-block', block.type, true, {
-        blockId: block.id,
-        subBlockKey: 'type',
-        valuePath: [],
-        encoding: 'scalar',
-      })
     const context = {
       registeredReferencesOnly: true,
       blockId: block.id,

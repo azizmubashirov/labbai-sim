@@ -41,7 +41,6 @@ export function getConfiguredConversationToolBinding(tool: ProviderToolConfig): 
         usageControl: tool.usageControl,
         transform: tool.paramsTransform?.toString(),
         jsonShapedParamKeys: tool.jsonShapedParamKeys,
-        customInputs: tool.customBlockInputFields,
       })
     )
     .digest('hex')

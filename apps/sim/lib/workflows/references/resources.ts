@@ -1,6 +1,5 @@
 import {
   credential,
-  customBlock,
   customTools,
   document,
   folder as folderTable,
@@ -17,7 +16,6 @@ import {
   workspaceSandbox,
 } from '@sim/db/schema'
 import { and, asc, count, eq, exists, gt, inArray, isNull, sql } from 'drizzle-orm'
-import { alias } from 'drizzle-orm/pg-core'
 import type { DbOrTx } from '@/lib/db/types'
 import { MAX_FOLDERS_PER_WORKSPACE } from '@/lib/folders/constants'
 import { parseFolderPath, ROOT_FOLDER_PATH } from '@/lib/folders/paths'
@@ -147,57 +145,6 @@ const skillCandidatesQuery = (
     : ids
       ? query
       : query.limit(CANDIDATE_LIMIT)
-}
-
-/**
- * Custom-block mapping candidates, keyed by BLOCK TYPE (`custom_block_<slug>`), not
- * `custom_block.id` — a placed block references the type, and every kind keys by whatever
- * the workflow references (`file` by storage key, `env-var` by name).
- *
- * The ONLY candidate query scoped by ORGANIZATION rather than workspace: `custom_block` is
- * keyed `(organization_id, type)` and binds a workflow in the PUBLISHER's workspace, so the
- * blocks a workspace may place are its org's, not its own. A fork inherits its parent's
- * organization, so both sides of an edge see the SAME candidate set — which is exactly why
- * an environment must be told which of them to bind. Two environments' blocks usually share
- * a name, so the label carries the source workspace to make that choice legible.
- *
- * Disabled blocks are excluded: `getCustomBlockAuthority` refuses them at execution, so
- * mapping onto one would produce a block that fails every run with `unavailable`.
- */
-const customBlockCandidatesQuery = async (
-  executor: DbOrTx,
-  workspaceId: string,
-  types?: string[]
-): Promise<ForkResourceCandidate[]> => {
-  const [consumerWorkspace] = await executor
-    .select({ organizationId: workspace.organizationId })
-    .from(workspace)
-    .where(eq(workspace.id, workspaceId))
-    .limit(1)
-  if (!consumerWorkspace?.organizationId) return []
-
-  const sourceWorkspace = alias(workspace, 'custom_block_source_workspace')
-  const query = executor
-    .select({
-      id: customBlock.type,
-      name: customBlock.name,
-      sourceWorkspaceName: sourceWorkspace.name,
-    })
-    .from(customBlock)
-    .innerJoin(workflow, eq(workflow.id, customBlock.workflowId))
-    .leftJoin(sourceWorkspace, eq(sourceWorkspace.id, workflow.workspaceId))
-    .where(
-      and(
-        eq(customBlock.organizationId, consumerWorkspace.organizationId),
-        eq(customBlock.enabled, true),
-        types ? inArray(customBlock.type, types) : undefined
-      )
-    )
-  const rows = await (types ? query : query.limit(CANDIDATE_LIMIT))
-  return rows.map((row) => ({
-    id: row.id,
-    label: row.sourceWorkspaceName ? `${row.name} (${row.sourceWorkspaceName})` : row.name,
-  }))
 }
 
 const mcpServerCandidatesQuery = (
@@ -346,7 +293,6 @@ export async function listForkResourceCandidates(
     skills,
     files,
     fileFolders,
-    customBlocks,
     sandboxes,
   ] = await Promise.all([
     executor
@@ -378,7 +324,6 @@ export async function listForkResourceCandidates(
     skillCandidatesQuery(executor, workspaceId),
     fileCandidatesQuery(executor, workspaceId),
     fileFolderCandidatesQuery(executor, workspaceId),
-    customBlockCandidatesQuery(executor, workspaceId),
     sandboxCandidatesQuery(executor, workspaceId),
   ])
 
@@ -399,7 +344,6 @@ export async function listForkResourceCandidates(
     'knowledge-base': kbs,
     'mcp-server': servers,
     'custom-tool': tools,
-    'custom-block': customBlocks,
     skill: skills,
     sandbox: sandboxes,
     'knowledge-document': [],
@@ -440,7 +384,6 @@ async function loadForkResourceRows(
   const mcpIds = ids('mcp-server')
   const toolIds = ids('custom-tool')
   const skillIds = ids('skill')
-  const customBlockIds = ids('custom-block')
   const sandboxIds = ids('sandbox')
   // Files are identified by storage key (not `workspace_files.id`); a copied file's mapping
   // target is its child storage key, so existence is checked by key in the target workspace.
@@ -457,7 +400,6 @@ async function loadForkResourceRows(
     skills,
     files,
     fileFolders,
-    customBlocks,
     sandboxes,
   ] = await Promise.all([
     credIds.length === 0
@@ -510,9 +452,6 @@ async function loadForkResourceRows(
     fileFolderPaths.length === 0
       ? Promise.resolve([] as ForkResourceRow[])
       : fileFolderCandidatesQuery(executor, workspaceId, fileFolderPaths),
-    customBlockIds.length === 0
-      ? Promise.resolve([] as ForkResourceRow[])
-      : customBlockCandidatesQuery(executor, workspaceId, customBlockIds),
     sandboxIds.length === 0
       ? Promise.resolve([] as ForkResourceRow[])
       : sandboxCandidatesQuery(executor, workspaceId, sandboxIds),
@@ -530,9 +469,6 @@ async function loadForkResourceRows(
   // `fileCandidatesQuery` exposes the storage key under `id`, so file rows key by `r.id`.
   if (fileKeys.length > 0) result.file = files
   if (fileFolderPaths.length > 0) result['file-folder'] = fileFolders
-  // Resolved through the workspace's ORGANIZATION, so a block published from a sibling
-  // workspace still counts as existing here - which is the normal case for an environment.
-  if (customBlockIds.length > 0) result['custom-block'] = customBlocks
   return result
 }
 

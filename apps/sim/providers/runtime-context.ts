@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { createLogger } from '@sim/logger'
 import { getErrorMessage } from '@sim/utils/errors'
-import { isRecordLike, omit } from '@sim/utils/object'
+import { isRecordLike } from '@sim/utils/object'
 import { projectToolResultForCopilot } from '@/lib/copilot/request/tools/resolved-secret-result'
 import type { ToolExecutionResult } from '@/lib/copilot/tool-executor/types'
 import {
@@ -13,10 +13,6 @@ import {
   AGENT_MEMORY_RETRIEVAL_TOOL_ID,
   type AgentMemoryRetrievalBinding,
 } from '@/lib/memory/retrieval-tool-types'
-import {
-  CHILD_EXECUTION_ID_OUTPUT_KEY,
-  CHILD_TRACE_DISABLED_OUTPUT_KEY,
-} from '@/executor/constants'
 import type { ExecutionContext } from '@/executor/types'
 import type { ResolvedSecretTraceRegistry } from '@/executor/utils/resolved-secret-trace-registry'
 import { getPreparedProviderToolInputProvenance } from '@/providers/tool-input-provenance'
@@ -82,31 +78,6 @@ function toProviderModelResponse(
       ? (projectedResponse.output as ToolResponse['output'])
       : {},
     ...(projectedResponse.error !== undefined ? { error: projectedResponse.error } : {}),
-  }
-}
-
-/**
- * Drops a custom block's child-run handle from the copy bound for the model.
- *
- * The handle has to survive on `rawResponse`, which is what the tool-call record
- * (and therefore the trace span) is built from — but it is trace plumbing, and an
- * opaque execution id in a tool result reads to a model like data the tool
- * returned, which it may then quote back to the user. Applied at this single
- * split point because every provider's tool loop goes through here; there is no
- * other place both copies exist.
- */
-function withoutChildTraceHandle(response: ToolResponse): ToolResponse {
-  const output = response.output
-  if (!isRecordLike(output)) return response
-  if (
-    !Object.hasOwn(output, CHILD_EXECUTION_ID_OUTPUT_KEY) &&
-    !Object.hasOwn(output, CHILD_TRACE_DISABLED_OUTPUT_KEY)
-  ) {
-    return response
-  }
-  return {
-    ...response,
-    output: omit(output, [CHILD_EXECUTION_ID_OUTPUT_KEY, CHILD_TRACE_DISABLED_OUTPUT_KEY]),
   }
 }
 
@@ -239,11 +210,12 @@ export async function executeProviderTool(
       runtimeContext?.failedFunctionToolCost
     )
     if (!registry || !toolCallRegistry) {
-      return recordResult({ rawResponse: result, modelResponse: withoutChildTraceHandle(result) })
+      return recordResult({ rawResponse: result, modelResponse: result })
     }
 
-    const modelResponse = withoutChildTraceHandle(
-      toProviderModelResponse(result, projectToolResultForCopilot(result, toolCallRegistry))
+    const modelResponse = toProviderModelResponse(
+      result,
+      projectToolResultForCopilot(result, toolCallRegistry)
     )
     registry.mergeToolCallRegistry(toolCallRegistry)
     return recordResult({ rawResponse: result, modelResponse })

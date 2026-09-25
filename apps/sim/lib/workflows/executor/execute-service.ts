@@ -17,7 +17,6 @@ import { preprocessExecution } from '@/lib/execution/preprocessing'
 import { LoggingSession } from '@/lib/logs/execution/logging-session'
 import { MAX_MCP_WORKFLOW_RESPONSE_BYTES } from '@/lib/mcp/constants'
 import { hydrateUserFilesWithBase64 } from '@/lib/uploads/utils/user-file-base64.server'
-import { getCustomBlockRowsForWorkspace } from '@/lib/workflows/custom-blocks/operations'
 import { enqueueWorkflowExecution } from '@/lib/workflows/executor/enqueue-execution'
 import { executeWorkflow } from '@/lib/workflows/executor/execute-workflow'
 import { executeWorkflowCore } from '@/lib/workflows/executor/execution-core'
@@ -40,7 +39,6 @@ import {
   createStreamingResponse,
 } from '@/lib/workflows/streaming/streaming'
 import { workflowHasResponseBlock } from '@/lib/workflows/utils'
-import { withCustomBlockOverlay } from '@/blocks/custom/server-overlay'
 import { ExecutionSnapshot } from '@/executor/execution/snapshot'
 import type { ExecutionMetadata, SerializableExecutionState } from '@/executor/execution/types'
 import type { NormalizedBlockOutput } from '@/executor/types'
@@ -489,17 +487,12 @@ export async function executeWorkflowService(
           (workflow.variables as Record<string, unknown> | null) ??
           {}
 
-        // Custom blocks resolve only inside the org overlay; wrap this pre-execution
-        // serialize (used for input file-field discovery) the same way the core does.
-        const customBlockRows = await getCustomBlockRowsForWorkspace(workspaceId)
-        const serializedWorkflow = await withCustomBlockOverlay(customBlockRows, async () =>
-          new Serializer().serializeWorkflow(
-            workflowData.blocks,
-            workflowData.edges,
-            workflowData.loops || {},
-            workflowData.parallels || {},
-            false
-          )
+        const serializedWorkflow = new Serializer().serializeWorkflow(
+          workflowData.blocks,
+          workflowData.edges,
+          workflowData.loops || {},
+          workflowData.parallels || {},
+          false
         )
 
         processedInput = await processInputFileFields(

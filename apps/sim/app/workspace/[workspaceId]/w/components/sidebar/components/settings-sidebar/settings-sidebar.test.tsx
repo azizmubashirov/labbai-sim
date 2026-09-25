@@ -68,7 +68,6 @@ const deployment: DeploymentShape = {
   features: {
     accessControl: true,
     auditLogs: true,
-    customBlocks: true,
     dataDrains: true,
     dataRetention: true,
     scim: true,

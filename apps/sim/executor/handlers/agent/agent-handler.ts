@@ -38,13 +38,11 @@ import {
   type FallbackModelCandidate,
   resolveFallbackTuning,
 } from '@/lib/workflows/blocks/fallback-models'
-import { resolveCustomBlockToolBinding } from '@/lib/workflows/custom-blocks/operations'
 import {
   getAgentToolUsageControlMode,
   resolveAgentToolUsageControl,
 } from '@/lib/workflows/tool-input/usage-control'
 import { getAllBlocks, getBlock } from '@/blocks'
-import { assembleCustomBlockInputMapping, isCustomBlockType } from '@/blocks/custom/build-config'
 import type { BlockOutput } from '@/blocks/types'
 import { normalizeFileInput } from '@/blocks/utils'
 import {
@@ -791,18 +789,6 @@ export class AgentBlockHandler implements BlockHandler {
     const projectedParams = projectedTool?.params ?? tool.params ?? {}
     const formattedParams = formattedTool.params ?? {}
 
-    if (isCustomBlockType(tool.type)) {
-      // Same sub-blocks the raw copy was assembled with, so both sides decode alike and
-      // the projection keeps the shape the provenance registry compares.
-      return {
-        ...formattedParams,
-        inputMapping: assembleCustomBlockInputMapping(
-          projectedParams,
-          formattedTool.customBlockInputFields
-        ),
-      }
-    }
-
     const alignedParams = Object.fromEntries(
       Object.keys(formattedParams).map((key) => [
         key,
@@ -1160,8 +1146,6 @@ export class AgentBlockHandler implements BlockHandler {
         executorDelegationOrigin: ctx.executorDelegationOrigin,
       },
       toolIndex,
-      resolveCustomBlockBinding: (blockType: string) =>
-        resolveCustomBlockToolBinding(blockType, ctx.workspaceId),
       readWorkflowInputFields: readWorkflowInputFieldsForTool,
       readWorkflowMetadata: readWorkflowMetadataForTool,
     })
@@ -2718,8 +2702,8 @@ export class AgentBlockHandler implements BlockHandler {
           callChain: ctx.callChain,
           billingAttribution: ctx.metadata.billingAttribution,
           // Reaches tool `_context` via `prepareToolExecution`, so a tool that starts
-          // its own child execution (a custom block) correlates and cancels against
-          // this real run instead of minting a phantom id.
+          // its own child execution (a workflow tool) correlates against this real
+          // run instead of minting a phantom id.
           executionId: ctx.executionId,
           reasoningEffort: providerRequest.reasoningEffort,
           verbosity: providerRequest.verbosity,

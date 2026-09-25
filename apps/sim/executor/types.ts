@@ -262,7 +262,7 @@ export type StartBlockRunSubject =
  * block's "Add run metadata" toggle is enabled. Built server-side from the
  * authenticated execution context — never from caller-supplied input.
  * Every field describes the INVOKING run: on top-level runs that is the run
- * itself; on child and custom-block executions it is the parent run (its
+ * itself; on child executions it is the parent run (its
  * actor's email, workspace, and workflow) — never the child's own static,
  * authoring-time-known identity.
  */
@@ -314,21 +314,6 @@ export interface BlockLog {
    * while preserving data for trace-spans processing.
    */
   childTraceSpans?: TraceSpan[]
-  /**
-   * A custom block's child run, which executes under its own execution id against
-   * the SOURCE workspace. Only the opaque id crosses the invocation boundary — the
-   * child's spans stay on its own log row and are joined at READ time. Written only
-   * for a block whose publisher opted its runs into consumer traces — the presence of
-   * this id IS that permission. Kept off `output` for the same reason
-   * {@link childTraceSpans} is.
-   */
-  childExecution?: { executionId: string }
-  /**
-   * A custom block ran a child whose publisher has not opened it to consumers, so no
-   * `childExecution` handle exists to join. Recorded because a boundary span with
-   * no children is otherwise indistinguishable from a leaf block.
-   */
-  childTraceDisabled?: boolean
   /** Internal encrypted sidecar used only for causal display projection. */
   displayResolvedSecretTraceProvenance?: ResolvedSecretTraceProvenanceV1
 }
@@ -401,8 +386,7 @@ export interface BlockState {
  * Canonical signed execution identity used for executor-delegated internal operations.
  *
  * A nested workflow changes {@link ExecutionContext.workflowId} for execution semantics, but it
- * still belongs to the parent log row identified here. Custom blocks replace this origin with the
- * publisher-owned child execution after opening their own source-workspace log row.
+ * still belongs to the parent log row identified here.
  */
 export interface ExecutorDelegationOrigin {
   subjectUserId?: string
@@ -629,12 +613,6 @@ export interface ExecutionContext {
    * and they are a known, authenticated workspace member — i.e. an editor/manual
    * run. Deliberately UNSET on chat deployments, public API, webhook, and schedule
    * runs, whose stream consumer may be an anonymous external visitor.
-   *
-   * Whether a custom block may stream the SOURCE workflow's block events is the
-   * publisher's decision, not this viewer's — but that decision covers the ORG, so it
-   * still requires a stream with an identified consumer. This field is the proof of
-   * one; absent, the boundary holds and every anonymous-consumer surface is
-   * fail-closed by default.
    */
   liveTraceViewerUserId?: string
 
@@ -643,12 +621,6 @@ export interface ExecutionContext {
    * run's progress markers. `onBlockStart`/`onBlockComplete` above are persist-then-emit
    * composites: on the invoking run they write block names and I/O into that run's
    * `LoggingSession` before reaching the stream.
-   *
-   * A custom block's child must reach the emit half and never the persist half. The
-   * stream is gated on the publisher's trace policy AND an identified consumer, but a
-   * persisted marker is keyed by the PARENT execution and is readable by anyone with
-   * parent-workspace access on any surface — so persisting the source workflow's block
-   * names there would leak them past the gate entirely.
    */
   liveStreamCallbacks?: Pick<ExecutionCallbacks, 'onBlockStart' | 'onBlockComplete'>
 

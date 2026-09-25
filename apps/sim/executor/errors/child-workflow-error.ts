@@ -1,5 +1,4 @@
 import type { TraceSpan } from '@/lib/logs/types'
-import type { CustomBlockFailure } from '@/executor/errors/boundary'
 import type { ExecutionResult } from '@/executor/types'
 
 interface ChildWorkflowErrorOptions {
@@ -13,20 +12,6 @@ interface ChildWorkflowErrorOptions {
   workflowChain?: string[]
   /** The deepest non-workflow failure, already block-name-prefixed (`"Function 1: boom"`). */
   rootErrorMessage?: string
-  /** Consumer-safe failure descriptor. Set only at a custom-block invocation boundary. */
-  consumerFacing?: CustomBlockFailure
-  /**
-   * The custom-block child run's own execution id. Distinct from
-   * {@link CustomBlockFailure.ref}: that one is consumer-facing (it reaches the
-   * block's output), this one is log-only and is always set once a child run
-   * started — including for boundary-safe failures, which carry no `ref`.
-   */
-  childExecutionId?: string
-  /**
-   * A child run happened but the invocation opted out of publishing it. Mutually
-   * exclusive with {@link childExecutionId} — see `CHILD_TRACE_DISABLED_OUTPUT_KEY`.
-   */
-  childTraceDisabled?: boolean
   cause?: Error
 }
 
@@ -48,9 +33,6 @@ export class ChildWorkflowError extends Error {
   readonly workflowChain: string[]
   /** The deepest non-workflow failure, without any workflow-chain prefixes. */
   readonly rootErrorMessage: string
-  readonly consumerFacing?: CustomBlockFailure
-  readonly childExecutionId?: string
-  readonly childTraceDisabled?: boolean
 
   constructor(options: ChildWorkflowErrorOptions) {
     super(options.message, { cause: options.cause })
@@ -62,9 +44,6 @@ export class ChildWorkflowError extends Error {
     this.childWorkflowInstanceId = options.childWorkflowInstanceId
     this.workflowChain = options.workflowChain ?? [options.childWorkflowName]
     this.rootErrorMessage = options.rootErrorMessage ?? options.message
-    this.consumerFacing = options.consumerFacing
-    this.childExecutionId = options.childExecutionId
-    this.childTraceDisabled = options.childTraceDisabled
   }
 
   static isChildWorkflowError(error: unknown): error is ChildWorkflowError {

@@ -92,7 +92,6 @@ export const TOOL_ICONS: Readonly<Record<string, IconComponent>> = {
   platform: Library,
   prepare_file_edit: File,
   promote_to_live: Rocket,
-  publish_custom_block: Wrench,
   query_logs: TerminalWindow,
   query_user_table: TableIcon,
   read: File,

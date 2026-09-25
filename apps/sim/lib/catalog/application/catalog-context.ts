@@ -5,12 +5,10 @@ import { isIntegrationDeploymentAvailableForVisibility } from '@/lib/integration
 import { allowedIntegrationTypes, principalUserId } from '@/lib/integrations/principal-scope.server'
 import { isBlockTypeAccessControlExempt } from '@/lib/permission-groups/block-access'
 import { resolveAccessControlBlockType } from '@/lib/permission-groups/integration-allowlist'
-import { listCustomBlocksWithInputsForWorkspace } from '@/lib/workflows/custom-blocks/operations'
 import {
   type ActiveWorkspaceApplicationContext,
   loadActiveWorkspaceApplicationContext,
 } from '@/lib/workspaces/application/workspace-context'
-import { withCustomBlockOverlay } from '@/blocks/custom/server-overlay'
 import type { BlockConfig } from '@/blocks/types'
 import { isHiddenUnder } from '@/blocks/visibility/context'
 import { withBlockVisibility } from '@/blocks/visibility/server-context'
@@ -18,8 +16,8 @@ import { withBlockVisibility } from '@/blocks/visibility/server-context'
 /**
  * The per-caller, per-workspace state every catalog read is filtered through.
  *
- * A catalog looks like static reference data and is not. Four independent
- * policies decide what a caller may see, and all four are resolved here so the
+ * A catalog looks like static reference data and is not. Several independent
+ * policies decide what a caller may see, and all of them are resolved here so the
  * six catalog use cases cannot answer differently.
  */
 export interface CatalogGate {
@@ -27,8 +25,6 @@ export interface CatalogGate {
   visibility: BlockVisibilityState
   /** Lowercased block types the workspace permits, or `null` when unrestricted. */
   allowedIntegrations: ReadonlySet<string> | null
-  /** Workflows this workspace's organization has deployed as blocks. */
-  customBlockRows: Awaited<ReturnType<typeof listCustomBlocksWithInputsForWorkspace>>
 }
 
 /** Loads the canonical workspace, concealing one the caller cannot reach as absent. */
@@ -46,15 +42,14 @@ export async function resolveCatalogGate(
   context: ActiveWorkspaceApplicationContext
 ): Promise<CatalogGate> {
   const userId = principalUserId(principal)
-  const [allowedIntegrations, visibility, customBlockRows] = await Promise.all([
+  const [allowedIntegrations, visibility] = await Promise.all([
     allowedIntegrationTypes(principal, context.workspaceId),
     getBlockVisibility({
       ...(userId ? { userId } : {}),
       ...(context.workspaceOrganizationId ? { orgId: context.workspaceOrganizationId } : {}),
     }),
-    listCustomBlocksWithInputsForWorkspace(context.workspaceId),
   ])
-  return { allowedIntegrations, visibility, customBlockRows }
+  return { allowedIntegrations, visibility }
 }
 
 /**
@@ -81,15 +76,11 @@ export function isBlockTypeAllowed(blockType: string, gate: CatalogGate): boolea
 /**
  * Runs `read` with the gate's block scope established.
  *
- * `getAllBlocks`/`getBlock` are synchronous and resolve both the viewer's
- * visibility projection and the workspace's custom blocks from
- * AsyncLocalStorage. Outside this scope the visibility resolver returns `null`,
- * which is fail-closed for unreleased blocks but does NOT apply the kill switch
- * — a disabled shipped block would still be listed. The two scopes are
- * independent and nest in either order.
+ * `getAllBlocks` is synchronous and resolves the viewer's visibility projection
+ * from AsyncLocalStorage. Outside this scope the visibility resolver returns
+ * `null`, which is fail-closed for unreleased blocks but does NOT apply the kill
+ * switch — a disabled shipped block would still be listed.
  */
 export function withCatalogBlockScope<T>(gate: CatalogGate, read: () => Promise<T>): Promise<T> {
-  return withBlockVisibility(gate.visibility, () =>
-    withCustomBlockOverlay(gate.customBlockRows, read)
-  )
+  return withBlockVisibility(gate.visibility, read)
 }

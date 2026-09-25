@@ -9,7 +9,6 @@ export const WORKFLOW_RESOURCE_KINDS = [
   'file-folder',
   'mcp-server',
   'custom-tool',
-  'custom-block',
   'skill',
   'sandbox',
 ] as const
@@ -42,25 +41,23 @@ export type WorkflowBlockIdResolver = (targetWorkflowId: string, sourceBlockId: 
 
 /**
  * A configured field that depends on a remappable parent resource (credential, knowledge base,
- * table, custom block or MCP server) and must be re-picked when that parent changes in the
+ * table or MCP server) and must be re-picked when that parent changes in the
  * destination workspace, e.g. during a workflow import.
  */
 export interface ForkDependentReconfig {
   /** The remappable parent whose change makes this field reconfigurable. */
-  parentKind: 'credential' | 'knowledge-base' | 'table' | 'custom-block' | 'mcp-server'
+  parentKind: 'credential' | 'knowledge-base' | 'table' | 'mcp-server'
   /** Source id of that parent. */
   parentSourceId: string
-  /** Selector context key the new parent value is supplied under (absent for custom blocks). */
+  /** Selector context key the new parent value is supplied under. */
   parentContextKey?: string
   targetWorkflowId: string
   targetBlockId: string
   blockName: string
   subBlockKey: string
-  /** Selector key; absent for typed custom-block inputs. */
+  /** Selector key. */
   selectorKey?: string
   multiSelect?: boolean
-  /** Declared field type of a custom-block input. */
-  fieldType?: string
   /** Plain field title. */
   title: string
   /** Display name of the nested tool this field belongs to, if any. */

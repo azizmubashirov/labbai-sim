@@ -14,7 +14,6 @@ const mocks = vi.hoisted(() => ({
     features: {
       accessControl: false,
       auditLogs: false,
-      customBlocks: false,
       dataDrains: false,
       dataRetention: false,
       sessionPolicies: false,

@@ -26,11 +26,6 @@ export const AuditAction = {
   CHAT_DELETED: 'chat.deleted',
   CHAT_PASSWORD_VIEWED: 'chat.password_viewed',
 
-  // Custom Blocks (deploy-as-block)
-  CUSTOM_BLOCK_PUBLISHED: 'custom_block.published',
-  CUSTOM_BLOCK_UPDATED: 'custom_block.updated',
-  CUSTOM_BLOCK_DELETED: 'custom_block.deleted',
-
   // Custom Tools
   CUSTOM_TOOL_CREATED: 'custom_tool.created',
   CUSTOM_TOOL_UPDATED: 'custom_tool.updated',
@@ -278,7 +273,6 @@ export const AuditResourceType = {
   CONNECTOR: 'connector',
   CREDENTIAL: 'credential',
   CREDENTIAL_GROUP: 'credential_group',
-  CUSTOM_BLOCK: 'custom_block',
   CUSTOM_TOOL: 'custom_tool',
   DOCUMENT: 'document',
   ENVIRONMENT: 'environment',

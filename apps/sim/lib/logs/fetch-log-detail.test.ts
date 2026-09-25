@@ -8,15 +8,10 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   materializeExecutionData: vi.fn(),
-  hydrateChildTraces: vi.fn(),
 }))
 
 vi.mock('@/lib/logs/execution/trace-store', () => ({
   materializeExecutionDataForDisplay: mocks.materializeExecutionData,
-}))
-
-vi.mock('@/lib/logs/execution/hydrate-child-traces', () => ({
-  hydrateChildTraces: mocks.hydrateChildTraces,
 }))
 
 vi.mock('@/lib/logs/execution-origin', () => ({
@@ -132,7 +127,6 @@ describe('readLogDetail', () => {
     vi.clearAllMocks()
     resetDbChainMock()
     mocks.materializeExecutionData.mockResolvedValue({})
-    mocks.hydrateChildTraces.mockResolvedValue({ hydrated: 0, dropped: {} })
   })
 
   afterAll(resetDbChainMock)
@@ -252,9 +246,6 @@ describe('readLogDetail', () => {
       expect.anything(),
       expect.objectContaining({ workspaceId: 'workspace-1', userId: undefined })
     )
-    expect(mocks.hydrateChildTraces).toHaveBeenCalledWith(expect.any(Array), {
-      viewerUserId: undefined,
-    })
   })
 
   describe("when the viewer's permission group withholds cost", () => {

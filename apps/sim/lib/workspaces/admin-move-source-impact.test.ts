@@ -113,7 +113,6 @@ describe('resolveMoveEntitlements', () => {
         'permission groups',
         'audit logs',
         'organization connected accounts',
-        'custom blocks',
       ])
     )
   })
