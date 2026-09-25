@@ -46,6 +46,11 @@ lived there (Activity log / audit logs UI, Access requests, Credential groups, S
 permission groups / access control) are re-implemented as Labbai code — same behavior,
 our own implementation (not copied from `ee`). Apache-licensed parts outside `ee`
 (e.g. `packages/audit`, `packages/platform-authz`) are reused.
+Owner decision (2026-09-25): do it now as part of cleanup — clean-room: requirements come
+only from Apache-licensed code (call sites outside `ee`, `packages/db` schema, API
+contracts), never from `ee` source. Other `ee` features (SSO, whitelabeling, data
+retention, data drains, workspace forking, session policy, organization stats/usage,
+custom blocks) are removed, not re-implemented.
 
 ## Integrations kept (~10%)
 
