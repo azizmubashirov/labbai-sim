@@ -16,32 +16,86 @@ export interface ScimOperation<Id extends string = string> extends ApplicationOp
   readonly scope: ScimCredentialScope
 }
 
-function defineScimOperation<const Id extends string>(definition: {
-  id: Id
-  scope: ScimCredentialScope
-}): ScimOperation<Id> {
-  /**
-   * permission-group-exempt: a SCIM connection is the identity provider, not a
-   * member, so no permission group governs it; credential scopes do instead.
-   */
-  const operation: ScimOperation<Id> = { ...definition, capability: 'none' }
+function defineScimOperation<const Id extends string>(
+  operation: ScimOperation<Id>
+): ScimOperation<Id> {
   assertOperationCapability(operation)
   return Object.freeze(operation)
 }
 
+/**
+ * The SCIM protocol operations. A SCIM connection is the identity provider,
+ * not a member, so no permission group governs it; credential scopes do.
+ */
 export const scimOperations = {
-  listUsers: defineScimOperation({ id: 'scim.users.list', scope: 'users:read' }),
-  getUser: defineScimOperation({ id: 'scim.users.get', scope: 'users:read' }),
-  provisionUser: defineScimOperation({ id: 'scim.users.provision', scope: 'users:write' }),
-  replaceUser: defineScimOperation({ id: 'scim.users.replace', scope: 'users:write' }),
-  patchUser: defineScimOperation({ id: 'scim.users.patch', scope: 'users:write' }),
-  deprovisionUser: defineScimOperation({ id: 'scim.users.deprovision', scope: 'users:write' }),
-  listGroups: defineScimOperation({ id: 'scim.groups.list', scope: 'groups:read' }),
-  getGroup: defineScimOperation({ id: 'scim.groups.get', scope: 'groups:read' }),
-  createGroup: defineScimOperation({ id: 'scim.groups.create', scope: 'groups:write' }),
-  replaceGroup: defineScimOperation({ id: 'scim.groups.replace', scope: 'groups:write' }),
-  patchGroup: defineScimOperation({ id: 'scim.groups.patch', scope: 'groups:write' }),
-  deleteGroup: defineScimOperation({ id: 'scim.groups.delete', scope: 'groups:write' }),
+  // permission-group-exempt: the caller is the identity provider, gated by credential scope.
+  listUsers: defineScimOperation({
+    id: 'scim.users.list',
+    capability: 'none',
+    scope: 'users:read',
+  }),
+  // permission-group-exempt: the caller is the identity provider, gated by credential scope.
+  getUser: defineScimOperation({ id: 'scim.users.get', capability: 'none', scope: 'users:read' }),
+  // permission-group-exempt: the caller is the identity provider, gated by credential scope.
+  provisionUser: defineScimOperation({
+    id: 'scim.users.provision',
+    capability: 'none',
+    scope: 'users:write',
+  }),
+  // permission-group-exempt: the caller is the identity provider, gated by credential scope.
+  replaceUser: defineScimOperation({
+    id: 'scim.users.replace',
+    capability: 'none',
+    scope: 'users:write',
+  }),
+  // permission-group-exempt: the caller is the identity provider, gated by credential scope.
+  patchUser: defineScimOperation({
+    id: 'scim.users.patch',
+    capability: 'none',
+    scope: 'users:write',
+  }),
+  // permission-group-exempt: the caller is the identity provider, gated by credential scope.
+  deprovisionUser: defineScimOperation({
+    id: 'scim.users.deprovision',
+    capability: 'none',
+    scope: 'users:write',
+  }),
+  // permission-group-exempt: the caller is the identity provider, gated by credential scope.
+  listGroups: defineScimOperation({
+    id: 'scim.groups.list',
+    capability: 'none',
+    scope: 'groups:read',
+  }),
+  // permission-group-exempt: the caller is the identity provider, gated by credential scope.
+  getGroup: defineScimOperation({
+    id: 'scim.groups.get',
+    capability: 'none',
+    scope: 'groups:read',
+  }),
+  // permission-group-exempt: the caller is the identity provider, gated by credential scope.
+  createGroup: defineScimOperation({
+    id: 'scim.groups.create',
+    capability: 'none',
+    scope: 'groups:write',
+  }),
+  // permission-group-exempt: the caller is the identity provider, gated by credential scope.
+  replaceGroup: defineScimOperation({
+    id: 'scim.groups.replace',
+    capability: 'none',
+    scope: 'groups:write',
+  }),
+  // permission-group-exempt: the caller is the identity provider, gated by credential scope.
+  patchGroup: defineScimOperation({
+    id: 'scim.groups.patch',
+    capability: 'none',
+    scope: 'groups:write',
+  }),
+  // permission-group-exempt: the caller is the identity provider, gated by credential scope.
+  deleteGroup: defineScimOperation({
+    id: 'scim.groups.delete',
+    capability: 'none',
+    scope: 'groups:write',
+  }),
 } as const
 
 /** What a SCIM use case body receives once the principal is admitted. */

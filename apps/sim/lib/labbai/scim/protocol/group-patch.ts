@@ -62,7 +62,8 @@ function applyAttribute(
     state.displayName = stringValue(value, 'displayName')
   } else if (folded === 'externalid') {
     const unwrapped = Array.isArray(value) && value.length === 1 ? value[0] : value
-    state.externalId = typeof unwrapped === 'string' && unwrapped.trim() ? unwrapped.trim() : undefined
+    state.externalId =
+      typeof unwrapped === 'string' && unwrapped.trim() ? unwrapped.trim() : undefined
   } else if (folded === 'members') {
     if (op === 'replace') members.clear()
     for (const id of memberIdsFrom(value)) members.add(id)

@@ -2,7 +2,7 @@ import type { ScimConnectionPrincipal } from '@sim/auth/principal'
 import { db } from '@sim/db'
 import { scimConnection, scimCredential } from '@sim/db/schema'
 import { createLogger } from '@sim/logger'
-import { sha256Hex } from '@sim/security/hash'
+import { sha256Base64Url } from '@sim/security/hash'
 import { and, eq, isNull, lt, or } from 'drizzle-orm'
 import type { NextRequest } from 'next/server'
 import { ScimError } from '@/lib/labbai/scim/protocol/errors'
@@ -25,7 +25,7 @@ function unauthorized(detail: string): ScimError {
 
 /** The digest stored for a bearer token; the token itself is never stored. */
 export function hashScimToken(token: string): string {
-  return sha256Hex(token)
+  return sha256Base64Url(token)
 }
 
 function bearerToken(request: NextRequest): string | null {

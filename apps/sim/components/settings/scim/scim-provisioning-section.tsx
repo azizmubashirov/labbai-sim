@@ -174,8 +174,7 @@ function ScimConnectionPanel({ organizationId, connection }: ScimConnectionPanel
         </div>
         {reconcile.data ? (
           <span role='status' className='text-[var(--text-muted)] text-caption'>
-            Checked {reconcile.data.reconciledUsers} users: {reconcile.data.grantsAdded} granted,{' '}
-            {reconcile.data.grantsRemoved} withdrawn.
+            {`Checked ${reconcile.data.reconciledUsers} users: ${reconcile.data.grantsAdded} granted, ${reconcile.data.grantsRemoved} withdrawn.`}
           </span>
         ) : null}
         {reconcile.error ? (

@@ -110,7 +110,10 @@ export async function ensureScimConnection(
 export async function requireScimConnection(organizationId: string): Promise<ScimConnectionRow> {
   const connection = await findScimConnectionByOrganization(organizationId)
   if (!connection) {
-    throw new OrchestrationError('not_found', 'SCIM provisioning is not set up for this organization')
+    throw new OrchestrationError(
+      'not_found',
+      'SCIM provisioning is not set up for this organization'
+    )
   }
   return connection
 }

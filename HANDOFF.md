@@ -46,9 +46,11 @@ Done on the branch:
 - SSO, whitelabeling, session policy removed; branding is static (`lib/branding/index.ts`).
 - Access requests re-implemented: `lib/labbai/access-requests/*`, `components/access-requests/*`
   (gap: no "grant me workspace access" request; preview impact counts approximate).
+- SCIM 2.0 re-implemented: `lib/labbai/scim/*`, `components/settings/scim/*`, `hooks/queries/scim.ts`,
+  Security page section (gaps: new accounts skip signup hooks, eq-only filters, no
+  verified-domain check; `isScimEnabled` flag must stay).
 
 Possibly unfinished (helpers were stopped / may have been mid-edit — verify each):
-- SCIM re-implementation (`components/settings/organization-security.tsx` still imported ee).
 - Removal of data retention, data drains, custom blocks, organization usage/search stats.
 
 Leftover TODOs reported by helpers:

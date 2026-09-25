@@ -20,7 +20,10 @@ const MANAGED_MESSAGE =
   'This member is managed by your identity provider. Change their access in your directory instead.'
 
 /** SQL: the connection locks manual membership (unset means locked). */
-const lockedSettings = sql`coalesce((${scimConnection.settings}->>'lockManualMembership')::boolean, true)`
+const lockedSettings = sql`coalesce(
+  (${scimConnection.settings}->>'lockManualMembership')::boolean,
+  true
+)`
 
 /**
  * A boolean SQL expression, true when `userIdColumn` names a user this
@@ -30,7 +33,14 @@ export function scimManagedUserPredicate(
   organizationId: string,
   userIdColumn: AnyPgColumn | SQL
 ): SQL<boolean> {
-  return sql<boolean>`exists (select 1 from ${scimUser} inner join ${scimConnection} on ${scimConnection.id} = ${scimUser.connectionId} where ${scimConnection.organizationId} = ${organizationId} and ${scimConnection.status} = 'active' and ${lockedSettings} and ${scimUser.userId} = ${userIdColumn})`
+  return sql<boolean>`exists (
+    select 1 from ${scimUser}
+    inner join ${scimConnection} on ${scimConnection.id} = ${scimUser.connectionId}
+    where ${scimConnection.organizationId} = ${organizationId}
+      and ${scimConnection.status} = 'active'
+      and ${lockedSettings}
+      and ${scimUser.userId} = ${userIdColumn}
+  )`
 }
 
 /** Whether a user's membership in `organizationId` is directory-managed. */

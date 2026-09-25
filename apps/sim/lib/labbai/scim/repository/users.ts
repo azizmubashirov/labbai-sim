@@ -2,8 +2,8 @@ import { db } from '@sim/db'
 import { scimGroup, scimGroupMember, scimUser } from '@sim/db/schema'
 import { and, asc, count, eq, inArray, type SQL, sql } from 'drizzle-orm'
 import type { DbOrTx } from '@/lib/db/types'
-import { assertFilterAttributes, type ScimFilter } from '@/lib/labbai/scim/protocol/filter'
 import { ScimError } from '@/lib/labbai/scim/protocol/errors'
+import { assertFilterAttributes, type ScimFilter } from '@/lib/labbai/scim/protocol/filter'
 import type { ScimGroupReference } from '@/lib/labbai/scim/protocol/resources'
 
 /** A provisioned User row. */

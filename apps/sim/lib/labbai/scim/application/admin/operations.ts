@@ -3,30 +3,70 @@ import { defineOrganizationOperation } from '@/lib/core/application/organization
 /**
  * Settings-surface operations for an organization's SCIM connection. Only an
  * organization admin (or owner) may configure provisioning, issue tokens, or
- * change what directory groups mean.
+ * change what directory groups mean; no permission group governs them.
  */
-
-function adminOperation<const Id extends string>(id: Id) {
-  /**
-   * permission-group-exempt: directory provisioning is configured by
-   * organization administrators; the admin role is the whole gate.
-   */
-  return defineOrganizationOperation({
-    id,
+export const scimAdminOperations = {
+  // permission-group-exempt: directory provisioning is gated by the organization admin role alone.
+  getConnection: defineOrganizationOperation({
+    id: 'scim_admin.connection.get',
     minimumRole: 'admin',
     capability: 'none',
     principalKinds: ['session'],
-  })
-}
-
-export const scimAdminOperations = {
-  getConnection: adminOperation('scim_admin.connection.get'),
-  configureConnection: adminOperation('scim_admin.connection.configure'),
-  listActivity: adminOperation('scim_admin.activity.list'),
-  reconcile: adminOperation('scim_admin.connection.reconcile'),
-  issueCredential: adminOperation('scim_admin.credentials.issue'),
-  revokeCredential: adminOperation('scim_admin.credentials.revoke'),
-  listMappings: adminOperation('scim_admin.mappings.list'),
-  upsertMapping: adminOperation('scim_admin.mappings.upsert'),
-  deleteMapping: adminOperation('scim_admin.mappings.delete'),
+  }),
+  // permission-group-exempt: directory provisioning is gated by the organization admin role alone.
+  configureConnection: defineOrganizationOperation({
+    id: 'scim_admin.connection.configure',
+    minimumRole: 'admin',
+    capability: 'none',
+    principalKinds: ['session'],
+  }),
+  // permission-group-exempt: directory provisioning is gated by the organization admin role alone.
+  listActivity: defineOrganizationOperation({
+    id: 'scim_admin.activity.list',
+    minimumRole: 'admin',
+    capability: 'none',
+    principalKinds: ['session'],
+  }),
+  // permission-group-exempt: directory provisioning is gated by the organization admin role alone.
+  reconcile: defineOrganizationOperation({
+    id: 'scim_admin.connection.reconcile',
+    minimumRole: 'admin',
+    capability: 'none',
+    principalKinds: ['session'],
+  }),
+  // permission-group-exempt: directory provisioning is gated by the organization admin role alone.
+  issueCredential: defineOrganizationOperation({
+    id: 'scim_admin.credentials.issue',
+    minimumRole: 'admin',
+    capability: 'none',
+    principalKinds: ['session'],
+  }),
+  // permission-group-exempt: directory provisioning is gated by the organization admin role alone.
+  revokeCredential: defineOrganizationOperation({
+    id: 'scim_admin.credentials.revoke',
+    minimumRole: 'admin',
+    capability: 'none',
+    principalKinds: ['session'],
+  }),
+  // permission-group-exempt: directory provisioning is gated by the organization admin role alone.
+  listMappings: defineOrganizationOperation({
+    id: 'scim_admin.mappings.list',
+    minimumRole: 'admin',
+    capability: 'none',
+    principalKinds: ['session'],
+  }),
+  // permission-group-exempt: directory provisioning is gated by the organization admin role alone.
+  upsertMapping: defineOrganizationOperation({
+    id: 'scim_admin.mappings.upsert',
+    minimumRole: 'admin',
+    capability: 'none',
+    principalKinds: ['session'],
+  }),
+  // permission-group-exempt: directory provisioning is gated by the organization admin role alone.
+  deleteMapping: defineOrganizationOperation({
+    id: 'scim_admin.mappings.delete',
+    minimumRole: 'admin',
+    capability: 'none',
+    principalKinds: ['session'],
+  }),
 } as const

@@ -17,7 +17,11 @@ export async function endDirectoryMembershipTx(
   params: { userId: string; organizationId: string }
 ): Promise<{ ended: number }> {
   const rows = await tx
-    .select({ id: scimUser.id, connectionId: scimUser.connectionId, externalId: scimUser.externalId })
+    .select({
+      id: scimUser.id,
+      connectionId: scimUser.connectionId,
+      externalId: scimUser.externalId,
+    })
     .from(scimUser)
     .innerJoin(scimConnection, eq(scimConnection.id, scimUser.connectionId))
     .where(

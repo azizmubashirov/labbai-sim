@@ -83,6 +83,10 @@ export const listScimGroupMappings = defineAuthorizedOrganizationUseCase({
   },
 })
 
+function targetLabel(kind: string): string {
+  return kind.replace('_', ' ')
+}
+
 type UpsertMappingInput = { organizationId: string } & ScimGroupMappingBody
 
 export const upsertScimGroupMapping = defineAuthorizedOrganizationUseCase({
@@ -131,7 +135,10 @@ export const upsertScimGroupMapping = defineAuthorizedOrganizationUseCase({
         )
         .limit(1)
       if (!target) {
-        throw new OrchestrationError('validation', 'Permission group not found in this organization')
+        throw new OrchestrationError(
+          'validation',
+          'Permission group not found in this organization'
+        )
       }
       targetCondition = eq(scimGroupMapping.permissionGroupId, input.permissionGroupId)
     } else {
@@ -167,7 +174,8 @@ export const upsertScimGroupMapping = defineAuthorizedOrganizationUseCase({
           id: generateId(),
           groupId: group.id,
           targetKind: input.targetKind,
-          permissionGroupId: input.targetKind === 'permission_group' ? input.permissionGroupId : null,
+          permissionGroupId:
+            input.targetKind === 'permission_group' ? input.permissionGroupId : null,
           workspaceId: input.targetKind === 'workspace' ? input.workspaceId : null,
           permissionType: input.targetKind === 'workspace' ? input.permissionType : null,
           role: input.targetKind === 'org_role' ? input.role : null,
@@ -187,7 +195,7 @@ export const upsertScimGroupMapping = defineAuthorizedOrganizationUseCase({
       resourceType: AuditResourceType.SCIM_GROUP,
       resourceId: group.id,
       resourceName: group.displayName,
-      description: `Mapped directory group ${group.displayName} to ${input.targetKind.replace('_', ' ')}`,
+      description: `Mapped directory group ${group.displayName} to ${targetLabel(mapping.targetKind)}`,
       metadata: {
         organizationId: input.organizationId,
         mappingId: mapping.id,

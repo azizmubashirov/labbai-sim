@@ -432,7 +432,9 @@ export const deprovisionScimUser = defineScimUseCase({
     const [membership] = await db
       .select({ id: member.id, role: member.role })
       .from(member)
-      .where(and(eq(member.organizationId, principal.organizationId), eq(member.userId, row.userId)))
+      .where(
+        and(eq(member.organizationId, principal.organizationId), eq(member.userId, row.userId))
+      )
       .limit(1)
 
     if (membership) {

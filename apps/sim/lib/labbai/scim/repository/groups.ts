@@ -166,7 +166,9 @@ export async function setScimGroupMembers(
   if (removed.length > 0) {
     await tx
       .delete(scimGroupMember)
-      .where(and(eq(scimGroupMember.groupId, groupId), inArray(scimGroupMember.scimUserId, removed)))
+      .where(
+        and(eq(scimGroupMember.groupId, groupId), inArray(scimGroupMember.scimUserId, removed))
+      )
   }
   if (added.length > 0) {
     await tx

@@ -18,8 +18,7 @@ export function effectiveScimSettings(
   settings: ScimConnectionSettings | null | undefined
 ): Required<ScimConnectionSettings> {
   return {
-    lockManualMembership:
-      settings?.lockManualMembership ?? DEFAULT_SCIM_CONNECTION_SETTINGS.lockManualMembership ?? true,
+    lockManualMembership: settings?.lockManualMembership ?? true,
     disableJit: settings?.disableJit ?? false,
     autoMapPermissionGroupsByName: settings?.autoMapPermissionGroupsByName ?? false,
   }

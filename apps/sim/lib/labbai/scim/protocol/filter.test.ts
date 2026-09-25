@@ -38,7 +38,8 @@ describe('parseScimFilter', () => {
   })
 
   it('refuses unsupported operators and connectives as invalidFilter', () => {
-    for (const filter of ['userName co "ada"', 'userName eq "a" or userName eq "b"', 'userName eq "a']) {
+    const filters = ['userName co "ada"', 'userName eq "a" or userName eq "b"', 'userName eq "a']
+    for (const filter of filters) {
       try {
         parseScimFilter(filter)
         expect.unreachable(filter)
