@@ -74,6 +74,19 @@ patches/ into an empty dir and run
   NEXT_PUBLIC_PLATFORM_LLM_PROVIDERS=openai. Never paste secrets into chat or commits.
 - The server is too weak to build images — always build in GitHub Actions.
 
+## Latest state (2026-09-26, end of session)
+
+- Deployed on the test server: `dc32a92a` — includes the local copilot fix (edit_workflow result
+  was sanitized twice → `Object.entries(undefined)` failed every turn after a workflow edit).
+  Lifecycle failures now log `stack`.
+- Google OAuth: owner created a Google Cloud OAuth client (project "Labbai", Testing mode) and put
+  `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` into the server `.env`; app recreated with them.
+  Redirect URIs registered: `http://localhost:3300/api/auth/oauth2/callback/google-{email,drive,docs,sheets,calendar,forms}`.
+  In Testing mode only listed Test users can connect (tokens expire after 7 days). Before real
+  customers: domain + privacy policy + Google verification (Gmail `gmail.modify` and full `drive`
+  are restricted scopes → CASA audit; consider narrower scopes).
+- Next: owner tests the copilot (e.g. Telegram apartment-sales agent with Google Sheets).
+
 ## Known open issues (not cleanup)
 
 Listed in LABBAI_PLAN.md "Open issues found in testing" (Google OAuth client, secret
