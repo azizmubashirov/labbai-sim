@@ -448,20 +448,7 @@ export const env = createEnv({
     WORDPRESS_CLIENT_SECRET:               z.string().optional(),                  // WordPress.com OAuth client secret
     CALCOM_CLIENT_ID:                      z.string().optional(),                  // Cal.com OAuth client ID
 
-    // Access Control (Permission Groups) - for self-hosted deployments
-    ACCESS_CONTROL_ENABLED:                z.boolean().optional(),                 // Enable access control on self-hosted (bypasses plan requirements)
-
-    // Enterprise master switch - for self-hosted deployments
-    ENTERPRISE_ENABLED:                    z.boolean().optional(),                 // Enable the whole enterprise suite on self-hosted; individual flags below override it per feature
-
-    // Enterprise Feature Overrides - for self-hosted deployments
-    WHITELABELING_ENABLED:                 z.boolean().optional(),                 // Enable whitelabeling on self-hosted (bypasses hosted requirements)
-    AUDIT_LOGS_ENABLED:                    z.boolean().optional(),                 // Enable audit logs on self-hosted (bypasses hosted requirements)
-    CUSTOM_BLOCKS_ENABLED:                 z.boolean().optional(),                 // Enable custom blocks on self-hosted (bypasses hosted requirements)
-    DATA_RETENTION_ENABLED:               z.boolean().optional(),                 // Enable data retention settings and retention deletion on self-hosted (bypasses hosted requirements)
-    DATA_DRAINS_ENABLED:                  z.boolean().optional(),                 // Enable data drains on self-hosted (bypasses hosted requirements)
-    SESSION_POLICIES_ENABLED:             z.boolean().optional(),                 // Enable org session policies on self-hosted (bypasses hosted requirements)
-    FORKING_ENABLED:                      z.boolean().optional(),                 // Enable workspace forking on self-hosted (bypasses hosted requirements)
+    // Feature switches
     TABLES_V2_API:                        z.boolean().optional(),                 // Enable the v2 tables HTTP API (public /api/v2/tables + internal /api/table/[tableId]/query predicate-grammar route)
     TABLE_ROW_TTL:                        z.boolean().optional(),
     AGENT_MEMORY_HISTORY:                 z.boolean().optional(),
@@ -469,9 +456,6 @@ export const env = createEnv({
     KNOWLEDGE_TIN_KEYWORD:                z.boolean().optional(),                 // Rank large-scope keyword retrieval through the Tin text index where it exists
     KNOWLEDGE_ASYNC_PROJECTION:           z.boolean().optional(),                 // Knowledge writers leave search projection rows to the background projector
     KNOWLEDGE_PROJECTION_FILL:            z.boolean().optional(),                 // The knowledge projector fills projection rows written before they carried a source and ACL
-
-    // Organizations - for self-hosted deployments
-    ORGANIZATIONS_ENABLED:                 z.boolean().optional(),                 // Enable organizations on self-hosted (bypasses plan requirements)
 
     // Instance-tier organization - every user auto-joins this one org
     INSTANCE_ORG_NAME:                     z.string().min(1).optional(),           // Display name of the instance organization; setting it turns instance-org mode on
@@ -490,46 +474,6 @@ export const env = createEnv({
     /** Comma-separated proxy IPs/CIDRs skipped while resolving the forwarded client chain. */
     AUTH_TRUSTED_PROXIES:                  z.string().optional(),
 
-    // SSO Configuration (for script-based registration)
-    SSO_ENABLED:                           z.boolean().optional(),                 // Enable SSO functionality
-    SCIM_ENABLED:                          z.boolean().optional(),                 // Enable SCIM directory provisioning
-    USAGE_MONITORING_ENABLED:              z.boolean().optional(),                 // Enable organization usage monitoring on self-hosted (bypasses hosted requirements)
-    SSO_PROVIDER_TYPE:                     z.enum(['oidc', 'saml']).optional(),    // [REQUIRED] SSO provider type
-    SSO_PROVIDER_ID:                       z.string().optional(),                  // [REQUIRED] SSO provider ID
-    SSO_ISSUER:                            z.string().optional(),                  // [REQUIRED] SSO issuer URL
-    SSO_DOMAIN:                            z.string().optional(),                  // [REQUIRED] SSO email domain
-    SSO_USER_EMAIL:                        z.string().optional(),                  // [REQUIRED] User email for SSO registration
-    SSO_ORGANIZATION_ID:                   z.string().optional(),                  // Organization ID for SSO registration (optional)
-    SSO_TRUSTED_PROVIDER_IDS:              z.string().optional(),                  // Comma-separated SSO provider IDs to trust for automatic account linking when an existing account shares the same email. Use for IdPs that do not assert email_verified. Merged into Better Auth accountLinking.trustedProviders.
-
-    // SSO Mapping Configuration (optional - sensible defaults provided)
-    SSO_MAPPING_ID:                        z.string().optional(),                  // Custom ID claim mapping (default: sub for OIDC, nameidentifier for SAML)
-    SSO_MAPPING_EMAIL:                     z.string().optional(),                  // Custom email claim mapping (default: email for OIDC, emailaddress for SAML)
-    SSO_MAPPING_NAME:                      z.string().optional(),                  // Custom name claim mapping (default: name for both)
-    SSO_MAPPING_IMAGE:                     z.string().optional(),                  // Custom image claim mapping (default: picture for OIDC)
-
-    // SSO OIDC Configuration
-    SSO_OIDC_CLIENT_ID:                    z.string().optional(),                  // [REQUIRED for OIDC] OIDC client ID
-    SSO_OIDC_CLIENT_SECRET:                z.string().optional(),                  // [REQUIRED for OIDC] OIDC client secret
-    SSO_OIDC_SCOPES:                       z.string().optional(),                  // OIDC scopes (default: openid,profile,email)
-    SSO_OIDC_PKCE:                         z.string().optional(),                  // Enable PKCE (default: true)
-    SSO_OIDC_AUTHORIZATION_ENDPOINT:       z.string().optional(),                  // OIDC authorization endpoint (optional, uses discovery)
-    SSO_OIDC_TOKEN_ENDPOINT:               z.string().optional(),                  // OIDC token endpoint (optional, uses discovery)
-    SSO_OIDC_USERINFO_ENDPOINT:            z.string().optional(),                  // OIDC userinfo endpoint (optional, uses discovery)
-    SSO_OIDC_JWKS_ENDPOINT:                z.string().optional(),                  // OIDC JWKS endpoint (optional, uses discovery)
-    SSO_OIDC_DISCOVERY_ENDPOINT:           z.string().optional(),                  // OIDC discovery endpoint (default: {issuer}/.well-known/openid-configuration)
-
-    // SSO SAML Configuration
-    SSO_SAML_ENTRY_POINT:                  z.string().optional(),                  // [REQUIRED for SAML] SAML IdP SSO URL
-    SSO_SAML_CERT:                         z.string().optional(),                  // [REQUIRED for SAML] SAML IdP certificate
-    SSO_SAML_CALLBACK_URL:                 z.string().optional(),                  // SAML callback URL (default: {issuer}/callback)
-    SSO_SAML_SP_METADATA:                  z.string().optional(),                  // SAML SP metadata XML (auto-generated if not provided)
-    SSO_SAML_IDP_METADATA:                 z.string().optional(),                  // SAML IdP metadata XML (optional)
-    SSO_SAML_AUDIENCE:                     z.string().optional(),                  // SAML audience restriction (default: issuer URL)
-    SSO_SAML_WANT_ASSERTIONS_SIGNED:       z.string().optional(),                  // Require signed SAML assertions (default: false)
-    SSO_SAML_SIGNATURE_ALGORITHM:          z.string().optional(),                  // SAML signature algorithm (optional)
-    SSO_SAML_DIGEST_ALGORITHM:             z.string().optional(),                  // SAML digest algorithm (optional)
-    SSO_SAML_IDENTIFIER_FORMAT:            z.string().optional(),                  // SAML identifier format (optional)
   },
 
   client: {
@@ -545,40 +489,12 @@ export const env = createEnv({
     NEXT_PUBLIC_POSTHOG_ENABLED:           z.boolean().optional(),                 // Enable PostHog analytics (client-side)
     NEXT_PUBLIC_POSTHOG_KEY:               z.string().optional(),                  // PostHog project API key
 
-    // UI Branding & Whitelabeling
-    NEXT_PUBLIC_BRAND_NAME:                z.string().optional(),                  // Custom brand name (defaults to "Sim")
-    NEXT_PUBLIC_BRAND_LOGO_URL:            z.string().url().optional(),            // Custom logo URL
-    NEXT_PUBLIC_BRAND_FAVICON_URL:         z.string().url().optional(),            // Custom favicon URL
-    NEXT_PUBLIC_CUSTOM_CSS_URL:            z.string().url().optional(),            // Custom CSS stylesheet URL
-    NEXT_PUBLIC_SUPPORT_EMAIL:             z.string().email().optional(),          // Custom support email
-
     NEXT_PUBLIC_COHERE_CONFIGURED:         z.string().optional(),              // Hide Cohere API key field on Knowledge block when COHERE_API_KEY is pre-configured server-side
-    NEXT_PUBLIC_DOCUMENTATION_URL:         z.string().url().optional(),            // Custom documentation URL
     NEXT_PUBLIC_TERMS_URL:                 z.string().url().optional(),            // Custom terms of service URL
     NEXT_PUBLIC_PRIVACY_URL:               z.string().url().optional(),            // Custom privacy policy URL
 
-    // Theme Customization
-    NEXT_PUBLIC_BRAND_PRIMARY_COLOR:       z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),     // Primary brand color (hex format, e.g., "#33c482")
-    NEXT_PUBLIC_BRAND_PRIMARY_HOVER_COLOR: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),     // Primary brand hover state (hex format)
-    NEXT_PUBLIC_BRAND_ACCENT_COLOR:        z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),     // Accent brand color (hex format)
-    NEXT_PUBLIC_BRAND_ACCENT_HOVER_COLOR:  z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),     // Accent brand hover state (hex format)
-    NEXT_PUBLIC_BRAND_BACKGROUND_COLOR:    z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),     // Brand background color (hex format)
-
     // Feature Flags
-    NEXT_PUBLIC_ENTERPRISE_ENABLED:        z.boolean().optional(),                   // Client twin of ENTERPRISE_ENABLED — set both together
-    NEXT_PUBLIC_SSO_ENABLED:               z.boolean().optional(),                   // Enable SSO login UI components
-    NEXT_PUBLIC_SCIM_ENABLED:              z.boolean().optional(),                   // Enable SCIM settings UI
-    NEXT_PUBLIC_ACCESS_CONTROL_ENABLED:    z.boolean().optional(),                   // Enable access control (permission groups) on self-hosted
-    NEXT_PUBLIC_WHITELABELING_ENABLED:     z.boolean().optional(),                   // Enable whitelabeling on self-hosted (bypasses hosted requirements)
-    NEXT_PUBLIC_AUDIT_LOGS_ENABLED:        z.boolean().optional(),                   // Enable audit logs on self-hosted (bypasses hosted requirements)
-    NEXT_PUBLIC_CUSTOM_BLOCKS_ENABLED:     z.boolean().optional(),                   // Enable custom blocks on self-hosted (bypasses hosted requirements)
-    NEXT_PUBLIC_USAGE_MONITORING_ENABLED:  z.boolean().optional(),                   // Enable organization usage monitoring on self-hosted (bypasses hosted requirements)
-    NEXT_PUBLIC_DATA_RETENTION_ENABLED:   z.boolean().optional(),                   // Enable data retention settings on self-hosted (bypasses hosted requirements)
-    NEXT_PUBLIC_DATA_DRAINS_ENABLED:      z.boolean().optional(),                   // Enable data drains on self-hosted (bypasses hosted requirements)
-    NEXT_PUBLIC_SESSION_POLICIES_ENABLED: z.boolean().optional(),                   // Enable org session policies on self-hosted (bypasses hosted requirements)
-    NEXT_PUBLIC_FORKING_ENABLED:          z.boolean().optional(),                   // Enable workspace forking on self-hosted (bypasses hosted requirements)
     NEXT_PUBLIC_WORKFLOW_COLUMNS_ENABLED: z.boolean().optional(),                   // Show the "Workflow" column type in user tables (defaults to false)
-    NEXT_PUBLIC_ORGANIZATIONS_ENABLED:     z.boolean().optional(),                   // Enable organizations on self-hosted (bypasses plan requirements)
     NEXT_PUBLIC_DISABLE_INVITATIONS:       z.boolean().optional(),                   // Disable workspace invitations globally (for self-hosted deployments)
     NEXT_PUBLIC_DISABLE_PUBLIC_API:        z.boolean().optional(),                   // Disable public API access UI toggle globally
     NEXT_PUBLIC_CHAT_DISABLED:             z.boolean().optional(),                   // Hide the Chat module (Chat is shown when unset)
@@ -597,33 +513,9 @@ export const env = createEnv({
   experimental__runtimeEnv: {
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
     NEXT_PUBLIC_SOCKET_URL: process.env.NEXT_PUBLIC_SOCKET_URL,
-    NEXT_PUBLIC_BRAND_NAME: process.env.NEXT_PUBLIC_BRAND_NAME,
-    NEXT_PUBLIC_BRAND_LOGO_URL: process.env.NEXT_PUBLIC_BRAND_LOGO_URL,
-    NEXT_PUBLIC_BRAND_FAVICON_URL: process.env.NEXT_PUBLIC_BRAND_FAVICON_URL,
-    NEXT_PUBLIC_CUSTOM_CSS_URL: process.env.NEXT_PUBLIC_CUSTOM_CSS_URL,
-    NEXT_PUBLIC_SUPPORT_EMAIL: process.env.NEXT_PUBLIC_SUPPORT_EMAIL,
-    NEXT_PUBLIC_DOCUMENTATION_URL: process.env.NEXT_PUBLIC_DOCUMENTATION_URL,
     NEXT_PUBLIC_TERMS_URL: process.env.NEXT_PUBLIC_TERMS_URL,
     NEXT_PUBLIC_PRIVACY_URL: process.env.NEXT_PUBLIC_PRIVACY_URL,
-    NEXT_PUBLIC_BRAND_PRIMARY_COLOR: process.env.NEXT_PUBLIC_BRAND_PRIMARY_COLOR,
-    NEXT_PUBLIC_BRAND_PRIMARY_HOVER_COLOR: process.env.NEXT_PUBLIC_BRAND_PRIMARY_HOVER_COLOR,
-    NEXT_PUBLIC_BRAND_ACCENT_COLOR: process.env.NEXT_PUBLIC_BRAND_ACCENT_COLOR,
-    NEXT_PUBLIC_BRAND_ACCENT_HOVER_COLOR: process.env.NEXT_PUBLIC_BRAND_ACCENT_HOVER_COLOR,
-    NEXT_PUBLIC_BRAND_BACKGROUND_COLOR: process.env.NEXT_PUBLIC_BRAND_BACKGROUND_COLOR,
-    NEXT_PUBLIC_SSO_ENABLED: process.env.NEXT_PUBLIC_SSO_ENABLED,
-    NEXT_PUBLIC_SCIM_ENABLED: process.env.NEXT_PUBLIC_SCIM_ENABLED,
-    NEXT_PUBLIC_ACCESS_CONTROL_ENABLED: process.env.NEXT_PUBLIC_ACCESS_CONTROL_ENABLED,
-    NEXT_PUBLIC_WHITELABELING_ENABLED: process.env.NEXT_PUBLIC_WHITELABELING_ENABLED,
-    NEXT_PUBLIC_AUDIT_LOGS_ENABLED: process.env.NEXT_PUBLIC_AUDIT_LOGS_ENABLED,
-    NEXT_PUBLIC_CUSTOM_BLOCKS_ENABLED: process.env.NEXT_PUBLIC_CUSTOM_BLOCKS_ENABLED,
-    NEXT_PUBLIC_USAGE_MONITORING_ENABLED: process.env.NEXT_PUBLIC_USAGE_MONITORING_ENABLED,
-    NEXT_PUBLIC_DATA_RETENTION_ENABLED: process.env.NEXT_PUBLIC_DATA_RETENTION_ENABLED,
-    NEXT_PUBLIC_DATA_DRAINS_ENABLED: process.env.NEXT_PUBLIC_DATA_DRAINS_ENABLED,
-    NEXT_PUBLIC_SESSION_POLICIES_ENABLED: process.env.NEXT_PUBLIC_SESSION_POLICIES_ENABLED,
-    NEXT_PUBLIC_FORKING_ENABLED: process.env.NEXT_PUBLIC_FORKING_ENABLED,
     NEXT_PUBLIC_WORKFLOW_COLUMNS_ENABLED: process.env.NEXT_PUBLIC_WORKFLOW_COLUMNS_ENABLED,
-    NEXT_PUBLIC_ENTERPRISE_ENABLED: process.env.NEXT_PUBLIC_ENTERPRISE_ENABLED,
-    NEXT_PUBLIC_ORGANIZATIONS_ENABLED: process.env.NEXT_PUBLIC_ORGANIZATIONS_ENABLED,
     NEXT_PUBLIC_DISABLE_INVITATIONS: process.env.NEXT_PUBLIC_DISABLE_INVITATIONS,
     NEXT_PUBLIC_DISABLE_PUBLIC_API: process.env.NEXT_PUBLIC_DISABLE_PUBLIC_API,
     NEXT_PUBLIC_CHAT_DISABLED: process.env.NEXT_PUBLIC_CHAT_DISABLED,

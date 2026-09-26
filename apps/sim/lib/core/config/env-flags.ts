@@ -229,8 +229,7 @@ export const isTriggerDevEnabled = isTruthy(env.TRIGGER_DEV_ENABLED)
 /**
  * Labbai feature gates formerly resolved through the Sim enterprise license.
  *
- * Kept features (re-implemented as Labbai code) are always on. Removed
- * features are constant `false` until their last consumer is gone.
+ * Kept features (re-implemented as Labbai code) are always on.
  */
 export const isAccessControlEnabled = true as boolean
 
@@ -242,23 +241,6 @@ export const isScimEnabled = true as boolean
 
 /** Organizations (members + roles) are part of the product. */
 export const isOrganizationsEnabled = true as boolean
-
-/** Removed in Labbai. */
-export const isSsoEnabled = false as boolean
-/** Removed in Labbai. */
-export const isUsageMonitoringEnabled = false as boolean
-/** Removed in Labbai. */
-export const isWhitelabelingEnabled = false as boolean
-/** Removed in Labbai. */
-export const isCustomBlocksEnabled = false as boolean
-/** Removed in Labbai. */
-export const isDataRetentionEnabled = false as boolean
-/** Removed in Labbai. */
-export const isDataDrainsEnabled = false as boolean
-/** Removed in Labbai. */
-export const isSessionPoliciesEnabled = false as boolean
-/** Removed in Labbai. */
-export const isForkingEnabled = false as boolean
 
 /**
  * Remote code sandboxes (E2B / Daytona) were removed: Function blocks run

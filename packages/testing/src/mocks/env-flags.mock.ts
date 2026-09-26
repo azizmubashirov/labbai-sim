@@ -26,19 +26,10 @@ export interface EnvFlagsMockState {
   isAppConfigEnabled: boolean
   isSlackExtendedScopesEnabled: boolean
   isTriggerDevEnabled: boolean
-  isEnterpriseEnabled: boolean
-  isSsoEnabled: boolean
-  isUsageMonitoringEnabled: boolean
   isAccessControlEnabled: boolean
   isOrganizationsEnabled: boolean
   isScimEnabled: boolean
-  isWhitelabelingEnabled: boolean
   isAuditLogsEnabled: boolean
-  isCustomBlocksEnabled: boolean
-  isDataRetentionEnabled: boolean
-  isDataDrainsEnabled: boolean
-  isSessionPoliciesEnabled: boolean
-  isForkingEnabled: boolean
   isRemoteSandboxEnabled: boolean
   isMothershipSandboxEnabled: boolean
   isDocSandboxEnabled: boolean
@@ -74,23 +65,10 @@ const defaultEnvFlagsState: EnvFlagsMockState = {
   isAppConfigEnabled: false,
   isSlackExtendedScopesEnabled: false,
   isTriggerDevEnabled: false,
-  isEnterpriseEnabled: false,
-  isSsoEnabled: false,
-  /** OAuth-aware route behavior is available unless a suite overrides it. */
-  isUsageMonitoringEnabled: false,
-  isAccessControlEnabled: false,
-  isOrganizationsEnabled: false,
-  // True with billing off and no flags set — these carry a legacy default of
-  // `true` so upgrades do not remove a feature. See
-  // ENTERPRISE_FEATURE_LEGACY_DEFAULTS.
-  isScimEnabled: false,
-  isWhitelabelingEnabled: true,
-  isSessionPoliciesEnabled: true,
-  isAuditLogsEnabled: false,
-  isCustomBlocksEnabled: false,
-  isDataRetentionEnabled: false,
-  isDataDrainsEnabled: false,
-  isForkingEnabled: false,
+  isAccessControlEnabled: true,
+  isOrganizationsEnabled: true,
+  isScimEnabled: true,
+  isAuditLogsEnabled: true,
   isRemoteSandboxEnabled: false,
   isMothershipSandboxEnabled: false,
   isDocSandboxEnabled: false,
@@ -147,7 +125,7 @@ export const envFlagsMockFns = {
  * @example
  * ```ts
  * beforeEach(() => {
- *   setEnvFlags({ isHosted: true, isSsoEnabled: true })
+ *   setEnvFlags({ isHosted: true, isChatEnabled: false })
  * })
  * afterAll(resetEnvFlagsMock)
  * ```

@@ -72,7 +72,6 @@ import {
   OrganizationSlugTakenError,
 } from '@/lib/billing/organizations/create-organization'
 import { ensureUserInOrganization } from '@/lib/billing/organizations/membership'
-import { isOrganizationsEnabled } from '@/lib/core/config/env-flags'
 import { getInstanceOrganizationConfig } from '@/lib/organizations/instance-org'
 import { attachOwnedWorkspacesToOrganization } from '@/lib/workspaces/organization-workspaces'
 import { WORKSPACE_MODE } from '@/lib/workspaces/policy'
@@ -359,14 +358,6 @@ async function main(): Promise<void> {
   console.log('\nConsolidate users into a single organization')
   console.log('===========================================\n')
 
-  if (!isOrganizationsEnabled) {
-    console.log(
-      'WARNING: organizations are not enabled for this process. Set ORGANIZATIONS_ENABLED=true and\n' +
-        '         NEXT_PUBLIC_ORGANIZATIONS_ENABLED=true on the app, or the org UI stays hidden even\n' +
-        '         though the data written here is correct.\n'
-    )
-  }
-
   const target = await resolveTargetOrganization(options)
 
   const allUsers = await db
@@ -542,7 +533,7 @@ async function main(): Promise<void> {
     return
   }
 
-  console.log('Done. Restart the app if ORGANIZATIONS_ENABLED was changed in the same deploy.\n')
+  console.log('Done.\n')
 }
 
 main()

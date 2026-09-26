@@ -68,13 +68,7 @@ const deployment: DeploymentShape = {
   features: {
     accessControl: true,
     auditLogs: true,
-    dataDrains: true,
-    dataRetention: true,
     scim: true,
-    sessionPolicies: true,
-    sso: true,
-    usageMonitoring: true,
-    whitelabeling: true,
   },
 }
 
@@ -209,7 +203,6 @@ describe('workspace SettingsSidebar organization rollout', () => {
       renderSidebar()
 
       expect(workspaceLink('organization')).toHaveTextContent('Members')
-      expect(workspaceLink('usage')).toHaveTextContent('Insights')
       expect(workspaceLink('connected-accounts')).toHaveTextContent('Credential groups')
       expect(workspaceLink('requests')).toHaveTextContent('Requests')
       expect(container.querySelector('a[href^="/o/"]')).toBeNull()
@@ -238,7 +231,7 @@ describe('workspace SettingsSidebar organization rollout', () => {
       expect(links).toHaveLength(1)
       expect(links[0]).toHaveAttribute('href', '/o/host-org/settings/members')
       expect(links[0]).toHaveTextContent('Organization')
-      for (const section of ['organization', 'usage', 'connected-accounts']) {
+      for (const section of ['organization', 'connected-accounts']) {
         expect(workspaceLink(section)).toBeNull()
       }
       expectWorkspaceLinks()
@@ -250,7 +243,7 @@ describe('workspace SettingsSidebar organization rollout', () => {
     renderSidebar()
 
     expect(workspaceLink('organization')).toHaveTextContent('Members')
-    for (const section of ['usage', 'connected-accounts']) {
+    for (const section of ['connected-accounts']) {
       expect(workspaceLink(section)).toBeNull()
     }
     expect(container.querySelector('a[href^="/o/"]')).toBeNull()
@@ -282,7 +275,7 @@ describe('workspace SettingsSidebar organization rollout', () => {
       } else {
         expect(workspaceLink('organization')).toHaveTextContent('Members')
       }
-      for (const section of ['connected-accounts', 'access-control', 'usage', 'security']) {
+      for (const section of ['connected-accounts', 'access-control', 'security']) {
         if (role === 'admin') {
           expect(workspaceLink(section)).not.toBeNull()
         } else {
@@ -300,7 +293,7 @@ describe('workspace SettingsSidebar organization rollout', () => {
       renderSidebar()
 
       expect(container.querySelector('a[href^="/o/"]')).toBeNull()
-      for (const section of ['organization', 'usage', 'connected-accounts']) {
+      for (const section of ['organization', 'connected-accounts']) {
         expect(workspaceLink(section)).toBeNull()
       }
       expectWorkspaceLinks()

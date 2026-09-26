@@ -14,12 +14,7 @@ const mocks = vi.hoisted(() => ({
     features: {
       accessControl: false,
       auditLogs: false,
-      dataDrains: false,
-      dataRetention: false,
-      sessionPolicies: false,
-      sso: false,
-      usageMonitoring: false,
-      whitelabeling: false,
+      scim: false,
     },
   },
   getOrganizationSettingsFeatures: vi.fn((hasEnterprisePlan: boolean) => ({ hasEnterprisePlan })),

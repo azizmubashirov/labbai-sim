@@ -16,6 +16,7 @@ import {
 import { ArrowUpRight, Building, ChevronLeft, Lock } from '@sim/emcn/icons'
 import { useQueryClient } from '@tanstack/react-query'
 import { useParams, usePathname, useRouter } from 'next/navigation'
+import { useWorkspaceAccessRequestFeatures } from '@/components/access-requests/permission-access-boundary'
 import {
   getOrganizationSettingsHref,
   getSettingsPermissionConfigKey,
@@ -42,7 +43,6 @@ import {
   SIDEBAR_RAIL_CHIP_CLASS,
   SIDEBAR_SECTION_GAP_CLASS,
 } from '@/app/workspace/[workspaceId]/w/components/sidebar/constants'
-import { useWorkspaceAccessRequestFeatures } from '@/components/access-requests/permission-access-boundary'
 import { useGeneralSettings } from '@/hooks/queries/general-settings'
 import { usePermissionConfig } from '@/hooks/use-permission-config'
 import { useSettingsNavigation } from '@/hooks/use-settings-navigation'
@@ -169,16 +169,17 @@ export function SettingsSidebar({
         return false
       }
 
+      /**
+       * Org-plane sections route through the organization gate in
+       * `settings/[section]/page.tsx` (host organization + org-admin viewer),
+       * which 404s other viewers — mirror it here so the item never links to
+       * a dead page.
+       */
+      if (ORGANIZATION_PLANE_UNIFIED_SECTIONS.has(item.id) && !isOrgAdminOrOwner) {
+        return false
+      }
+
       if (isSelfHostedOverrideEnabled(item.selfHostedOverride, deployment)) {
-        /**
-         * Org-plane sections route through the organization gate in
-         * `settings/[section]/page.tsx` (host organization + org-admin viewer),
-         * which 404s other viewers — mirror it here so the item never links to
-         * a dead page.
-         */
-        if (ORGANIZATION_PLANE_UNIFIED_SECTIONS.has(item.id) && !isOrgAdminOrOwner) {
-          return false
-        }
         return true
       }
 

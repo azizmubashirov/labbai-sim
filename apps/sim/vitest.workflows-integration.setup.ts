@@ -30,7 +30,6 @@ Object.assign(process.env, {
   NEXT_PUBLIC_APP_URL: 'http://127.0.0.1:3000',
   INTERNAL_API_BASE_URL: 'http://127.0.0.1:3000',
   NEXT_PUBLIC_FORCE_HOSTED: 'false',
-  ACCESS_CONTROL_ENABLED: 'true',
   STORAGE_PROVIDER: 'local',
   OCR_PROVIDER: 'local',
   DISABLE_AUTH: 'false',

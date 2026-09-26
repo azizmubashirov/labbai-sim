@@ -185,11 +185,7 @@ export function AuditLogs({ organizationId }: AuditLogsProps) {
             onClear={() => void setParams({ from: null, to: null })}
             align='start'
           />
-          {filtered && (
-            <Chip variant='default' onClick={clearFilters}>
-              Clear filters
-            </Chip>
-          )}
+          {filtered && <Chip onClick={clearFilters}>Clear filters</Chip>}
         </div>
 
         {logs.isError && !logs.data ? (
