@@ -24,9 +24,6 @@ function facts(overrides: Partial<AccountDeletionFacts> = {}): AccountDeletionFa
     workspaces: [],
     company: new Map(),
     organizationNames: [],
-    paidOrganizationName: null,
-    personalPlan: null,
-    hasDataDrains: false,
     ...overrides,
   }
 }
@@ -111,18 +108,6 @@ describe('classifyAccountDeletion', () => {
     expect(plan.workspacesToDelete).toEqual([])
   })
 
-  it('reports paid organization ownership instead of plain membership', () => {
-    const plan = classifyAccountDeletion(
-      facts({
-        paidOrganizationName: 'Acme',
-        organizationNames: ['Acme'],
-      })
-    )
-
-    expect(codes(plan)).toEqual(['paid_organization_owner'])
-    expect(plan.blockers[0].message).toContain('Acme')
-  })
-
   it('asks a plain organization member to leave first, so their seat is released', () => {
     const plan = classifyAccountDeletion(facts({ organizationNames: ['Acme'] }))
 
@@ -136,17 +121,10 @@ describe('classifyAccountDeletion', () => {
         workspaces: [ws],
         company: new Map([[ws.id, company({ hasOtherMembers: true })]]),
         organizationNames: ['Acme'],
-        personalPlan: 'pro',
-        hasDataDrains: true,
       })
     )
 
-    expect(codes(plan)).toEqual([
-      'organization_member',
-      'active_subscription',
-      'data_drain_owner',
-      'shared_workspace',
-    ])
+    expect(codes(plan)).toEqual(['organization_member', 'shared_workspace'])
   })
 
   it('names up to three workspaces and summarizes the rest', () => {
@@ -169,11 +147,11 @@ describe('classifyAccountDeletion', () => {
 describe('AccountDeletionBlockedError', () => {
   it('classifies itself as a conflict so the route renders a refusal as 409, not 500', () => {
     const error = new AccountDeletionBlockedError([
-      { code: 'active_subscription', message: 'Your pro plan is still active.' },
+      { code: 'organization_member', message: 'Leave "Acme" before deleting your account.' },
     ])
 
     expect(error.code).toBe('conflict')
-    expect(error.message).toBe('Your pro plan is still active.')
+    expect(error.message).toBe('Leave "Acme" before deleting your account.')
   })
 
   it('still carries a message when constructed with no blockers', () => {

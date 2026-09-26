@@ -29,7 +29,6 @@ vi.unmock('drizzle-orm')
 
 const {
   resolveMoveEntitlements,
-  findCrossOrgForkEdges,
   cleanupSourceOrganizationArtifactsTx,
   acquireOrganizationMutationLock,
   recordAudit,
@@ -53,7 +52,6 @@ const {
       capabilitiesLost: [] as string[],
     })
   ),
-  findCrossOrgForkEdges: vi.fn(() => Promise.resolve([])),
   cleanupSourceOrganizationArtifactsTx: vi.fn(() =>
     Promise.resolve({ detachedPermissionGroupIds: [] })
   ),
@@ -156,9 +154,7 @@ vi.mock('@/lib/table/billing', () => ({ invalidateWorkspaceTableLimitsCache }))
 vi.mock('@/lib/workspaces/admin-move-source-impact', () => ({
   cleanupSourceOrganizationArtifactsTx,
   collectWorkspaceCredentialSummary,
-  countRetentionRulesForWorkspace: vi.fn(() => ({ retentionOverrides: 0 })),
   findAttachedPermissionGroups: vi.fn(() => Promise.resolve([])),
-  findCrossOrgForkEdges,
   findRetainedCollaboratorCaps: vi.fn(() => Promise.resolve([])),
   getSourceOrganization,
   resolveMoveEntitlements,
@@ -1194,51 +1190,6 @@ describe('moveWorkspaceToOrganization retries', () => {
     )
   })
 
-  it('refuses a cross-organization fork edge without mutating anything', async () => {
-    queueMoveSelects(organizationWorkspace)
-    findCrossOrgForkEdges.mockResolvedValueOnce([
-      {
-        workspaceId: 'parent-1',
-        name: 'Parent',
-        organizationId: 'org-source',
-        direction: 'parent',
-      },
-    ] as never)
-
-    await expect(
-      moveWorkspaceToOrganization({
-        workspaceId: organizationWorkspace.id,
-        destinationOrganizationId: destination.id,
-        adminEmail: 'admin@sim.ai',
-        durableOperationId: 'operation-1',
-      })
-    ).rejects.toMatchObject<Partial<WorkspaceMoveError>>({ code: 'fork-lineage-conflict' })
-
-    expect(changeWorkspaceStoragePayerInTx).not.toHaveBeenCalled()
-  })
-
-  it('refuses a cross-organization fork edge on a PERSONAL source too', async () => {
-    queueMoveSelects(personalWorkspace)
-    findCrossOrgForkEdges.mockResolvedValueOnce([
-      { workspaceId: 'parent-1', name: 'Parent', organizationId: 'org-other', direction: 'parent' },
-    ] as never)
-
-    /**
-     * A personal workspace whose parent has since moved into an organization
-     * still produces a cross-org edge. Gating the check on an organization
-     * source let the transaction accept a move preflight had already refused.
-     */
-    await expect(
-      moveWorkspaceToOrganization({
-        workspaceId: personalWorkspace.id,
-        destinationOrganizationId: destination.id,
-        adminEmail: 'admin@sim.ai',
-      })
-    ).rejects.toMatchObject<Partial<WorkspaceMoveError>>({ code: 'fork-lineage-conflict' })
-
-    expect(changeWorkspaceStoragePayerInTx).not.toHaveBeenCalled()
-  })
-
   it('does not fence a move when both organizations are equally entitled', async () => {
     queueMoveSelects(organizationWorkspace)
     /**
@@ -1301,7 +1252,7 @@ describe('moveWorkspaceToOrganization retries', () => {
     resolveMoveEntitlements.mockResolvedValue({
       sourceIsEnterprise: true,
       destinationIsEnterprise: false,
-      capabilitiesLost: ['permission groups', 'workspace forking'],
+      capabilitiesLost: ['permission groups', 'audit logs'],
     })
 
     await expect(

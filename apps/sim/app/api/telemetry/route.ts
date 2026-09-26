@@ -59,7 +59,9 @@ async function forwardToCollector(data: Record<string, unknown>): Promise<boolea
     return false
   }
 
-  const endpoint = env.TELEMETRY_ENDPOINT || 'https://telemetry.simstudio.ai/v1/traces'
+  // Telemetry goes only to our own collector; without TELEMETRY_ENDPOINT it is dropped.
+  const endpoint = env.TELEMETRY_ENDPOINT
+  if (!endpoint) return false
   const timeout = DEFAULT_TIMEOUT
 
   try {
@@ -68,7 +70,7 @@ async function forwardToCollector(data: Record<string, unknown>): Promise<boolea
     const safeAttrs = createSafeAttributes(data)
 
     const serviceAttrs = [
-      { key: 'service.name', value: { stringValue: 'sim-studio' } },
+      { key: 'service.name', value: { stringValue: 'labbai' } },
       {
         key: 'service.version',
         value: { stringValue: '0.1.0' },

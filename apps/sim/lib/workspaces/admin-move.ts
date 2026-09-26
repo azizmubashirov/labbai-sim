@@ -42,12 +42,9 @@ import { getInvitationById, isInvitationExpired } from '@/lib/invitations/core'
 import { acquireInvitationMutationLocks } from '@/lib/invitations/locks'
 import { PENDING_INVITATION_UNIQUE_INDEX, sendInvitationEmail } from '@/lib/invitations/send'
 import {
-  type CrossOrgForkEdge,
   cleanupSourceOrganizationArtifactsTx,
   collectWorkspaceCredentialSummary,
-  countRetentionRulesForWorkspace,
   findAttachedPermissionGroups,
-  findCrossOrgForkEdges,
   findRetainedCollaboratorCaps,
   getSourceOrganization,
   resolveMoveEntitlements,
@@ -64,18 +61,6 @@ const logger = createLogger('AdminWorkspaceMove')
 /** Second `member` alias so one query can test membership of both organizations. */
 const sourceMember = alias(member, 'source_member')
 
-/**
- * Moving a workspace between organizations is the only operation in the product
- * capable of separating an artifact from the organization that owns it, so two
- * invariant that nothing else has ever had to defend is enforced here.
- *
- * **A fork parent and child always share an organization.** `assertCanFork`
- * pins the child to the source's org, and `resolveForkEdge` has no org check at
- * all. The move refuses to run while a cross-org edge would result; the fork
- * must be disconnected first.
- *
- * The invariant tolerates no transitional or "inert" violation.
- */
 /**
  * A dashboard member add may move several grants from one invitation in
  * consecutive short transactions. Let that split/merge sequence settle before
@@ -100,7 +85,6 @@ export class WorkspaceMoveError extends Error {
       | 'source-equals-destination'
       | 'move-operation-parameter-mismatch'
       | 'destination-entitlement-downgrade'
-      | 'fork-lineage-conflict'
       | 'pending-invitations-present'
   ) {
     super(message)
@@ -143,15 +127,7 @@ export interface WorkspaceMoveSourceOrganization {
  * admin can review the damage before confirming.
  */
 export interface WorkspaceMoveSourceImpact {
-  /** Fork edges crossing the org boundary. Non-empty blocks the move. */
-  blockingForkEdges: Array<{
-    workspaceId: string
-    name: string
-    organizationId: string | null
-    direction: 'parent' | 'child'
-  }>
   detachedPermissionGroups: Array<{ permissionGroupId: string; name: string }>
-  strippedRetentionRules: { retentionOverrides: number }
   /** Retained collaborators whose source-org per-member cap stops applying. */
   retainedCollaboratorCaps: Array<{
     userId: string
@@ -162,7 +138,6 @@ export interface WorkspaceMoveSourceImpact {
   truncated: {
     permissionGroups: number
     collaboratorCaps: number
-    forkEdges: number
     credentials: number
     environmentVariableKeys: number
   } | null
@@ -435,7 +410,6 @@ function buildAppliedTruncation(params: {
       0
     ),
     collaboratorCaps: 0,
-    forkEdges: 0,
     credentials: params.credentials.truncatedCredentials,
     environmentVariableKeys: params.credentials.truncatedEnvironmentVariableKeys,
   }
@@ -631,16 +605,13 @@ export async function getWorkspaceMovePreflight(
       ? `This move is blocked: ${currentMembers} current member${currentMembers === 1 ? '' : 's'} plus ${projectedPendingInternalSeats} pending internal invitation reservation${projectedPendingInternalSeats === 1 ? '' : 's'} exceed the ${seatCapacity}-seat Enterprise capacity.`
       : null
 
-  const [sourceOrganization, entitlements, credentials, forkEdges, sourceImpact] =
-    await Promise.all([
-      sourceOrganizationId ? getSourceOrganization(sourceOrganizationId) : null,
-      resolveMoveEntitlements(sourceOrganizationId, destinationOrganizationId),
-      collectWorkspaceCredentialSummary(workspaceId, sourceOrganizationId),
-      findCrossOrgForkEdges(workspaceId, destinationOrganizationId),
-      collectSourceOrganizationImpact(workspaceId, sourceOrganizationId),
-    ])
+  const [sourceOrganization, entitlements, credentials, sourceImpact] = await Promise.all([
+    sourceOrganizationId ? getSourceOrganization(sourceOrganizationId) : null,
+    resolveMoveEntitlements(sourceOrganizationId, destinationOrganizationId),
+    collectWorkspaceCredentialSummary(workspaceId, sourceOrganizationId),
+    collectSourceOrganizationImpact(workspaceId, sourceOrganizationId),
+  ])
 
-  const boundedForkEdges = boundList(forkEdges, PREFLIGHT_LIST_LIMITS.forkEdges)
   /**
    * One truncation record covering every bounded list, so a partial review is
    * never presented as a complete one.
@@ -648,7 +619,6 @@ export async function getWorkspaceMovePreflight(
   const droppedTotal =
     (sourceImpact.truncated?.permissionGroups ?? 0) +
     (sourceImpact.truncated?.collaboratorCaps ?? 0) +
-    boundedForkEdges.dropped +
     credentials.truncatedCredentials +
     credentials.truncatedEnvironmentVariableKeys
   const mergedTruncation =
@@ -656,7 +626,6 @@ export async function getWorkspaceMovePreflight(
       ? {
           permissionGroups: sourceImpact.truncated?.permissionGroups ?? 0,
           collaboratorCaps: sourceImpact.truncated?.collaboratorCaps ?? 0,
-          forkEdges: boundedForkEdges.dropped,
           credentials: credentials.truncatedCredentials,
           environmentVariableKeys: credentials.truncatedEnvironmentVariableKeys,
         }
@@ -664,7 +633,6 @@ export async function getWorkspaceMovePreflight(
 
   const blockers = buildMoveBlockers({
     entitlements,
-    forkEdges,
     pendingInvitationCount: sourceOrganizationId ? invitationRows.length : 0,
     /**
      * Seat capacity throws `seat-capacity-exceeded` in the transaction, so it
@@ -689,7 +657,6 @@ export async function getWorkspaceMovePreflight(
     invitations: invitationRows.map(({ organizationId: _organizationId, ...row }) => row),
     sourceOrganizationImpact: {
       ...sourceImpact,
-      blockingForkEdges: boundedForkEdges.items,
       truncated: mergedTruncation,
     },
     credentials,
@@ -712,7 +679,6 @@ export async function getWorkspaceMovePreflight(
  */
 function buildMoveBlockers(params: {
   entitlements: WorkspaceMoveEntitlements
-  forkEdges: CrossOrgForkEdge[]
   pendingInvitationCount: number
   seatCapacityWarning: string | null
 }): string[] {
@@ -723,11 +689,6 @@ function buildMoveBlockers(params: {
   if (params.entitlements.capabilitiesLost.length > 0) {
     blockers.push(
       `The destination organization is not on Enterprise, so this workspace would lose ${formatList(params.entitlements.capabilitiesLost)}. Upgrade the destination or choose another organization.`
-    )
-  }
-  if (params.forkEdges.length > 0) {
-    blockers.push(
-      `${params.forkEdges.length} fork ${params.forkEdges.length === 1 ? 'edge' : 'edges'} would span two organizations. Disconnect ${params.forkEdges.length === 1 ? 'it' : 'them'} from workspace settings before moving.`
     )
   }
   if (params.pendingInvitationCount > 0) {
@@ -742,19 +703,19 @@ function buildMoveBlockers(params: {
 function buildMoveNotices(params: {
   sourceOrganization: WorkspaceMoveSourceOrganization | null
   destinationOrganization: WorkspaceMoveDestination
-  sourceImpact: Omit<WorkspaceMoveSourceImpact, 'blockingForkEdges'>
+  sourceImpact: WorkspaceMoveSourceImpact
   credentials: WorkspaceMoveCredentialSummary
 }): string[] {
   const notices: string[] = []
   /**
-   * Truncation is reported before the source-organization early return: fork
-   * edges and credentials can be truncated on a personal source too, and a
-   * partial review must never present as a complete one.
+   * Truncation is reported before the source-organization early return:
+   * credentials can be truncated on a personal source too, and a partial
+   * review must never present as a complete one.
    */
   if (params.sourceImpact.truncated) {
     const t = params.sourceImpact.truncated
     notices.push(
-      `This review is incomplete — some lists were truncated to stay within response limits: ${t.permissionGroups} permission group(s), ${t.collaboratorCaps} collaborator cap(s), ${t.forkEdges} fork edge(s), ${t.credentials} credential(s) and ${t.environmentVariableKeys} environment variable(s) not shown.`
+      `This review is incomplete — some lists were truncated to stay within response limits: ${t.permissionGroups} permission group(s), ${t.collaboratorCaps} collaborator cap(s), ${t.credentials} credential(s) and ${t.environmentVariableKeys} environment variable(s) not shown.`
     )
   }
   if (!params.sourceOrganization) return notices
@@ -789,7 +750,6 @@ function buildMoveNotices(params: {
  * say so instead; never drop rows without a notice.
  */
 const PREFLIGHT_LIST_LIMITS = {
-  forkEdges: 500,
   permissionGroups: 500,
   collaboratorCaps: 1_000,
   credentials: 1_000,
@@ -809,30 +769,21 @@ function formatList(items: string[]): string {
   return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`
 }
 
-/**
- * Gathers everything the source organization loses, excluding fork edges, which
- * the caller resolves separately because they also drive a blocker.
- */
+/** Gathers everything the source organization loses. */
 async function collectSourceOrganizationImpact(
   workspaceId: string,
   sourceOrganizationId: string | null
-): Promise<Omit<WorkspaceMoveSourceImpact, 'blockingForkEdges'>> {
+): Promise<WorkspaceMoveSourceImpact> {
   if (!sourceOrganizationId) {
     return {
       detachedPermissionGroups: [],
-      strippedRetentionRules: { retentionOverrides: 0 },
       retainedCollaboratorCaps: [],
       truncated: null,
     }
   }
 
-  const [permissionGroups, retentionSettings, collaboratorCaps] = await Promise.all([
+  const [permissionGroups, collaboratorCaps] = await Promise.all([
     findAttachedPermissionGroups(workspaceId),
-    db
-      .select({ dataRetentionSettings: organization.dataRetentionSettings })
-      .from(organization)
-      .where(eq(organization.id, sourceOrganizationId))
-      .limit(1),
     findRetainedCollaboratorCaps(workspaceId, sourceOrganizationId),
   ])
 
@@ -841,17 +792,12 @@ async function collectSourceOrganizationImpact(
 
   return {
     detachedPermissionGroups: boundedGroups.items,
-    strippedRetentionRules: countRetentionRulesForWorkspace(
-      retentionSettings[0]?.dataRetentionSettings,
-      workspaceId
-    ),
     retainedCollaboratorCaps: boundedCaps.items,
     truncated:
       boundedGroups.dropped + boundedCaps.dropped > 0
         ? {
             permissionGroups: boundedGroups.dropped,
             collaboratorCaps: boundedCaps.dropped,
-            forkEdges: 0,
             credentials: 0,
             environmentVariableKeys: 0,
           }
@@ -1117,32 +1063,11 @@ export async function moveWorkspaceToOrganization(params: {
         }
 
         /**
-         * The three org-to-org blockers, re-checked under the locks. Preflight
-         * evaluated them too, but a subscription can lapse, a fork can be
-         * created, and an invitation can arrive in between — and each of these
-         * either violates a cross-org invariant or silently rewrites a promise
-         * the source organization made.
+         * The org-to-org blockers, re-checked under the locks. Preflight
+         * evaluated them too, but a subscription can lapse and an invitation
+         * can arrive in between — and either silently rewrites a promise the
+         * source organization made.
          */
-        /**
-         * The fork check is NOT gated on an organization source. A personal
-         * workspace whose parent has since moved into an organization still
-         * produces a cross-organization edge when it lands in a different one,
-         * and the invariant admits no exceptions. Preflight already reports it
-         * unconditionally; gating it here would let the transaction accept a
-         * move preflight had refused.
-         */
-        const forkEdges = await findCrossOrgForkEdges(
-          params.workspaceId,
-          params.destinationOrganizationId,
-          tx
-        )
-        if (forkEdges.length > 0) {
-          throw new WorkspaceMoveError(
-            `${forkEdges.length} fork ${forkEdges.length === 1 ? 'edge' : 'edges'} would span two organizations. Disconnect the fork before moving this workspace.`,
-            'fork-lineage-conflict'
-          )
-        }
-
         /**
          * An organization source requires a durable operation, and that is a
          * caller contract rather than an operator-facing outcome.
@@ -2675,9 +2600,7 @@ async function getMovedWorkspaceSummary(
 
 /** A move that is already applied has no source-org context to report. */
 const EMPTY_SOURCE_IMPACT: WorkspaceMoveSourceImpact = {
-  blockingForkEdges: [],
   detachedPermissionGroups: [],
-  strippedRetentionRules: { retentionOverrides: 0 },
   retainedCollaboratorCaps: [],
   truncated: null,
 }

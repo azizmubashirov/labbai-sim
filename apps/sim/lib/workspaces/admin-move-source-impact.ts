@@ -3,7 +3,6 @@ import {
   account,
   credential,
   credentialGroup,
-  type DataRetentionSettings,
   member,
   organization,
   organizationMemberUsageLimit,
@@ -13,12 +12,10 @@ import {
   subscription,
   user,
   userStats,
-  workspace,
   workspaceBYOKKeys,
   workspaceEnvironment,
 } from '@sim/db/schema'
-import { and, eq, inArray, isNull, ne, or } from 'drizzle-orm'
-import { alias } from 'drizzle-orm/pg-core'
+import { and, eq, inArray } from 'drizzle-orm'
 import type { OrganizationSettingsSection } from '@/components/settings/navigation'
 import { isSubscriptionBackedEntitlement } from '@/lib/billing/core/subscription'
 import { isEnterprise } from '@/lib/billing/plan-helpers'
@@ -103,66 +100,6 @@ export async function getSourceOrganization(
     .limit(1)
 
   return row ?? null
-}
-
-export interface CrossOrgForkEdge {
-  workspaceId: string
-  name: string
-  organizationId: string | null
-  direction: 'parent' | 'child'
-}
-
-/**
- * Fork edges that would span two organizations once the workspace lands in
- * `destinationOrganizationId`, in both directions.
- *
- * Deliberately does NOT filter archived workspaces the way `getForkParent` /
- * `getForkChildren` do. Those are read helpers for the settings UI; an archived
- * workspace can be unarchived, so the invariant has to hold for it too.
- */
-export async function findCrossOrgForkEdges(
-  workspaceId: string,
-  destinationOrganizationId: string,
-  executor: DbOrTx = db
-): Promise<CrossOrgForkEdge[]> {
-  const parent = alias(workspace, 'fork_parent')
-  const [parentRows, childRows] = await Promise.all([
-    executor
-      .select({
-        workspaceId: parent.id,
-        name: parent.name,
-        organizationId: parent.organizationId,
-      })
-      .from(workspace)
-      .innerJoin(parent, eq(parent.id, workspace.forkedFromWorkspaceId))
-      .where(
-        and(
-          eq(workspace.id, workspaceId),
-          or(isNull(parent.organizationId), ne(parent.organizationId, destinationOrganizationId))
-        )
-      ),
-    executor
-      .select({
-        workspaceId: workspace.id,
-        name: workspace.name,
-        organizationId: workspace.organizationId,
-      })
-      .from(workspace)
-      .where(
-        and(
-          eq(workspace.forkedFromWorkspaceId, workspaceId),
-          or(
-            isNull(workspace.organizationId),
-            ne(workspace.organizationId, destinationOrganizationId)
-          )
-        )
-      ),
-  ])
-
-  return [
-    ...parentRows.map((row) => ({ ...row, direction: 'parent' as const })),
-    ...childRows.map((row) => ({ ...row, direction: 'child' as const })),
-  ]
 }
 
 export interface WorkspaceMoveCredentialSummaryRow {
@@ -419,40 +356,9 @@ export async function findAttachedPermissionGroups(
     .where(eq(permissionGroupWorkspace.workspaceId, workspaceId))
 }
 
-/** Counts the source-org retention entries that name this workspace. */
-export function countRetentionRulesForWorkspace(
-  settings: DataRetentionSettings | null | undefined,
-  workspaceId: string
-): { retentionOverrides: number } {
-  return {
-    retentionOverrides: (settings?.retentionOverrides ?? []).filter(
-      (override) => override.workspaceId === workspaceId
-    ).length,
-  }
-}
-
-/** Removes every entry naming `workspaceId`, or `null` when nothing changed. */
-export function stripRetentionRulesForWorkspace(
-  settings: DataRetentionSettings | null | undefined,
-  workspaceId: string
-): DataRetentionSettings | null {
-  if (!settings) return null
-  const counts = countRetentionRulesForWorkspace(settings, workspaceId)
-  if (counts.retentionOverrides === 0) return null
-
-  const next: DataRetentionSettings = { ...settings }
-  if (settings.retentionOverrides) {
-    next.retentionOverrides = settings.retentionOverrides.filter(
-      (override) => override.workspaceId !== workspaceId
-    )
-  }
-  return next
-}
-
 /**
  * Deletes the source-org rows that cannot follow the workspace and would
- * otherwise desynchronize, and strips the source org's retention entries that
- * name it. Runs inside the move transaction.
+ * otherwise desynchronize. Runs inside the move transaction.
  *
  * `permission_group_workspace` grants nothing after the move — `resolveWorkspaceGroup`
  * filters by the workspace's *current* organization — but `getGroupWorkspaces`
@@ -468,24 +374,6 @@ export async function cleanupSourceOrganizationArtifactsTx(
     .delete(permissionGroupWorkspace)
     .where(eq(permissionGroupWorkspace.workspaceId, params.workspaceId))
     .returning({ permissionGroupId: permissionGroupWorkspace.permissionGroupId })
-
-  const [sourceOrg] = await tx
-    .select({ dataRetentionSettings: organization.dataRetentionSettings })
-    .from(organization)
-    .where(eq(organization.id, params.sourceOrganizationId))
-    .for('update')
-    .limit(1)
-
-  const strippedSettings = stripRetentionRulesForWorkspace(
-    sourceOrg?.dataRetentionSettings,
-    params.workspaceId
-  )
-  if (strippedSettings) {
-    await tx
-      .update(organization)
-      .set({ dataRetentionSettings: strippedSettings, updatedAt: new Date() })
-      .where(eq(organization.id, params.sourceOrganizationId))
-  }
 
   return { detachedPermissionGroupIds: detached.map((row) => row.permissionGroupId) }
 }

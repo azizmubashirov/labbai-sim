@@ -27,7 +27,7 @@ const SPAN_NAME_PREFIX = `${MOTHERSHIP_ORIGIN}: `
 const SERVICE_INSTANCE_SLUG = 'sim' as const
 
 const DEFAULT_TELEMETRY_CONFIG = {
-  endpoint: env.TELEMETRY_ENDPOINT || 'https://telemetry.simstudio.ai/v1/traces',
+  endpoint: env.TELEMETRY_ENDPOINT || '',
   serviceName: 'mothership',
   serviceVersion: '0.1.0',
   serverSide: { enabled: true },
@@ -169,6 +169,11 @@ async function initializeOpenTelemetry() {
       process.env.TELEMETRY_ENDPOINT ||
       env.TELEMETRY_ENDPOINT ||
       telemetryConfig.endpoint
+    // No default collector: telemetry is sent only to our own endpoint.
+    if (!resolvedEndpoint) {
+      logger.info('OpenTelemetry disabled: TELEMETRY_ENDPOINT is not set')
+      return
+    }
     telemetryConfig = {
       ...telemetryConfig,
       endpoint: resolvedEndpoint,

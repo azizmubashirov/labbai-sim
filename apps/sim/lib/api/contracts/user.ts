@@ -446,12 +446,7 @@ export type ExportUsageLogsQuery = z.output<typeof exportUsageLogsQuerySchema>
 
 /** Every reason an account cannot be erased on its own, as rendered to its owner. */
 export const accountDeletionBlockerSchema = z.object({
-  code: z.enum([
-    'organization_member',
-    'shared_workspace',
-    'organization_workspace',
-    'data_drain_owner',
-  ]),
+  code: z.enum(['organization_member', 'shared_workspace', 'organization_workspace']),
   /** A sentence naming both the obstacle and the way out. */
   message: z.string(),
 })

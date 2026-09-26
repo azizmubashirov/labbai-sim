@@ -18,7 +18,7 @@ permissions:
 jobs:
   typecheck:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v4
 
@@ -54,6 +54,17 @@ jobs:
           set -o pipefail
           bunx vitest run local-copilot lib/api-key lib/mothership/inbox --reporter=dot 2>&1 | tee /tmp/tests.txt
 
+      # Whole apps/sim suite, report only (does not fail the job) until the stale
+      # tests left by the cleanup are fixed.
+      - name: Full unit tests (report only)
+        id: fulltests
+        if: always()
+        continue-on-error: true
+        working-directory: apps/sim
+        run: |
+          set -o pipefail
+          NODE_OPTIONS=--max-old-space-size=8192 bunx vitest run --reporter=dot 2>&1 | tee /tmp/full-tests.txt
+
       # Job logs need repo-admin auth to download; publish the results on a public
       # branch so they can be read from raw.githubusercontent.com.
       - name: Publish report
@@ -64,7 +75,9 @@ jobs:
           cp /tmp/typecheck.txt typecheck.txt 2>/dev/null || echo "no output" > typecheck.txt
           tail -c 200000 /tmp/tests.txt > tests.txt 2>/dev/null || echo "no output" > tests.txt
           tail -c 100000 /tmp/install.txt > install.txt 2>/dev/null || echo "no output" > install.txt
-          printf 'sha=%s\ntsc=%s\ntests=%s\n' "$GITHUB_SHA" "${{ steps.tsc.outcome }}" "${{ steps.tests.outcome }}" > status.txt
+          grep -v '^\s*$' /tmp/full-tests.txt | tail -c 600000 > full-tests.txt 2>/dev/null || echo "no output" > full-tests.txt
+          grep -E '(FAIL|✗|×) ' /tmp/full-tests.txt | sort -u > full-tests-failed.txt 2>/dev/null || true
+          printf 'sha=%s\ntsc=%s\ntests=%s\nfull_tests=%s\n' "$GITHUB_SHA" "${{ steps.tsc.outcome }}" "${{ steps.tests.outcome }}" "${{ steps.fulltests.outcome }}" > status.txt
           git add -A && git -c user.name=ci -c user.email=ci@localhost commit -qm "report $GITHUB_SHA"
           git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" ci-reports
 

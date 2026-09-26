@@ -1,6 +1,5 @@
 import { db } from '@sim/db'
 import {
-  dataDrains,
   document,
   knowledgeBase,
   member,
@@ -194,7 +193,6 @@ export interface AccountDeletionFacts {
   /** Who else is in each of those workspaces, keyed by workspace id. */
   company: Map<string, WorkspaceCompany>
   organizationNames: string[]
-  hasDataDrains: boolean
 }
 
 /**
@@ -229,14 +227,6 @@ export function classifyAccountDeletion(facts: AccountDeletionFacts): AccountDel
     blockers.push({
       code: 'organization_member',
       message: `Leave ${formatNames(facts.organizationNames)} before deleting your account, so your seat is released and your work is handed over.`,
-    })
-  }
-
-  if (facts.hasDataDrains) {
-    blockers.push({
-      code: 'data_drain_owner',
-      message:
-        'You created one or more data drains that other people still depend on. Ask an organization admin to delete them before deleting your account.',
     })
   }
 
@@ -286,21 +276,15 @@ function formatResourceNames(resources: AccountDeletionResource[]): string {
 
 /** Gathers the facts above and classifies them. */
 export async function getAccountDeletionPlan(userId: string): Promise<AccountDeletionPlan> {
-  const [workspaces, organizationNames, drains] = await Promise.all([
+  const [workspaces, organizationNames] = await Promise.all([
     loadRelatedWorkspaces(userId),
     loadOrganizationNames(userId),
-    db
-      .select({ id: dataDrains.id })
-      .from(dataDrains)
-      .where(eq(dataDrains.createdBy, userId))
-      .limit(1),
   ])
 
   return classifyAccountDeletion({
     workspaces,
     company: await loadWorkspaceCompany(userId, workspaces),
     organizationNames,
-    hasDataDrains: drains.length > 0,
   })
 }
 
