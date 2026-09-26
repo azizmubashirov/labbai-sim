@@ -1,5 +1,5 @@
 import { db } from '@sim/db'
-import { member, organization, user, userStats } from '@sim/db/schema'
+import { member, organization, userStats } from '@sim/db/schema'
 import { createLogger } from '@sim/logger'
 import { generateId } from '@sim/utils/id'
 import { and, eq, isNull, sql } from 'drizzle-orm'

@@ -44,7 +44,7 @@ function WorkspaceStatusCard({
   onPrimary,
 }: WorkspaceStatusCardProps) {
   return (
-    <main className='min-h-screen flex w-full items-center justify-center bg-[var(--surface-1)] p-6'>
+    <main className='flex min-h-screen w-full items-center justify-center bg-[var(--surface-1)] p-6'>
       <div className='flex max-w-md flex-col items-center gap-3 text-center'>
         <div className='flex size-10 items-center justify-center rounded-full bg-[var(--surface-3)]'>
           <CircleAlert className='size-[18px] text-[var(--text-icon)]' aria-hidden />
@@ -206,7 +206,7 @@ export default function WorkspacePage() {
   }
 
   return (
-    <div className='min-h-screen flex w-full items-center justify-center'>
+    <div className='flex min-h-screen w-full items-center justify-center'>
       <div
         className='size-[18px] animate-spin rounded-full'
         style={{

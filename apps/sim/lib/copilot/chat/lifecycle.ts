@@ -271,16 +271,7 @@ export async function resolveOrCreateChat(params: {
    */
   includeTranscript?: boolean
 }): Promise<ChatLoadResult> {
-  const {
-    chatId,
-    userId,
-    workflowId,
-    workspaceId,
-    model,
-    type,
-    title,
-    includeTranscript,
-  } = params
+  const { chatId, userId, workflowId, workspaceId, model, type, title, includeTranscript } = params
 
   if (workspaceId) {
     await assertActiveWorkspaceAccess(workspaceId, userId)

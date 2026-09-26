@@ -12,8 +12,6 @@ import {
   serializeApiKeyIntegrations,
   serializeBlockSchema,
   serializeConnectedAccounts,
-  serializeConnectorOverview,
-  serializeConnectorSchema,
   serializeConnectors,
   serializeCredentials,
   serializeDeployments,

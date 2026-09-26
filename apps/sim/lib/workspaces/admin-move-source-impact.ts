@@ -365,7 +365,7 @@ export async function findAttachedPermissionGroups(
  */
 export async function cleanupSourceOrganizationArtifactsTx(
   tx: DbOrTx,
-  params: { workspaceId: string; sourceOrganizationId: string }
+  params: { workspaceId: string }
 ): Promise<{ detachedPermissionGroupIds: string[] }> {
   const detached = await tx
     .delete(permissionGroupWorkspace)

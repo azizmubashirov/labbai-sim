@@ -83,10 +83,7 @@ describe('partitionClientCredentialFields', () => {
 
   describe('a provider that offers two grants', () => {
     it('requires the secret and hides key material on the client-credentials branch', () => {
-      const { visible, required } = partitionClientCredentialFields(
-        twoGrant,
-        'client_credentials'
-      )
+      const { visible, required } = partitionClientCredentialFields(twoGrant, 'client_credentials')
       expect(ids(required)).toEqual(['clientId', 'clientSecret', 'orgId'])
       expect(ids(visible)).not.toContain('privateKey')
       expect(ids(visible)).not.toContain('username')

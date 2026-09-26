@@ -9,7 +9,6 @@ import {
   skill,
   userTableDefinitions,
   workflow,
-  workspace,
   workspaceEnvironment,
   workspaceFiles,
   workspaceSandbox,

@@ -1186,7 +1186,7 @@ describe('moveWorkspaceToOrganization retries', () => {
 
     expect(cleanupSourceOrganizationArtifactsTx).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ sourceOrganizationId: 'org-source' })
+      expect.objectContaining({ workspaceId: organizationWorkspace.id })
     )
   })
 

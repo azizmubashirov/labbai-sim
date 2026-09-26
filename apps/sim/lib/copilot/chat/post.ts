@@ -570,15 +570,7 @@ async function buildInitialExecutionContext(params: {
   userTimezone?: string
   requestMode: string
 }): Promise<ExecutionContext> {
-  const {
-    userId,
-    workflowId,
-    workspaceId,
-    chatId,
-    messageId,
-    userTimezone,
-    requestMode,
-  } = params
+  const { userId, workflowId, workspaceId, chatId, messageId, userTimezone, requestMode } = params
 
   if (workflowId && !workspaceId) {
     const context = await prepareExecutionContext(userId, workflowId, chatId)
@@ -632,15 +624,8 @@ function buildOnComplete(params: {
     }) => void
   }
 }) {
-  const {
-    chatId,
-    userMessageId,
-    requestId,
-    workspaceId,
-    userId,
-    notifyChatStatus,
-    otelRoot,
-  } = params
+  const { chatId, userMessageId, requestId, workspaceId, userId, notifyChatStatus, otelRoot } =
+    params
 
   return async (result: OrchestratorResult) => {
     if (otelRoot && result.success) {

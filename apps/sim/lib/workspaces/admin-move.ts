@@ -1192,10 +1192,7 @@ export async function moveWorkspaceToOrganization(params: {
           ? await getSourceOrganization(sourceOrganizationId, tx)
           : null
         const cleanup = sourceOrganizationId
-          ? await cleanupSourceOrganizationArtifactsTx(tx, {
-              workspaceId: params.workspaceId,
-              sourceOrganizationId,
-            })
+          ? await cleanupSourceOrganizationArtifactsTx(tx, { workspaceId: params.workspaceId })
           : { detachedPermissionGroupIds: [] }
 
         await changeWorkspaceStoragePayerInTx(tx, {

@@ -18,7 +18,6 @@ import {
   type WorkflowGroup,
   type WorkflowGroupDependencies,
   type WorkflowGroupDeploymentMode,
-  type WorkflowGroupInputMapping,
   type WorkflowGroupOutput,
 } from '@/lib/table'
 import { defineAuthorizedTableUseCase } from '@/lib/table/application/authorized-table-use-case'

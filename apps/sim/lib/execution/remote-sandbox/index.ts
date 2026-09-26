@@ -45,7 +45,6 @@ import type {
   SandboxCodeResult,
   SandboxCollectedFile,
   SandboxCommandResult,
-  SandboxCostSink,
   SandboxDirectoryEntry,
   SandboxExecutionCost,
   SandboxExecutionRequest,

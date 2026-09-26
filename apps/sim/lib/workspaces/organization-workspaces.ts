@@ -158,8 +158,6 @@ export async function attachOwnedWorkspacesToOrganization({
     })
   })
 
-  for (const workspaceId of attached.attachedWorkspaceIds) {
-  }
   for (const userId of attached.usageLimitUserIds) {
     try {
       await syncUsageLimitsFromSubscription(userId)

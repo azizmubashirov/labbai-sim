@@ -4,7 +4,7 @@
 
 import { document, knowledgeConnector, member } from '@sim/db/schema'
 import { dbChainMockFns, queueTableRows, resetDbChainMock } from '@sim/testing'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   resolveKnowledgeBase: vi.fn(),
@@ -169,7 +169,6 @@ vi.mock('@/connectors/registry.server', () => ({
 
 import { internalOrchestrationErrorPolicy } from '@/lib/api/server/routes/internal-json-route'
 import { OrchestrationError } from '@/lib/core/orchestration/types'
-import * as encryption from '@/lib/core/security/encryption'
 import {
   createApprovedSearchSource,
   createKnowledgeConnector,

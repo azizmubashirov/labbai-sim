@@ -21,7 +21,6 @@ import { and, asc, count, eq, inArray, lte, sql } from 'drizzle-orm'
 import { invalidateMembershipCache } from '@/lib/auth/security-policy'
 import { syncUsageLimitsFromSubscription } from '@/lib/billing/core/usage'
 import {
-  acquireOrganizationMutationLock,
   acquireOrgMembershipLock,
   ensureUserInOrganizationTx,
   getUserOrganization,

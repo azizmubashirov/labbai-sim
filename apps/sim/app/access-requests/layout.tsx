@@ -5,5 +5,5 @@ interface AccessRequestsLayoutProps {
 }
 
 export default function AccessRequestsLayout({ children }: AccessRequestsLayoutProps) {
-  return <div className='min-h-screen flex flex-col bg-[var(--bg)]'>{children}</div>
+  return <div className='flex min-h-screen flex-col bg-[var(--bg)]'>{children}</div>
 }

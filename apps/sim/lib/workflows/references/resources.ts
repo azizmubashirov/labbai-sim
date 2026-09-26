@@ -10,7 +10,6 @@ import {
   workflow,
   workflowDeploymentVersion,
   workflowMcpServer,
-  workspace,
   workspaceEnvironment,
   workspaceFiles,
   workspaceSandbox,

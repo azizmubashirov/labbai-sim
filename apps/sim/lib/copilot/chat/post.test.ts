@@ -124,7 +124,6 @@ vi.mock('@/lib/billing/core/billing-attribution', () => ({
   resolveBillingAttribution,
 }))
 
-
 vi.mock('@/lib/copilot/entitlements', () => ({ computeWorkspaceEntitlements }))
 
 vi.mock('@/lib/copilot/chat/workspace-context', () => ({

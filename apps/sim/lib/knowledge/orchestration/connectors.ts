@@ -21,7 +21,6 @@ import {
 import {
   incrementStorageUsageForBillingContextInTx,
   resolveStorageBillingContext,
-  type StorageBillingContext,
 } from '@/lib/billing/storage'
 import { OrchestrationError, type OrchestrationErrorCode } from '@/lib/core/orchestration/types'
 import {
@@ -1168,7 +1167,6 @@ export async function performDeleteKnowledgeConnector(
   }
 
   let docCount: number
-  let storageNotification: { context: StorageBillingContext; updatedUsage: number } | undefined
   try {
     const [owner] = await db
       .select({
@@ -1261,14 +1259,7 @@ export async function performDeleteKnowledgeConnector(
         if (!Number.isSafeInteger(reservedBytes) || reservedBytes < 0) {
           throw new Error('Invalid retained connector storage size')
         }
-        const updatedUsage = await incrementStorageUsageForBillingContextInTx(
-          tx,
-          storageContext,
-          reservedBytes
-        )
-        if (updatedUsage !== undefined) {
-          storageNotification = { context: storageContext, updatedUsage }
-        }
+        await incrementStorageUsageForBillingContextInTx(tx, storageContext, reservedBytes)
       }
 
       const retiredAt = new Date()

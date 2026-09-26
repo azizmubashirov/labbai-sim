@@ -5,7 +5,6 @@ import path from 'node:path'
 import { parseEnv } from 'node:util'
 import { db } from '@sim/db'
 import {
-  credential,
   document,
   embedding,
   knowledgeConnector,

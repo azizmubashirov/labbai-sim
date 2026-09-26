@@ -442,11 +442,7 @@ describe('ConnectOAuthModal reauthorization', () => {
   })
 
   it('does not carry a prior OAuth result into a new provider callback URL', async () => {
-    window.history.replaceState(
-      {},
-      '',
-      '/?keep=1&error=stale&error_description=stale-detail'
-    )
+    window.history.replaceState({}, '', '/?keep=1&error=stale&error_description=stale-detail')
     renderReauthorizeModal()
 
     await clickConnect()

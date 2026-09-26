@@ -79,7 +79,6 @@ vi.mock('@/lib/billing/storage', () => ({
 vi.mock('@sim/audit', () => ({ recordAudit: mocks.recordAudit }))
 
 import { listBillingLogs } from '@/lib/billing/application/list-billing-logs'
-import { DEFAULT_PERMISSION_GROUP_CONFIG } from '@/lib/permission-groups/fields'
 
 const workspaceContext = {
   workspaceId: 'workspace-1',

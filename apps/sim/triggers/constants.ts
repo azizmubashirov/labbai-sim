@@ -43,12 +43,9 @@ export const TRIGGER_RUNTIME_SUBBLOCK_IDS: string[] = [
 export const TRIGGER_WEBHOOK_URL_FIELD = 'triggerWebhookUrl'
 
 /**
- * Derived, read-only input surfaced on copilot reads of trigger blocks that
- * route by CREDENTIAL rather than a per-workflow webhook URL (e.g. Slack v2's
- * `slack_oauth`). Explains where events actually arrive — a custom bot's
- * per-credential Request URL or the shared Sim-app endpoint — so the copilot
- * can answer "where do I point Slack?" without inventing a field. Never
- * stored; rejected on write like {@link TRIGGER_WEBHOOK_URL_FIELD}.
+ * Derived, read-only input name once surfaced for credential-routed triggers
+ * (none remain). Still stripped and rejected on write, like
+ * {@link TRIGGER_WEBHOOK_URL_FIELD}, so a model that writes it gets a clear error.
  */
 export const TRIGGER_ROUTING_FIELD = 'triggerRouting'
 

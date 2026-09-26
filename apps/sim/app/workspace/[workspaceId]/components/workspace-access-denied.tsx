@@ -4,7 +4,7 @@ import { WORKSPACES_PATH } from '@/lib/navigation/paths'
 
 export function WorkspaceAccessDenied() {
   return (
-    <main className='min-h-screen flex items-center justify-center bg-[var(--surface-1)] p-6'>
+    <main className='flex min-h-screen items-center justify-center bg-[var(--surface-1)] p-6'>
       <div className='flex max-w-md flex-col items-center gap-3 text-center'>
         <div className='flex size-10 items-center justify-center rounded-full bg-[var(--surface-3)]'>
           <CircleAlert className='size-[18px] text-[var(--text-icon)]' aria-hidden />

@@ -4025,12 +4025,7 @@ export function useChat(
       }
       clearQueuedSendHandoffClaim(handoff.id, claimOwnerId)
     }
-  }, [
-    workspaceId,
-    queuedHandoffRecoveryEpoch,
-    adoptResolvedChatId,
-    resolveChatIdForStream,
-  ])
+  }, [workspaceId, queuedHandoffRecoveryEpoch, adoptResolvedChatId, resolveChatIdForStream])
   useEffect(() => {
     if (!workspaceId || !chatHistory || sendingRef.current || pendingStopPromiseRef.current) return
 
@@ -4078,12 +4073,7 @@ export function useChat(
       }
       clearQueuedSendHandoffClaim(handoff.id, claimOwnerId)
     })
-  }, [
-    workspaceId,
-    chatHistory,
-    queuedHandoffRecoveryEpoch,
-    startSendMessage,
-  ])
+  }, [workspaceId, chatHistory, queuedHandoffRecoveryEpoch, startSendMessage])
   const cancelActiveWorkflowExecutions = useCallback(() => {
     const execState = useExecutionStore.getState()
     const consoleStore = useTerminalConsoleStore.getState()
@@ -4683,13 +4673,7 @@ export function useChat(
     if (resolvedChatId && !chatHistoryReady) return
     if (remoteActiveStreamId) return
     void enqueueQueueDispatchRef.current({ type: 'send_head' })
-  }, [
-    workspaceId,
-    messageQueue.length,
-    resolvedChatId,
-    chatHistoryReady,
-    remoteActiveStreamId,
-  ])
+  }, [workspaceId, messageQueue.length, resolvedChatId, chatHistoryReady, remoteActiveStreamId])
 
   useEffect(() => {
     return () => {

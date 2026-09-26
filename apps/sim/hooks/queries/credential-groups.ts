@@ -18,7 +18,6 @@ import {
   updateCredentialGroupMcpConnectorContract,
 } from '@/lib/api/contracts/credential-groups'
 import type { ContractJsonResponse } from '@/lib/api/contracts/types'
-import { resourceScopeFromOwner } from '@/lib/core/resource-scope'
 import {
   CREDENTIAL_GROUP_ACCESS_STALE_TIME,
   CREDENTIAL_GROUP_DETAIL_STALE_TIME,

@@ -7,7 +7,6 @@ import {
   credential,
   credentialGroup,
   document,
-  embedding,
   embeddingSearch,
   knowledgeBase,
   knowledgeConnector,

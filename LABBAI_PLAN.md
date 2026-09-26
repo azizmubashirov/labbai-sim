@@ -84,18 +84,12 @@ Gemini / Workers AI.
 
 ## Open issues found in testing
 
-- Google OAuth (Sheets/Drive/…): self-host needs our own Google OAuth client
-  (`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`).
+- Google OAuth: our own client is set up (Testing mode, see HANDOFF.md). Before real
+  customers: domain, privacy policy and Google verification.
 - Secrets pasted into chat during testing (an OpenAI key, a Telegram bot token) must be
   rotated by the owner.
 - Local copilot file writes use the `workspace_file` tool name; the new Sim file preview
   listens for `prepare_file_edit` — verify live preview manually.
-- `DEFAULT_LOCAL_COPILOT_MODEL` is a Claude id; chats created without a picker choice
-  (inbox, API) may resolve to Anthropic — point it at the Cloudflare/OpenAI default.
-- Cloud mothership tool execution depends on `executor: 'client'` frames — irrelevant
-  once the cloud path is removed.
-- Test server `147.93.62.159` (`/root/labbai`, tunnel `localhost:3300`) still runs the old
-  Arena build; the new Sim + copilot image needs a fresh DB volume (`labbai_pg_v2`).
 
 ## Order of work
 

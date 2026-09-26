@@ -1,15 +1,13 @@
 /**
  * @vitest-environment node
  */
-import { account, credential, webhook, workflowDeploymentVersion } from '@sim/db/schema'
+import { credential, webhook, workflowDeploymentVersion } from '@sim/db/schema'
 import {
   dbChainMockFns,
   queueTableRows,
   resetDbChainMock,
   resetEnvFlagsMock,
   resetEnvMock,
-  setEnv,
-  setEnvFlags,
 } from '@sim/testing'
 import { eq, ne } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it, type Mock, vi } from 'vitest'
@@ -59,12 +57,9 @@ import {
   buildProviderConfig,
   cleanupInactiveDeploymentWebhooks,
   resolveTriggerCredentialId,
-  resolveWebhookConfigForBlock,
 } from '@/lib/webhooks/deploy'
 import { cleanupExternalWebhook } from '@/lib/webhooks/provider-subscriptions'
 import { getProviderHandler } from '@/lib/webhooks/providers'
-import { getBlock } from '@/blocks'
-import { getTrigger } from '@/triggers'
 
 afterAll(() => {
   resetDbChainMock()

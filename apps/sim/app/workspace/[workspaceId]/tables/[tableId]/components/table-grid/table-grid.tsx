@@ -22,7 +22,6 @@ import type {
   TableMetadata,
   TablePredicate,
   TableRow as TableRowType,
-  WorkflowGroup,
 } from '@/lib/table'
 import { getColumnId } from '@/lib/table/column-keys'
 import { columnTypeOf } from '@/lib/table/column-types'

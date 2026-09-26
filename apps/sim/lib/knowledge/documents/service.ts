@@ -2380,11 +2380,6 @@ interface DocumentStorageBilling {
   readonly bytes: number
 }
 
-interface DocumentStorageNotification {
-  readonly context: StorageBillingContext
-  readonly updatedUsage: number
-}
-
 interface DocumentStorageAdmission {
   readonly workspaceId: string
   readonly billing?: DocumentStorageBilling
@@ -2492,9 +2487,7 @@ export async function createDocumentRecords(
   const resolvedDocuments = await resolveServerKnownDocumentSizes(documents)
   const totalBytes = resolvedDocuments.reduce((sum, docData) => sum + (docData.fileSize || 0), 0)
   const admission = await resolveDocumentStorageAdmission(knowledgeBaseId, totalBytes)
-  const { returnData, storageNotification } = await db.transaction(async (tx) => {
-    let storageNotification: DocumentStorageNotification | null = null
-
+  const returnData = await db.transaction(async (tx) => {
     await tx.execute(sql`SELECT 1 FROM knowledge_base WHERE id = ${knowledgeBaseId} FOR UPDATE`)
 
     const kb = await tx
@@ -2550,14 +2543,11 @@ export async function createDocumentRecords(
 
     if (admission.billing) {
       const preparedBilling = admission.billing
-      const updatedUsage = await incrementStorageUsageForBillingContextInTx(
+      await incrementStorageUsageForBillingContextInTx(
         tx,
         preparedBilling.context,
         preparedBilling.bytes
       )
-      if (updatedUsage !== undefined) {
-        storageNotification = { context: preparedBilling.context, updatedUsage }
-      }
     }
 
     // One load per batch (was N+1); skip entirely if no doc carries tags.
@@ -2683,7 +2673,7 @@ export async function createDocumentRecords(
         .where(eq(knowledgeBase.id, knowledgeBaseId))
     }
 
-    return { returnData, storageNotification }
+    return returnData
   })
 
   return returnData
@@ -3150,8 +3140,7 @@ export async function createSingleDocument(
     ...processedTags,
   }
 
-  const storageNotification = await db.transaction(async (tx) => {
-    let storageNotification: DocumentStorageNotification | null = null
+  await db.transaction(async (tx) => {
     if (options?.uploadedArtifact) {
       await claimKnowledgeUploadForAttachment(tx, options.uploadedArtifact.cleanupEventId)
     }
@@ -3228,14 +3217,11 @@ export async function createSingleDocument(
 
     if (admission.billing) {
       const preparedBilling = admission.billing
-      const updatedUsage = await incrementStorageUsageForBillingContextInTx(
+      await incrementStorageUsageForBillingContextInTx(
         tx,
         preparedBilling.context,
         preparedBilling.bytes
       )
-      if (updatedUsage !== undefined) {
-        storageNotification = { context: preparedBilling.context, updatedUsage }
-      }
     }
 
     const source = createKnowledgeDocumentSourceValue(newDocument)
@@ -3277,8 +3263,6 @@ export async function createSingleDocument(
         processingLane: 'interactive',
       })
     }
-
-    return storageNotification
   })
 
   logger.info(`[${requestId}] Document created: ${documentId} in knowledge base ${knowledgeBaseId}`)

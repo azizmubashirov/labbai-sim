@@ -117,12 +117,10 @@ vi.mock('@/lib/credential-groups/providers', () => ({
 
 import {
   canConnectPersonally,
-  canConnectWithDefaults,
   getConnectorAccessAvailability,
   isSearchConnectorAvailable,
   missingSetupFields,
   personalSetupFields,
-  personalSourceConfigFieldIds,
   SEARCH_CONNECTORS,
   withSearchSourceDefaults,
 } from '@/lib/sim-search/connectors'

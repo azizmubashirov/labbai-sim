@@ -36,12 +36,14 @@ copy or restore `ee` source from git history. Requirements come only from Apache
 - Unreachable assistant/org branches: `requestMode === 'assistant'` in `tools/index.ts`,
   `executor/utils/credential-token.ts`, `application-delegation.ts`, org plumbing in
   `lib/copilot/request/lifecycle/{start,run}.ts`, `chat-status.ts` org owner.
-- Dead `storageNotification` variables in `lib/knowledge/{connectors/detachment,orchestration/connectors,documents/service}.ts`.
-- Empty loop in `lib/workspaces/organization-workspaces.ts` (Stripe leftover).
-- `fileId` selector-context key no kept block supplies; Slack trigger routing in
-  `lib/workflows/sanitization/json-sanitizer.ts`; connect-OAuth modal "OAuth app configuration" fields (QuickBooks-only).
-- `cleanupSourceOrganizationArtifactsTx` keeps an unused `sourceOrganizationId` param.
-- Biome issues that need `--unsafe` (unused imports, class sorting): `bunx biome check apps/sim packages`.
+  `mode: 'assistant'` is rejected at the boundary (`lib/copilot/chat/post.ts`,
+  `lib/copilot/request/lifecycle/run.ts`) but still listed in `COPILOT_REQUEST_MODES`;
+  removing it touches the credential path in `tools/index.ts` — do it as its own change.
+- `fileId` selector-context key no kept block supplies; connect-OAuth modal
+  "OAuth app configuration" fields (QuickBooks-only); `TRIGGER_ROUTING_FIELD` write guard
+  (no trigger emits it any more).
+- Biome: one `noDelete` in `lib/labbai/scim/protocol/group-patch.ts` (unsafe fix would keep
+  the key as `undefined` — check SCIM semantics before changing).
 
 ## How to verify (no local builds — the owner's Mac has 8 GB)
 

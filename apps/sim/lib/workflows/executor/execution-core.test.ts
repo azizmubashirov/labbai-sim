@@ -8,7 +8,7 @@ import {
   workflowsUtilsMock,
   workflowsUtilsMockFns,
 } from '@sim/testing'
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LoggingSession } from '@/lib/logs/execution/logging-session'
 import type { ExecutionSnapshot } from '@/executor/execution/snapshot'
 

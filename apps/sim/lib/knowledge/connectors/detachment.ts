@@ -220,7 +220,6 @@ export const detachKnowledgeConnector: OutboxHandler = async (rawPayload, contex
     ? await resolveStorageBillingContext(owner.workspaceId)
     : undefined
 
-  let storageNotification: { context: StorageBillingContext; updatedUsage: number } | undefined
   let outcome: 'progress' | 'complete' | 'obsolete' | 'paused' = 'progress'
   for (let batch = 0; batch < MAX_BATCHES_PER_RUN && outcome === 'progress'; batch++) {
     context.signal.throwIfAborted()
@@ -283,14 +282,7 @@ export const detachKnowledgeConnector: OutboxHandler = async (rawPayload, contex
           context.signal
         )
         if (drained === 'complete' && storageContext) {
-          const updatedUsage = await settleDetachReservationInTx(
-            tx,
-            storageContext,
-            connector.reservedBytes
-          )
-          if (updatedUsage !== undefined) {
-            storageNotification = { context: storageContext, updatedUsage }
-          }
+          await settleDetachReservationInTx(tx, storageContext, connector.reservedBytes)
         }
         return drained
       }

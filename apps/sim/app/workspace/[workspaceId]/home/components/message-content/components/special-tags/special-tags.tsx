@@ -2863,9 +2863,7 @@ export function CredentialDisplay({
   // pairing) stay stable — the card simply renders no sim_key rows.
   const simKeyReveals = data
     .map((item, index) =>
-      item.type === 'sim_key' ? (
-        <SecretReveal key={`sim-key-${index}`} value={item.value} />
-      ) : null
+      item.type === 'sim_key' ? <SecretReveal key={`sim-key-${index}`} value={item.value} /> : null
     )
     .filter(Boolean)
   const inputItems = data.filter((item) => item.type !== 'sim_key')
