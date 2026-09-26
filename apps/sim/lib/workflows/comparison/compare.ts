@@ -276,7 +276,7 @@ export function generateWorkflowDiffSummary(
       /*
        * A field the definition does not declare still gets blank-collapsed; it
        * just has no default to compare against. Falling back to the stored type
-       * keeps the shape rules working for undeclared and custom-block fields.
+       * keeps the shape rules working for undeclared fields.
        */
       const declared = blockSpec?.fields.get(subId)
       const spec: CanonicalFieldSpec = {

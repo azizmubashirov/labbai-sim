@@ -394,7 +394,6 @@
         "apps/sim/blocks/registry.ts": 355,
         "apps/sim/lib/webhooks/providers/index.ts": 117,
         "apps/sim/lib/webhooks/providers/registry.ts": 115,
-        "apps/sim/ee/access-control/components/access-control.tsx": 80,
         "apps/sim/app/workspace/[workspaceId]/settings/components/recently-deleted/recently-deleted.tsx": 79
       }
     },
@@ -459,27 +458,6 @@
         "apps/sim/components/permissions/add-people-modal.tsx": 79,
         "apps/sim/app/workspace/[workspaceId]/settings/secrets/[credentialId]/secret-detail.tsx": 78,
         "apps/sim/app/workspace/[workspaceId]/providers/workspace-permissions-provider.tsx": 77
-      }
-    },
-    "app/workspace/[workspaceId]/settings/usage/events/layout.tsx": {
-      "modules": 4,
-      "gateways": {}
-    },
-    "app/workspace/[workspaceId]/settings/usage/events/loading.tsx": {
-      "modules": 9,
-      "gateways": {}
-    },
-    "app/workspace/[workspaceId]/settings/usage/events/page.tsx": {
-      "modules": 1597,
-      "gateways": {
-        "apps/sim/lib/auth/index.ts": 1443,
-        "apps/sim/triggers/index.ts": 487,
-        "apps/sim/triggers/registry.ts": 485,
-        "apps/sim/blocks/registry.ts": 363,
-        "apps/sim/blocks/registry-maps.ts": 360,
-        "apps/sim/lib/webhooks/providers/index.ts": 120,
-        "apps/sim/lib/webhooks/providers/registry.ts": 117,
-        "apps/sim/lib/workflows/lifecycle.ts": 52
       }
     },
     "app/workspace/[workspaceId]/skills/[skillId]/page.tsx": {

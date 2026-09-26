@@ -54,7 +54,7 @@ vi.mock('@/lib/workflows/orchestration', () => ({
   performChatDeploy: mocks.performChatDeploy,
   performChatUndeploy: vi.fn(),
 }))
-vi.mock('@/ee/access-control/utils/permission-check', () => ({
+vi.mock('@/lib/labbai/access-control/permission-check', () => ({
   validateChatDeployAuth: mocks.validateChatDeployAuth,
 }))
 

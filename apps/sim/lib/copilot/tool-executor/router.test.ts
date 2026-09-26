@@ -25,7 +25,6 @@ const { stubHandlerModule } = vi.hoisted(() => ({
     ),
 }))
 
-vi.mock('@/lib/copilot/tools/handlers/deployment/custom-block', stubHandlerModule)
 vi.mock('@/lib/copilot/tools/handlers/deployment/deploy', stubHandlerModule)
 vi.mock('@/lib/copilot/tools/handlers/deployment/manage', stubHandlerModule)
 vi.mock('@/lib/copilot/tools/handlers/function-execute', stubHandlerModule)

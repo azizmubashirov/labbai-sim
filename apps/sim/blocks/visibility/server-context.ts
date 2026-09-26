@@ -3,9 +3,7 @@ import type { BlockVisibilityState } from '@/lib/core/config/block-visibility'
 import { registerBlockVisibilityResolver } from '@/blocks/visibility/context'
 
 /**
- * Server-side visibility context: a per-request AsyncLocalStorage, independent
- * of the custom-block overlay's ALS so `withBlockVisibility` and
- * `withCustomBlockOverlay` nest in either order without clobbering each other.
+ * Server-side visibility context: a per-request AsyncLocalStorage.
  *
  * Only copilot/mothership discovery paths establish this scope. Execution entry
  * points (execute route, trigger.dev tasks, schedules/webhooks) never do — so

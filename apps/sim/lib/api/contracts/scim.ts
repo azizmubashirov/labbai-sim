@@ -8,13 +8,13 @@ import {
   SCIM_MAX_PATCH_OPERATIONS,
   SCIM_PATCH_OP_SCHEMA,
   SCIM_USER_SCHEMA,
-} from '@/ee/scim/lib/protocol/constants'
+} from '@/lib/labbai/scim/protocol/constants'
 import {
   canonicalizeAttributeNames,
   normalizeScimBoolean,
   stripProviderSchemaMarkers,
   unwrapSingleElement,
-} from '@/ee/scim/lib/protocol/normalize'
+} from '@/lib/labbai/scim/protocol/normalize'
 
 /**
  * Wire schemas for the SCIM 2.0 surface.

@@ -17,7 +17,7 @@ import { getQueryClient } from '@/app/_shell/providers/get-query-client'
 import { buildAuthCrossLink } from '@/app/(auth)/auth-redirect'
 import { OrganizationSettings } from '@/app/o/[organizationId]/settings/[section]/settings'
 import { resolveOrganizationSurfaceSection } from '@/app/o/[organizationId]/settings/navigation'
-import { getLegacyAccessRequestsQuery } from '@/ee/access-requests/lib/navigation'
+import { getLegacyAccessRequestsQuery } from '@/lib/labbai/access-requests/navigation'
 
 interface OrganizationSettingsSectionPageProps {
   params: Promise<{ organizationId: string; section: string }>

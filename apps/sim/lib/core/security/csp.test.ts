@@ -9,8 +9,6 @@ vi.mock('@/lib/core/config/env', () =>
     AWS_REGION: 'us-east-1',
     S3_KB_BUCKET_NAME: 'test-kb-bucket',
     S3_CHAT_BUCKET_NAME: 'test-chat-bucket',
-    NEXT_PUBLIC_BRAND_LOGO_URL: 'https://brand.example.com/logo.png',
-    NEXT_PUBLIC_BRAND_FAVICON_URL: 'https://brand.example.com/favicon.ico',
     NEXT_PUBLIC_PRIVACY_URL: 'https://legal.example.com/privacy',
     NEXT_PUBLIC_TERMS_URL: 'https://legal.example.com/terms',
   })
@@ -157,10 +155,10 @@ describe('generateRuntimeCSP', () => {
     expect(csp).toContain('wss://socket.example.com')
   })
 
-  it('should include brand URLs', () => {
+  it('should include legal page URLs', () => {
     const csp = generateRuntimeCSP()
 
-    expect(csp).toContain('https://brand.example.com')
+    expect(csp).toContain('https://legal.example.com')
   })
 
   it('should not have excessive whitespace', () => {

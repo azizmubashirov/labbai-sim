@@ -1,4 +1,3 @@
-import { resolvePrincipalSubjectUserId } from '@sim/auth/principal'
 import { db } from '@sim/db'
 import { jobExecutionLogs, workflowExecutionLogs, workflowExecutionSnapshots } from '@sim/db/schema'
 import { eq, inArray } from 'drizzle-orm'
@@ -10,7 +9,6 @@ import {
   logDelegationAuthorization,
 } from '@/lib/logs/application/authorization'
 import { logOperations } from '@/lib/logs/application/operations'
-import { hydrateChildTraces } from '@/lib/logs/execution/hydrate-child-traces'
 import { materializeExecutionData } from '@/lib/logs/execution/trace-store'
 import {
   logProjectionSubjectUserId,
@@ -193,13 +191,6 @@ const authorizedReadExecutionSnapshotUseCase = defineAuthorizedWorkspaceUseCase(
       }
     )) as WorkflowExecutionLog['executionData']
     const traceSpans = (executionData?.traceSpans as TraceSpan[]) || []
-    if (traceSpans.length > 0) {
-      // Attribution, not authorization: the publisher's policy is the only gate,
-      // and an actorless run has no user to name.
-      await hydrateChildTraces(traceSpans, {
-        viewerUserId: resolvePrincipalSubjectUserId(principal),
-      })
-    }
 
     const childSnapshotIds = collectChildSnapshotIds(traceSpans)
     const childWorkflowSnapshots: Array<{ id: string; stateData: unknown }> = []

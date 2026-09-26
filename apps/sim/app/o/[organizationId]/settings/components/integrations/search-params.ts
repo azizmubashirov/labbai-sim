@@ -2,7 +2,7 @@ import { createSerializer, parseAsString, parseAsStringLiteral } from 'nuqs/serv
 
 export const organizationIntegrationsTabParam = {
   key: 'tab',
-  parser: parseAsStringLiteral(['providers', 'people', 'stats']).withDefault('providers'),
+  parser: parseAsStringLiteral(['providers', 'people']).withDefault('providers'),
 } as const
 
 export const connectedAccountsParam = {

@@ -22,7 +22,7 @@ const SAFE_ORGANIZATION_POST_PATHS = new Set(['organization/check-slug', 'organi
  * minutes, keyed on the address) and writes the `PASSWORD_RESET_REQUESTED` audit record. Every
  * plugin alias reaches the same mailer with only a per-IP default in front of it, which a caller
  * spread across addresses walks straight past, at one victim's mailbox. Matched rather than listed,
- * like the SSO and OAuth guards below, so a plugin version that renames or adds an alias cannot
+ * like the OAuth guards below, so a plugin version that renames or adds an alias cannot
  * quietly reopen the path.
  */
 function isBlockedPasswordResetPath(path: string): boolean {
@@ -59,14 +59,6 @@ const UNSUPPORTED_OIDC_PATHS = new Set([
 ])
 
 /**
- * SAML protocol endpoints the IdP posts to (`saml2/callback/:id`,
- * `saml2/sp/acs/:id`, `saml2/sp/slo/:id`, `saml2/logout/:id`). These are the
- * only SSO paths the plugin must keep serving on POST — every other SSO POST
- * endpoint it registers is a provider mutation.
- */
-const SAML_PROTOCOL_POST_PREFIX = 'sso/saml2/'
-
-/**
  * Provider endpoints served by the plugin. Token and revocation requests have
  * dedicated routes that own their validation and token-family lifecycle.
  */
@@ -99,30 +91,6 @@ function getCredentialGroupCallbackProviderId(request: NextRequest, path: string
 }
 
 /**
- * SSO provider configuration is owned by `/api/auth/sso/register`, which proves
- * domain ownership before granting trust and restricts the attribute mapping to
- * `id`/`email`/`name`/`image`. The plugin's own `sso/update-provider` bypasses
- * both: it is gated only on provider ownership and merges the caller's config,
- * so a provider owner could add `mapping.emailVerified` — a change the plugin's
- * identity-boundary guard does not consider, so it never trips the linked-account
- * conflict — and then assert an arbitrary victim's email as verified to auto-link
- * into their account. `sso/delete-provider` likewise lets an owner drop a login
- * path outside the application's flow.
- *
- * `trustEmailVerified: false` independently defuses that claim, so these two
- * guards are layered, not redundant: this one keeps provider configuration
- * owned by the register route (which alone proves domain ownership) and is what
- * stops the mapping rewrite from becoming live again if that option is ever
- * reconsidered.
- *
- * Deny-by-default rather than a blocklist so a future plugin version cannot
- * introduce another unshadowed provider mutation.
- */
-function isBlockedSsoMutationPath(path: string): boolean {
-  return path.startsWith('sso/') && !path.startsWith(SAML_PROTOCOL_POST_PREFIX)
-}
-
-/**
  * Client registration and client/consent mutation are not Sim's OAuth surface.
  *
  * `allowDynamicClientRegistration: false` gates only `/oauth2/register`; the
@@ -135,7 +103,7 @@ function isBlockedSsoMutationPath(path: string): boolean {
  * `apps/sim/scripts/create-oauth-client.ts`), and a consent is changed by
  * granting or revoking it, never by editing the row.
  *
- * Deny-by-default, like the SSO block above, so a future plugin version cannot
+ * Deny-by-default so a future plugin version cannot
  * introduce another unshadowed mutation endpoint. `oauth2/link` and
  * `oauth2/callback/` belong to the existing generic OAuth connector client.
  */
@@ -204,13 +172,6 @@ export const POST = withRouteHandler(async (request: NextRequest) => {
   if (isBlockedOrganizationMutationPath(path)) {
     return NextResponse.json(
       { error: 'Organization mutations are handled by application API routes.' },
-      { status: 404 }
-    )
-  }
-
-  if (isBlockedSsoMutationPath(path)) {
-    return NextResponse.json(
-      { error: 'SSO provider mutations are handled by application API routes.' },
       { status: 404 }
     )
   }

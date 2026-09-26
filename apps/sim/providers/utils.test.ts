@@ -1262,12 +1262,7 @@ describe('transformBlockTool knowledge-base identities', () => {
 describe('prepareToolExecution invoker identity hand-off', () => {
   const tool = { params: {}, parameters: {} }
 
-  /**
-   * A custom block invoked as an agent tool starts its own child execution, and
-   * correlates + cancels against the INVOKING run. That id only reaches it via
-   * `_context`, so this asserts the hand-off rather than any single hop — three
-   * separate fixes each repaired one hop and left the chain broken elsewhere.
-   */
+  /** A workflow invoked as an agent tool correlates against the INVOKING run via `_context`. */
   it("puts the invoking run's execution id on tool _context", () => {
     const { executionParams } = prepareToolExecution(
       tool,

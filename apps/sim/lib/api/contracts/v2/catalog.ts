@@ -48,7 +48,7 @@ export const V2_TOOL_EXECUTION_MAX_TIMEOUT_SECONDS = 300
 const catalogWorkspaceQuerySchema = z
   .object({
     workspaceId: workspaceIdSchema.describe(
-      'Workspace whose integration allowlist, revealed preview blocks, and deployed custom blocks decide what this catalog contains.'
+      'Workspace whose integration allowlist and revealed preview blocks decide what this catalog contains.'
     ),
   })
   .strict()
@@ -202,10 +202,8 @@ export const v2BlockFieldSchema = z
 export type V2BlockField = z.output<typeof v2BlockFieldSchema>
 
 const catalogBlockSourceSchema = z
-  .enum(['builtin', 'custom'])
-  .describe(
-    'Block source: `builtin` for built-in blocks, or `custom` for workflows this workspace deployed as blocks.'
-  )
+  .enum(['builtin'])
+  .describe('Block source: always `builtin` (blocks defined in the code registry).')
 
 /** Summary view of a block. */
 export const v2BlockSummarySchema = z
@@ -724,9 +722,9 @@ export const v2ListBlocksQuerySchema = catalogWorkspaceQuerySchema
         'Restrict to blocks that can start a workflow — the `triggers` category, blocks declaring `triggerAllowed`, and blocks with trigger-mode fields.'
       ),
     source: z
-      .enum(['builtin', 'custom'])
+      .enum(['builtin'])
       .optional()
-      .describe("Restrict to built-in blocks or this workspace's deployed custom blocks."),
+      .describe('Restrict to built-in blocks.'),
     ...v2SortFields(v2BlockSortFields, { sortBy: 'id', sortOrder: 'asc' }),
     ...v2PaginationFields({ description: 'Maximum blocks to return per page.' }),
   })
@@ -778,8 +776,8 @@ export type V2ListConnectorTypesQuery = z.output<typeof v2ListConnectorTypesQuer
 
 /**
  * Block list, paginated by an opaque offset cursor rather than the keyset most
- * v2 lists use — the same case as `GET /api/v2/skills`. The sequence merges the
- * static code registry with the workspace’s deployed custom blocks, filters it
+ * v2 lists use — the same case as `GET /api/v2/skills`. The sequence reads the
+ * static code registry, filters it
  * against the caller’s visibility, and sorts it in memory, so there is no
  * ordered SQL read for a keyset predicate to act on.
  */

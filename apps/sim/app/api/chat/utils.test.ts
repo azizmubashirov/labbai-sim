@@ -423,69 +423,18 @@ describe('Chat API Utils', () => {
       expect(result3.error).toBe('Email not authorized')
     })
 
-    describe('SSO auth', () => {
-      const ssoDeployment = {
-        id: 'chat-id',
-        authType: 'sso',
-        allowedEmails: ['user@example.com', '@company.com'],
-      }
+    it('denies the retired SSO auth type even for an allowlisted session', async () => {
+      mockGetSession.mockResolvedValue({ user: { email: 'user@example.com' } })
+      mockIsEmailAllowed.mockReturnValue(true)
 
-      const postRequest = {
-        method: 'POST',
-        cookies: { get: vi.fn().mockReturnValue(null) },
-      } as any
+      const result = await validateChatAuth(
+        'request-id',
+        { id: 'chat-id', authType: 'sso', allowedEmails: ['user@example.com'] },
+        { method: 'POST', cookies: { get: vi.fn().mockReturnValue(null) } } as any,
+        { input: 'hello' }
+      )
 
-      it('rejects when no session is present', async () => {
-        mockGetSession.mockResolvedValue(null)
-
-        const result = await validateChatAuth('request-id', ssoDeployment, postRequest, {
-          input: 'hello',
-        })
-
-        expect(result.authorized).toBe(false)
-        expect(result.error).toBe('auth_required_sso')
-      })
-
-      it('ignores body-supplied email and uses the session email', async () => {
-        mockGetSession.mockResolvedValue({ user: { email: 'session@example.com' } })
-        mockIsEmailAllowed.mockReturnValue(true)
-
-        await validateChatAuth('request-id', ssoDeployment, postRequest, {
-          email: 'attacker@evil.com',
-          input: 'hello',
-        })
-
-        expect(mockIsEmailAllowed).toHaveBeenCalledWith(
-          'session@example.com',
-          ssoDeployment.allowedEmails
-        )
-      })
-
-      it('authorizes execution when session email is allowlisted', async () => {
-        mockGetSession.mockResolvedValue({ user: { email: 'User@Example.com' } })
-        mockIsEmailAllowed.mockReturnValue(true)
-
-        const result = await validateChatAuth('request-id', ssoDeployment, postRequest, {
-          input: 'hello',
-        })
-
-        expect(result).toEqual({
-          authorized: true,
-          authenticatedEmail: 'user@example.com',
-        })
-      })
-
-      it('rejects execution when session email is not allowlisted', async () => {
-        mockGetSession.mockResolvedValue({ user: { email: 'stranger@other.com' } })
-        mockIsEmailAllowed.mockReturnValue(false)
-
-        const result = await validateChatAuth('request-id', ssoDeployment, postRequest, {
-          input: 'hello',
-        })
-
-        expect(result.authorized).toBe(false)
-        expect(result.error).toBe('Your email is not authorized to access this resource')
-      })
+      expect(result).toEqual({ authorized: false, error: 'Unsupported authentication type' })
     })
   })
 

@@ -24,7 +24,7 @@ const EMPTY_PARALLELS: Record<string, Parallel> = {}
  * On the canvas this is the workflow open in the editor, read from the live stores — which is
  * why every reference surface used to read those stores directly. Off-canvas there IS no open
  * workflow, so a surface that configures a block belonging to some OTHER workflow (the fork
- * sync modal configuring a custom block in a target workspace's workflow) supplies the graph
+ * sync modal configuring a block in a target workspace's workflow) supplies the graph
  * itself. Both paths then produce identical, position-aware suggestions.
  */
 /**

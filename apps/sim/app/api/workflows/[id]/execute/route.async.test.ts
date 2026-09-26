@@ -111,7 +111,7 @@ vi.mock('@/lib/workspaces/utils', () => ({
   getWorkspaceBillingSettings: mockGetWorkspaceBillingSettings,
 }))
 
-vi.mock('@/ee/access-control/utils/permission-check', () => ({
+vi.mock('@/lib/labbai/access-control/permission-check', () => ({
   PublicApiNotAllowedError: class PublicApiNotAllowedError extends Error {},
   validatePublicApiAllowed: mockValidatePublicApiAllowed,
 }))

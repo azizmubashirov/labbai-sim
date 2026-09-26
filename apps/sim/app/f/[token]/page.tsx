@@ -2,20 +2,14 @@ import { cache } from 'react'
 import type { Metadata } from 'next'
 import { cookies } from 'next/headers'
 import { notFound } from 'next/navigation'
-import { getSession } from '@/lib/auth'
-import {
-  deploymentAuthCookieName,
-  isEmailAllowed,
-  validateAuthToken,
-} from '@/lib/core/security/deployment'
+import { getBrandConfig } from '@/lib/branding'
+import { deploymentAuthCookieName, validateAuthToken } from '@/lib/core/security/deployment'
 import { resolveActiveShareByToken } from '@/lib/public-shares/share-manager'
 import { getWorkspaceFileSize } from '@/lib/uploads/shared/types'
 import { PublicFileAuth } from '@/app/f/[token]/public-file-auth'
 import { PublicFileEmailAuth } from '@/app/f/[token]/public-file-email-auth'
-import { PublicFileSSOAuth } from '@/app/f/[token]/public-file-sso-auth'
 import { PublicFileView } from '@/app/f/[token]/public-file-view'
 import { buildProvenance } from '@/app/f/[token]/utils'
-import { getBrandConfig } from '@/ee/whitelabeling'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,7 +25,7 @@ interface PublicFilePageProps {
 
 /**
  * Social-preview metadata. Public shares unfurl with the file name + provenance;
- * any protected share (password / email / SSO) stays deliberately generic so the
+ * any protected share (password / email) stays deliberately generic so the
  * filename never leaks before the visitor authenticates. Always `noindex`.
  */
 export async function generateMetadata({ params }: PublicFilePageProps): Promise<Metadata> {
@@ -73,21 +67,13 @@ interface GateShare {
 /**
  * Returns the auth prompt to render when a protected share is not yet authorized,
  * or `null` when the visitor may view the file. `password`/`email` use the
- * `file_auth_{shareId}` cookie; `sso` uses the global Sim session.
+ * `file_auth_{shareId}` cookie.
  */
 async function renderAuthGate(token: string, share: GateShare) {
   if (share.authType === 'public') return null
 
-  if (share.authType === 'sso') {
-    const session = await getSession()
-    const allowedEmails = Array.isArray(share.allowedEmails)
-      ? (share.allowedEmails as string[])
-      : []
-    const authorized = Boolean(
-      session?.user?.email && isEmailAllowed(session.user.email, allowedEmails)
-    )
-    return authorized ? null : <PublicFileSSOAuth token={token} />
-  }
+  /** SSO-gated shares are no longer supported; nobody can open them. */
+  if (share.authType === 'sso') notFound()
 
   const cookieStore = await cookies()
   const cookieValue = cookieStore.get(deploymentAuthCookieName('file', share.id))?.value

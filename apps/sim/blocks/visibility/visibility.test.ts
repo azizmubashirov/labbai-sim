@@ -34,7 +34,6 @@ vi.mock('@/blocks/registry-maps', () => ({
 }))
 
 import type { BlockVisibilityState } from '@/lib/core/config/block-visibility'
-import { registerBlockOverlayResolver } from '@/blocks/custom/overlay'
 import { getAllBlocks, getBlock, getCanonicalBlocksByCategory } from '@/blocks/registry'
 import type { BlockConfig } from '@/blocks/types'
 import { isHiddenUnder, registerBlockVisibilityResolver } from '@/blocks/visibility/context'
@@ -56,7 +55,6 @@ const byType = (blocks: BlockConfig[], type: string) => blocks.find((b) => b.typ
 
 afterEach(() => {
   registerBlockVisibilityResolver(null)
-  registerBlockOverlayResolver(null)
 })
 
 describe('isHiddenUnder', () => {
@@ -128,22 +126,5 @@ describe('registry projection', () => {
     withVisibility(vis({ revealed: new Set(['gmail_v2']) }))
     expect(byType(getAllBlocks(), 'slack')).toBe(synthRegistry.slack)
     expect(byType(getAllBlocks(), 'old_v1')).toBe(synthRegistry.old_v1)
-  })
-
-  it('never re-clones or suffixes already-hidden custom blocks', () => {
-    const disabledCustom = {
-      ...synthRegistry.slack,
-      type: 'custom_block_abc',
-      name: 'My Custom',
-      hideFromToolbar: true,
-    } as BlockConfig
-    registerBlockOverlayResolver({
-      get: (t) => (t === disabledCustom.type ? disabledCustom : undefined),
-      all: () => [disabledCustom],
-    })
-    withVisibility(vis({ revealed: new Set(['gmail_v2']) }))
-    const projected = byType(getAllBlocks(), 'custom_block_abc')
-    expect(projected).toBe(disabledCustom)
-    expect(projected?.name).toBe('My Custom')
   })
 })

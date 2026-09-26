@@ -4,10 +4,10 @@ import { useMemo } from 'react'
 import { Chip, OverflowText, SimWordmark } from '@sim/emcn'
 import { Download } from '@sim/emcn/icons'
 import Link from 'next/link'
+import { useBrandConfig } from '@/lib/branding'
 import type { WorkspaceFileRecord } from '@/lib/uploads/contexts/workspace'
 import { buildProvenance } from '@/app/f/[token]/utils'
 import { FileViewer } from '@/app/workspace/[workspaceId]/files/components/file-viewer'
-import { useBrandConfig } from '@/ee/whitelabeling'
 import { createPublicFileContentSource } from '@/hooks/use-file-content-source'
 
 interface PublicFileViewProps {

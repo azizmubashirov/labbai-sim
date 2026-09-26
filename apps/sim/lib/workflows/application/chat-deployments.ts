@@ -21,7 +21,7 @@ import { workflowOperations } from '@/lib/workflows/application/operations'
 import { assertedWorkflowWorkspaceId } from '@/lib/workflows/application/principal-scope'
 import { performChatDeploy, performChatUndeploy } from '@/lib/workflows/orchestration'
 import { formatInternalOutputSelector } from '@/lib/workflows/streaming/output-selector'
-import { validateChatDeployAuth } from '@/ee/access-control/utils/permission-check'
+import { validateChatDeployAuth } from '@/lib/labbai/access-control/permission-check'
 
 type ChatAuthType = 'public' | 'password' | 'email' | 'sso'
 type ChatOutputConfig = { workflowId?: string; blockId: string; path: string }

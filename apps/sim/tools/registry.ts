@@ -665,7 +665,7 @@ import {
   wordpressUpdateTagTool,
   wordpressUploadMediaTool,
 } from '@/tools/wordpress'
-import { customBlockExecutorTool, workflowExecutorTool } from '@/tools/workflow'
+import { workflowExecutorTool } from '@/tools/workflow'
 import {
   zoomCreateMeetingTool,
   zoomDeleteMeetingTool,
@@ -1184,7 +1184,6 @@ export const tools: Record<string, ExecutableToolConfig> = {
   google_forms_delete_watch: googleFormsDeleteWatchTool,
   google_forms_renew_watch: googleFormsRenewWatchTool,
   workflow_executor: workflowExecutorTool,
-  deployed_block_executor: customBlockExecutorTool,
   wordpress_create_post: wordpressCreatePostTool,
   wordpress_update_post: wordpressUpdatePostTool,
   wordpress_delete_post: wordpressDeletePostTool,

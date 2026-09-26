@@ -5,8 +5,8 @@ import {
   internalRateLimits,
   internalSessionAuth,
 } from '@/lib/api/server/routes'
-import { accessRequestOperations } from '@/ee/access-requests/lib/application/operations'
-import { resolveAccessRequest } from '@/ee/access-requests/lib/application/review'
+import { accessRequestOperations } from '@/lib/labbai/access-requests/application/operations'
+import { resolveAccessRequest } from '@/lib/labbai/access-requests/application/review'
 
 export const POST = defineInternalJsonRoute({
   contract: resolveAccessRequestContract,

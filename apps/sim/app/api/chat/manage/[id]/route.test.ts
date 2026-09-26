@@ -65,7 +65,7 @@ vi.mock('@/lib/workflows/orchestration', () => ({
 vi.mock('@/lib/workflows/deployment-status', () => ({
   checkNeedsRedeployment: mocks.checkNeedsRedeployment,
 }))
-vi.mock('@/ee/access-control/utils/permission-check', () => ({
+vi.mock('@/lib/labbai/access-control/permission-check', () => ({
   validateChatDeployAuth: mocks.validateChatDeployAuth,
 }))
 

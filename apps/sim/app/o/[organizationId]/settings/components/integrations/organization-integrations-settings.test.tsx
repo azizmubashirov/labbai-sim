@@ -23,14 +23,6 @@ vi.mock(
   '@/app/o/[organizationId]/settings/components/integrations/organization-integrations-setup',
   () => ({ OrganizationIntegrationsSetup: () => <div>Provider setup</div> })
 )
-vi.mock(
-  '@/app/o/[organizationId]/settings/components/integrations/organization-source-stats',
-  () => ({
-    OrganizationSourceStats: ({ organizationId }: { organizationId: string }) => (
-      <div>Stats for {organizationId}</div>
-    ),
-  })
-)
 vi.mock('@/hooks/queries/organization-accounts', () => ({
   useOrganizationAccounts: mocks.accounts,
   useUpdateOrganizationAccounts: () => ({
@@ -333,13 +325,6 @@ describe('organization integration invitations', () => {
     expect(mocks.people).not.toHaveBeenCalled()
     expect(mocks.invite).not.toHaveBeenCalled()
   })
-  it('opens organization stats without loading people', async () => {
-    await render()
-    await click('Stats')
-    expect(container.textContent).toContain('Stats for org-a')
-    expect(mocks.people).not.toHaveBeenCalled()
-  })
-
   it('filters connection summaries and requests to the selected integration, then returns to All', async () => {
     mocks.accounts.mockReturnValue({
       isSuccess: true,

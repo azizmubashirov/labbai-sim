@@ -22,7 +22,7 @@ import {
   v2SearchSchema,
   v2SortFields,
 } from '@/lib/api/contracts/v2/shared'
-import { ACCESS_REQUEST_TARGET_KINDS } from '@/ee/access-requests/lib/targets'
+import { ACCESS_REQUEST_TARGET_KINDS } from '@/lib/labbai/access-requests/targets'
 
 export const v2AccessRequestSchema = accessRequestRecordSchema.meta({ id: 'V2AccessRequest' })
 export type V2AccessRequest = z.output<typeof v2AccessRequestSchema>

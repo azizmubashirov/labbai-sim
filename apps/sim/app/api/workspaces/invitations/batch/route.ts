@@ -8,7 +8,7 @@ import {
 import { invitationOperations } from '@/lib/invitations/application/operations'
 import { sendInvitationBatch } from '@/lib/invitations/application/send-invitation-batch'
 import { WorkspaceInvitationError } from '@/lib/invitations/workspace-invitations'
-import { InvitationsNotAllowedError } from '@/ee/access-control/utils/permission-check'
+import { InvitationsNotAllowedError } from '@/lib/labbai/access-control/permission-check'
 
 export const dynamic = 'force-dynamic'
 

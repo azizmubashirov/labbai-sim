@@ -3,12 +3,7 @@
  * config-boundary dependencies use workspace packages or relative imports.
  */
 
-import {
-  ENTERPRISE_FEATURE_LEGACY_DEFAULTS,
-  type EnterpriseFeature,
-  resolveEnterpriseEntitlement,
-} from './enterprise-entitlements'
-import { env, envBoolean, envNumber, getEnv, isFalsy, isTruthy } from './env'
+import { env, envNumber, getEnv, isFalsy, isTruthy } from './env'
 
 /**
  * Is the application running in production mode
@@ -232,179 +227,38 @@ export const isAppConfigEnabled =
 export const isTriggerDevEnabled = isTruthy(env.TRIGGER_DEV_ENABLED)
 
 /**
- * Turns on the whole enterprise suite for the deployment. Individual feature
- * flags below still win where they are set, so an operator can enable
- * everything and then switch one feature back off.
+ * Labbai feature gates formerly resolved through the Sim enterprise license.
  *
- * Server code reads `ENTERPRISE_ENABLED`. Server-only vars never reach browser
- * bundles, so the browser reads the `NEXT_PUBLIC_ENTERPRISE_ENABLED` twin (via
- * `window.__ENV`, populated by `<PublicEnvScript>`). Deployments must set both
- * together.
+ * Kept features (re-implemented as Labbai code) are always on. Removed
+ * features are constant `false` until their last consumer is gone.
  */
-export const isEnterpriseEnabled =
-  typeof window === 'undefined'
-    ? isTruthy(env.ENTERPRISE_ENABLED)
-    : isTruthy(getEnv('NEXT_PUBLIC_ENTERPRISE_ENABLED'))
+export const isAccessControlEnabled = true as boolean
 
-/**
- * Reads a feature's own flag as a tri-state, picking the server var or its
- * browser twin for the current runtime. `undefined` means the operator left it
- * unset, which is what lets the master switch and legacy default apply.
- */
-function explicitEnterpriseFlag(
-  serverValue: boolean | string | undefined,
-  clientKey: string
-): boolean | undefined {
-  return typeof window === 'undefined' ? envBoolean(serverValue) : envBoolean(getEnv(clientKey))
-}
+/** Audit log reading (settings Activity log + audit-logs API). */
+export const isAuditLogsEnabled = true as boolean
 
-/**
- * Resolves one enterprise feature for this deployment.
- *
- * Labbai has no paid plans to consult, so resolution falls through the
- * feature's own flag and the master switch to the feature's legacy default
- * (see {@link ENTERPRISE_FEATURE_LEGACY_DEFAULTS}).
- */
-function enterpriseFeatureEnabled(
-  feature: EnterpriseFeature,
-  serverValue: boolean | string | undefined,
-  clientKey: string
-): boolean {
-  const explicit = explicitEnterpriseFlag(serverValue, clientKey)
-  return resolveEnterpriseEntitlement({
-    explicit,
-    masterEnabled: isEnterpriseEnabled,
-    legacyDefault: ENTERPRISE_FEATURE_LEGACY_DEFAULTS[feature],
-  })
-}
+/** SCIM 2.0 directory provisioning. */
+export const isScimEnabled = true as boolean
 
-/**
- * Is SSO enabled for enterprise authentication
- */
-export const isSsoEnabled = enterpriseFeatureEnabled(
-  'sso',
-  env.SSO_ENABLED,
-  'NEXT_PUBLIC_SSO_ENABLED'
-)
+/** Organizations (members + roles) are part of the product. */
+export const isOrganizationsEnabled = true as boolean
 
-/**
- * Is SCIM directory provisioning enabled.
- *
- * Hosted deployments default on; an explicit false defers activation during a rolling deploy.
- * Gates the settings section, the admin API, and the provisioning endpoints
- * alike. A connection whose organization loses the entitlement stops
- * authenticating rather than continuing to accept directory writes.
- */
-export const isScimEnabled = isHosted
-  ? (explicitEnterpriseFlag(env.SCIM_ENABLED, 'NEXT_PUBLIC_SCIM_ENABLED') ?? true)
-  : enterpriseFeatureEnabled('scim', env.SCIM_ENABLED, 'NEXT_PUBLIC_SCIM_ENABLED')
-
-/**
- * Is organization usage monitoring enabled.
- *
- * Gates the settings section and the API that backs it, so nav and server always
- * answer the same question — a section visible but rejected (or reachable but
- * hidden) is exactly what this pairing exists to prevent.
- */
-export const isUsageMonitoringEnabled = enterpriseFeatureEnabled(
-  'usageMonitoring',
-  env.USAGE_MONITORING_ENABLED,
-  'NEXT_PUBLIC_USAGE_MONITORING_ENABLED'
-)
-
-/**
- * Is access control (permission groups) enabled.
- * Required for permission-group enforcement to run at all off-hosted.
- */
-export const isAccessControlEnabled = enterpriseFeatureEnabled(
-  'accessControl',
-  env.ACCESS_CONTROL_ENABLED,
-  'NEXT_PUBLIC_ACCESS_CONTROL_ENABLED'
-)
-
-/**
- * Is organizations enabled.
- * True if resolved on for this deployment (on by default in Labbai), OR if
- * access control is enabled (access control requires organizations).
- *
- * Each term resolves through its `NEXT_PUBLIC_*` twin in the browser, so client
- * code — e.g. the better-auth `organizationClient` plugin registration — sees
- * the same value as the server.
- */
-export const isOrganizationsEnabled =
-  enterpriseFeatureEnabled(
-    'organizations',
-    env.ORGANIZATIONS_ENABLED,
-    'NEXT_PUBLIC_ORGANIZATIONS_ENABLED'
-  ) ||
-  isAccessControlEnabled
-
-/**
- * Is whitelabeling enabled
- */
-export const isWhitelabelingEnabled = enterpriseFeatureEnabled(
-  'whitelabeling',
-  env.WHITELABELING_ENABLED,
-  'NEXT_PUBLIC_WHITELABELING_ENABLED'
-)
-
-/**
- * Is audit log reading enabled.
- *
- * Off-hosted this replaces the enterprise-subscription check that audit access
- * used to require, which no billing-free deployment could ever satisfy.
- */
-export const isAuditLogsEnabled = enterpriseFeatureEnabled(
-  'auditLogs',
-  env.AUDIT_LOGS_ENABLED,
-  'NEXT_PUBLIC_AUDIT_LOGS_ENABLED'
-)
-
-export const isCustomBlocksEnabled = enterpriseFeatureEnabled(
-  'customBlocks',
-  env.CUSTOM_BLOCKS_ENABLED,
-  'NEXT_PUBLIC_CUSTOM_BLOCKS_ENABLED'
-)
-
-/**
- * Is retention *deletion* enabled.
- *
- * Configuring retention has always been possible with billing off; this flag
- * governs whether the cleanup pass actually expires data. Opt-in on purpose —
- * see the note on `dataRetention` in {@link ENTERPRISE_FEATURE_LEGACY_DEFAULTS}.
- */
-export const isDataRetentionEnabled = enterpriseFeatureEnabled(
-  'dataRetention',
-  env.DATA_RETENTION_ENABLED,
-  'NEXT_PUBLIC_DATA_RETENTION_ENABLED'
-)
-
-/**
- * Is data drains enabled
- */
-export const isDataDrainsEnabled = enterpriseFeatureEnabled(
-  'dataDrains',
-  env.DATA_DRAINS_ENABLED,
-  'NEXT_PUBLIC_DATA_DRAINS_ENABLED'
-)
-
-/**
- * Are organization session policies enabled
- */
-export const isSessionPoliciesEnabled = enterpriseFeatureEnabled(
-  'sessionPolicies',
-  env.SESSION_POLICIES_ENABLED,
-  'NEXT_PUBLIC_SESSION_POLICIES_ENABLED'
-)
-
-/**
- * Is workspace forking enabled
- */
-export const isForkingEnabled = enterpriseFeatureEnabled(
-  'forking',
-  env.FORKING_ENABLED,
-  'NEXT_PUBLIC_FORKING_ENABLED'
-)
+/** Removed in Labbai. */
+export const isSsoEnabled = false as boolean
+/** Removed in Labbai. */
+export const isUsageMonitoringEnabled = false as boolean
+/** Removed in Labbai. */
+export const isWhitelabelingEnabled = false as boolean
+/** Removed in Labbai. */
+export const isCustomBlocksEnabled = false as boolean
+/** Removed in Labbai. */
+export const isDataRetentionEnabled = false as boolean
+/** Removed in Labbai. */
+export const isDataDrainsEnabled = false as boolean
+/** Removed in Labbai. */
+export const isSessionPoliciesEnabled = false as boolean
+/** Removed in Labbai. */
+export const isForkingEnabled = false as boolean
 
 /**
  * Remote code sandboxes (E2B / Daytona) were removed: Function blocks run

@@ -40,7 +40,7 @@ vi.mock('@/lib/guardrails/validate_hallucination', () => ({
 }))
 vi.mock('@/lib/guardrails/validate_json', () => ({ validateJson: mocks.validateJson }))
 vi.mock('@/lib/guardrails/validate_regex', () => ({ validateRegex: mocks.validateRegex }))
-vi.mock('@/ee/access-control/utils/permission-check', () => ({
+vi.mock('@/lib/labbai/access-control/permission-check', () => ({
   assertPermissionsAllowed: mocks.assertPermissionsAllowed,
   ModelNotAllowedError: class ModelNotAllowedError extends Error {},
   ProviderNotAllowedError: class ProviderNotAllowedError extends Error {},

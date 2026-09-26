@@ -25,7 +25,7 @@ import { OrchestrationError } from '@/lib/core/orchestration/types'
 import { encryptSecret } from '@/lib/core/security/encryption'
 import { checkNeedsRedeployment } from '@/lib/workflows/deployment-status'
 import { getWorkflowDeploymentSummary, performFullDeploy } from '@/lib/workflows/orchestration'
-import { validateChatDeployAuth } from '@/ee/access-control/utils/permission-check'
+import { validateChatDeployAuth } from '@/lib/labbai/access-control/permission-check'
 
 const logger = createLogger('UpdateChatDeployment')
 

@@ -9,7 +9,6 @@ import { trackGoogleEvent } from '@/lib/analytics/google'
 import { client, useSession } from '@/lib/auth/auth-client'
 import { useTrackingConsent } from '@/lib/consent/tracking-consent'
 import { getEnv, isFalsy } from '@/lib/core/config/env'
-import { isSsoEnabled } from '@/lib/core/config/env-flags'
 import { validateCallbackUrl } from '@/lib/core/security/input-validation'
 import { quickValidateEmail } from '@/lib/messaging/email/validation'
 import { captureClientEvent, captureEvent } from '@/lib/posthog/client'
@@ -32,7 +31,6 @@ import {
   AuthSubmitButton,
   PasswordInput,
   SocialLoginButtons,
-  SSOLoginButton,
 } from '@/app/(auth)/components'
 
 const logger = createLogger('SignupForm')
@@ -383,13 +381,11 @@ function SignupFormContent({
     }
   }
 
-  const ssoEnabled = isSsoEnabled
   const emailEnabled =
     !isFalsy(getEnv('NEXT_PUBLIC_EMAIL_PASSWORD_SIGNUP_ENABLED')) && emailSignupEnabled
   const hasSocial = githubAvailable || googleAvailable || microsoftAvailable
-  const hasOnlySSO = ssoEnabled && !emailEnabled && !hasSocial
-  const showBottomSection = hasSocial || (ssoEnabled && !hasOnlySSO)
-  const showDivider = (emailEnabled || hasOnlySSO) && showBottomSection
+  const showBottomSection = hasSocial
+  const showDivider = emailEnabled && showBottomSection
 
   const nameFieldErrors = showNameValidationError && nameErrors.length > 0 ? nameErrors : []
   const emailHasError = Boolean(emailError) || (showEmailValidationError && emailErrors.length > 0)
@@ -405,10 +401,6 @@ function SignupFormContent({
   return (
     <div className='space-y-6'>
       <AuthHeader title='Create an account' description='Create an account or log in' />
-
-      {hasOnlySSO && (
-        <SSOLoginButton callbackURL={redirectUrl || DEFAULT_POST_AUTH_ROUTE} variant='primary' />
-      )}
 
       {emailEnabled && (
         <form onSubmit={onSubmit} className='space-y-6'>
@@ -487,14 +479,7 @@ function SignupFormContent({
           googleAvailable={googleAvailable}
           microsoftAvailable={microsoftAvailable}
           callbackURL={redirectUrl || DEFAULT_POST_AUTH_ROUTE}
-        >
-          {ssoEnabled && !hasOnlySSO && (
-            <SSOLoginButton
-              callbackURL={redirectUrl || DEFAULT_POST_AUTH_ROUTE}
-              variant='outline'
-            />
-          )}
-        </SocialLoginButtons>
+        />
       )}
 
       <AuthNavPrompt

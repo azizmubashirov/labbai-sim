@@ -4,12 +4,15 @@ import {
   patchScimUserContract,
   replaceScimUserContract,
 } from '@/lib/api/contracts/scim'
-import { deprovisionScimUser } from '@/ee/scim/lib/application/users/deprovision-user'
-import { getScimUser } from '@/ee/scim/lib/application/users/read-users'
-import { patchScimUser, replaceScimUser } from '@/ee/scim/lib/application/users/update-user'
-import { toCanonicalUser } from '@/ee/scim/lib/protocol/canonical'
-import { parseAttributeProjection } from '@/ee/scim/lib/protocol/resources'
-import { defineScimRoute } from '@/ee/scim/lib/route'
+import {
+  deprovisionScimUser,
+  getScimUser,
+  patchScimUser,
+  replaceScimUser,
+} from '@/lib/labbai/scim/application/users'
+import { toCanonicalUser } from '@/lib/labbai/scim/protocol/canonical'
+import { parseAttributeProjection } from '@/lib/labbai/scim/protocol/resources'
+import { defineScimRoute } from '@/lib/labbai/scim/route'
 
 /** One User resource. */
 

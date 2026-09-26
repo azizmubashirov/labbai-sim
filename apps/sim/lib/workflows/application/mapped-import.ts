@@ -83,7 +83,7 @@ async function prepareMappedImport(principal: Principal, input: ImportWorkflowIn
   const resolution = await resolveWorkflowFolderPath(input.workspaceId, input.folderPath ?? '/')
   await assertFolderMutable(resolution.folderId)
   const plan = buildWorkflowImportPlan(input.workflow, input)
-  const configuration = await inspectImportConfiguration(plan, input, input.workspaceId)
+  const configuration = await inspectImportConfiguration(plan, input)
   assertWorkflowPreviewFits({
     bindings: plan.bindings,
     unresolvedBindings: plan.unresolvedBindings,

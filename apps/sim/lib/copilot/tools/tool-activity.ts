@@ -189,15 +189,6 @@ export const TOOL_ACTIVITIES: Readonly<Record<string, ActivityPhrase | Operation
     },
   },
   promote_to_live: 'deployed workflows',
-  publish_custom_block: {
-    label: 'managed custom blocks',
-    parameter: 'action',
-    defaultOperation: 'deploy',
-    operations: {
-      deploy: 'published custom blocks',
-      undeploy: 'unpublished custom blocks',
-    },
-  },
   query_logs: 'read logs',
   query_user_table: {
     label: 'read tables',

@@ -11,7 +11,7 @@ import type {
   SelectorCredentialPolicy,
   ServerSelectorAttachment,
 } from '@/lib/selectors/server/types'
-import { IntegrationNotAllowedError } from '@/ee/access-control/utils/permission-check'
+import { IntegrationNotAllowedError } from '@/lib/labbai/access-control/permission-check'
 
 const logger = createLogger('SelectorIntegrationAccess')
 

@@ -108,7 +108,6 @@ const INDIRECT_ZOD_ROUTES = new Set([
   'apps/sim/app/api/cron/cleanup-oauth-tokens/route.ts',
   'apps/sim/app/api/cron/billing-cycle-close/route.ts',
   'apps/sim/app/api/cron/reconcile-billing-seats/route.ts',
-  'apps/sim/app/api/cron/run-data-drains/route.ts',
   // Returns immediately after Trigger.dev accepts the asynchronous dispatcher task.
   'apps/sim/app/api/cron/workspace-file-search-dispatch/route.ts',
   'apps/sim/app/api/cron/knowledge-projection/route.ts',
@@ -184,7 +183,7 @@ const RAW_JSON_BASELINE_ROUTES = new Set([
 
 const CONTRACT_IMPORT_PATTERN = /\bfrom\s+['"]@\/lib\/api\/contracts(?:\/[^'"]*)?['"]/
 const DECLARATIVE_ROUTE_BUILDER_IMPORT_PATTERN =
-  /\bimport\s*\{[^}]*(?:\bdefineInternalJsonRoute\b|\bdefineV2JsonRoute\b|\bdefineInternalBinaryRoute\b|\bdefineV2BinaryRoute\b)[^}]*\}\s*from\s*['"]@\/lib\/api\/server\/routes['"]|\bimport\s*\{[^}]*\bdefineScimRoute\b[^}]*\}\s*from\s*['"]@\/ee\/scim\/lib\/route['"]/
+  /\bimport\s*\{[^}]*(?:\bdefineInternalJsonRoute\b|\bdefineV2JsonRoute\b|\bdefineInternalBinaryRoute\b|\bdefineV2BinaryRoute\b)[^}]*\}\s*from\s*['"]@\/lib\/api\/server\/routes['"]|\bimport\s*\{[^}]*\bdefineScimRoute\b[^}]*\}\s*from\s*['"]@\/lib\/labbai\/scim\/route['"]/
 const DECLARATIVE_ROUTE_BUILDER_USAGE_PATTERN =
   /\b(?:defineInternalJsonRoute|defineV2JsonRoute|defineInternalBinaryRoute|defineV2BinaryRoute|defineScimRoute)\s*\(/
 const SERVER_VALIDATION_IMPORT_PATTERN = /\bfrom\s+['"]@\/lib\/api\/server(?:\/validation)?['"]/

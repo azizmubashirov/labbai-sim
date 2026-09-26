@@ -56,8 +56,8 @@ export function filterOutputForLog(
     if (key.startsWith('_')) continue
 
     // Skip globally hidden keys. A block whose config does not declare the key as
-    // `hiddenFromDisplay` (a custom block, whose outputs are publisher-curated) would
-    // otherwise persist it straight into the block log and the trace span's output.
+    // `hiddenFromDisplay` would otherwise persist it straight into the block log and
+    // the trace span's output.
     if (isHiddenOutputKey(key)) continue
 
     if (blockConfig?.outputs && isHiddenFromDisplay(blockConfig.outputs[key])) {

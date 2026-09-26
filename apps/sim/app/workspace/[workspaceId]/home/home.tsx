@@ -42,7 +42,7 @@ import {
   resolveResourceSelectionUpdate,
 } from '@/app/workspace/[workspaceId]/home/resource-view-policy'
 import { resourceParam, resourceUrlKeys } from '@/app/workspace/[workspaceId]/home/search-params'
-import { PermissionAccessBoundary } from '@/ee/access-requests/components/permission-access-boundary'
+import { PermissionAccessBoundary } from '@/components/access-requests/permission-access-boundary'
 import { useFolders } from '@/hooks/queries/folders'
 import { useMarkMothershipChatRead } from '@/hooks/queries/mothership-chats'
 import { useWorkflows } from '@/hooks/queries/workflows'

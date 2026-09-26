@@ -412,11 +412,8 @@ export const WORKSPACE_API_KEY_DENIED_AS_NOT_FOUND =
  * The window itself is `CLEANUP_CONFIG['cleanup-logs'].defaults` in
  * `lib/billing/cleanup-dispatcher.ts`: 30 days on the free plan, and `null`
  * — meaning the plan is skipped entirely and nothing is deleted — on Pro and
- * Team. Enterprise resolves per organization through
- * `resolveEffectiveRetentionHours`, with a per-workspace override, and is
- * likewise unbounded until someone configures it. Self-hosted classifies every
- * workspace as enterprise and dispatches nothing unless data retention is
- * enabled.
+ * Team. Enterprise carries no default. Self-hosted classifies every workspace
+ * as enterprise, so nothing is dispatched.
  *
  * Stated because deletion is otherwise invisible: an aged-out run is not a
  * tombstone or a 404, it is simply absent. The matching `runCount` caveat lives

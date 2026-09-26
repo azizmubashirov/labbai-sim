@@ -2,7 +2,6 @@ import { createLogger } from '@sim/logger'
 import { isPlainRecord } from '@sim/utils/object'
 import { DEFAULT_SUBBLOCK_TYPE } from '@sim/workflow-persistence/subblocks'
 import { getBlock } from '@/blocks'
-import { isCustomBlockType } from '@/blocks/custom/build-config'
 import type { BlockState } from '@/stores/workflows/workflow/types'
 
 const logger = createLogger('WorkflowSubblockSanitization')
@@ -31,15 +30,6 @@ interface SanitizableBlock {
  * the conditions array while edge handles still remap, orphaning the edges.
  * Draft loads persist this repair via `persistMigratedBlocks`, so stored
  * state converges back to the registry.
- *
- * Custom blocks are schema-agnostic here: their server-side config never
- * declares the per-field input sub-blocks (the execution overlay passes bare
- * wiring rows, and this may run with no overlay at all), so "not in config"
- * carries no signal for them. A consumer-typed field value stored via the
- * realtime `type: 'unknown'` fallback must be repaired to a concrete type and
- * kept — dropping it would delete user input from the draft. Values for fields
- * the source workflow no longer has are filtered at serialization/execution
- * (`customBlockHasDeclaredInputs`, `remapCustomBlockInputKeys`), never at rest.
  */
 export function sanitizeMalformedSubBlocks(
   block: SanitizableBlock,
@@ -47,7 +37,6 @@ export function sanitizeMalformedSubBlocks(
 ): { subBlocks: Record<string, BlockState['subBlocks'][string]>; changed: boolean } {
   let changed = false
   const blockConfig = getBlock(block.type)
-  const schemaAgnostic = isCustomBlockType(block.type)
   const result: Record<string, BlockState['subBlocks'][string]> = {}
 
   for (const [subBlockId, subBlock] of Object.entries(block.subBlocks || {})) {
@@ -60,7 +49,7 @@ export function sanitizeMalformedSubBlocks(
     const configuredType = blockConfig?.subBlocks?.find((config) => config.id === subBlockId)?.type
 
     if (!isPlainRecord(subBlock)) {
-      if (!configuredType && !schemaAgnostic) {
+      if (!configuredType) {
         logger.warn('Skipping malformed subBlock: unrecognized value entry', {
           blockId: block.id,
           subBlockId,
@@ -79,7 +68,7 @@ export function sanitizeMalformedSubBlocks(
       continue
     }
 
-    if (subBlock.type === 'unknown' && !configuredType && !schemaAgnostic) {
+    if (subBlock.type === 'unknown' && !configuredType) {
       logger.warn('Skipping malformed subBlock: type is "unknown"', {
         blockId: block.id,
         subBlockId,
@@ -97,7 +86,7 @@ export function sanitizeMalformedSubBlocks(
       typeof subBlock.type !== 'string' ||
       subBlock.type.length === 0
 
-    if (missingMetadata && !typeFromConfig && !schemaAgnostic) {
+    if (missingMetadata && !typeFromConfig) {
       logger.warn('Skipping malformed subBlock: unrecognized metadata entry', {
         blockId: block.id,
         subBlockId,

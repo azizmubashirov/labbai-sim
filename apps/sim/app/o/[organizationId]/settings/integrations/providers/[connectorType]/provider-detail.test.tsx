@@ -86,7 +86,7 @@ vi.mock('@/hooks/use-permission-config', () => ({
     refetchIntegrationAvailability: mocks.retryAvailability,
   }),
 }))
-vi.mock('@/ee/credential-groups/components/organization-account-people', () => ({
+vi.mock('@/components/settings/credential-groups/organization-account-people', () => ({
   OrganizationAccountPeople: (props: unknown) => {
     mocks.people(props)
     return <p>Provider account connections</p>

@@ -7,21 +7,14 @@ import {
   isAzureConfigured,
   isChatEnabled,
   isCohereConfigured,
-  isCustomBlocksEnabled,
-  isDataDrainsEnabled,
-  isDataRetentionEnabled,
   isHosted,
   isScimEnabled,
-  isSessionPoliciesEnabled,
-  isSsoEnabled,
-  isUsageMonitoringEnabled,
-  isWhitelabelingEnabled,
 } from '@/lib/core/config/env-flags'
 
 /**
  * One reader for the deployment's shape: hosted or self-hosted, whether
- * Chat runs, which provider credentials the deployment supplies, and which enterprise
- * features its configuration turns on.
+ * Chat runs, which provider credentials the deployment supplies, and which governance
+ * features it offers.
  *
  * Server code reads the `env-flags` constants directly and this module only packages
  * them. Browser code must not. Those constants are computed once from the
@@ -86,14 +79,7 @@ export function resolveDeploymentShape(): DeploymentShape {
     features: {
       accessControl: isAccessControlEnabled,
       auditLogs: isAuditLogsEnabled,
-      customBlocks: isCustomBlocksEnabled,
-      dataDrains: isDataDrainsEnabled,
-      dataRetention: isDataRetentionEnabled,
       scim: isScimEnabled,
-      sessionPolicies: isSessionPoliciesEnabled,
-      sso: isSsoEnabled,
-      usageMonitoring: isUsageMonitoringEnabled,
-      whitelabeling: isWhitelabelingEnabled,
     },
   }
 }

@@ -147,8 +147,7 @@ export interface CostSummaryOptions {
   /**
    * Per-run fixed charge folded into the total. Defaults to
    * `BASE_EXECUTION_CHARGE`. Pass `0` for a run whose base charge is already
-   * paid by an invoking run — a custom block's child, for instance, is one
-   * logical run with its consumer and must not add a second execution fee.
+   * paid by an invoking run, so it does not add a second execution fee.
    */
   baseExecutionCharge?: number
 }

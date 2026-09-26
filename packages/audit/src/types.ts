@@ -26,22 +26,10 @@ export const AuditAction = {
   CHAT_DELETED: 'chat.deleted',
   CHAT_PASSWORD_VIEWED: 'chat.password_viewed',
 
-  // Custom Blocks (deploy-as-block)
-  CUSTOM_BLOCK_PUBLISHED: 'custom_block.published',
-  CUSTOM_BLOCK_UPDATED: 'custom_block.updated',
-  CUSTOM_BLOCK_DELETED: 'custom_block.deleted',
-
   // Custom Tools
   CUSTOM_TOOL_CREATED: 'custom_tool.created',
   CUSTOM_TOOL_UPDATED: 'custom_tool.updated',
   CUSTOM_TOOL_DELETED: 'custom_tool.deleted',
-
-  // Data Drains
-  DATA_DRAIN_CREATED: 'data_drain.created',
-  DATA_DRAIN_UPDATED: 'data_drain.updated',
-  DATA_DRAIN_DELETED: 'data_drain.deleted',
-  DATA_DRAIN_RAN: 'data_drain.ran',
-  DATA_DRAIN_TESTED: 'data_drain.tested',
 
   // Billing
   CREDIT_PURCHASED: 'credit.purchased',
@@ -285,9 +273,7 @@ export const AuditResourceType = {
   CONNECTOR: 'connector',
   CREDENTIAL: 'credential',
   CREDENTIAL_GROUP: 'credential_group',
-  CUSTOM_BLOCK: 'custom_block',
   CUSTOM_TOOL: 'custom_tool',
-  DATA_DRAIN: 'data_drain',
   DOCUMENT: 'document',
   ENVIRONMENT: 'environment',
   FILE: 'file',

@@ -16,7 +16,6 @@ const { mockFetch, mockIsPlatformAdmin, envRef } = vi.hoisted(() => ({
     TABLES_V2_API: undefined as boolean | undefined,
     TABLE_ROW_TTL: undefined as boolean | undefined,
     AGENT_MEMORY_HISTORY: undefined as boolean | undefined,
-    CREDENTIAL_GROUPS: undefined as boolean | undefined,
     KNOWLEDGE_MEMBER_ACCESS: undefined as boolean | undefined,
     KNOWLEDGE_TIN_KEYWORD: undefined as boolean | undefined,
   },
@@ -103,7 +102,7 @@ describe('getFeatureFlags', () => {
     expect(flags['trigger-eu-region']).toEqual({ enabled: false })
     expect(flags['tables-v2-api']).toEqual({ enabled: false })
     expect(flags['table-row-ttl']).toEqual({ enabled: false })
-    expect(flags['credential-groups']).toEqual({ enabled: false })
+    expect(flags['knowledge-member-access']).toEqual({ enabled: false })
     expect(mockFetch).not.toHaveBeenCalled()
   })
 
@@ -131,7 +130,7 @@ describe('getFeatureFlags', () => {
     expect(flags['trigger-eu-region']).toEqual({ enabled: false })
     expect(flags['tables-v2-api']).toEqual({ enabled: false })
     expect(flags['table-row-ttl']).toEqual({ enabled: false })
-    expect(flags['credential-groups']).toEqual({ enabled: false })
+    expect(flags['knowledge-member-access']).toEqual({ enabled: false })
   })
 
   it('degrades gracefully on a malformed document', async () => {
@@ -146,7 +145,6 @@ describe('isFeatureEnabled', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     setEnvFlags({ isAppConfigEnabled: false })
-    envRef.CREDENTIAL_GROUPS = undefined
     envRef.KNOWLEDGE_MEMBER_ACCESS = undefined
     envRef.KNOWLEDGE_TIN_KEYWORD = undefined
     envRef.KNOWLEDGE_ASYNC_PROJECTION = undefined
@@ -222,32 +220,6 @@ describe('isFeatureEnabled', () => {
         await isFeatureEnabled('knowledge-member-access', { workspaceId: 'ws-2', userId: 'u1' })
       ).toBe(false)
       expect(await isFeatureEnabled('knowledge-member-access', { workspaceId: 'ws-2' })).toBe(false)
-    })
-  })
-
-  describe('credential-groups flag', () => {
-    it('uses a global fallback switch off AppConfig', async () => {
-      expect(await isFeatureEnabled('credential-groups')).toBe(false)
-
-      envRef.CREDENTIAL_GROUPS = true
-      expect(await isFeatureEnabled('credential-groups')).toBe(true)
-    })
-
-    it('uses the global AppConfig clause', async () => {
-      withAppConfig({ 'credential-groups': { enabled: true } })
-      expect(await isFeatureEnabled('credential-groups')).toBe(true)
-    })
-
-    it('opens for an allowlisted organization only', async () => {
-      withAppConfig({ 'credential-groups': { orgIds: ['org-1'] } })
-      expect(await isFeatureEnabled('credential-groups', { orgId: 'org-1' })).toBe(true)
-      expect(await isFeatureEnabled('credential-groups', { orgId: 'org-2' })).toBe(false)
-      expect(await isFeatureEnabled('credential-groups')).toBe(false)
-    })
-
-    it('a legacy workspace allowlist does not enable the organization gate', async () => {
-      withAppConfig({ 'credential-groups': { workspaceIds: ['ws-1'] } })
-      expect(await isFeatureEnabled('credential-groups', { orgId: 'org-1' })).toBe(false)
     })
   })
 

@@ -1,11 +1,11 @@
 import { Section, Text } from '@react-email/components'
 import { baseStyles } from '@/components/emails/_styles'
 import { EmailButton, EmailLayout } from '@/components/emails/components'
+import { getBrandConfig } from '@/lib/branding'
 import {
   SCHEDULE_DISABLE_REASON_COPY,
   type ScheduleDisableReason,
 } from '@/lib/workflows/schedules/disable-reasons'
-import { getBrandConfig } from '@/ee/whitelabeling'
 
 interface ScheduleDisabledEmailProps {
   recipientName?: string

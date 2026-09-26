@@ -7,7 +7,6 @@ import { getOrganizationAccountUpdateOptions } from '@/lib/credential-groups/org
 import { useOrganizationContext } from '@/app/o/[organizationId]/providers/organization-provider'
 import { OrganizationIntegrationsSetup } from '@/app/o/[organizationId]/settings/components/integrations/organization-integrations-setup'
 import { OrganizationSourcePeople } from '@/app/o/[organizationId]/settings/components/integrations/organization-source-people'
-import { OrganizationSourceStats } from '@/app/o/[organizationId]/settings/components/integrations/organization-source-stats'
 import {
   organizationIntegrationsTabParam,
   organizationPeopleIntegrationParam,
@@ -58,7 +57,6 @@ export function OrganizationIntegrationsSettings() {
       options={[
         { value: 'providers', label: 'Sources' },
         { value: 'people', label: 'People' },
-        { value: 'stats', label: 'Stats' },
       ]}
     />
   )
@@ -97,7 +95,6 @@ export function OrganizationIntegrationsSettings() {
         <ChipModalError>{update.error?.message}</ChipModalError>
       </ChipConfirmModal>
       {tab === 'providers' && <OrganizationIntegrationsSetup />}
-      {tab === 'stats' && <OrganizationSourceStats organizationId={organization.id} tabs={tabs} />}
       {tab === 'people' && (
         <OrganizationSourcePeople
           key={organization.id}

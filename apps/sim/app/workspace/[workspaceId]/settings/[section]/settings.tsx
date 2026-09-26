@@ -13,7 +13,7 @@ import {
   getSettingsSectionMeta,
   type SettingsSection,
 } from '@/app/workspace/[workspaceId]/settings/navigation'
-import { PermissionAccessBoundary } from '@/ee/access-requests/components/permission-access-boundary'
+import { PermissionAccessBoundary } from '@/components/access-requests/permission-access-boundary'
 
 const Admin = dynamic(() =>
   import('@/app/workspace/[workspaceId]/settings/components/admin/admin').then((m) => m.Admin)
@@ -23,12 +23,11 @@ const ApiKeys = dynamic(() =>
     (m) => m.ApiKeys
   )
 )
-const Forks = dynamic(() => import('@/ee/workspace-forking/components/forks').then((m) => m.Forks))
 const Secrets = dynamic(() =>
   import('@/app/workspace/[workspaceId]/settings/components/secrets/secrets').then((m) => m.Secrets)
 )
 const OrganizationConnectedAccounts = dynamic(() =>
-  import('@/ee/credential-groups/components/organization-connected-accounts').then(
+  import('@/components/settings/credential-groups/organization-connected-accounts').then(
     (m) => m.OrganizationConnectedAccounts
   )
 )
@@ -61,38 +60,18 @@ const WorkflowMcpServers = dynamic(() =>
   ).then((m) => m.WorkflowMcpServers)
 )
 const AccessControl = dynamic(() =>
-  import('@/ee/access-control/components/access-control').then((m) => m.AccessControl)
+  import('@/components/settings/access-control/access-control').then((m) => m.AccessControl)
 )
 const AccessRequestsSettings = dynamic(() =>
-  import('@/ee/access-requests/components/access-requests-settings').then(
+  import('@/components/access-requests/access-requests-settings').then(
     (m) => m.AccessRequestsSettings
   )
 )
-const CustomBlocks = dynamic(() =>
-  import('@/ee/custom-blocks/components/custom-blocks').then((m) => m.CustomBlocks)
-)
 const AuditLogs = dynamic(() =>
-  import('@/ee/audit-logs/components/audit-logs').then((m) => m.AuditLogs)
-)
-const SSO = dynamic(() => import('@/ee/sso/components/sso-settings').then((m) => m.SSO))
-const DataRetentionSettings = dynamic(() =>
-  import('@/ee/data-retention/components/data-retention-settings').then(
-    (m) => m.DataRetentionSettings
-  )
-)
-const DataDrainsSettings = dynamic(() =>
-  import('@/ee/data-drains/components/data-drains-settings').then((m) => m.DataDrainsSettings)
+  import('@/components/settings/audit-logs/audit-logs').then((m) => m.AuditLogs)
 )
 const OrganizationSecuritySettings = dynamic(() =>
   import('@/components/settings/organization-security').then((m) => m.OrganizationSecuritySettings)
-)
-const UsageMonitoring = dynamic(() =>
-  import('@/ee/organization-usage/components/usage-monitoring').then((m) => m.UsageMonitoring)
-)
-const WhitelabelingSettings = dynamic(() =>
-  import('@/ee/whitelabeling/components/whitelabeling-settings').then(
-    (m) => m.WhitelabelingSettings
-  )
 )
 
 interface SettingsPageProps {
@@ -150,37 +129,18 @@ function SettingsPageContent({ section }: SettingsPageProps) {
           }
         />
       )}
-      {effectiveSection === 'custom-blocks' && <CustomBlocks />}
       {effectiveSection === 'audit-logs' && organizationId && (
         <AuditLogs organizationId={organizationId} />
-      )}
-      {effectiveSection === 'usage' && organizationId && (
-        <UsageMonitoring
-          organizationId={organizationId}
-          eventsHref={`/workspace/${hostContext.workspace.id}/settings/usage/events`}
-          auditLogsHref={`/workspace/${hostContext.workspace.id}/settings/audit-logs`}
-        />
       )}
       {effectiveSection === 'apikeys' && <ApiKeys scope='combined' />}
       {effectiveSection === 'teammates' && <Teammates />}
       {effectiveSection === 'organization' && organizationId && (
         <TeamManagement organizationId={organizationId} />
       )}
-      {effectiveSection === 'sso' && organizationId && <SSO organizationId={organizationId} />}
-      {effectiveSection === 'data-retention' && organizationId && (
-        <DataRetentionSettings organizationId={organizationId} />
-      )}
-      {effectiveSection === 'data-drains' && organizationId && (
-        <DataDrainsSettings organizationId={organizationId} />
-      )}
       {effectiveSection === 'security' && organizationId && (
         <OrganizationSecuritySettings organizationId={organizationId} />
       )}
-      {effectiveSection === 'whitelabeling' && organizationId && (
-        <WhitelabelingSettings organizationId={organizationId} />
-      )}
       {effectiveSection === 'mcp' && <MCP />}
-      {effectiveSection === 'forks' && <Forks />}
       {effectiveSection === 'custom-tools' && <CustomTools />}
       {effectiveSection === 'workflow-mcp-servers' && <WorkflowMcpServers />}
       {effectiveSection === 'recently-deleted' && <RecentlyDeleted />}

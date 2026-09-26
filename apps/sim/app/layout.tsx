@@ -3,10 +3,10 @@ import type { Metadata, Viewport } from 'next'
 import Script from 'next/script'
 import { NuqsAdapter } from 'nuqs/adapters/next/app'
 import { BrandedLayout } from '@/components/branded-layout'
+import { getBrandConfig } from '@/lib/branding'
 import { PasteAdmissionGuard } from '@/app/_shell/paste-admission-guard'
 import { BrowserTelemetry } from '@/app/_shell/providers/browser-telemetry'
 import { PostHogProvider } from '@/app/_shell/providers/posthog-provider'
-import { generateBrandedMetadata, generateThemeCSS } from '@/ee/whitelabeling'
 import '@/app/_styles/globals.css'
 import { env } from '@/lib/core/config/env'
 import {
@@ -37,10 +37,22 @@ export const viewport: Viewport = {
   ],
 }
 
-export const metadata: Metadata = generateBrandedMetadata()
+const brand = getBrandConfig()
+
+export const metadata: Metadata = {
+  title: { default: brand.name, template: `%s | ${brand.name}` },
+  applicationName: brand.name,
+  icons: {
+    icon: [
+      { url: '/favicon/favicon.svg', type: 'image/svg+xml' },
+      { url: '/favicon/favicon-96x96.png', sizes: '96x96', type: 'image/png' },
+      { url: '/favicon/favicon.ico' },
+    ],
+    apple: '/favicon/apple-touch-icon.png',
+  },
+}
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const themeCSS = generateThemeCSS()
   const application = (
     <ToastProvider>
       <PasteAdmissionGuard />
@@ -226,16 +238,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             `,
           }}
         />
-
-        {/* Theme CSS Override */}
-        {themeCSS && (
-          <style
-            id='theme-override'
-            dangerouslySetInnerHTML={{
-              __html: themeCSS,
-            }}
-          />
-        )}
 
         {/* Basic head hints that are not covered by the Metadata API */}
         <meta name='color-scheme' content='light dark' />

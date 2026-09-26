@@ -22,7 +22,7 @@ import type {
   WorkspaceCreditAvailability,
   WorkspaceUsageGate,
 } from '@/lib/api/contracts/workspaces'
-import { ACCESS_REQUEST_LIST_PAGE_SIZE } from '@/ee/access-requests/lib/constants'
+import { ACCESS_REQUEST_LIST_PAGE_SIZE } from '@/lib/labbai/access-requests/constants'
 import {
   ACCESS_REQUESTS_STALE_TIME,
   accessRequestKeys,

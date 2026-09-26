@@ -40,7 +40,6 @@ export function resolveOrganizationSettingsSection(
     aliases: {
       organization: 'members',
       team: 'members',
-      domains: 'sso',
       sessions: 'security',
     },
   })

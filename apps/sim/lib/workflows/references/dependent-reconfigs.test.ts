@@ -15,17 +15,10 @@ vi.mock('@/lib/workflows/search-replace/indexer', () => ({
   getToolInputParamConfigs: mockGetToolInputParamConfigs,
 }))
 
-import {
-  collectForkDependentReconfigs,
-  collectForkResourceUsages,
-} from '@/lib/workflows/references/dependent-reconfigs'
+import { collectForkDependentReconfigs } from '@/lib/workflows/references/dependent-reconfigs'
+import type { WorkflowBlockIdResolver } from '@/lib/workflows/references/types'
 import { getBlock } from '@/blocks/registry'
 import type { BlockConfig, SubBlockConfig } from '@/blocks/types'
-import {
-  buildForkBlockIdResolver,
-  deriveForkBlockId,
-  EMPTY_FORK_BLOCK_MAP,
-} from '@/ee/workspace-forking/lib/remap/block-identity'
 import type { WorkflowState } from '@/stores/workflows/workflow/types'
 
 const blockWith = (subBlocks: SubBlockConfig[]): BlockConfig =>
@@ -58,11 +51,11 @@ const replaceItem = {
   mode: 'replace' as const,
 }
 
-/**
- * No persisted block map in these unit tests, so the resolver derives - matching the
- * `deriveForkBlockId(...)` ids the expectations assert.
- */
-const resolve = buildForkBlockIdResolver(true, EMPTY_FORK_BLOCK_MAP)
+/** Deterministic test block-id derivation, matching the ids the expectations assert. */
+const deriveTargetBlockId = (targetWorkflowId: string, sourceBlockId: string): string =>
+  `${targetWorkflowId}::${sourceBlockId}`
+
+const resolve: WorkflowBlockIdResolver = deriveTargetBlockId
 
 /**
  * The indexer mock is module-scoped, so a `mockReturnValue` from one test would otherwise
@@ -117,7 +110,7 @@ describe('collectForkDependentReconfigs', () => {
         parentSourceId: 'cred-src',
         parentContextKey: 'oauthCredential',
         targetWorkflowId: 'wf-tgt',
-        targetBlockId: deriveForkBlockId('wf-tgt', 'block-1'),
+        targetBlockId: deriveTargetBlockId('wf-tgt', 'block-1'),
         blockName: 'Block',
         subBlockKey: 'folder',
         selectorKey: 'gmail.labels',
@@ -310,7 +303,7 @@ describe('collectForkDependentReconfigs', () => {
         parentSourceId: 'kb-src',
         parentContextKey: 'knowledgeBaseId',
         targetWorkflowId: 'wf-tgt',
-        targetBlockId: deriveForkBlockId('wf-tgt', 'block-1'),
+        targetBlockId: deriveTargetBlockId('wf-tgt', 'block-1'),
         blockName: 'Block',
         subBlockKey: 'documentSelector',
         selectorKey: 'knowledge.documents',
@@ -611,7 +604,7 @@ describe('collectForkDependentReconfigs', () => {
         parentSourceId: 'cred-src',
         parentContextKey: 'oauthCredential',
         targetWorkflowId: 'wf-tgt',
-        targetBlockId: deriveForkBlockId('wf-tgt', 'block-1'),
+        targetBlockId: deriveTargetBlockId('wf-tgt', 'block-1'),
         blockName: 'Block',
         subBlockKey: 'tools[0].folder',
         selectorKey: 'gmail.labels',
@@ -1389,66 +1382,5 @@ describe('collectForkDependentReconfigs — nested tool params follow ParameterV
     expect(result.find((f) => f.subBlockKey === 'tools[0].domain')).toMatchObject({
       required: false,
     })
-  })
-})
-
-describe('collectForkResourceUsages', () => {
-  const usageItem = (
-    sourceWorkflowId: string,
-    targetWorkflowId: string,
-    name: string,
-    mode: 'create' | 'replace' = 'replace'
-  ) => ({ sourceWorkflowId, targetWorkflowId, mode, sourceMeta: { name } })
-
-  // The reference scan reads each subblock entry's own `type`, so credential usages need
-  // typed entries (unlike the dependent collector, which keys off the block config).
-  const credentialState = (credentialId: string): WorkflowState =>
-    ({
-      blocks: {
-        'block-1': {
-          id: 'block-1',
-          type: 'gmail',
-          name: 'Block',
-          subBlocks: { credential: { id: 'credential', type: 'oauth-input', value: credentialId } },
-        },
-      },
-      edges: [],
-      loops: {},
-      parallels: {},
-      variables: {},
-    }) as unknown as WorkflowState
-
-  it('lists each replace workflow a resource is used in, with its (target) name', () => {
-    const states = new Map<string, WorkflowState>([
-      ['wf-a', credentialState('cred-src')],
-      ['wf-b', credentialState('cred-src')],
-    ])
-    const result = collectForkResourceUsages(
-      [usageItem('wf-a', 'wf-tgt-a', 'Workflow A'), usageItem('wf-b', 'wf-tgt-b', 'Workflow B')],
-      states
-    )
-    expect(result).toEqual([
-      {
-        parentKind: 'credential',
-        parentSourceId: 'cred-src',
-        workflows: [
-          { workflowId: 'wf-tgt-a', workflowName: 'Workflow A' },
-          { workflowId: 'wf-tgt-b', workflowName: 'Workflow B' },
-        ],
-      },
-    ])
-  })
-
-  it('includes create-mode targets (never-synced workflows count toward the next sync)', () => {
-    const states = new Map<string, WorkflowState>([['wf-a', credentialState('cred-src')]])
-    expect(
-      collectForkResourceUsages([usageItem('wf-a', 'wf-tgt-a', 'A', 'create')], states)
-    ).toEqual([
-      {
-        parentKind: 'credential',
-        parentSourceId: 'cred-src',
-        workflows: [{ workflowId: 'wf-tgt-a', workflowName: 'A' }],
-      },
-    ])
   })
 })

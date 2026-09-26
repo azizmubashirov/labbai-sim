@@ -84,7 +84,7 @@ import { useRegisterGlobalCommands } from '@/app/workspace/[workspaceId]/provide
 import { useUserPermissionsContext } from '@/app/workspace/[workspaceId]/providers/workspace-permissions-provider'
 import { BrandIcon } from '@/blocks/brand-icon'
 import { CONNECTOR_META_REGISTRY } from '@/connectors/registry'
-import { PermissionAccessBoundary } from '@/ee/access-requests/components/permission-access-boundary'
+import { PermissionAccessBoundary } from '@/components/access-requests/permission-access-boundary'
 import { useKnowledgeBasesList } from '@/hooks/kb/use-knowledge'
 import { useCreateFolder, useDeleteFolderMutation, useUpdateFolder } from '@/hooks/queries/folders'
 import {

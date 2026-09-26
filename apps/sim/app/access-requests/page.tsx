@@ -14,9 +14,9 @@ import { getOrganizationSettingsAccess } from '@/lib/organizations/settings-acce
 import { getOrganizationSurfaceContext } from '@/lib/organizations/surface'
 import { buildAuthCrossLink } from '@/app/(auth)/auth-redirect'
 import { SettingsEmptyState } from '@/app/workspace/[workspaceId]/settings/components/settings-empty-state'
-import { AccessRequestsSettings } from '@/ee/access-requests/components/access-requests-settings'
-import { accessRequestEntrySearchParams } from '@/ee/access-requests/components/search-params'
-import { getLegacyAccessRequestsSettingsQuery } from '@/ee/access-requests/lib/navigation'
+import { AccessRequestsSettings } from '@/components/access-requests/access-requests-settings'
+import { accessRequestEntrySearchParams } from '@/components/access-requests/search-params'
+import { getLegacyAccessRequestsSettingsQuery } from '@/lib/labbai/access-requests/navigation'
 
 export const metadata: Metadata = {
   title: 'Access requests',

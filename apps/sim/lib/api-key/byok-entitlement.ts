@@ -87,10 +87,8 @@ export async function isOrganizationBYOKEntitledCached(organizationId: string): 
 /**
  * Drops every cached entitlement. Test seam; never called in production code.
  *
- * There is deliberately no per-organization invalidator, unlike
- * `invalidateSessionPolicyCache`. That one works because the route that mutates
- * the policy runs in the same process that reads it. Entitlement changes land in
- * one process while the readers are per-worker — an invalidator there would look
+ * There is deliberately no per-organization invalidator: entitlement changes land
+ * in one process while the readers are per-worker, so an invalidator would look
  * like it made plan changes immediate when it only cleared one process. The TTL
  * is the real mechanism.
  */

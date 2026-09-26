@@ -184,7 +184,6 @@ const JOB_TYPE_TO_TASK_ID: Record<JobType, string> = {
   'cleanup-table-row-ttl': 'cleanup-table-row-ttl',
   'cleanup-tasks': 'cleanup-tasks',
   'cleanup-file-versions': 'cleanup-file-versions',
-  'run-data-drain': 'run-data-drain',
   'knowledge-connector-directory-sync': 'knowledge-connector-directory-sync',
 }
 

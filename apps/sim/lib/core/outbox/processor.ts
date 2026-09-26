@@ -1,6 +1,4 @@
-import { db } from '@sim/db'
 import { createLogger } from '@sim/logger'
-import { toError } from '@sim/utils/errors'
 import {
   OUTBOX_PROCESSOR_MAX_RUNTIME_MS,
   OUTBOX_PROCESSOR_RECOVERY_CUTOFF_MS,
@@ -17,9 +15,7 @@ import { workspaceFileStorageCleanupOutboxHandlers } from '@/lib/uploads/context
 import { workflowDeploymentOutboxHandlers } from '@/lib/workflows/deployment-outbox'
 import { invitationMigrationOutboxHandlers } from '@/lib/workspaces/admin-move'
 import { workspaceOperationOutboxHandlers } from '@/lib/workspaces/operations/outbox'
-import { permissionAccessRequestOutboxHandlers } from '@/ee/access-requests/lib/notifications'
-import { forkContentOutboxHandlers } from '@/ee/workspace-forking/application/content-outbox'
-import { reapStaleBackgroundWork } from '@/ee/workspace-forking/lib/background-work/store'
+import { permissionAccessRequestOutboxHandlers } from '@/lib/labbai/access-requests/notifications'
 
 const logger = createLogger('OutboxProcessor')
 
@@ -33,13 +29,11 @@ const handlers = {
   ...workspaceFileStorageCleanupOutboxHandlers,
   ...workflowDeploymentOutboxHandlers,
   ...workspaceOperationOutboxHandlers,
-  ...forkContentOutboxHandlers,
 } as const
 
 export interface OutboxProcessorResult {
   result: ProcessOutboxResult
   recoveredDocuments: number
-  reapedBackgroundWork: number
 }
 
 /** Processes one bounded batch and its recovery work in either the worker or self-hosted cron. */
@@ -68,18 +62,9 @@ export async function runOutboxProcessor(): Promise<OutboxProcessorResult> {
     })
   }
 
-  /** Reap independently so an expired fork lease cannot prevent outbox delivery. */
-  let reapedBackgroundWork = 0
-  try {
-    reapedBackgroundWork = await reapStaleBackgroundWork(db)
-  } catch (error) {
-    logger.error('Background-work reap failed', { error: toError(error).message })
-  }
-
-  const output = { result, reapedBackgroundWork, recoveredDocuments }
+  const output = { result, recoveredDocuments }
   logger.info('Outbox processing completed', {
     ...result,
-    reapedBackgroundWork,
     recoveredDocuments,
     durationMs: Date.now() - startedAt,
   })

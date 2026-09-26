@@ -88,7 +88,7 @@ vi.mock('@sim/platform-authz/workspace', () => ({
   resolveEffectiveWorkspacePermission: vi.fn().mockResolvedValue('read'),
 }))
 
-vi.mock('@/ee/access-control/utils/permission-check', () => ({
+vi.mock('@/lib/labbai/access-control/permission-check', () => ({
   PublicApiNotAllowedError: class PublicApiNotAllowedError extends Error {},
   validatePublicApiAllowed: mockValidatePublicApiAllowed,
 }))
@@ -124,14 +124,6 @@ vi.mock('@/lib/core/async-jobs', () => ({
 
 vi.mock('@/background/workflow-execution', () => ({
   executeWorkflowJob: vi.fn(),
-}))
-
-vi.mock('@/lib/workflows/custom-blocks/operations', () => ({
-  getCustomBlockRowsForWorkspace: vi.fn().mockResolvedValue([]),
-}))
-
-vi.mock('@/blocks/custom/server-overlay', () => ({
-  withCustomBlockOverlay: vi.fn(async (_rows: unknown, fn: () => unknown) => fn()),
 }))
 
 vi.mock('@/serializer', () => ({

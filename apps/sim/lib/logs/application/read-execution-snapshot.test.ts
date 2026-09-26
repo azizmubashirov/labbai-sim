@@ -24,7 +24,6 @@ const mocks = vi.hoisted(() => ({
   resolveWorkspace: vi.fn(),
   resolvePermission: vi.fn(),
   materialize: vi.fn(),
-  hydrateChildTraces: vi.fn(),
   recordAudit: vi.fn(),
 }))
 
@@ -50,10 +49,6 @@ vi.mock('@/lib/workspaces/application/workspace-context', () => ({
 
 vi.mock('@/lib/logs/execution/trace-store', () => ({
   materializeExecutionData: mocks.materialize,
-}))
-
-vi.mock('@/lib/logs/execution/hydrate-child-traces', () => ({
-  hydrateChildTraces: mocks.hydrateChildTraces,
 }))
 
 import { readExecutionSnapshotUseCase } from '@/lib/logs/application/read-execution-snapshot'

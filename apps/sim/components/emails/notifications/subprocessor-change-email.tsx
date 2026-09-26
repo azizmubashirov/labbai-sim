@@ -1,7 +1,7 @@
 import { Link, Section, Text } from '@react-email/components'
 import { baseStyles } from '@/components/emails/_styles'
 import { EmailButton, EmailLayout, EmailStrong } from '@/components/emails/components'
-import { getBrandConfig } from '@/ee/whitelabeling'
+import { getBrandConfig } from '@/lib/branding'
 
 /** How a sub-processor's role on the list is changing. */
 export type SubprocessorChangeType = 'added' | 'replaced' | 'removed'

@@ -3,15 +3,12 @@ import { createLogger } from '@sim/logger'
 import { getErrorMessage } from '@sim/utils/errors'
 import { generateId } from '@sim/utils/id'
 import { isRecordLike } from '@sim/utils/object'
+import type { BillingAttributionSnapshot } from '@/lib/billing/core/billing-attribution'
 import { calculateCostSummary } from '@/lib/logs/execution/logging-factory'
 import type { TraceSpan } from '@/lib/logs/types'
 import { ChildWorkflowError } from '@/executor/errors/child-workflow-error'
-import {
-  buildCustomBlockExecutionContext,
-  type CustomBlockExecutorContext,
-} from '@/executor/handlers/workflow/custom-block-tool-runner'
 import { WorkflowBlockHandler } from '@/executor/handlers/workflow/workflow-handler'
-import type { ExecutorDelegationOrigin } from '@/executor/types'
+import type { ExecutionContext, ExecutorDelegationOrigin } from '@/executor/types'
 import { classifyExecutionError } from '@/executor/utils/errors'
 import { parseJSON } from '@/executor/utils/json'
 import type { ResolvedSecretTraceRegistry } from '@/executor/utils/resolved-secret-trace-registry'
@@ -41,7 +38,7 @@ function aggregateChildCost(childTraceSpans: TraceSpan[]): number {
  * propagated, and `forkForPropagatedEntries` (the fork every model boundary projects through)
  * keeps only propagated entries. Without this crossing a value the child resolved from an
  * environment variable is dropped from the projection registry and reaches the model vendor in
- * plaintext. Mirrors the custom-block crossing in `workflow-handler`, and fails closed: an
+ * plaintext. Fails closed: an
  * unusable envelope marks the registry incomplete, which reduces the result the model sees.
  */
 async function markResultProvenanceCrossing(
@@ -66,10 +63,75 @@ async function markResultProvenanceCrossing(
   }
 }
 
+/** Server-set execution context propagated to every agent tool call. */
+interface WorkflowToolExecutorContext {
+  workspaceId?: string
+  userId?: string
+  workflowId?: string
+  callChain?: string[]
+  isDeployedContext?: boolean
+  billingAttribution?: BillingAttributionSnapshot
+  /** The invoking agent run's execution id. Server-set, never model-supplied. */
+  executionId?: string
+  /** The invoking run's request id, so both sides share one trace identifier. */
+  requestId?: string
+}
+
+interface WorkflowToolRunOptions {
+  environmentVariables: Record<string, string>
+  abortSignal?: AbortSignal
+  resolvedSecretTraceRegistry?: ResolvedSecretTraceRegistry
+  executorDelegationOrigin?: ExecutorDelegationOrigin
+  principal?: WorkflowExecutionPrincipal
+}
+
+/**
+ * Builds the minimal parent {@link ExecutionContext} `WorkflowBlockHandler` needs to
+ * run a workflow tool: the invoking run's identity, call chain, env and cancellation.
+ */
+function buildWorkflowToolExecutionContext(
+  context: WorkflowToolExecutorContext,
+  options: WorkflowToolRunOptions
+): ExecutionContext {
+  // Prefer the invoking agent run's id so correlation points at a real execution.
+  const executionId = context.executionId ?? generateId()
+  return {
+    workflowId: context.workflowId ?? 'workflow-tool',
+    workspaceId: context.workspaceId,
+    userId: context.userId,
+    principal: options.principal,
+    executorDelegationOrigin: options.executorDelegationOrigin,
+    executionId,
+    isDeployedContext: context.isDeployedContext,
+    // Inherit the accumulated chain so the handler appends + validates depth.
+    callChain: context.callChain ?? [],
+    abortSignal: options.abortSignal,
+    resolvedSecretTraceRegistry: options.resolvedSecretTraceRegistry,
+    environmentVariables: options.environmentVariables,
+    blockStates: new Map(),
+    executedBlocks: new Set(),
+    blockLogs: [],
+    decisions: { router: new Map(), condition: new Map() },
+    completedLoops: new Set(),
+    activeExecutionPath: new Set(),
+    metadata: {
+      duration: 0,
+      requestId: context.requestId ?? generateId(),
+      executionId,
+      workflowId: context.workflowId,
+      workspaceId: context.workspaceId,
+      userId: context.userId,
+      principal: options.principal,
+      billingAttribution: context.billingAttribution,
+      executionMode: 'sync',
+    },
+  }
+}
+
 interface WorkflowToolParams {
   workflowId?: string
   inputMapping?: Record<string, unknown> | string
-  _context?: CustomBlockExecutorContext
+  _context?: WorkflowToolExecutorContext
 }
 
 /**
@@ -86,24 +148,18 @@ interface WorkflowToolParams {
  *
  * The child runs under the invoking run's environment variables and block-output
  * redaction policy, matching the canvas workflow block — `workflow-handler.ts`
- * keeps both from the parent context on the non-custom branch. The handler's
+ * keeps both from the parent context. The handler's
  * same-workspace assert bounds that forwarding to a single workspace.
  */
 export async function runWorkflowTool(
   params: WorkflowToolParams,
-  options: {
-    environmentVariables: Record<string, string>
-    abortSignal?: AbortSignal
-    resolvedSecretTraceRegistry?: ResolvedSecretTraceRegistry
-    executorDelegationOrigin?: ExecutorDelegationOrigin
-    principal?: WorkflowExecutionPrincipal
-  }
+  options: WorkflowToolRunOptions
 ): Promise<ToolResponse> {
   if (!params.workflowId) {
     return { success: false, output: {}, error: 'Missing workflowId' }
   }
 
-  const ctx = buildCustomBlockExecutionContext(params._context ?? {}, options)
+  const ctx = buildWorkflowToolExecutionContext(params._context ?? {}, options)
   const block: SerializedBlock = {
     id: generateId(),
     position: { x: 0, y: 0 },

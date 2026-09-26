@@ -147,7 +147,7 @@ interface UpsertFileShareInput {
   authType?: ShareAuthType
   /** Plaintext password to set; encrypted at rest. Required to first enable a password share. */
   password?: string
-  /** Allowed emails/domains; required to enable an `email`/`sso` share without an existing list. */
+  /** Allowed emails/domains; required to enable an `email` share without an existing list. */
   allowedEmails?: string[]
   /** Client-reserved token to persist on first insert; ignored when the share already exists. */
   token?: string
@@ -160,7 +160,8 @@ interface UpsertFileShareInput {
  *
  * Auth validation only applies when **enabling** (`isActive: true`): `password`
  * requires a plaintext `password` unless one is already stored (encrypted via
- * {@link encryptSecret}); `email`/`sso` require a non-empty `allowedEmails`.
+ * {@link encryptSecret}); `email` requires a non-empty `allowedEmails`; `sso` is retired
+ * and refused.
  * Disabling (going Private) always succeeds and preserves the stored config so a
  * later re-enable restores it. Validation failures throw {@link ShareValidationError}.
  */
@@ -191,6 +192,9 @@ export async function upsertFileShare({
   let finalPassword: string | null = existing?.password ?? null
   let finalAllowedEmails: string[] = existingAllowedEmails
   if (isActive) {
+    if (finalAuthType === 'sso') {
+      throw new ShareValidationError('SSO shares are no longer supported')
+    }
     if (finalAuthType === 'password') {
       if (password) {
         finalPassword = (await encryptSecret(password)).encrypted
@@ -200,12 +204,10 @@ export async function upsertFileShare({
         throw new ShareValidationError('Password is required for password-protected shares')
       }
       finalAllowedEmails = []
-    } else if (finalAuthType === 'email' || finalAuthType === 'sso') {
+    } else if (finalAuthType === 'email') {
       finalAllowedEmails = allowedEmails ?? existingAllowedEmails
       if (finalAllowedEmails.length === 0) {
-        throw new ShareValidationError(
-          'At least one allowed email is required for email/SSO shares'
-        )
+        throw new ShareValidationError('At least one allowed email is required for email shares')
       }
       finalPassword = null
     } else {

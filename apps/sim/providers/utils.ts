@@ -11,8 +11,6 @@ import {
   normalizeStringRecord,
   normalizeWorkflowVariables,
 } from '@/lib/core/utils/records'
-import type { CustomBlockToolBinding } from '@/lib/workflows/custom-blocks/operations'
-import { isFileFieldType, type WorkflowInputField } from '@/lib/workflows/input-format'
 import {
   buildCanonicalIndex,
   type CanonicalGroup,
@@ -21,7 +19,6 @@ import {
   resolveActiveCanonicalValue,
   scopeCanonicalModesForTool,
 } from '@/lib/workflows/subblocks/visibility'
-import { assembleCustomBlockInputMapping, isCustomBlockType } from '@/blocks/custom/build-config'
 import type { SubBlockConfig } from '@/blocks/types'
 import { isCustomTool } from '@/executor/constants'
 import {
@@ -424,60 +421,6 @@ function resolveCanonicalResourceParams(
   return resolved
 }
 
-/** JSON-schema type for a workflow input field (LLM tool schema). */
-function inputFieldSchemaType(fieldType: string): string {
-  switch (fieldType) {
-    case 'number':
-      return 'number'
-    case 'boolean':
-      return 'boolean'
-    case 'object':
-      return 'object'
-    case 'array':
-      return 'array'
-    default:
-      return 'string'
-  }
-}
-
-/**
- * Build the LLM tool schema for a custom block used as an agent tool: a single
- * `inputMapping` object whose properties are the block's deployed input fields,
- * keyed by the field's stable id (so it lines up with `assembleCustomBlockInputMapping`
- * and the child's id→name remap) and marked required per the publisher's overrides.
- * `file[]` fields are omitted — the model can't synthesize uploaded-file descriptors.
- */
-function buildCustomBlockInputMappingSchema(
-  blockName: string,
-  inputFields: WorkflowInputField[],
-  requiredInputIds: string[]
-): ProviderToolConfig['parameters'] {
-  const requiredSet = new Set(requiredInputIds)
-  const properties: Record<string, any> = {}
-  const requiredFields: string[] = []
-  for (const field of inputFields) {
-    if (isFileFieldType(field.type)) continue
-    const key = field.id ?? field.name
-    properties[key] = {
-      type: inputFieldSchemaType(field.type),
-      description: field.description ? `${field.name} — ${field.description}` : field.name,
-    }
-    if (requiredSet.has(key)) requiredFields.push(key)
-  }
-  return {
-    type: 'object',
-    properties: {
-      inputMapping: {
-        type: 'object',
-        description: `Input values for ${blockName}`,
-        properties,
-        required: requiredFields,
-      },
-    },
-    required: requiredFields.length > 0 ? ['inputMapping'] : [],
-  }
-}
-
 type BlockToolParamsFn = (params: Record<string, any>) => Record<string, any>
 
 /**
@@ -653,14 +596,6 @@ export async function transformBlockTool(
       context: WorkflowToolExecutionContext
     ) => Promise<{ name: string; description: string | null }>
     /**
-     * Server-only resolver for a custom (deploy-as-block) tool's binding (bound
-     * workflow + input schema), org-scoped to the consumer. Injected as a dependency
-     * — like `getAllBlocks`/`getTool` — so this client-reachable module never imports
-     * the DB-backed `operations` module. Omit for non-server callers that can't
-     * resolve authority; a custom block is then simply not offered as a tool.
-     */
-    resolveCustomBlockBinding?: (blockType: string) => Promise<CustomBlockToolBinding | null>
-    /**
      * Position of this tool within its parent agent block's `tool-input` array. Canonical-mode
      * overrides are stored scoped by this index (`${toolIndex}:${canonicalId}`) rather than by
      * `block.type`, so that two tool entries of the same type (e.g. two Table tools) don't share
@@ -686,64 +621,6 @@ export async function transformBlockTool(
   if (!blockDef) {
     logger.warn(`Block definition not found for type: ${block.type}`)
     return null
-  }
-
-  // Custom (deploy-as-block) blocks resolve to the generic `workflow_executor`, but
-  // as an agent tool they must run through the authority boundary (owner identity,
-  // latest deployment, curated outputs) — not the plain workflow executor. Route
-  // them to the dedicated in-process `deployed_block_executor` tool, carrying the
-  // block TYPE (never a source workflow id) so authority is re-resolved server-side.
-  // Dynamic imports keep the DB/executor dependency graph out of client bundles.
-  if (isCustomBlockType(block.type)) {
-    const binding = await options.resolveCustomBlockBinding?.(block.type)
-    if (!binding) {
-      logger.warn(`Custom block tool binding not resolved for type: ${block.type}`)
-      return null
-    }
-    const customToolConfig = getTool('deployed_block_executor')
-    if (!customToolConfig) {
-      logger.warn('deployed_block_executor tool not registered')
-      return null
-    }
-    // From the BINDING, not `blockDef.subBlocks`: the server overlay builds custom-block
-    // configs with `inputFields: []`, so on the execution path the block config carries no
-    // field sub-blocks and the decode would silently no-op, handing the child workflow the
-    // string 'false' for a boolean input.
-    const inputMapping = assembleCustomBlockInputMapping(block.params || {}, binding.inputFields)
-    // A `file[]` field is omitted from the model schema (the model can't synthesize
-    // upload descriptors). If such a field is REQUIRED and the user hasn't
-    // pre-filled it on the block, no invocation could ever satisfy the child's
-    // required-input check — so don't offer an unusable tool at all.
-    const prefilled = JSON.parse(inputMapping) as Record<string, unknown>
-    const requiredIds = new Set(binding.requiredInputIds)
-    const unfillableFileField = binding.inputFields.find((field) => {
-      const key = field.id ?? field.name
-      return isFileFieldType(field.type) && requiredIds.has(key) && !(key in prefilled)
-    })
-    if (unfillableFileField) {
-      logger.warn(
-        `Custom block ${block.type} not offered as a tool: required file input "${unfillableFileField.name}" has no preset value and cannot be supplied by the model`
-      )
-      return null
-    }
-    return {
-      id: customToolConfig.id,
-      // The description comes from the block itself — never the source workflow's metadata,
-      // which the consumer has no access to.
-      description: blockDef.description || customToolConfig.description,
-      params: {
-        blockType: block.type,
-        inputMapping,
-      },
-      // The projection has to assemble its copy from the same fields, or the two mappings
-      // decode differently and the provenance comparison reads that as a shape divergence.
-      customBlockInputFields: binding.inputFields,
-      parameters: buildCustomBlockInputMappingSchema(
-        blockDef.name,
-        binding.inputFields,
-        binding.requiredInputIds
-      ),
-    }
   }
 
   let toolId: string | null = null

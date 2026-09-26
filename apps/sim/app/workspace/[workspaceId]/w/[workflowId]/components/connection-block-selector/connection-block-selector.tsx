@@ -152,7 +152,6 @@ function isRecentSelection(value: unknown): value is RecentSelection {
 export function ConnectionBlockSelector({ id, data }: NodeProps<ConnectionBlockSelectorNode>) {
   const params = useParams()
   const workspaceId = params.workspaceId as string
-  const currentWorkflowId = params.workflowId as string | undefined
   const posthog = usePostHog()
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
@@ -193,19 +192,8 @@ export function ConnectionBlockSelector({ id, data }: NodeProps<ConnectionBlockS
     }
   }, [recentStorageKey])
 
-  const availableBlocks = useMemo(
-    () =>
-      blocks.filter(
-        (block) => !block.sourceWorkflowId || block.sourceWorkflowId !== currentWorkflowId
-      ),
-    [blocks, currentWorkflowId]
-  )
-
-  const availableTools = useMemo(
-    () =>
-      tools.filter((tool) => !tool.sourceWorkflowId || tool.sourceWorkflowId !== currentWorkflowId),
-    [currentWorkflowId, tools]
-  )
+  const availableBlocks = blocks
+  const availableTools = tools
 
   const searchCandidates = useMemo<RecentPickerResult[]>(
     () => [

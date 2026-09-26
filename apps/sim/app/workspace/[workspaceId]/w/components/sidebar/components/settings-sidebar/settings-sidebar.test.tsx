@@ -39,15 +39,6 @@ vi.mock('@/lib/core/config/deployment-shape', () => ({
 vi.mock('@/app/workspace/[workspaceId]/providers/workspace-host-provider', () => ({
   useWorkspaceHostContext: () => hostContext,
 }))
-vi.mock('@/app/workspace/[workspaceId]/providers/workspace-permissions-provider', () => ({
-  useUserPermissionsContext: () => ({ canAdmin: true }),
-}))
-vi.mock('@/ee/sso/hooks/sso', () => ({
-  useSSOProviders: () => ({ data: { providers: [] }, isLoading: false }),
-}))
-vi.mock('@/ee/workspace-forking/hooks/use-forking-available', () => ({
-  useForkingAvailable: () => false,
-}))
 vi.mock('@/hooks/queries/general-settings', () => ({
   useGeneralSettings: () => ({ data: { superUserModeEnabled: false } }),
 }))
@@ -77,7 +68,6 @@ const deployment: DeploymentShape = {
   features: {
     accessControl: true,
     auditLogs: true,
-    customBlocks: true,
     dataDrains: true,
     dataRetention: true,
     scim: true,
@@ -220,8 +210,7 @@ describe('workspace SettingsSidebar organization rollout', () => {
 
       expect(workspaceLink('organization')).toHaveTextContent('Members')
       expect(workspaceLink('usage')).toHaveTextContent('Insights')
-      expect(workspaceLink('sso')).toHaveTextContent('Single sign-on')
-      expect(workspaceLink('connected-accounts')).toHaveTextContent('Credential Groups')
+      expect(workspaceLink('connected-accounts')).toHaveTextContent('Credential groups')
       expect(workspaceLink('requests')).toHaveTextContent('Requests')
       expect(container.querySelector('a[href^="/o/"]')).toBeNull()
       expectWorkspaceLinks()
@@ -249,7 +238,7 @@ describe('workspace SettingsSidebar organization rollout', () => {
       expect(links).toHaveLength(1)
       expect(links[0]).toHaveAttribute('href', '/o/host-org/settings/members')
       expect(links[0]).toHaveTextContent('Organization')
-      for (const section of ['organization', 'usage', 'sso', 'connected-accounts']) {
+      for (const section of ['organization', 'usage', 'connected-accounts']) {
         expect(workspaceLink(section)).toBeNull()
       }
       expectWorkspaceLinks()
@@ -261,7 +250,7 @@ describe('workspace SettingsSidebar organization rollout', () => {
     renderSidebar()
 
     expect(workspaceLink('organization')).toHaveTextContent('Members')
-    for (const section of ['usage', 'sso', 'connected-accounts']) {
+    for (const section of ['usage', 'connected-accounts']) {
       expect(workspaceLink(section)).toBeNull()
     }
     expect(container.querySelector('a[href^="/o/"]')).toBeNull()
@@ -274,7 +263,7 @@ describe('workspace SettingsSidebar organization rollout', () => {
     renderSidebar()
 
     expect(workspaceLink('organization')).toHaveTextContent('Members')
-    for (const section of ['usage', 'sso']) {
+    for (const section of ['usage']) {
       expect(workspaceLink(section)).toBeNull()
     }
     expectWorkspaceLinks()
@@ -293,7 +282,7 @@ describe('workspace SettingsSidebar organization rollout', () => {
       } else {
         expect(workspaceLink('organization')).toHaveTextContent('Members')
       }
-      for (const section of ['connected-accounts', 'access-control', 'usage', 'sso', 'security']) {
+      for (const section of ['connected-accounts', 'access-control', 'usage', 'security']) {
         if (role === 'admin') {
           expect(workspaceLink(section)).not.toBeNull()
         } else {
@@ -311,7 +300,7 @@ describe('workspace SettingsSidebar organization rollout', () => {
       renderSidebar()
 
       expect(container.querySelector('a[href^="/o/"]')).toBeNull()
-      for (const section of ['organization', 'usage', 'sso', 'connected-accounts']) {
+      for (const section of ['organization', 'usage', 'connected-accounts']) {
         expect(workspaceLink(section)).toBeNull()
       }
       expectWorkspaceLinks()

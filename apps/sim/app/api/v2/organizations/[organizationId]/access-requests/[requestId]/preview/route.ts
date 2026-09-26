@@ -1,8 +1,8 @@
 import { v2PreviewOrganizationAccessRequestContract } from '@/lib/api/contracts/v2/access-requests'
 import { defineV2JsonRoute, v2ApiKeyAuth, v2RateLimits } from '@/lib/api/server/routes'
 import { v2AccessRequestErrorPolicy } from '@/lib/api/server/routes/access-requests'
-import { accessRequestOperations } from '@/ee/access-requests/lib/application/operations'
-import { previewAccessRequest } from '@/ee/access-requests/lib/application/review'
+import { accessRequestOperations } from '@/lib/labbai/access-requests/application/operations'
+import { previewAccessRequest } from '@/lib/labbai/access-requests/application/review'
 
 export const GET = defineV2JsonRoute({
   contract: v2PreviewOrganizationAccessRequestContract,

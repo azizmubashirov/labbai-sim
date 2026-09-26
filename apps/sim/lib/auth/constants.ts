@@ -20,8 +20,7 @@ export const ANONYMOUS_USER = {
  * the current session user and never mints a session. Allowing a connector to
  * reach the sign-in endpoints enables nOAuth-style account takeover, where a
  * multi-tenant IdP asserting an attacker-controlled, unverified email mints a
- * session for the matching existing user. SSO uses a separate `/sign-in/sso`
- * endpoint and is unaffected by this list.
+ * session for the matching existing user.
  */
 export const SIGN_IN_PROVIDER_IDS = ['google', 'github', 'microsoft'] as const
 
@@ -106,13 +105,3 @@ export function applyRegistrationGate<T extends Record<string, RegistrationGate>
   /** The spread widens past what TypeScript can prove; the keys are unchanged. */
   return gated as T
 }
-
-/**
- * How a sign-in refused by an organization's single sign-on requirement identifies itself. Here
- * rather than beside the policy so the sign-in and verification screens can recognize the refusal
- * without pulling the policy module — and its database dependencies — into the browser bundle.
- */
-export const SSO_REQUIRED_ERROR_CODE = 'SSO_REQUIRED'
-
-export const SSO_REQUIRED_MESSAGE =
-  'Your organization requires single sign-on. Sign in through your identity provider.'

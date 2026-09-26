@@ -52,12 +52,11 @@ export type { DeployedChatConfig }
  */
 export type DeployedChatConfigResult =
   | { kind: 'config'; config: DeployedChatConfig }
-  | { kind: 'auth'; authType: 'password' | 'email' | 'sso' }
+  | { kind: 'auth'; authType: 'password' | 'email' }
 
-const AUTH_ERROR_MAP: Record<string, 'password' | 'email' | 'sso'> = {
+const AUTH_ERROR_MAP: Record<string, 'password' | 'email'> = {
   auth_required_password: 'password',
   auth_required_email: 'email',
-  auth_required_sso: 'sso',
 }
 
 async function fetchDeployedChatConfig(
@@ -86,7 +85,7 @@ async function fetchDeployedChatConfig(
 /**
  * Loads the public chat configuration for a deployed chat identifier.
  * Resolves to `{ kind: 'auth', authType }` when the chat requires
- * password/email/SSO gating so the consumer can render the appropriate form.
+ * password/email gating so the consumer can render the appropriate form.
  */
 export function useDeployedChatConfig(identifier: string) {
   return useQuery({

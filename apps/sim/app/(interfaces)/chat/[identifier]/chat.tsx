@@ -20,7 +20,6 @@ import {
 } from '@/app/(interfaces)/chat/components'
 import { CHAT_ERROR_MESSAGES, CHAT_REQUEST_TIMEOUT_MS } from '@/app/(interfaces)/chat/constants'
 import { useChatStreaming } from '@/app/(interfaces)/chat/hooks'
-import SSOAuth from '@/ee/sso/components/sso-auth'
 import { useDeployedChatConfig } from '@/hooks/queries/chats'
 
 const logger = createLogger('ChatClient')
@@ -295,9 +294,6 @@ export default function ChatClient({ identifier }: { identifier: string }) {
     }
     if (authRequired === 'email') {
       return <EmailAuth identifier={identifier} />
-    }
-    if (authRequired === 'sso') {
-      return <SSOAuth identifier={identifier} />
     }
   }
 

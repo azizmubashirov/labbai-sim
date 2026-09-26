@@ -8,16 +8,10 @@ import { resolveToolDisplay } from './store-utils'
 import { ClientToolCallState } from './tool-call-state'
 
 const gmailBlock = { type: 'gmail_v2', name: 'Gmail', icon: () => null }
-const customBlock = {
-  type: 'custom_block_invoice_parser',
-  name: 'Invoice Parser',
-  icon: () => null,
-}
 
 vi.mock('@/blocks/registry', () => ({
   getBlock: vi.fn((type: string) => {
     if (type === 'gmail_v2') return gmailBlock
-    if (type === 'custom_block_invoice_parser') return customBlock
     return undefined
   }),
   getLatestBlock: vi.fn((baseType: string) => (baseType === 'gmail' ? gmailBlock : undefined)),
@@ -189,7 +183,7 @@ describe('resolveToolDisplay', () => {
     ).toBe('Read style details for deck.pptx')
   })
 
-  it('shows the block display name for block, integration, and custom-block reads', () => {
+  it('shows the block display name for block and integration reads', () => {
     expect(
       resolveToolDisplay(ReadTool.id, ClientToolCallState.success, {
         path: 'components/blocks/gmail_v2.json',
@@ -207,12 +201,6 @@ describe('resolveToolDisplay', () => {
         path: 'components/blocks/unknown_block.json',
       })?.text
     ).toBe('Read Unknown block')
-
-    expect(
-      resolveToolDisplay(ReadTool.id, ClientToolCallState.success, {
-        path: 'organization/custom-blocks/custom_block_invoice_parser.json',
-      })?.text
-    ).toBe('Read Invoice Parser')
   })
 
   it('humanizes internal VFS resource identifiers', () => {

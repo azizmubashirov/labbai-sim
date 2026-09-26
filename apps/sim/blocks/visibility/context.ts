@@ -2,11 +2,8 @@ import type { BlockVisibilityState } from '@/lib/core/config/block-visibility'
 import type { BlockConfig } from '@/blocks/types'
 
 /**
- * Resolver for the per-viewer block-visibility projection, mirroring the
- * custom-block overlay seam (`@/blocks/custom/overlay`) but deliberately
- * independent of it: visibility is a discovery concern with its own lifecycle,
- * and a separate AsyncLocalStorage composes with `withCustomBlockOverlay`
- * without `store.run` clobbering.
+ * Resolver for the per-viewer block-visibility projection. Visibility is a
+ * discovery concern with its own lifecycle, independent of execution.
  *
  * Two environment-specific resolvers register here:
  *  - client: module state hydrated from `useBlockVisibility` (see `client.ts`)

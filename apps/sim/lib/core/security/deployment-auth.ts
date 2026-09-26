@@ -1,6 +1,5 @@
 import { createLogger } from '@sim/logger'
 import { safeCompare } from '@sim/security/compare'
-import { normalizeEmail } from '@sim/utils/string'
 import type { NextRequest } from 'next/server'
 import type { TokenBucketConfig } from '@/lib/core/rate-limiter'
 import { RateLimiter } from '@/lib/core/rate-limiter'
@@ -66,10 +65,11 @@ export interface DeploymentAuthResult {
 }
 
 /**
- * Shared password/email/SSO gate for deployed resources. The `cookiePrefix`
+ * Shared password/email gate for deployed resources. The `cookiePrefix`
  * selects the auth cookie (`${cookiePrefix}_auth_${id}`) and the rate-limit
  * namespace so chat deployments and public file shares share one code path. Both
- * support all four modes: `'public'`, `'password'`, `'email'`, and `'sso'`.
+ * support `'public'`, `'password'`, and `'email'`; any other stored mode
+ * (including the retired `'sso'`) is denied.
  */
 export async function validateDeploymentAuth(
   requestId: string,
@@ -194,35 +194,6 @@ export async function validateDeploymentAuth(
     } catch (error) {
       logger.error(`[${requestId}] Error validating email:`, error)
       return { authorized: false, error: 'Authentication error' }
-    }
-  }
-
-  if (authType === 'sso') {
-    try {
-      if (request.method !== 'GET' && !parsedBody) {
-        return { authorized: false, error: 'SSO authentication is required' }
-      }
-
-      const { getSession } = await import('@/lib/auth')
-      const session = await getSession()
-
-      if (!session || !session.user) {
-        return { authorized: false, error: 'auth_required_sso' }
-      }
-
-      const userEmail = session.user.email
-      if (!userEmail) {
-        return { authorized: false, error: 'SSO session does not contain email' }
-      }
-
-      if (isEmailAllowed(userEmail, resource.allowedEmails)) {
-        return { authorized: true, authenticatedEmail: normalizeEmail(userEmail) }
-      }
-
-      return { authorized: false, error: 'Your email is not authorized to access this resource' }
-    } catch (error) {
-      logger.error(`[${requestId}] Error validating SSO:`, error)
-      return { authorized: false, error: 'SSO authentication error' }
     }
   }
 

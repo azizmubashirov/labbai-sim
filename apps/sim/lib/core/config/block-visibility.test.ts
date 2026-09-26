@@ -98,14 +98,6 @@ describe('getBlockVisibility', () => {
     expect(vis.revealed.has('slack')).toBe(false)
   })
 
-  it('drops custom_block_* keys so custom blocks can never be gated', async () => {
-    withAppConfig({ custom_block_abc123: { enabled: false }, gmail_v2: { enabled: true } })
-    const vis = await getBlockVisibility({ userId: 'u1' })
-    expect(vis.disabled.has('custom_block_abc123')).toBe(false)
-    expect(vis.revealed.has('custom_block_abc123')).toBe(false)
-    expect(vis.revealed.has('gmail_v2')).toBe(true)
-  })
-
   it('drops malformed entries', async () => {
     withAppConfig({ a: 'nope', b: { enabled: false, orgIds: [' o1 ', ''] } })
     const vis = await getBlockVisibility({ orgId: 'o1' })

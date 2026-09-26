@@ -1,6 +1,5 @@
 import { stripVersionSuffix } from '@sim/utils/string'
 import type { BlockVisibilityState } from '@/lib/core/config/block-visibility'
-import { overlayBlocks, resolveOverlayBlock } from '@/blocks/custom/overlay'
 import { BLOCK_META_REGISTRY, BLOCK_REGISTRY } from '@/blocks/registry-maps'
 import type {
   BlockCategory,
@@ -33,9 +32,9 @@ function ownBlock(type: string): BlockConfig | undefined {
   return Object.hasOwn(BLOCK_REGISTRY, type) ? BLOCK_REGISTRY[type] : undefined
 }
 
-/** Get the block config for a single block type. Falls back to the custom-block overlay. */
+/** Get the block config for a single block type. */
 export function getBlock(type: string): BlockConfig | undefined {
-  return ownBlock(type) ?? ownBlock(normalizeType(type)) ?? resolveOverlayBlock(type)
+  return ownBlock(type) ?? ownBlock(normalizeType(type))
 }
 
 /**
@@ -69,7 +68,7 @@ function visibilityInert(vis: BlockVisibilityState | null): boolean {
 
 /**
  * Effective hidden state for discovery surfaces: static `hideFromToolbar`
- * (superseded versions, disabled custom blocks) plus the per-viewer visibility
+ * (superseded versions) plus the per-viewer visibility
  * predicate ({@link isHiddenUnder}: unrevealed `preview` blocks — fail-closed
  * even without a context — and kill-switched types).
  */
@@ -83,8 +82,8 @@ function effectiveHidden(block: BlockConfig, vis: BlockVisibilityState | null): 
  * clones with `hideFromToolbar: true` (CLONE-NOT-REMOVE — gated blocks must stay
  * in `getAllBlocks()` output because `.find`-by-type consumers rely on it), and
  * revealed-but-not-GA preview blocks get a display " (Preview)" name suffix.
- * The `!block.hideFromToolbar` guard keeps already-hidden blocks (including
- * disabled custom blocks) un-cloned and never suffixed.
+ * The `!block.hideFromToolbar` guard keeps already-hidden blocks un-cloned and
+ * never suffixed.
  */
 function projectBlock(block: BlockConfig, vis: BlockVisibilityState | null): BlockConfig {
   if (effectiveHidden(block, vis) && !block.hideFromToolbar) {
@@ -97,12 +96,11 @@ function projectBlock(block: BlockConfig, vis: BlockVisibilityState | null): Blo
 }
 
 /**
- * All block configs, including any in-scope custom blocks from the overlay,
- * projected through the viewer's block visibility. Execution paths are
+ * All block configs, projected through the viewer's block visibility. Execution paths are
  * unaffected: they resolve via the pure {@link getBlock}.
  */
 export function getAllBlocks(): BlockConfig[] {
-  const all = [...Object.values(BLOCK_REGISTRY), ...overlayBlocks()]
+  const all = Object.values(BLOCK_REGISTRY)
   const vis = overlayVisibility()
   if (visibilityInert(vis)) return all
   return all.map((block) => projectBlock(block, vis))
@@ -123,16 +121,10 @@ export function getAllBlocks(): BlockConfig[] {
  */
 export function getLatestBlockForViewer(type: string): BlockConfig | undefined {
   const vis = overlayVisibility()
-  const overlay = resolveOverlayBlock(type)
-
   for (const candidate of versionCandidates(type)) {
     if (!effectiveHidden(candidate, vis)) {
       return visibilityInert(vis) ? candidate : projectBlock(candidate, vis)
     }
-  }
-
-  if (overlay && !effectiveHidden(overlay, vis)) {
-    return visibilityInert(vis) ? overlay : projectBlock(overlay, vis)
   }
   return undefined
 }
@@ -237,7 +229,7 @@ export function getBlocksByCategory(category: BlockCategory): BlockConfig[] {
  */
 export function getCanonicalBlocksByCategory(category: BlockCategory): BlockConfig[] {
   const vis = overlayVisibility()
-  const blocks = [...Object.values(BLOCK_REGISTRY), ...overlayBlocks()].filter(
+  const blocks = Object.values(BLOCK_REGISTRY).filter(
     (block) => block.category === category && !effectiveHidden(block, vis)
   )
   return visibilityInert(vis) ? blocks : blocks.map((block) => projectBlock(block, vis))
@@ -250,11 +242,7 @@ export function getAllBlockTypes(): string[] {
 
 /** Whether the given string is a registered block type. Accepts hyphens as a dash-form alias. */
 export function isValidBlockType(type: string): type is string {
-  return (
-    type in BLOCK_REGISTRY ||
-    normalizeType(type) in BLOCK_REGISTRY ||
-    Boolean(resolveOverlayBlock(type))
-  )
+  return type in BLOCK_REGISTRY || normalizeType(type) in BLOCK_REGISTRY
 }
 
 /**

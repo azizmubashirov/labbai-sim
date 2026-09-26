@@ -16,12 +16,10 @@ interface BlockSpecVariants {
 }
 
 /**
- * Keyed on the config's identity rather than its block type, because `getBlock`
- * falls back to the custom-block overlay, whose configs are replaced at runtime.
- * A type-keyed cache would keep serving a published block's old field defaults
- * after an update; keying on identity re-derives when the object is swapped and
- * lets the old entry be collected. Built-in configs are module-scope singletons,
- * so they resolve to one stable entry for the life of the process.
+ * Keyed on the config's identity rather than its block type, so a config object
+ * swapped at runtime re-derives and the old entry can be collected. Built-in
+ * configs are module-scope singletons, so they resolve to one stable entry for
+ * the life of the process.
  */
 const variantsByConfig = new WeakMap<BlockConfig, BlockSpecVariants>()
 

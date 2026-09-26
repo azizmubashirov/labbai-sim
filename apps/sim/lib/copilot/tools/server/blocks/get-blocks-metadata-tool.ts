@@ -266,9 +266,8 @@ export const getBlocksMetadataServerTool: BaseServerTool<
          * One block's projection must not fail the whole call. A sub-block
          * `condition` declared as a function is invoked during projection, and a
          * throwing one propagates — the `catalog-sweep` test proves no
-         * registered block has one, but a runtime-built custom (deploy-as-block)
-         * config is not swept, so this keeps the blast radius to the block that
-         * carries the defect rather than every block the agent asked for.
+         * registered block has one, but this still keeps the blast radius to the
+         * block that carries a defect rather than every block the agent asked for.
          */
         try {
           metadata = toCopilotBlockMetadata(

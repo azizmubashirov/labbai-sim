@@ -91,9 +91,7 @@ import {
   serializeKBMeta,
   serializeMcpServer,
   serializeOrganization,
-  serializeOrganizationCustomBlocks,
   serializeOrganizationWorkspaces,
-  serializeOrgCustomBlockDetail,
   serializePermissionGroupRoster,
   serializeRecentExecutions,
   serializeSkill,
@@ -103,7 +101,6 @@ import {
   serializeTriggerSchema,
   serializeVersions,
   serializeWorkflowMeta,
-  serializeWorkspaceForks,
 } from '@/lib/copilot/vfs/serializers'
 import type { BlockVisibilityState } from '@/lib/core/config/block-visibility'
 import {
@@ -161,18 +158,11 @@ import type {
   WorkspaceFileSecretProvenanceIdentity,
 } from '@/lib/uploads/contexts/workspace/workspace-file-secret-provenance'
 import { isImageFileType, resolveEffectiveMimeType } from '@/lib/uploads/utils/file-utils'
-import {
-  type CustomBlockWithInputs,
-  listCustomBlocksWithInputsForWorkspace,
-} from '@/lib/workflows/custom-blocks/operations'
 import { getCustomToolById } from '@/lib/workflows/custom-tools/operations'
 import { checkNeedsRedeployment } from '@/lib/workflows/deployment-status'
 import { collectWorkflowFieldIssues, lintEditedWorkflowState } from '@/lib/workflows/editing/lint'
 import { UNRESOLVABLE_AT_LINT_NOTE } from '@/lib/workflows/editing/validation'
-import {
-  loadDeployedWorkflowState,
-  loadWorkflowFromNormalizedTables,
-} from '@/lib/workflows/persistence/utils'
+import { loadWorkflowFromNormalizedTables } from '@/lib/workflows/persistence/utils'
 import { sanitizeForCopilot } from '@/lib/workflows/sanitization/json-sanitizer'
 import { getSkillById } from '@/lib/workflows/skills/operations'
 import { listFolders, listWorkflows } from '@/lib/workflows/utils'
@@ -193,24 +183,16 @@ import {
   hasWorkspaceAdminAccess,
 } from '@/lib/workspaces/permissions/utils'
 import { listAccessibleWorkspaceRowsForUser } from '@/lib/workspaces/utils'
-import { buildCustomBlockConfig, isCustomBlockType } from '@/blocks/custom/build-config'
 import { BLOCK_REGISTRY } from '@/blocks/registry-maps'
-import type { BlockConfig, BlockIcon } from '@/blocks/types'
+import type { BlockConfig } from '@/blocks/types'
 import { isHiddenUnder, overlayVisibility } from '@/blocks/visibility/context'
 import { CONNECTOR_REGISTRY } from '@/connectors/registry.server'
-import { resolveVerifiedUserAccessControlContext } from '@/ee/access-control/utils/permission-check'
-import { isForkingAvailableForWorkspace } from '@/ee/workspace-forking/lib/lineage/authz'
-import { getForkChildren, getForkParent } from '@/ee/workspace-forking/lib/lineage/lineage'
-import { loadForkBlockMap } from '@/ee/workspace-forking/lib/mapping/block-map-store'
-import { getEdgeMappingRows } from '@/ee/workspace-forking/lib/mapping/mapping-store'
+import { resolveVerifiedUserAccessControlContext } from '@/lib/labbai/access-control/permission-check'
 import type { ExecutableToolConfig } from '@/tools/types'
 import { TRIGGER_REGISTRY } from '@/triggers/registry'
 
 const logger = createLogger('WorkspaceVFS')
 
-/** Placeholder icon for custom-block configs — `serializeBlockSchema` never reads it. */
-// double-cast-allowed: a no-op stands in for the unused SVG-typed BlockIcon slot
-const PLACEHOLDER_BLOCK_ICON = (() => null) as unknown as BlockIcon
 const MAX_COMPILED_ATTACHMENT_BYTES = 5 * 1024 * 1024
 const KNOWLEDGE_DOCUMENT_PAGE_SIZE = 100
 const MAX_VFS_KNOWLEDGE_DOCUMENTS = 10_000
@@ -685,8 +667,6 @@ function getStaticComponentFiles(): Map<string, string> {
  *   account/billing.json                             (plan/usage/credits; lazy, read fresh)
  *   organization/organization.json                   (org standing; only when org-hosted)
  *   organization/access-control.json                 (your governing group + restrictions)
- *   organization/custom-blocks.json                  (org-published block provenance)
- *   organization/forks.json                          (fork topology; workspace admins only)
  *   environment/credentials.json
  *   environment/api-keys.json
  *   environment/variables.json
@@ -720,20 +700,7 @@ export class WorkspaceVFS {
     Promise<Awaited<ReturnType<typeof loadWorkflowFromNormalizedTables>>>
   >()
   private deploymentCache = new Map<string, Promise<DeploymentData | null>>()
-  private customBlocksPromise: Promise<CustomBlockWithInputs[]> | undefined
   private _workspaceId = ''
-  /**
-   * Types of the org's CURRENT custom blocks (enabled + disabled — a disabled block
-   * still resolves/renders). Populated by {@link materializeCustomBlocks}; used to
-   * drop a placed custom block from a workflow's state when its definition has been
-   * deleted, so the copilot never sees a block it can't render.
-   *
-   * `null` means "not loaded" — either not materialized yet or the load FAILED. In
-   * that case {@link dropDeletedCustomBlocks} strips nothing, so a transient failure
-   * can't wrongly nuke every placed custom block. An empty `Set` is distinct: it
-   * means the org genuinely has no custom blocks, so any placed one IS deleted.
-   */
-  private _customBlockTypes: Set<string> | null = null
 
   constructor(
     filePrincipal?: Principal,
@@ -764,43 +731,10 @@ export class WorkspaceVFS {
   ): Promise<Awaited<ReturnType<typeof loadWorkflowFromNormalizedTables>>> {
     let cached = this.normalizedCache.get(workflowId)
     if (!cached) {
-      cached = loadWorkflowFromNormalizedTables(workflowId).then((n) =>
-        this.dropDeletedCustomBlocks(n)
-      )
+      cached = loadWorkflowFromNormalizedTables(workflowId)
       this.normalizedCache.set(workflowId, cached)
     }
     return cached
-  }
-
-  /**
-   * Strip placed custom blocks whose definition no longer exists from a loaded
-   * workflow (and any edges touching them), so the copilot never sees a block it
-   * can't render — mirroring how the serializer drops an unresolvable custom block.
-   * A live definition (enabled or disabled) is kept; only a DELETED one is removed.
-   * Runs lazily (after materialize), so `_customBlockTypes` is populated by then.
-   */
-  private dropDeletedCustomBlocks(
-    normalized: Awaited<ReturnType<typeof loadWorkflowFromNormalizedTables>>
-  ): Awaited<ReturnType<typeof loadWorkflowFromNormalizedTables>> {
-    // `null` = definitions never loaded (or the load failed) — strip nothing rather
-    // than treat every placed custom block as deleted.
-    if (!normalized || this._customBlockTypes === null) return normalized
-    const validTypes = this._customBlockTypes
-    const dropped = new Set<string>()
-    const blocks: Record<string, unknown> = {}
-    for (const [id, block] of Object.entries(normalized.blocks)) {
-      const type = (block as { type?: string }).type
-      if (isCustomBlockType(type) && !validTypes.has(type)) {
-        dropped.add(id)
-        continue
-      }
-      blocks[id] = block
-    }
-    if (dropped.size === 0) return normalized
-    const edges = (normalized.edges ?? []).filter(
-      (e) => !dropped.has(e.source) && !dropped.has(e.target)
-    )
-    return { ...normalized, blocks: blocks as typeof normalized.blocks, edges }
   }
 
   /** Load a workflow's deployment data once per instance (deployment.json + versions.json share it). */
@@ -902,8 +836,6 @@ export class WorkspaceVFS {
     this.lazy = new Map()
     this.normalizedCache = new Map()
     this.deploymentCache = new Map()
-    this.customBlocksPromise = undefined
-    this._customBlockTypes = null
     this._workspaceId = workspaceId
 
     // Per-phase wall-clock, stamped on the span so a slow materialize in a
@@ -942,7 +874,6 @@ export class WorkspaceVFS {
               fileSummary,
               envSummary,
               toolsSummary,
-              customBlocksSummary,
               mcpServersSummary,
               skillsSummary,
               wsRow,
@@ -964,7 +895,6 @@ export class WorkspaceVFS {
                 )
               ),
               timed('custom_tools', this.materializeCustomTools(workspaceId, userId)),
-              timed('custom_blocks', this.materializeCustomBlocks(workspaceId)),
               timed('mcp_servers', this.materializeMcpServers(workspaceId)),
               timed('skills', this.materializeSkills(workspaceId)),
               timed('workspace_row', getWorkspaceWithOwner(workspaceId)),
@@ -990,7 +920,6 @@ export class WorkspaceVFS {
               oauthIntegrations: envSummary.oauthIntegrations,
               envVariables: envSummary.envVariables,
               customTools: toolsSummary,
-              customBlocks: customBlocksSummary,
               mcpServers: mcpServersSummary,
               skills: skillsSummary,
             }
@@ -2432,66 +2361,6 @@ export class WorkspaceVFS {
   }
 
   /**
-   * Materialize the org's published custom (deploy-as-block) blocks as VFS
-   * component files — the same `components/blocks/<type>.json` path + serializer
-   * first-party blocks use — so the agent can grep/read them. Returns the summary
-   * for `WORKSPACE_CONTEXT.md`. Per-request/per-org, so it bypasses the frozen
-   * static component cache. Only enabled blocks are exposed.
-   */
-  private async materializeCustomBlocks(
-    workspaceId: string
-  ): Promise<NonNullable<WorkspaceMdData['customBlocks']>> {
-    try {
-      const blocks = await this.loadCustomBlocks(workspaceId)
-      // Every current definition (incl. disabled) — the authoritative set used to
-      // drop deleted-definition instances from workflow state (see loadNormalized).
-      this._customBlockTypes = new Set(blocks.map((cb) => cb.type))
-      const summary: NonNullable<WorkspaceMdData['customBlocks']> = []
-
-      for (const cb of blocks) {
-        if (!cb.enabled) continue
-        const config = buildCustomBlockConfig(
-          {
-            type: cb.type,
-            name: cb.name,
-            description: cb.description,
-            workflowId: cb.workflowId,
-            exposedOutputs: cb.exposedOutputs,
-          },
-          cb.inputFields,
-          { icon: PLACEHOLDER_BLOCK_ICON }
-        )
-        this.files.set(`components/blocks/${config.type}.json`, serializeBlockSchema(config))
-        summary.push({
-          type: cb.type,
-          name: cb.name,
-          ...(cb.description ? { description: cb.description } : {}),
-        })
-      }
-
-      return summary
-    } catch (err) {
-      logger.warn('Failed to materialize custom blocks', {
-        workspaceId,
-        error: toError(err).message,
-      })
-      return []
-    }
-  }
-
-  /** Load the org's custom blocks once per VFS materialization. Failed loads remain retryable. */
-  private async loadCustomBlocks(workspaceId: string): Promise<CustomBlockWithInputs[]> {
-    const request = this.customBlocksPromise ?? listCustomBlocksWithInputsForWorkspace(workspaceId)
-    this.customBlocksPromise = request
-    try {
-      return await request
-    } catch (error) {
-      if (this.customBlocksPromise === request) this.customBlocksPromise = undefined
-      throw error
-    }
-  }
-
-  /**
    * Materialize `account/` — the acting user's vantage: this workspace and
    * their role in it, the workspaces they can reach, who else is here, and
    * their live plan.
@@ -2515,10 +2384,6 @@ export class WorkspaceVFS {
       ])
 
       const current = rows.find((row) => row.workspace.id === workspaceId)
-      const parentId = current?.workspace.forkedFromWorkspaceId ?? null
-      // Name the parent only when the viewer can reach it; otherwise the id
-      // stands alone rather than leaking a workspace name they cannot open.
-      const parentRow = parentId ? rows.find((row) => row.workspace.id === parentId) : undefined
       const isAdmin = hostContext?.viewer.permission === 'admin'
 
       this.files.set(
@@ -2536,9 +2401,6 @@ export class WorkspaceVFS {
           organization: hostContext?.hostOrganizationId
             ? { id: hostContext.hostOrganizationId }
             : null,
-          forkedFrom: parentId
-            ? { id: parentId, name: parentRow?.workspace.name ?? parentId }
-            : null,
           entitlements,
         })
       )
@@ -2551,7 +2413,6 @@ export class WorkspaceVFS {
             name: row.workspace.name,
             role: row.permissionType,
             organizationId: row.workspace.organizationId,
-            forkedFromWorkspaceId: row.workspace.forkedFromWorkspaceId,
             isCurrent: row.workspace.id === workspaceId,
           }))
         )
@@ -2612,13 +2473,10 @@ export class WorkspaceVFS {
 
   /**
    * Materialize `organization/` — org standing, the access-control rules that
-   * actually bind this viewer, org-published block provenance, and fork
-   * topology.
+   * actually bind this viewer, and org-published block provenance.
    *
    * The namespace exists only when the workspace belongs to an organization, so
-   * its absence is itself the answer for a personal workspace. Fork detail is
-   * mounted only for a workspace admin of a forking-enabled org, matching the
-   * gate the fork routes apply.
+   * its absence is itself the answer for a personal workspace.
    */
   private async materializeOrganization(
     workspaceId: string,
@@ -2667,50 +2525,6 @@ export class WorkspaceVFS {
         }
       })
 
-      // The block list is fetched at materialize time (one indexed query, the
-      // same one the components pass already ran) because the README and the
-      // names-only index need it, and each block's detail path must exist in
-      // the key view for glob to list. Only the deployed graph stays lazy —
-      // it is the expensive part and most turns never read it.
-      const orgBlocks = await this.loadCustomBlocks(workspaceId).catch((err) => {
-        logger.warn('Failed to list org custom blocks', {
-          workspaceId,
-          error: toError(err).message,
-        })
-        return []
-      })
-      if (orgBlocks.length > 0) {
-        this.files.set(
-          'organization/custom-blocks.json',
-          serializeOrganizationCustomBlocks(orgBlocks)
-        )
-        // The names index matches editor visibility: anyone who can open the
-        // workspace sees the block in the toolbar. The deployed GRAPH is org
-        // implementation internals, so an external collaborator — workspace
-        // access without org membership — gets the interface (components/
-        // schema) but not the graph; for them the detail files simply do not
-        // exist.
-        if (hostContext.viewer.isHostOrganizationMember)
-          for (const orgBlock of orgBlocks) {
-            this.registerLazy(`organization/custom-blocks/${orgBlock.type}.json`, async () => {
-              try {
-                const deployed = await loadDeployedWorkflowState(
-                  orgBlock.workflowId,
-                  orgBlock.workspaceId ?? undefined
-                )
-                return serializeOrgCustomBlockDetail(orgBlock, deployed)
-              } catch (err) {
-                logger.warn('Failed to load deployed state for org custom block', {
-                  workspaceId,
-                  blockType: orgBlock.type,
-                  error: toError(err).message,
-                })
-                return null
-              }
-            })
-          }
-      }
-
       // Everything below is registered LAZILY: the paths appear in the key
       // view (so glob lists them) but no query runs until something reads
       // one. Registration itself is the permission gate — an unpermitted
@@ -2723,15 +2537,11 @@ export class WorkspaceVFS {
               listAccessibleWorkspaceRowsForUser(userId).catch(() => []),
             ])
             const accessibleIds = new Set(accessible.map((row) => row.workspace.id))
-            const forkParents = new Map(
-              accessible.map((row) => [row.workspace.id, row.workspace.forkedFromWorkspaceId])
-            )
             return serializeOrganizationWorkspaces(
               refs.map((ref) => ({
                 id: ref.id,
                 name: ref.name,
                 hasAccess: accessibleIds.has(ref.id),
-                forkedFromWorkspaceId: forkParents.get(ref.id) ?? null,
               }))
             )
           } catch (err) {
@@ -2762,64 +2572,15 @@ export class WorkspaceVFS {
 
       const connectedAccountsAvailable = this.materializeConnectedAccounts(hostContext)
 
-      const forksAvailable =
-        hostContext.viewer.permission === 'admin' &&
-        (await isForkingAvailableForWorkspace(organizationId, userId).catch(() => false))
-
       this.files.set(
         'organization/README.md',
         buildOrganizationReadme({
           organizationId,
           isEnterprise: hostContext.ownerBilling.isEnterprise,
-          customBlocks: orgBlocks,
-          forksMounted: forksAvailable,
           permissionGroupsMounted: hostContext.viewer.isHostOrganizationAdmin,
           connectedAccountsMounted: connectedAccountsAvailable,
         })
       )
-
-      if (!forksAvailable) return
-
-      this.registerLazy('organization/forks.json', async () => {
-        try {
-          const [parent, children] = await Promise.all([
-            getForkParent(workspaceId),
-            getForkChildren(workspaceId),
-          ])
-          if (!parent && children.length === 0) return null
-
-          const resourceMappingCounts: Record<string, number> = {}
-          let blockMappingCount = 0
-          if (parent) {
-            const [resourceRows, blockMap] = await Promise.all([
-              getEdgeMappingRows(db, workspaceId),
-              loadForkBlockMap(db, workspaceId),
-            ])
-            for (const row of resourceRows) {
-              resourceMappingCounts[row.resourceType] =
-                (resourceMappingCounts[row.resourceType] ?? 0) + 1
-            }
-            blockMappingCount = blockMap.parentToChild.size
-          }
-
-          return serializeWorkspaceForks({
-            parent: parent ? { id: parent.id, name: parent.name } : null,
-            children: children.map((child) => ({
-              id: child.id,
-              name: child.name,
-              createdAt: child.createdAt,
-            })),
-            resourceMappingCounts,
-            blockMappingCount,
-          })
-        } catch (err) {
-          logger.warn('Failed to load fork topology', {
-            workspaceId,
-            error: toError(err).message,
-          })
-          return null
-        }
-      })
     } catch (err) {
       logger.warn('Failed to materialize organization namespace', {
         workspaceId,

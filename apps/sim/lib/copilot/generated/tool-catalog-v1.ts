@@ -61,7 +61,6 @@ export interface ToolCatalogEntry {
     | 'platform'
     | 'prepare_file_edit'
     | 'promote_to_live'
-    | 'publish_custom_block'
     | 'query_logs'
     | 'query_user_table'
     | 'read'
@@ -163,7 +162,6 @@ export interface ToolCatalogEntry {
     | 'platform'
     | 'prepare_file_edit'
     | 'promote_to_live'
-    | 'publish_custom_block'
     | 'query_logs'
     | 'query_user_table'
     | 'read'
@@ -2435,118 +2433,6 @@ export const PromoteToLive: ToolCatalogEntry = {
   },
   requiredPermission: 'admin',
   requiresApproval: true,
-}
-
-export const PublishCustomBlock: ToolCatalogEntry = {
-  id: 'publish_custom_block',
-  name: 'publish_custom_block',
-  route: 'sim',
-  mode: 'async',
-  parameters: {
-    type: 'object',
-    properties: {
-      action: {
-        type: 'string',
-        description: 'Whether to publish (deploy) or unpublish (undeploy) the custom block',
-        enum: ['deploy', 'undeploy'],
-        default: 'deploy',
-      },
-      description: {
-        type: 'string',
-        description: 'Short description shown in the block picker, max 280 characters',
-      },
-      exposedOutputs: {
-        type: 'array',
-        description:
-          "Outputs the block exposes, each mapping a child block output path to a friendly name (use get_block_outputs for valid paths). Omit to expose the terminal block's whole result",
-        items: {
-          type: 'object',
-          properties: {
-            blockId: { type: 'string', description: 'Block UUID inside the workflow' },
-            name: { type: 'string', description: 'Friendly output name shown on the block' },
-            path: {
-              type: 'string',
-              description:
-                "Dot-path into that block's output (from get_block_outputs relativeOutputs)",
-            },
-          },
-          required: ['blockId', 'path', 'name'],
-        },
-      },
-      iconUrl: {
-        type: 'string',
-        description:
-          'Optional icon image for the block: a workspace file VFS path (e.g. "files/icon.png", copied into public icon storage at publish) or an https image URL. Omit to use the organization\'s default icon',
-      },
-      inputs: {
-        type: 'array',
-        description:
-          "Optional per-input placeholder overrides. Input names and types are derived from the workflow's input trigger and cannot be changed here",
-        items: {
-          type: 'object',
-          properties: {
-            id: { type: 'string', description: 'Stable id of the input trigger field' },
-            placeholder: {
-              type: 'string',
-              description: "Placeholder text shown in the block's input field",
-            },
-          },
-          required: ['id'],
-        },
-      },
-      name: {
-        type: 'string',
-        description:
-          'Display name for the block, max 60 characters. REQUIRED the first time a workflow is published. When republishing an existing block, omit it to keep the current name or pass a new one to rename. Ignored for undeploy.',
-      },
-      workflowId: { type: 'string', description: 'Workflow ID (defaults to active workflow)' },
-    },
-  },
-  resultSchema: {
-    type: 'object',
-    properties: {
-      action: {
-        type: 'string',
-        description: 'Action performed by the tool, such as "deploy" or "undeploy".',
-      },
-      blockId: { type: 'string', description: 'Custom block record ID.' },
-      blockType: {
-        type: 'string',
-        description: 'Stable block type slug (custom_block_*) used in workflow state.',
-      },
-      deploymentConfig: {
-        type: 'object',
-        description:
-          "Structured deployment configuration keyed by surface name. Includes the block's type, name, description, icon, derived input fields, and exposed outputs.",
-      },
-      deploymentStatus: {
-        type: 'object',
-        description:
-          'Structured per-surface deployment status keyed by surface name, including customBlock and the underlying api surface when applicable.',
-      },
-      deploymentType: {
-        type: 'string',
-        description:
-          'Deployment surface this result describes. For publish_custom_block this is always "custom_block".',
-      },
-      isDeployed: {
-        type: 'boolean',
-        description: 'Whether the custom block is published after this tool call.',
-      },
-      name: { type: 'string', description: 'Display name of the custom block.' },
-      removed: {
-        type: 'boolean',
-        description: 'Whether the custom block was unpublished during an undeploy action.',
-      },
-      updated: {
-        type: 'boolean',
-        description: 'Whether an existing custom block was updated instead of created.',
-      },
-      workflowId: { type: 'string', description: 'Workflow ID the custom block is bound to.' },
-    },
-    required: ['deploymentType', 'deploymentStatus'],
-  },
-  requiredPermission: 'admin',
 }
 
 export const QueryLogs: ToolCatalogEntry = {
@@ -5314,7 +5200,6 @@ export const TOOL_CATALOG: Record<string, ToolCatalogEntry> = {
   [Platform.id]: Platform,
   [PrepareFileEdit.id]: PrepareFileEdit,
   [PromoteToLive.id]: PromoteToLive,
-  [PublishCustomBlock.id]: PublishCustomBlock,
   [QueryLogs.id]: QueryLogs,
   [QueryUserTable.id]: QueryUserTable,
   [Read.id]: Read,

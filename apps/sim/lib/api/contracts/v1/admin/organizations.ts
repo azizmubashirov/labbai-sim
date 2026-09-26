@@ -1,9 +1,4 @@
 import { z } from 'zod'
-import {
-  updateOrganizationDataRetentionBodySchema,
-  updateOrganizationSessionPolicyBodySchema,
-  updateOrganizationWhitelabelBodySchema,
-} from '@/lib/api/contracts/organization'
 import { type ContractJsonResponse, defineRouteContract } from '@/lib/api/contracts/types'
 import {
   adminV1IdParamsSchema,
@@ -129,12 +124,6 @@ const adminV1DeleteOrganizationResultSchema = z.object({
   slug: z.string(),
   membersRemoved: z.number(),
   workspacesDetached: z.number(),
-})
-
-/** Shared result for the org-settings PATCH endpoints. */
-const adminV1OrganizationSettingsResultSchema = z.object({
-  success: z.literal(true),
-  organizationId: z.string(),
 })
 
 const adminV1TransferOwnershipResultSchema = z.object({
@@ -311,51 +300,9 @@ export const adminV1DeleteOrganizationContract = defineRouteContract({
   },
 })
 
-export const adminV1UpdateOrganizationWhitelabelContract = defineRouteContract({
-  method: 'PATCH',
-  path: '/api/v1/admin/organizations/[id]/whitelabel',
-  params: adminV1IdParamsSchema,
-  body: updateOrganizationWhitelabelBodySchema,
-  response: {
-    mode: 'json',
-    schema: adminV1SingleResponseSchema(adminV1OrganizationSettingsResultSchema),
-  },
-})
-
-export const adminV1UpdateOrganizationDataRetentionContract = defineRouteContract({
-  method: 'PATCH',
-  path: '/api/v1/admin/organizations/[id]/data-retention',
-  params: adminV1IdParamsSchema,
-  body: updateOrganizationDataRetentionBodySchema,
-  response: {
-    mode: 'json',
-    schema: adminV1SingleResponseSchema(adminV1OrganizationSettingsResultSchema),
-  },
-})
-
-export const adminV1UpdateOrganizationSessionPolicyContract = defineRouteContract({
-  method: 'PATCH',
-  path: '/api/v1/admin/organizations/[id]/session-policy',
-  params: adminV1IdParamsSchema,
-  body: updateOrganizationSessionPolicyBodySchema,
-  response: {
-    mode: 'json',
-    schema: adminV1SingleResponseSchema(adminV1OrganizationSettingsResultSchema),
-  },
-})
-
 export type AdminV1TransferOwnershipResponse = ContractJsonResponse<
   typeof adminV1TransferOwnershipContract
 >
 export type AdminV1DeleteOrganizationResponse = ContractJsonResponse<
   typeof adminV1DeleteOrganizationContract
->
-export type AdminV1UpdateOrganizationWhitelabelResponse = ContractJsonResponse<
-  typeof adminV1UpdateOrganizationWhitelabelContract
->
-export type AdminV1UpdateOrganizationDataRetentionResponse = ContractJsonResponse<
-  typeof adminV1UpdateOrganizationDataRetentionContract
->
-export type AdminV1UpdateOrganizationSessionPolicyResponse = ContractJsonResponse<
-  typeof adminV1UpdateOrganizationSessionPolicyContract
 >

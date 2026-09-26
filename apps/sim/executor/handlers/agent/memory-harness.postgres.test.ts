@@ -47,7 +47,7 @@ vi.mock('@/lib/uploads/core/setup.server', () => ({
   },
 }))
 /** Fixture principals and explicit keys replace account configuration, not file authorization. */
-vi.mock('@/ee/access-control/utils/permission-check', () => ({
+vi.mock('@/lib/labbai/access-control/permission-check', () => ({
   assertPermissionsAllowed: async () => {},
   validateModelProvider: async () => {},
   validateBlockType: async () => {},

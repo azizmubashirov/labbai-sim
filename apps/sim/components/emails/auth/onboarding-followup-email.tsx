@@ -1,6 +1,6 @@
 import { Body, Head, Html, Preview, Text } from '@react-email/components'
 import { plainEmailStyles as styles } from '@/components/emails/_styles'
-import { getBrandConfig } from '@/ee/whitelabeling'
+import { getBrandConfig } from '@/lib/branding'
 
 interface OnboardingFollowupEmailProps {
   userName?: string

@@ -3,8 +3,8 @@ import { getErrorMessage } from '@sim/utils/errors'
 import { type NextRequest, NextResponse } from 'next/server'
 import { verifyCronAuth } from '@/lib/auth/internal'
 import { withRouteHandler } from '@/lib/core/utils/with-route-handler'
-import { isScimDeploymentEnabled } from '@/ee/scim/lib/entitlement'
-import { runScimReconcileSweep } from '@/ee/scim/lib/reconcile/job'
+import { isScimDeploymentEnabled } from '@/lib/labbai/scim/entitlement'
+import { runScimReconcileSweep } from '@/lib/labbai/scim/reconcile'
 
 const logger = createLogger('CronScimReconcile')
 

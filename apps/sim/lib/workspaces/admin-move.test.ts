@@ -30,10 +30,7 @@ vi.unmock('drizzle-orm')
 const {
   resolveMoveEntitlements,
   findCrossOrgForkEdges,
-  findUnpublishableCustomBlocks,
-  findSourceOrgCustomBlocksForWorkspace,
   cleanupSourceOrganizationArtifactsTx,
-  deleteCustomBlock,
   acquireOrganizationMutationLock,
   recordAudit,
   recordAuditOnce,
@@ -57,12 +54,9 @@ const {
     })
   ),
   findCrossOrgForkEdges: vi.fn(() => Promise.resolve([])),
-  findUnpublishableCustomBlocks: vi.fn(() => Promise.resolve({ items: [], total: 0 })),
-  findSourceOrgCustomBlocksForWorkspace: vi.fn(() => Promise.resolve([])),
   cleanupSourceOrganizationArtifactsTx: vi.fn(() =>
     Promise.resolve({ detachedPermissionGroupIds: [] })
   ),
-  deleteCustomBlock: vi.fn(),
   acquireOrganizationMutationLock: vi.fn(),
   recordAudit: vi.fn(),
   recordAuditOnce: vi.fn(),
@@ -123,12 +117,10 @@ vi.mock('@sim/audit', () => ({
     WORKSPACE_UPDATED: 'workspace.updated',
     INVITATION_UPDATED: 'invitation.updated',
     ORGANIZATION_UPDATED: 'organization.updated',
-    CUSTOM_BLOCK_DELETED: 'custom_block.deleted',
   },
   AuditResourceType: {
     WORKSPACE: 'workspace',
     ORGANIZATION: 'organization',
-    CUSTOM_BLOCK: 'custom_block',
   },
   recordAudit,
   recordAuditOnce,
@@ -161,7 +153,6 @@ vi.mock('@/lib/invitations/send', () => ({
   sendInvitationEmail,
 }))
 vi.mock('@/lib/table/billing', () => ({ invalidateWorkspaceTableLimitsCache }))
-vi.mock('@/lib/workflows/custom-blocks/operations', () => ({ deleteCustomBlock }))
 vi.mock('@/lib/workspaces/admin-move-source-impact', () => ({
   cleanupSourceOrganizationArtifactsTx,
   collectWorkspaceCredentialSummary,
@@ -169,11 +160,8 @@ vi.mock('@/lib/workspaces/admin-move-source-impact', () => ({
   findAttachedPermissionGroups: vi.fn(() => Promise.resolve([])),
   findCrossOrgForkEdges,
   findRetainedCollaboratorCaps: vi.fn(() => Promise.resolve([])),
-  findUnpublishableCustomBlocks,
-  findSourceOrgCustomBlocksForWorkspace,
   getSourceOrganization,
   resolveMoveEntitlements,
-  willBrandingChange: vi.fn(() => Promise.resolve(false)),
 }))
 
 const movedWorkspace = {
@@ -701,7 +689,6 @@ describe('moveWorkspaceToOrganization retries', () => {
              */
             sourceOrganizationId: null,
             /** Persisted so the reload path can replay the source-org audit. */
-            unpublishedCustomBlocks: [],
             detachedPermissionGroupIds: [],
           },
         },
@@ -1099,9 +1086,6 @@ describe('moveWorkspaceToOrganization retries', () => {
 
   it('records the loss in the source organization audit view, not the destination', async () => {
     queueMoveSelects(organizationWorkspace)
-    findSourceOrgCustomBlocksForWorkspace.mockResolvedValueOnce([
-      { id: 'block-1', type: 'custom_block_1', name: 'Reporter' },
-    ] as never)
 
     await moveWorkspaceToOrganization({
       workspaceId: organizationWorkspace.id,
@@ -1122,14 +1106,6 @@ describe('moveWorkspaceToOrganization retries', () => {
         workspaceId: null,
         action: 'organization.updated',
         resourceId: 'org-source',
-        metadata: expect.objectContaining({ organizationId: 'org-source' }),
-      })
-    )
-    expect(entries).toContainEqual(
-      expect.objectContaining({
-        workspaceId: null,
-        action: 'custom_block.deleted',
-        resourceId: 'block-1',
         metadata: expect.objectContaining({ organizationId: 'org-source' }),
       })
     )
@@ -1202,11 +1178,8 @@ describe('moveWorkspaceToOrganization retries', () => {
     )
   })
 
-  it('unpublishes source-organization custom blocks bound to the moving workspace', async () => {
+  it('cleans up source-organization artifacts for the moving workspace', async () => {
     queueMoveSelects(organizationWorkspace)
-    findSourceOrgCustomBlocksForWorkspace.mockResolvedValueOnce([
-      { id: 'block-1', type: 'custom_block_1', name: 'Reporter' },
-    ] as never)
 
     await moveWorkspaceToOrganization({
       workspaceId: organizationWorkspace.id,
@@ -1215,7 +1188,6 @@ describe('moveWorkspaceToOrganization retries', () => {
       durableOperationId: 'operation-1',
     })
 
-    expect(deleteCustomBlock).toHaveBeenCalledWith('block-1', expect.anything())
     expect(cleanupSourceOrganizationArtifactsTx).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ sourceOrganizationId: 'org-source' })
@@ -1243,7 +1215,6 @@ describe('moveWorkspaceToOrganization retries', () => {
     ).rejects.toMatchObject<Partial<WorkspaceMoveError>>({ code: 'fork-lineage-conflict' })
 
     expect(changeWorkspaceStoragePayerInTx).not.toHaveBeenCalled()
-    expect(deleteCustomBlock).not.toHaveBeenCalled()
   })
 
   it('refuses a cross-organization fork edge on a PERSONAL source too', async () => {
@@ -1359,7 +1330,6 @@ describe('moveWorkspaceToOrganization retries', () => {
     expect(acquireOrganizationMutationLock.mock.calls.map((call) => call[1])).toEqual([
       destination.id,
     ])
-    expect(deleteCustomBlock).not.toHaveBeenCalled()
     expect(cleanupSourceOrganizationArtifactsTx).not.toHaveBeenCalled()
     expect(changeWorkspaceStoragePayerInTx).toHaveBeenCalledWith(
       expect.anything(),

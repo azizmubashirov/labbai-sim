@@ -71,7 +71,7 @@ vi.mock('@/lib/internal/mcp/discover-tools', () => ({
   discoverMcpServerToolsAsExecutor: mockDiscoverMcpServerToolsAsExecutor,
 }))
 
-vi.mock('@/ee/access-control/utils/permission-check', () => ({
+vi.mock('@/lib/labbai/access-control/permission-check', () => ({
   assertPermissionsAllowed: vi.fn().mockResolvedValue(undefined),
   validateBlockType: vi.fn().mockResolvedValue(undefined),
   validateModelProvider: mockValidateModelProvider,

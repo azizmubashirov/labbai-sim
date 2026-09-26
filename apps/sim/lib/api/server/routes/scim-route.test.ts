@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
   enforceIpRateLimit: vi.fn(),
 }))
 
-vi.mock('@/ee/scim/lib/base-url', () => ({ scimBaseUrl: () => 'https://sim.test/api/scim/v2' }))
+vi.mock('@/lib/labbai/scim/base-url', () => ({ scimBaseUrl: () => 'https://sim.test/api/scim/v2' }))
 
 vi.mock('@/lib/core/rate-limiter', () => ({
   RateLimiter: class {
@@ -26,9 +26,9 @@ import {
   listScimUsersContract,
 } from '@/lib/api/contracts/scim'
 import { createScimRouteBuilder } from '@/lib/api/server/routes'
-import { scimOperations } from '@/ee/scim/lib/application/operations'
-import { SCIM_MEDIA_TYPE } from '@/ee/scim/lib/protocol/constants'
-import { ScimError } from '@/ee/scim/lib/protocol/errors'
+import { scimOperations } from '@/lib/labbai/scim/application/operations'
+import { SCIM_MEDIA_TYPE } from '@/lib/labbai/scim/protocol/constants'
+import { ScimError } from '@/lib/labbai/scim/protocol/errors'
 
 const principal: ScimConnectionPrincipal = {
   kind: 'scim_connection',

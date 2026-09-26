@@ -1,8 +1,7 @@
 import { z } from 'zod'
-import { organizationRoleSchema, retentionOverridesSchema } from '@/lib/api/contracts/primitives'
+import { organizationRoleSchema } from '@/lib/api/contracts/primitives'
 import { defineRouteContract } from '@/lib/api/contracts/types'
 import { workspacePermissionSchema } from '@/lib/api/contracts/workspaces'
-import { HEX_COLOR_REGEX } from '@/lib/branding'
 
 const numericResponseSchema = z.preprocess((value) => {
   if (typeof value !== 'string') return value
@@ -50,124 +49,6 @@ export const updateOrganizationBodySchema = z.object({
 
 export const updateOrganizationMemberRoleBodySchema = z.object({
   role: organizationRoleSchema,
-})
-
-const organizationDataRetentionHoursSchema = z
-  .number()
-  .int()
-  .min(24)
-  .max(43800)
-  .nullable()
-  .optional()
-
-export const updateOrganizationDataRetentionBodySchema = z.object({
-  logRetentionHours: organizationDataRetentionHoursSchema,
-  softDeleteRetentionHours: organizationDataRetentionHoursSchema,
-  taskCleanupHours: organizationDataRetentionHoursSchema,
-  fileVersionRetentionHours: organizationDataRetentionHoursSchema,
-  retentionOverrides: retentionOverridesSchema.optional(),
-})
-
-export type UpdateOrganizationDataRetentionBody = z.input<
-  typeof updateOrganizationDataRetentionBodySchema
->
-
-const organizationRetentionValuesSchema = z.object({
-  logRetentionHours: z.number().int().nullable(),
-  softDeleteRetentionHours: z.number().int().nullable(),
-  taskCleanupHours: z.number().int().nullable(),
-  fileVersionRetentionHours: z.number().int().nullable(),
-  retentionOverrides: retentionOverridesSchema.nullable(),
-})
-
-export type OrganizationRetentionValues = z.output<typeof organizationRetentionValuesSchema>
-
-const organizationDataRetentionDataSchema = z.object({
-  isEnterprise: z.boolean(),
-  defaults: organizationRetentionValuesSchema,
-  configured: organizationRetentionValuesSchema,
-  effective: organizationRetentionValuesSchema,
-})
-
-export type OrganizationDataRetention = z.output<typeof organizationDataRetentionDataSchema>
-
-export const organizationDataRetentionResponseSchema = z.object({
-  success: z.boolean(),
-  data: organizationDataRetentionDataSchema,
-})
-
-/**
- * Session-policy bounds — the single source for the contract validation, the
- * server-side clamp (`@/lib/auth/session-policy`), and the settings UI.
- * `MIN_IDLE_TIMEOUT_HOURS` is twice the session cookie-cache window (24h):
- * cached reads never record activity, so a continuously active user only
- * refreshes their session when the cookie cache expires. A floor of one
- * window would sign out active users exactly at the cache boundary; two
- * windows guarantees a DB-path refresh lands before the idle limit can.
- */
-export const MIN_SESSION_LIFETIME_HOURS = 1
-export const MIN_IDLE_TIMEOUT_HOURS = 48
-export const MAX_SESSION_POLICY_HOURS = 8760
-
-export const updateOrganizationSessionPolicyBodySchema = z.object({
-  maxSessionHours: z
-    .number()
-    .int()
-    .min(MIN_SESSION_LIFETIME_HOURS, 'Max session lifetime must be at least 1 hour')
-    .max(MAX_SESSION_POLICY_HOURS, 'Max session lifetime cannot exceed 8760 hours (1 year)')
-    .nullable(),
-  idleTimeoutHours: z
-    .number()
-    .int()
-    .min(
-      MIN_IDLE_TIMEOUT_HOURS,
-      'Idle timeout must be at least 48 hours — session activity is recorded at most once per 24h cookie-cache window'
-    )
-    .max(MAX_SESSION_POLICY_HOURS, 'Idle timeout cannot exceed 8760 hours (1 year)')
-    .nullable(),
-})
-
-export type UpdateOrganizationSessionPolicyBody = z.input<
-  typeof updateOrganizationSessionPolicyBodySchema
->
-
-const organizationSessionPolicyValuesSchema = z.object({
-  maxSessionHours: z.number().int().nullable(),
-  idleTimeoutHours: z.number().int().nullable(),
-})
-
-const organizationSessionPolicyDataSchema = z.object({
-  isEnterprise: z.boolean(),
-  configured: organizationSessionPolicyValuesSchema,
-})
-
-export type OrganizationSessionPolicy = z.output<typeof organizationSessionPolicyDataSchema>
-
-export const organizationSessionPolicyResponseSchema = z.object({
-  success: z.boolean(),
-  data: organizationSessionPolicyDataSchema,
-})
-
-export const updateOrganizationSsoPolicyBodySchema = z.object({
-  requireSso: z.boolean(),
-})
-
-export type UpdateOrganizationSsoPolicyBody = z.input<typeof updateOrganizationSsoPolicyBodySchema>
-
-const organizationSsoPolicyDataSchema = z.object({
-  /** The stored setting. */
-  requireSso: z.boolean(),
-  /** Whether an identity provider could satisfy the requirement today. */
-  hasVerifiedProvider: z.boolean(),
-  /** Whether sign-in actually enforces it — false once the organization cannot satisfy it. */
-  isEnforced: z.boolean(),
-})
-
-export type OrganizationSsoPolicy = z.output<typeof organizationSsoPolicyDataSchema>
-
-export const organizationSsoPolicyResponseSchema = z.object({
-  success: z.boolean(),
-  data: organizationSsoPolicyDataSchema,
 })
 
 export const MAX_ORGANIZATION_DOMAINS = 25
@@ -220,46 +101,6 @@ export const revokeOrganizationSessionsResponseSchema = z.object({
   data: z.object({
     revokedSessions: z.number().int().min(0),
   }),
-})
-
-export const updateOrganizationWhitelabelBodySchema = z.object({
-  brandName: z
-    .string()
-    .trim()
-    .max(64, 'Brand name must be 64 characters or fewer')
-    .nullable()
-    .optional(),
-  logoUrl: z.string().min(1).nullable().optional(),
-  wordmarkUrl: z.string().min(1).nullable().optional(),
-  primaryColor: z
-    .string()
-    .regex(HEX_COLOR_REGEX, 'Primary color must be a valid hex color (e.g. #33c482)')
-    .nullable()
-    .optional(),
-  primaryHoverColor: z
-    .string()
-    .regex(HEX_COLOR_REGEX, 'Primary hover color must be a valid hex color')
-    .nullable()
-    .optional(),
-  accentColor: z
-    .string()
-    .regex(HEX_COLOR_REGEX, 'Accent color must be a valid hex color')
-    .nullable()
-    .optional(),
-  accentHoverColor: z
-    .string()
-    .regex(HEX_COLOR_REGEX, 'Accent hover color must be a valid hex color')
-    .nullable()
-    .optional(),
-  supportEmail: z
-    .string()
-    .email('Support email must be a valid email address')
-    .nullable()
-    .optional(),
-  documentationUrl: z.string().url('Documentation URL must be a valid URL').nullable().optional(),
-  termsUrl: z.string().url('Terms URL must be a valid URL').nullable().optional(),
-  privacyUrl: z.string().url('Privacy URL must be a valid URL').nullable().optional(),
-  hidePoweredBySim: z.boolean().optional(),
 })
 
 export const transferOwnershipBodySchema = z.object({
@@ -518,69 +359,6 @@ export const updateOrganizationContract = defineRouteContract({
   },
 })
 
-export const getOrganizationDataRetentionContract = defineRouteContract({
-  method: 'GET',
-  path: '/api/organizations/[id]/data-retention',
-  params: organizationParamsSchema,
-  response: {
-    mode: 'json',
-    schema: organizationDataRetentionResponseSchema,
-  },
-})
-
-export const updateOrganizationDataRetentionContract = defineRouteContract({
-  method: 'PUT',
-  path: '/api/organizations/[id]/data-retention',
-  params: organizationParamsSchema,
-  body: updateOrganizationDataRetentionBodySchema,
-  response: {
-    mode: 'json',
-    schema: organizationDataRetentionResponseSchema,
-  },
-})
-
-export const getOrganizationSessionPolicyContract = defineRouteContract({
-  method: 'GET',
-  path: '/api/organizations/[id]/session-policy',
-  params: organizationParamsSchema,
-  response: {
-    mode: 'json',
-    schema: organizationSessionPolicyResponseSchema,
-  },
-})
-
-export const updateOrganizationSessionPolicyContract = defineRouteContract({
-  method: 'PUT',
-  path: '/api/organizations/[id]/session-policy',
-  params: organizationParamsSchema,
-  body: updateOrganizationSessionPolicyBodySchema,
-  response: {
-    mode: 'json',
-    schema: organizationSessionPolicyResponseSchema,
-  },
-})
-
-export const getOrganizationSsoPolicyContract = defineRouteContract({
-  method: 'GET',
-  path: '/api/organizations/[id]/sso-policy',
-  params: organizationParamsSchema,
-  response: {
-    mode: 'json',
-    schema: organizationSsoPolicyResponseSchema,
-  },
-})
-
-export const updateOrganizationSsoPolicyContract = defineRouteContract({
-  method: 'PUT',
-  path: '/api/organizations/[id]/sso-policy',
-  params: organizationParamsSchema,
-  body: updateOrganizationSsoPolicyBodySchema,
-  response: {
-    mode: 'json',
-    schema: organizationSsoPolicyResponseSchema,
-  },
-})
-
 export const revokeOrganizationSessionsContract = defineRouteContract({
   method: 'POST',
   path: '/api/organizations/[id]/sessions/revoke',
@@ -629,51 +407,6 @@ export const removeOrganizationDomainContract = defineRouteContract({
   response: {
     mode: 'json',
     schema: z.object({ success: z.boolean() }),
-  },
-})
-
-// Read shape mirrors `OrganizationWhitelabelSettings` from
-// `@/lib/branding/types`. All fields are optional (nullable on the way in
-// for the PUT contract, but stored without nulls on the way out — the
-// route deletes keys that are explicitly cleared).
-export const organizationWhitelabelSettingsResponseSchema = z.object({
-  brandName: z.string().optional(),
-  logoUrl: z.string().optional(),
-  wordmarkUrl: z.string().optional(),
-  primaryColor: z.string().optional(),
-  primaryHoverColor: z.string().optional(),
-  accentColor: z.string().optional(),
-  accentHoverColor: z.string().optional(),
-  supportEmail: z.string().optional(),
-  documentationUrl: z.string().optional(),
-  termsUrl: z.string().optional(),
-  privacyUrl: z.string().optional(),
-  hidePoweredBySim: z.boolean().optional(),
-})
-
-const organizationWhitelabelEnvelopeResponseSchema = z.object({
-  success: z.boolean(),
-  data: organizationWhitelabelSettingsResponseSchema,
-})
-
-export const getOrganizationWhitelabelContract = defineRouteContract({
-  method: 'GET',
-  path: '/api/organizations/[id]/whitelabel',
-  params: organizationParamsSchema,
-  response: {
-    mode: 'json',
-    schema: organizationWhitelabelEnvelopeResponseSchema,
-  },
-})
-
-export const updateOrganizationWhitelabelContract = defineRouteContract({
-  method: 'PUT',
-  path: '/api/organizations/[id]/whitelabel',
-  params: organizationParamsSchema,
-  body: updateOrganizationWhitelabelBodySchema,
-  response: {
-    mode: 'json',
-    schema: organizationWhitelabelEnvelopeResponseSchema,
   },
 })
 

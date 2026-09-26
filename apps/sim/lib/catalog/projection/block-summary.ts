@@ -1,13 +1,9 @@
 import { normalizeCondition } from '@/lib/catalog/projection/subblock'
-import { isCustomBlockType } from '@/blocks/custom/build-config'
 import { getBlockMeta } from '@/blocks/registry'
 import type { BlockConfig, SubBlockConfig } from '@/blocks/types'
 
-/**
- * Where a block comes from: the code registry, or a workflow this workspace
- * deployed as a block.
- */
-export type CatalogBlockSource = 'builtin' | 'custom'
+/** Where a block comes from. Every block is defined in the code registry. */
+export type CatalogBlockSource = 'builtin'
 
 /** Lifecycle state of a shipped block. */
 export interface CatalogBlockSunset {
@@ -108,7 +104,7 @@ export function projectBlockSummary(block: BlockConfig): CatalogBlockSummary {
     name: block.name,
     description: block.description,
     category: block.category,
-    source: isCustomBlockType(block.type) ? 'custom' : 'builtin',
+    source: 'builtin',
     triggerAllowed: block.triggerAllowed === true,
     triggerCapable: isTriggerCapableBlock(block),
     triggerIds: [...(block.triggers?.available ?? [])],

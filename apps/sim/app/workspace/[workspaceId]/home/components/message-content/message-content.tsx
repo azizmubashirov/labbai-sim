@@ -38,7 +38,6 @@ import type {
   ToolCallData,
 } from '@/app/workspace/[workspaceId]/home/types'
 import { SUBAGENT_LABELS } from '@/app/workspace/[workspaceId]/home/types'
-import { useCustomBlockOverlayVersion } from '@/blocks/custom/client-overlay'
 import type { AgentGroupItem } from './components'
 import { AgentGroup, ChatContent, MessageSources, Options, PendingTagIndicator } from './components'
 import { deriveMessagePhase, isToolDone, type MessagePhase } from './utils'
@@ -882,14 +881,13 @@ function MessageContentInner({
   actions,
 }: MessageContentProps) {
   const { onWorkspaceResourceSelect } = useChatSurface()
-  const blockOverlayVersion = useCustomBlockOverlayVersion()
   const cited = useMemo(
     () => resolveMessageCitations(blocks, fallbackContent, requestMode === 'assistant'),
     [blocks, fallbackContent, requestMode]
   )
   const parsed = useMemo(
     () => (cited.blocks.length > 0 ? parseBlocks(cited.blocks) : []),
-    [cited.blocks, blockOverlayVersion]
+    [cited.blocks]
   )
 
   const [trailingRevealing, setTrailingRevealing] = useState(false)

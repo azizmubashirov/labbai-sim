@@ -23,7 +23,6 @@ import {
   getAccessibleOAuthCredentials,
 } from '@/lib/credentials/environment'
 import { connectorIsLive } from '@/lib/knowledge/connectors/sync-lock'
-import { listCustomBlockSummariesForWorkspace } from '@/lib/workflows/custom-blocks/operations'
 import { listCustomTools } from '@/lib/workflows/custom-tools/operations'
 import { listSkillsForUser } from '@/lib/workflows/skills/operations'
 import { listAllWorkspaceFiles } from '@/lib/workspace-files/application/list-workspace-files'
@@ -79,7 +78,6 @@ export interface WorkspaceMdData {
   }>
   envVariables: string[]
   customTools?: Array<{ id: string; name: string }>
-  customBlocks?: Array<{ type: string; name: string; description?: string }>
   mcpServers?: Array<{ id: string; name: string; url?: string | null; enabled: boolean }>
   skills?: Array<{ id: string; name: string; description: string }>
 }
@@ -262,13 +260,6 @@ export function buildWorkspaceMd(data: WorkspaceMdData): string {
     sections.push(`## Custom Tools (${data.customTools.length})\n${lines.join('\n')}`)
   }
 
-  if (data.customBlocks && data.customBlocks.length > 0) {
-    const lines = [...data.customBlocks]
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .map((b) => `- **${b.name}** (${b.type})${b.description ? ` — ${b.description}` : ''}`)
-    sections.push(`## Custom Blocks (${data.customBlocks.length})\n${lines.join('\n')}`)
-  }
-
   if (data.mcpServers && data.mcpServers.length > 0) {
     const lines = [...data.mcpServers].sort(byNameThenId).map((s) => {
       const status = s.enabled ? 'enabled' : 'disabled'
@@ -335,7 +326,6 @@ async function buildWorkspaceMdData(
       customTools,
       mcpServerRows,
       skillRows,
-      customBlockSummaries,
     ] = await Promise.all([
       getUsersWithPermissions(workspaceId),
 
@@ -417,8 +407,6 @@ async function buildWorkspaceMdData(
         .where(and(eq(mcpServers.workspaceId, workspaceId), isNull(mcpServers.deletedAt))),
 
       listSkillsForUser({ workspaceId, userId, includeBuiltins: false, workspaceAccess }),
-
-      listCustomBlockSummariesForWorkspace(workspaceId),
     ])
 
     const kbIds = kbs.map((kb) => kb.id)
@@ -492,7 +480,6 @@ async function buildWorkspaceMdData(
         stableCompare
       ),
       customTools: customTools.map((t) => ({ id: t.id, name: t.title })),
-      customBlocks: customBlockSummaries,
       mcpServers: mcpServerRows,
       skills: skillRows.map((s) => ({ id: s.id, name: s.name, description: s.description })),
     }
@@ -604,11 +591,6 @@ export function buildVfsSnapshot(data: WorkspaceMdData): VfsSnapshotV1 {
     })),
     envVars: data.envVariables,
     customTools: (data.customTools ?? []).map((t) => ({ id: t.id, name: t.name })),
-    customBlocks: (data.customBlocks ?? []).map((b) => ({
-      type: b.type,
-      name: b.name,
-      ...(b.description ? { description: b.description } : {}),
-    })),
     mcpServers: (data.mcpServers ?? []).map((s) => ({
       id: s.id,
       name: s.name,

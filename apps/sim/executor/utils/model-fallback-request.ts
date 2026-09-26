@@ -1,6 +1,6 @@
 import { createLogger } from '@sim/logger'
 import { resolveFallbackTuning } from '@/lib/workflows/blocks/fallback-models'
-import { validateModelProvider } from '@/ee/access-control/utils/permission-check'
+import { validateModelProvider } from '@/lib/labbai/access-control/permission-check'
 import { isRetryableBlockError } from '@/executor/execution/block-retry'
 import type { BlockRetryAttempt, ExecutionContext } from '@/executor/types'
 import {

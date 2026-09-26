@@ -32,7 +32,6 @@ import {
 } from '@/lib/api/contracts/v2/mcp-servers'
 import { v2GetMetaContract } from '@/lib/api/contracts/v2/meta'
 import { accessRequestOpenApiRoutes } from '@/lib/api/contracts/v2/openapi/access-requests'
-import { organizationUsageOpenApiRoutes } from '@/lib/api/contracts/v2/openapi/organization-usage'
 import { organizationOpenApiRoutes } from '@/lib/api/contracts/v2/openapi/organizations'
 import { permissionGroupOpenApiRoutes } from '@/lib/api/contracts/v2/openapi/permission-groups'
 import {
@@ -1949,7 +1948,6 @@ const declaredRoutes = [
   ...organizationOpenApiRoutes,
   ...workspacePermissionOpenApiRoutes,
   ...workspaceInvitationOpenApiRoutes,
-  ...organizationUsageOpenApiRoutes,
   ...accessRequestOpenApiRoutes,
 ] as const
 

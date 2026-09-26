@@ -20,7 +20,6 @@ export const SNAPSHOT_FINGERPRINT_KINDS = [
   'integrations',
   'mcpServers',
   'customTools',
-  'customBlocks',
   'members',
   'envVars',
   'workspace',
@@ -173,7 +172,6 @@ function itemLabel(
 ): string | undefined {
   if (kind === 'envVars') return asString(item.value)
   if (kind === 'members') return asString(item.email) ?? asString(item.name)
-  if (kind === 'customBlocks') return asString(item.name) ?? asString(item.type)
   if (kind === 'integrations') {
     return asString(item.displayName) ?? asString(item.providerId) ?? asString(item.id)
   }
@@ -183,8 +181,6 @@ function itemLabel(
 
 function itemKey(kind: SnapshotFingerprintKind, item: Record<string, unknown>): string | null {
   switch (kind) {
-    case 'customBlocks':
-      return asString(item.type) ?? null
     case 'members':
       return asString(item.email) ?? null
     case 'envVars':
@@ -220,8 +216,6 @@ function toItemRecords(
       return (snapshot.mcpServers ?? []) as unknown as Array<Record<string, unknown>>
     case 'customTools':
       return (snapshot.customTools ?? []) as unknown as Array<Record<string, unknown>>
-    case 'customBlocks':
-      return (snapshot.customBlocks ?? []) as unknown as Array<Record<string, unknown>>
     case 'members':
       return (snapshot.members ?? []) as unknown as Array<Record<string, unknown>>
     case 'envVars':
@@ -239,15 +233,13 @@ export function extractFingerprintFields(
   item: Record<string, unknown>
 ): SnapshotFingerprintFields {
   const skip = new Set(
-    kind === 'customBlocks'
-      ? ['type']
-      : kind === 'members'
-        ? ['email']
-        : kind === 'envVars'
-          ? ['value']
-          : kind === 'workspace'
-            ? []
-            : ['id']
+    kind === 'members'
+      ? ['email']
+      : kind === 'envVars'
+        ? ['value']
+        : kind === 'workspace'
+          ? []
+          : ['id']
   )
   const fields: SnapshotFingerprintFields = {}
   for (const [key, value] of Object.entries(item)) {
@@ -382,9 +374,6 @@ function describeAddedItem(kind: SnapshotFingerprintKind, item: Record<string, u
   }
   if (kind === 'envVars') {
     return String(item.value ?? key)
-  }
-  if (kind === 'customBlocks') {
-    return `type=${key} "${label ?? key}"`
   }
   if (kind === 'integrations') {
     return `${key} provider=${String(item.providerId ?? '')}`

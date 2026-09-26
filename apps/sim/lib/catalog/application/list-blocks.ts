@@ -25,7 +25,7 @@ export interface ListCatalogBlocksInput {
   search?: string
   category?: 'blocks' | 'tools' | 'triggers'
   capability?: 'trigger'
-  source?: 'builtin' | 'custom'
+  source?: 'builtin'
   sortBy: 'id' | 'name' | 'category'
   sortOrder: V2SortOrder
   offset: number
@@ -53,10 +53,8 @@ function matchesFilters(block: CatalogBlockSummary, input: ListCatalogBlocksInpu
 /**
  * The blocks this caller may place in this workspace.
  *
- * Built-in and custom blocks are one list on purpose: a workflow references
- * either by `type`, so "what may I place?" must be answerable in one call. The
- * `source` field tells them apart, and `capability=trigger` narrows to the
- * blocks that can start a workflow rather than needing a second endpoint.
+ * "What may I place?" is answerable in one call; `capability=trigger` narrows
+ * to the blocks that can start a workflow rather than needing a second endpoint.
  *
  * No audit is projected — reading a catalog is not a semantic event, and no
  * shipped v2 read records one.

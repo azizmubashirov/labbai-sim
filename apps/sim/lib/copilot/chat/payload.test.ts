@@ -564,11 +564,11 @@ describe('buildCopilotRequestPayload', () => {
         mode: 'agent',
         model: 'claude-opus-4-8',
         workspaceId: 'ws-1',
-        entitlements: ['custom-blocks'],
+        entitlements: ['organization-context'],
       },
       { selectedModel: 'claude-opus-4-8' }
     )
-    expect(withEntitlements).toEqual(expect.objectContaining({ entitlements: ['custom-blocks'] }))
+    expect(withEntitlements).toEqual(expect.objectContaining({ entitlements: ['organization-context'] }))
 
     const withoutEntitlements = await buildCopilotRequestPayload(
       {

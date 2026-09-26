@@ -1,19 +1,17 @@
 import { db } from '@sim/db'
-import type { DataRetentionSettings, WorkspaceMode } from '@sim/db/schema'
-import { organization, workspace } from '@sim/db/schema'
+import type { WorkspaceMode } from '@sim/db/schema'
+import { workspace } from '@sim/db/schema'
 import { createLogger } from '@sim/logger'
 import { chunkArray } from '@sim/utils/helpers'
 import { tasks } from '@trigger.dev/sdk'
-import { and, asc, eq, gt, isNull } from 'drizzle-orm'
+import { and, asc, gt, isNull } from 'drizzle-orm'
 import { validateCleanupLimits } from '@/lib/api/contracts/cleanup'
 import type { PlanCategory } from '@/lib/billing/plan-helpers'
-import { type RetentionHoursKey, resolveEffectiveRetentionHours } from '@/lib/billing/retention'
 import { type CleanupBudgets, type CleanupLimits, createCleanupBudgets } from '@/lib/cleanup/limits'
 import { getJobQueue } from '@/lib/core/async-jobs'
 import { shouldExecuteInline } from '@/lib/core/async-jobs/config'
 import { resolveTriggerRegion } from '@/lib/core/async-jobs/region'
 import type { EnqueueOptions } from '@/lib/core/async-jobs/types'
-import { isDataRetentionEnabled } from '@/lib/core/config/env-flags'
 import { isTriggerAvailable } from '@/lib/core/config/trigger-availability'
 
 const logger = createLogger('RetentionDispatcher')
@@ -47,7 +45,6 @@ export interface CleanupJobPayload {
 }
 
 interface CleanupJobConfig {
-  key: RetentionHoursKey
   defaults: Record<PlanCategory, number | null>
 }
 
@@ -56,7 +53,6 @@ interface WorkspaceCleanupScopeRow {
   billedAccountUserId: string
   organizationId: string | null
   workspaceMode: WorkspaceMode
-  organizationSettings: DataRetentionSettings | null
 }
 
 const DAY = 24
@@ -66,26 +62,20 @@ function getCleanupConcurrencyKey(jobType: CleanupJobType): string | undefined {
 }
 
 /**
- * Single source of truth for cleanup retention: which key each job type reads
- * from `organization.dataRetentionSettings`, and the default retention (in
- * hours) per plan. Enterprise is always `null` here — enterprise orgs must
- * set their own value.
+ * Single source of truth for cleanup retention: the default retention (in
+ * hours) per plan. `null` means the plan is skipped and nothing is deleted.
  */
 export const CLEANUP_CONFIG = {
   'cleanup-logs': {
-    key: 'logRetentionHours',
     defaults: { free: 30 * DAY, pro: null, team: null, enterprise: null },
   },
   'cleanup-soft-deletes': {
-    key: 'softDeleteRetentionHours',
     defaults: { free: 30 * DAY, pro: 90 * DAY, team: 90 * DAY, enterprise: null },
   },
   'cleanup-tasks': {
-    key: 'taskCleanupHours',
     defaults: { free: null, pro: null, team: null, enterprise: null },
   },
   'cleanup-file-versions': {
-    key: 'fileVersionRetentionHours',
     defaults: { free: 30 * DAY, pro: 180 * DAY, team: 180 * DAY, enterprise: null },
   },
 } as const satisfies Record<CleanupJobType, CleanupJobConfig>
@@ -100,10 +90,8 @@ async function listActiveWorkspaceCleanupScopeRowsPage(
       billedAccountUserId: workspace.billedAccountUserId,
       organizationId: workspace.organizationId,
       workspaceMode: workspace.workspaceMode,
-      organizationSettings: organization.dataRetentionSettings,
     })
     .from(workspace)
-    .leftJoin(organization, eq(organization.id, workspace.organizationId))
     .where(
       afterId
         ? and(isNull(workspace.archivedAt), gt(workspace.id, afterId))
@@ -112,10 +100,7 @@ async function listActiveWorkspaceCleanupScopeRowsPage(
     .orderBy(asc(workspace.id))
     .limit(pageSize)
 
-  return rows.map((row) => ({
-    ...row,
-    organizationSettings: (row.organizationSettings as DataRetentionSettings | null) ?? null,
-  }))
+  return rows
 }
 
 async function resolvePlanTypesByWorkspaceId(
@@ -128,9 +113,8 @@ async function resolvePlanTypesByWorkspaceId(
    * on a 30-day free-tier window nobody chose.
    *
    * Classifying every workspace as enterprise gives the semantics a self-hosted
-   * deployment wants: enterprise carries no default, so retention comes only
-   * from explicitly configured `organization.dataRetentionSettings` and a
-   * workspace with nothing configured keeps its data forever.
+   * deployment wants: enterprise carries no default, so every workspace keeps
+   * its data forever.
    */
   return new Map(rows.map((row) => [row.id, 'enterprise' as PlanCategory]))
 }
@@ -216,49 +200,6 @@ async function forEachCleanupChunk(
         })
       }
     }
-
-    for (const row of rows) {
-      if (planByWorkspaceId.get(row.id) !== 'enterprise') continue
-      const hours = resolveEffectiveRetentionHours({
-        orgSettings: row.organizationSettings,
-        workspaceId: row.id,
-        key: config.key,
-      })
-      if (hours == null) continue
-      workspaceCount++
-      await emitChunk({
-        plan: 'enterprise',
-        workspaceIds: [row.id],
-        retentionHours: hours,
-        label: `enterprise/${row.id}`,
-      })
-    }
-  }
-
-  if (jobType === 'cleanup-soft-deletes' || jobType === 'cleanup-tasks') {
-    let afterOrganizationId: string | null = null
-    while (!shouldStop()) {
-      const organizations = await db
-        .select({ id: organization.id, settings: organization.dataRetentionSettings })
-        .from(organization)
-        .where(afterOrganizationId ? gt(organization.id, afterOrganizationId) : undefined)
-        .orderBy(asc(organization.id))
-        .limit(pageSize)
-      if (organizations.length === 0) break
-      afterOrganizationId = organizations[organizations.length - 1].id
-      for (const row of organizations) {
-        if (shouldStop()) break
-        const retentionHours = row.settings?.[config.key] ?? null
-        if (retentionHours == null) continue
-        await emitChunk({
-          plan: 'enterprise',
-          workspaceIds: [],
-          organizationIds: [row.id],
-          retentionHours,
-          label: `enterprise/organization/${row.id}`,
-        })
-      }
-    }
   }
 
   return { chunkCount, workspaceCount }
@@ -275,20 +216,6 @@ export async function dispatchCleanupJobs(jobType: CleanupJobType): Promise<{
   chunkCount: number
   workspaceCount: number
 }> {
-  /**
-   * Plan-based retention is a hosted billing policy, so a billing-disabled
-   * deployment must never start expiring data on hosted defaults it never
-   * chose. Retention is therefore opt-in off-hosted: the operator turns it on
-   * with `DATA_RETENTION_ENABLED` (or the `ENTERPRISE_ENABLED` suite switch)
-   * after configuring the windows they want.
-   */
-  if (!isDataRetentionEnabled) {
-    logger.info(
-      `[${jobType}] Skipping cleanup dispatch: data retention is not enabled`
-    )
-    return { jobIds: [], jobCount: 0, chunkCount: 0, workspaceCount: 0 }
-  }
-
   const jobIds: string[] = []
   let succeeded = 0
   let failed = 0
@@ -374,7 +301,6 @@ export async function dispatchBoundedCleanup(
   input: CleanupLimits
 ) {
   const limits = validateCleanupLimits(jobType, input)
-  if (!isDataRetentionEnabled) throw new Error('Data retention is disabled')
   if (!isTriggerAvailable()) throw new Error('Queued cleanup requires Trigger.dev')
   const run = await tasks.trigger(
     jobType,
@@ -394,7 +320,6 @@ export async function runCleanupWithLimits(
   runScope: (payload: CleanupJobPayload, budgets: CleanupBudgets) => Promise<void>
 ): Promise<void> {
   const limits = validateCleanupLimits(jobType, input)
-  if (!isDataRetentionEnabled) throw new Error('Data retention is disabled')
   const budgets = createCleanupBudgets(limits)
   await forEachCleanupChunk(jobType, (scope) => runScope(scope, budgets), {
     shouldStop: () => Object.values(budgets).every((budget) => budget.remaining === 0),

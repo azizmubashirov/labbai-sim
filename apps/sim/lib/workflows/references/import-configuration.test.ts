@@ -70,7 +70,7 @@ describe('mapped import configuration', () => {
   })
   it('requires the lost MCP tool name in a legacy export and accepts a source-indexed repair', async () => {
     const plan = buildWorkflowImportPlan(source(null), { mappings })
-    expect(await inspectImportConfiguration(plan, { mappings }, 'destination')).toEqual([
+    expect(await inspectImportConfiguration(plan, { mappings })).toEqual([
       expect.objectContaining({
         blockId: 'agent',
         subBlockKey: 'tools[0].toolName',
@@ -85,7 +85,7 @@ describe('mapped import configuration', () => {
       dependentValues: [{ blockId: 'agent', subBlockKey: 'tools[0].toolName', value: 'search' }],
     }
     const repaired = buildWorkflowImportPlan(source(null), options)
-    const fields = await inspectImportConfiguration(repaired, options, 'destination')
+    const fields = await inspectImportConfiguration(repaired, options)
     await validateImportSelectorValues(principal, 'destination', fields, options)
     expect(fields[0].configured).toBe(true)
     expect(repaired.state.blocks.agent.subBlocks.tools.value).toEqual([
@@ -98,7 +98,7 @@ describe('mapped import configuration', () => {
   it('marks a preserved MCP name unavailable when the destination does not offer it', async () => {
     getOption.mockResolvedValue(null)
     const plan = buildWorkflowImportPlan(source('old-tool'), { mappings })
-    const fields = await inspectImportConfiguration(plan, { mappings }, 'destination')
+    const fields = await inspectImportConfiguration(plan, { mappings })
     await validateImportSelectorValues(principal, 'destination', fields, { mappings })
     expect(fields[0]).toMatchObject({ required: true, configured: false })
   })
@@ -108,6 +108,6 @@ describe('mapped import configuration', () => {
       { type: 'mcp-server-advanced', params: { serverId: 'source-server' } },
     ]
     const plan = buildWorkflowImportPlan(state, { mappings })
-    expect(await inspectImportConfiguration(plan, { mappings }, 'destination')).toEqual([])
+    expect(await inspectImportConfiguration(plan, { mappings })).toEqual([])
   })
 })

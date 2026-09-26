@@ -3,7 +3,7 @@
 import { SimWordmark } from '@sim/emcn'
 import Image from 'next/image'
 import Link from 'next/link'
-import { useBrandConfig } from '@/ee/whitelabeling'
+import { useBrandConfig } from '@/lib/branding'
 
 interface ChatHeaderProps {
   chatConfig: {

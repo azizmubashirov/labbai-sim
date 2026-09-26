@@ -9,11 +9,7 @@ vi.mock('@/blocks', () => ({
 
 vi.mock('@/executor/constants', () => ({
   isSubExecutionBlockType: vi.fn((blockType: string | undefined) => {
-    return (
-      blockType === 'workflow' ||
-      blockType === 'workflow_input' ||
-      blockType?.startsWith('custom_block_') === true
-    )
+    return blockType === 'workflow' || blockType === 'workflow_input'
   }),
 }))
 

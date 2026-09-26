@@ -10,9 +10,8 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react'
-import { resetEnvFlagsMock, setEnvFlags } from '@sim/testing'
 import { createRoot, type Root } from 'react-dom/client'
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -288,9 +287,6 @@ vi.mock('@/components/ui', () => ({
   ),
 }))
 
-/** SSO is a deployment feature, read through the deployment shape at render time. */
-beforeAll(() => setEnvFlags({ isSsoEnabled: true }))
-afterAll(resetEnvFlagsMock)
 vi.mock('@/lib/messaging/email/validation', () => ({
   validateAllowlistEntry: () => null,
 }))
@@ -558,7 +554,6 @@ describe('ShareModal', () => {
 
   it.each([
     { mode: 'Email' as const, authType: 'email' as const, entry: 'person@example.com' },
-    { mode: 'SSO' as const, authType: 'sso' as const, entry: 'example.com' },
   ])('requires an allow-list before sharing in $mode mode', async ({ mode, authType, entry }) => {
     await renderModal()
     await click(mode)
@@ -614,7 +609,6 @@ describe('ShareModal', () => {
     expect(button('Public')).toBeDisabled()
     expect(button('Password')).toBeDisabled()
     expect(button('Email')).toBeDisabled()
-    expect(button('SSO')).toBeDisabled()
     expect(button('Sharing...')).toBeDisabled()
 
     const editor = container.querySelector<HTMLInputElement>(

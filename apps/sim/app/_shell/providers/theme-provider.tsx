@@ -15,7 +15,6 @@ const LIGHT_SEGMENTS = [
   'login',
   'signup',
   'reset-password',
-  'sso',
   'invite',
   'verify',
   'chat',

@@ -8,14 +8,10 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const {
-  mockBrandingProvider,
-  mockGetOrgWhitelabelSettings,
   mockPrefetchWorkspaceHostContext,
   mockPrefetchWorkspaceSidebar,
   mockPrefetchWorkspaceAccess,
 } = vi.hoisted(() => ({
-  mockBrandingProvider: vi.fn(({ children }: { children: ReactNode }) => children),
-  mockGetOrgWhitelabelSettings: vi.fn(),
   mockPrefetchWorkspaceHostContext: vi.fn(),
   mockPrefetchWorkspaceSidebar: vi.fn(),
   mockPrefetchWorkspaceAccess: vi.fn(),
@@ -51,14 +47,6 @@ vi.mock('@/app/workspace/[workspaceId]/prefetch-access', () => ({
   prefetchWorkspaceAccess: mockPrefetchWorkspaceAccess,
 }))
 
-vi.mock('@/ee/whitelabeling/org-branding', () => ({
-  getOrgWhitelabelSettings: mockGetOrgWhitelabelSettings,
-}))
-
-vi.mock('@/ee/whitelabeling/components/branding-provider', () => ({
-  BrandingProvider: mockBrandingProvider,
-}))
-
 vi.mock('@/app/workspace/[workspaceId]/components/impersonation-banner', () => ({
   ImpersonationBanner: () => null,
 }))
@@ -77,10 +65,6 @@ vi.mock('@/app/workspace/[workspaceId]/w/components/sidebar/sidebar', () => ({
 
 vi.mock('@/app/workspace/[workspaceId]/components/workspace-access-denied', () => ({
   WorkspaceAccessDenied: () => <div>Workspace access denied</div>,
-}))
-
-vi.mock('@/app/workspace/[workspaceId]/providers/custom-blocks-loader', () => ({
-  CustomBlocksLoader: () => null,
 }))
 
 vi.mock('@/app/workspace/[workspaceId]/providers/block-visibility-loader', () => ({
@@ -149,18 +133,16 @@ describe('WorkspaceLayout host context', () => {
     mockPrefetchWorkspaceHostContext.mockResolvedValue(HOST_CONTEXT)
     mockPrefetchWorkspaceSidebar.mockResolvedValue(undefined)
     mockPrefetchWorkspaceAccess.mockResolvedValue(undefined)
-    mockGetOrgWhitelabelSettings.mockResolvedValue({ brandName: 'Host B' })
   })
 
-  it('hydrates branding from routed workspace B instead of viewer organization A', async () => {
+  it('loads routed workspace B data for a viewer whose active organization is A', async () => {
     const element = await WorkspaceLayout({
       children: <div>Workspace child</div>,
       params: Promise.resolve({ workspaceId: 'workspace-b' }),
     })
-    renderToStaticMarkup(element)
+    const html = renderToStaticMarkup(element)
 
-    expect(mockGetOrgWhitelabelSettings).toHaveBeenCalledWith('org-b')
-    expect(mockGetOrgWhitelabelSettings).not.toHaveBeenCalledWith('org-a')
+    expect(html).toContain('Workspace child')
     expect(mockPrefetchWorkspaceSidebar).toHaveBeenCalledWith(
       expect.anything(),
       'workspace-b',
@@ -173,17 +155,9 @@ describe('WorkspaceLayout host context', () => {
       userId: 'viewer-1',
       sessionId: 'session-1',
     })
-    expect(mockBrandingProvider).toHaveBeenCalledWith(
-      expect.objectContaining({
-        hostOrganizationId: 'org-b',
-        viewerIsHostOrganizationMember: false,
-        initialOrgSettings: { brandName: 'Host B' },
-      }),
-      undefined
-    )
   })
 
-  it('renders an explicit denial without loading workspace data or branding', async () => {
+  it('renders an explicit denial without loading workspace data', async () => {
     mockPrefetchWorkspaceHostContext.mockResolvedValue(null)
 
     const element = await WorkspaceLayout({
@@ -196,6 +170,5 @@ describe('WorkspaceLayout host context', () => {
     expect(html).not.toContain('Secret workspace child')
     expect(mockPrefetchWorkspaceSidebar).not.toHaveBeenCalled()
     expect(mockPrefetchWorkspaceAccess).not.toHaveBeenCalled()
-    expect(mockGetOrgWhitelabelSettings).not.toHaveBeenCalled()
   })
 })

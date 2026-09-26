@@ -15,7 +15,7 @@ vi.mock('@/lib/billing/organizations/membership', () => ({
   removeExternalUserFromOrganizationWorkspaces: mocks.external,
   WORKSPACE_BILLING_ACCOUNT_REMOVAL_ERROR: 'Billing owner cannot be removed',
 }))
-vi.mock('@/ee/scim/lib/managed-membership', () => ({ assertMembershipNotScimManaged: mocks.scim }))
+vi.mock('@/lib/labbai/scim/managed-membership', () => ({ assertMembershipNotScimManaged: mocks.scim }))
 
 import { ForbiddenOperationError } from '@/lib/core/application/forbidden'
 import {

@@ -10,17 +10,17 @@ import {
   ACCESS_REQUEST_MAX_ID_LENGTH,
   ACCESS_REQUEST_MAX_OFFSET,
   ACCESS_REQUEST_MAX_SEARCH_LENGTH,
-} from '@/ee/access-requests/lib/constants'
+} from '@/lib/labbai/access-requests/constants'
 import {
   storedAccessRequestDecisionSchema,
   storedAccessRequestPolicyChangeSchema,
   storedAccessRequestPolicyValueSchema,
   storedAccessRequestTargetSchema,
-} from '@/ee/access-requests/lib/schemas'
+} from '@/lib/labbai/access-requests/schemas'
 import {
   ACCESS_REQUEST_TARGET_KINDS,
   type AccessRequestScope as DomainAccessRequestScope,
-} from '@/ee/access-requests/lib/targets'
+} from '@/lib/labbai/access-requests/targets'
 
 export const ACCESS_REQUEST_STATUSES = [
   'pending',

@@ -34,7 +34,6 @@ Object.assign(process.env, {
   NEXT_PUBLIC_FORCE_HOSTED: 'false',
   INTERNAL_API_BASE_URL: 'http://localhost:3000',
   KNOWLEDGE_MEMBER_ACCESS: 'true',
-  CREDENTIAL_GROUPS: 'true',
   ACCESS_CONTROL_ENABLED: 'true',
   STORAGE_PROVIDER: 'local',
   OCR_PROVIDER: 'local',

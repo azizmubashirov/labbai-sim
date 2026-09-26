@@ -1,7 +1,7 @@
 import { createLogger, type Logger } from '@sim/logger'
 import { describeError } from '@sim/utils/errors'
 import { sleep } from '@sim/utils/helpers'
-import { isRecordLike, toRecord } from '@sim/utils/object'
+import { isRecordLike } from '@sim/utils/object'
 import { DrizzleQueryError } from 'drizzle-orm/errors'
 import { isTimeoutAbortReason } from '@/lib/core/execution-limits/types'
 import { redactApiKeys } from '@/lib/core/security/redaction'
@@ -13,14 +13,11 @@ import {
   hydrateUserFilesWithBase64,
 } from '@/lib/uploads/utils/user-file-base64.server'
 import { sanitizeInputFormat, sanitizeTools } from '@/lib/workflows/comparison/normalize'
-import { isCustomBlockType } from '@/blocks/custom/build-config'
-import { validateBlockType } from '@/ee/access-control/utils/permission-check'
+import { validateBlockType } from '@/lib/labbai/access-control/permission-check'
 import {
   BlockType,
   buildResumeApiUrl,
   buildResumeUiUrl,
-  CHILD_EXECUTION_ID_OUTPUT_KEY,
-  CHILD_TRACE_DISABLED_OUTPUT_KEY,
   DEFAULTS,
   EDGE,
   isHumanInTheLoopBlock,
@@ -364,21 +361,9 @@ export class BlockExecutor {
         if (normalizedOutput.childTraceSpans && Array.isArray(normalizedOutput.childTraceSpans)) {
           blockLog.childTraceSpans = normalizedOutput.childTraceSpans
         }
-        const childExecutionId = normalizedOutput[CHILD_EXECUTION_ID_OUTPUT_KEY]
-        if (typeof childExecutionId === 'string' && childExecutionId) {
-          blockLog.childExecution = { executionId: childExecutionId }
-        }
-        if (normalizedOutput[CHILD_TRACE_DISABLED_OUTPUT_KEY] === true) {
-          blockLog.childTraceDisabled = true
-        }
       }
 
-      const {
-        childTraceSpans: _traces,
-        [CHILD_EXECUTION_ID_OUTPUT_KEY]: _childExecutionId,
-        [CHILD_TRACE_DISABLED_OUTPUT_KEY]: _childTraceDisabled,
-        ...outputForState
-      } = normalizedOutput
+      const { childTraceSpans: _traces, ...outputForState } = normalizedOutput
       const stateOutput = outputForState as NormalizedBlockOutput
       const settledBlockRegistry = blockCtx.resolvedSecretTraceRegistry
       const stateProvenance = settledBlockRegistry?.exportCommittedProvenanceForValue(stateOutput)
@@ -685,24 +670,12 @@ export class BlockExecutor {
       errorOutput.content = partialContent
     }
 
-    // Only real workflow blocks surface a child workflow name. A custom block's
-    // source workflow is never named to its consumer — and before the handler
-    // resolves the real name this field still holds the source workflow id, so
-    // an early throw (e.g. the call-chain depth limit) would leak it outright.
+    // Only real workflow blocks surface a child workflow name.
     if (ChildWorkflowError.isChildWorkflowError(error)) {
       if (isWorkflowBlockType(block.metadata?.id)) {
         errorOutput.childWorkflowName = error.childWorkflowName
         if (error.childWorkflowSnapshotId) {
           errorOutput.childWorkflowSnapshotId = error.childWorkflowSnapshotId
-        }
-      }
-      // A custom block's consumer gets a machine-readable failure class and an
-      // opaque handle to the failed run — enough to branch on and to quote in a
-      // support request, without naming anything inside the source workflow.
-      if (error.consumerFacing) {
-        errorOutput.errorType = error.consumerFacing.errorType
-        if (error.consumerFacing.ref) {
-          errorOutput.errorRef = error.consumerFacing.ref
         }
       }
     }
@@ -721,14 +694,6 @@ export class BlockExecutor {
 
       if (ChildWorkflowError.isChildWorkflowError(error) && error.childTraceSpans.length > 0) {
         blockLog.childTraceSpans = error.childTraceSpans
-      }
-      // A failed custom block still has its own child run to join at read time —
-      // unless the instance opted out, which leaves only the marker.
-      if (ChildWorkflowError.isChildWorkflowError(error) && error.childExecutionId) {
-        blockLog.childExecution = { executionId: error.childExecutionId }
-      }
-      if (ChildWorkflowError.isChildWorkflowError(error) && error.childTraceDisabled) {
-        blockLog.childTraceDisabled = true
       }
     }
 
@@ -918,26 +883,7 @@ export class BlockExecutor {
     inputs: Record<string, any>,
     block?: SerializedBlock
   ): Record<string, any> {
-    const blockType = block?.metadata?.id
     const privateInputIds = new Set(block?.privateInputIds ?? [])
-    // Custom (deploy-as-block) blocks run via an internal `workflow_executor`; the
-    // baked `workflowId`/`inputMapping` wrapper is plumbing. Log the mapped input
-    // field values (the inputMapping contents) instead.
-    if (isCustomBlockType(blockType)) {
-      const mapping = inputs.inputMapping
-      const parsed =
-        typeof mapping === 'string'
-          ? (() => {
-              try {
-                return JSON.parse(mapping)
-              } catch {
-                return {}
-              }
-            })()
-          : mapping
-      inputs = toRecord(parsed)
-    }
-
     const result: Record<string, any> = {}
 
     for (const [key, value] of Object.entries(inputs)) {

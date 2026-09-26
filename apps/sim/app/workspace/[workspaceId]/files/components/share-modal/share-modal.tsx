@@ -18,7 +18,6 @@ import { Check, Link, Send } from '@sim/emcn/icons'
 import { generateShortId } from '@sim/utils/id'
 import { GeneratedPasswordInput } from '@/components/ui'
 import type { ShareAuthType, ShareRecord } from '@/lib/api/contracts/public-shares'
-import { useDeploymentShape } from '@/lib/core/config/deployment-shape'
 import { validateAllowlistEntry } from '@/lib/messaging/email/validation'
 import { useFileShare, useUpsertFileShare } from '@/hooks/queries/public-shares'
 import { usePermissionConfig } from '@/hooks/use-permission-config'
@@ -75,7 +74,6 @@ export function ShareModal({
   const { config: permissionConfig } = usePermissionConfig()
   const upsertShare = useUpsertFileShare()
   const { copied, copy } = useCopyToClipboard({ resetMs: 1500 })
-  const { features } = useDeploymentShape()
 
   const shareReadReady = isFetchedAfterMount && !isShareError
   const saved = shareReadReady ? (share ?? null) : (share ?? initialShare ?? null)
@@ -92,18 +90,18 @@ export function ShareModal({
   const isAuthTypeAllowed = (mode: ShareAuthType) =>
     allowedAuthTypes === null || allowedAuthTypes.includes(mode)
 
-  const ssoEnabled = features.sso || savedAccessMode === 'sso'
+  /** SSO sharing is retired; a share still saved as `sso` shows it only so it can be switched away. */
   const candidateAuthTypes: ShareAuthType[] = [
     'public',
     'password',
     'email',
-    ...(ssoEnabled ? (['sso'] as const) : []),
+    ...(savedAccessMode === 'sso' ? (['sso'] as const) : []),
   ]
   const accessModes = candidateAuthTypes.filter(
     (mode) => isAuthTypeAllowed(mode) || mode === savedAccessMode
   )
 
-  const modeDisallowed = !isAuthTypeAllowed(effectiveMode)
+  const modeDisallowed = !isAuthTypeAllowed(effectiveMode) || effectiveMode === 'sso'
   const enableBlockedByPolicy =
     (permissionConfig.disablePublicFileSharing && !saved?.isActive) || modeDisallowed
 
@@ -178,6 +176,8 @@ export function ShareModal({
 
   const accessHint = (() => {
     if (isShareError) return 'Unable to load the current sharing settings. Close and try again.'
+    if (effectiveMode === 'sso')
+      return 'SSO sharing is no longer supported. Choose another access method.'
     if (modeDisallowed) return 'This sharing method is disabled by an administrator.'
     if (enableBlockedByPolicy)
       return 'Public sharing is disabled for this workspace by an administrator.'
@@ -185,8 +185,6 @@ export function ShareModal({
       return 'Anyone with the link and the password can view and download this file.'
     if (effectiveMode === 'email')
       return 'Only allowed emails can access this file after a one-time code.'
-    if (effectiveMode === 'sso')
-      return 'Only allowed emails signed in via SSO can access this file.'
     return saved?.isActive && !isDirty
       ? 'Anyone with the link can view and download this file.'
       : `${saved?.isActive ? 'Update' : 'Share'} to make this file accessible to anyone with the link.`

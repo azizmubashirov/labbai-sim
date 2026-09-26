@@ -180,11 +180,11 @@ const START_RUN_METADATA_OUTPUT = {
     },
     workspaceId: {
       type: 'string',
-      description: 'Workspace ID of the invoking run (for custom blocks, the invoking workspace)',
+      description: 'Workspace ID of the invoking run',
     },
     workflowId: {
       type: 'string',
-      description: 'ID of the invoking workflow (for custom blocks, the invoking workflow)',
+      description: 'ID of the invoking workflow',
     },
     executionId: {
       type: 'string',

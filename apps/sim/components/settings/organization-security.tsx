@@ -1,14 +1,12 @@
 'use client'
 
 import { ChipCopyInput } from '@sim/emcn'
-import { SettingsPanel } from '@/components/settings/settings-panel'
-import { useDeploymentShape } from '@/lib/core/config/deployment-shape'
+import { ScimProvisioningSection } from '@/components/settings/scim/scim-provisioning-section'
 import {
   SettingsEmptyState,
   SettingsQueryErrorState,
 } from '@/app/workspace/[workspaceId]/settings/components/settings-empty-state'
 import { SettingsSection } from '@/app/workspace/[workspaceId]/settings/components/settings-section/settings-section'
-import { SessionPolicySettings } from '@/ee/session-policy/components/session-policy-settings'
 import { useOrganizationNetwork } from '@/hooks/queries/organization-network'
 
 interface OrganizationSecuritySettingsProps {
@@ -18,17 +16,9 @@ interface OrganizationSecuritySettingsProps {
 export function OrganizationSecuritySettings({
   organizationId,
 }: OrganizationSecuritySettingsProps) {
-  const { hosted, features } = useDeploymentShape()
-
   return (
     <div className='flex flex-col gap-7'>
-      {hosted || features.sessionPolicies ? (
-        <SettingsSection label='Session policies'>
-          <SessionPolicySettings key={organizationId} organizationId={organizationId} />
-        </SettingsSection>
-      ) : (
-        <SettingsPanel />
-      )}
+      <ScimProvisioningSection key={organizationId} organizationId={organizationId} />
       <OrganizationNetworkSection organizationId={organizationId} />
     </div>
   )

@@ -34,7 +34,7 @@ vi.mock('@sim/audit', () => ({
   AuditResourceType: { ORGANIZATION: 'organization' },
 }))
 
-vi.mock('@/lib/auth/sso/domain-verification', () => ({
+vi.mock('@/lib/organizations/domain-verification', () => ({
   checkDomainTxtRecord: mockCheckDomainTxtRecord,
   toDomainResponse: (row: { id: string; status: string }) => ({ id: row.id, status: row.status }),
 }))

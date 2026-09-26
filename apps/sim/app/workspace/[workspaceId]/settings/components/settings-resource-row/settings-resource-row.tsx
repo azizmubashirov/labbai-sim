@@ -35,7 +35,7 @@ interface SettingsResourceRowProps {
   iconVariant?: 'tile' | 'plain' | 'custom'
   /**
    * Let an image icon fill the tile edge-to-edge instead of clamping to 20px.
-   * Use for uploaded image/logo icons (e.g. custom blocks); glyph `<svg>`s still
+   * Use for uploaded image/logo icons; glyph `<svg>`s still
    * normalize to 20px so a fallback icon doesn't balloon. Tile variant only.
    */
   iconFill?: boolean

@@ -116,8 +116,8 @@ import {
   groupWorkflowsByFolder,
 } from '@/app/workspace/[workspaceId]/w/components/sidebar/utils'
 import { useImportWorkflow } from '@/app/workspace/[workspaceId]/w/hooks'
-import { useCustomBlockOverlayVersion } from '@/blocks/custom/client-overlay'
-import { useWorkspaceAccessRequestFeatures } from '@/ee/access-requests/components/permission-access-boundary'
+import { useBlockVisibilityVersion } from '@/blocks/visibility/version'
+import { useWorkspaceAccessRequestFeatures } from '@/components/access-requests/permission-access-boundary'
 import { useWorkspaceCredentials } from '@/hooks/queries/credentials'
 import { useFolderMap, useFolders } from '@/hooks/queries/folders'
 import { type LogFilters, useLogsList } from '@/hooks/queries/logs'
@@ -378,7 +378,7 @@ export const Sidebar = memo(function Sidebar() {
   const accessRequestsEnabled = accessRequests.data?.enabled === true
   const { getSettingsHref, navigateToSettings } = useSettingsNavigation()
   const initializeSearchData = useSearchModalStore((state) => state.initializeData)
-  const customBlockOverlayVersion = useCustomBlockOverlayVersion()
+  const blockVisibilityVersion = useBlockVisibilityVersion()
 
   useEffect(() => {
     initializeSearchData(filterBlocks, isToolAllowed)
@@ -386,7 +386,7 @@ export const Sidebar = memo(function Sidebar() {
     initializeSearchData,
     filterBlocks,
     isToolAllowed,
-    customBlockOverlayVersion,
+    blockVisibilityVersion,
   ])
 
   const setSidebarWidth = useSidebarStore((state) => state.setSidebarWidth)

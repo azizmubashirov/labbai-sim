@@ -41,8 +41,6 @@ for (const item of allNavigationItems) {
 const SECTION_ALIASES: Readonly<Record<string, SettingsSection>> = {
   team: 'organization',
   'api-keys': 'apikeys',
-  /** Verified domains moved into the SSO page. */
-  domains: 'sso',
   sessions: 'security',
 }
 

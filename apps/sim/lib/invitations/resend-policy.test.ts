@@ -26,7 +26,7 @@ vi.mock('@/lib/invitations/core', () => ({
   requireInvitationResendAuthority: mocks.authority,
   resolveInvitationAdmissionOrganizationId: mocks.admission,
 }))
-vi.mock('@/ee/access-control/utils/permission-check', () => ({
+vi.mock('@/lib/labbai/access-control/permission-check', () => ({
   validateInvitationsAllowed: mocks.capability,
 }))
 vi.mock('@/lib/workspaces/policy', () => ({

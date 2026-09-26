@@ -7,8 +7,8 @@ import { requestJson } from '@/lib/api/client/request'
 import { listCopilotChatsContract } from '@/lib/api/contracts/copilot'
 import { listKnowledgeBasesContract } from '@/lib/api/contracts/knowledge/base'
 import { listLogsContract } from '@/lib/api/contracts/logs'
-import { useCustomBlockOverlayVersion } from '@/blocks/custom/client-overlay'
 import { type IntegrationDescriptor, listIntegrations } from '@/blocks/integration-matcher'
+import { useBlockVisibilityVersion } from '@/blocks/visibility/version'
 import { useWorkflows } from '@/hooks/queries/workflows'
 import { usePermissionConfig } from '@/hooks/use-permission-config'
 import { useWorkflowRegistry } from '@/stores/workflows/registry/store'
@@ -131,12 +131,11 @@ export function useMentionData(props: UseMentionDataProps): MentionDataReturn {
   const [blocksList, setBlocksList] = useState<BlockItem[]>([])
   const [isLoadingBlocks, setIsLoadingBlocks] = useState(false)
 
-  // Reset on permission changes and on block-overlay bumps (custom-block or
-  // block-visibility hydrate) so late preview reveals refresh the folder.
-  const blockOverlayVersion = useCustomBlockOverlayVersion()
+  // Reset on permission changes and on block-visibility hydrate so late preview reveals refresh the folder.
+  const blockVisibilityVersion = useBlockVisibilityVersion()
   useEffect(() => {
     setBlocksList([])
-  }, [config.allowedIntegrations, blockOverlayVersion])
+  }, [config.allowedIntegrations, blockVisibilityVersion])
 
   const [logsList, setLogsList] = useState<LogItem[]>([])
   const [isLoadingLogs, setIsLoadingLogs] = useState(false)

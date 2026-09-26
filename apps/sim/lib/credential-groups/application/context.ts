@@ -18,11 +18,7 @@ export async function requireCredentialGroupsAvailable(workspaceId: string): Pro
     ownerBilling,
   })
   if (!availability.available) {
-    const message =
-      availability.reason === 'enterprise_plan_required'
-        ? 'Credential Groups are not available. Enterprise plan required.'
-        : 'Credential Groups are not available'
-    throw new OrchestrationError('forbidden', message)
+    throw new OrchestrationError('forbidden', 'Credential Groups are not available')
   }
 }
 

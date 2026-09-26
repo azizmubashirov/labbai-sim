@@ -1,9 +1,6 @@
-import { isHosted } from '@/lib/core/config/env-flags'
-import { isFeatureEnabled } from '@/lib/core/config/feature-flags'
-
 export type CredentialGroupsAvailability =
   | { available: true }
-  | { available: false; reason: 'feature_disabled' | 'enterprise_plan_required' }
+  | { available: false; reason: 'feature_disabled' }
 
 /**
  * The canonical organization and its billing entitlement. Personal workspaces
@@ -14,26 +11,18 @@ export interface CredentialGroupsAvailabilityInput {
   ownerBilling: { isEnterprise: boolean }
 }
 
+/**
+ * Credential Groups are always on in Labbai for any workspace that belongs to
+ * an organization. `ownerBilling` is accepted for caller compatibility only.
+ */
 export async function resolveCredentialGroupsAvailability({
   organizationId,
-  ownerBilling,
 }: CredentialGroupsAvailabilityInput): Promise<CredentialGroupsAvailability> {
-  if (
-    !organizationId ||
-    !(await isFeatureEnabled('credential-groups', { orgId: organizationId }))
-  ) {
-    return { available: false, reason: 'feature_disabled' }
-  }
-  if (isHosted && !ownerBilling.isEnterprise) {
-    return { available: false, reason: 'enterprise_plan_required' }
-  }
+  if (!organizationId) return { available: false, reason: 'feature_disabled' }
   return { available: true }
 }
 
-/**
- * Credential Groups use organization rollout targeting and require an active
- * Enterprise entitlement on Sim Cloud. Workspace flag targeting is not consulted.
- */
+/** Whether the organization behind a workspace can use Credential Groups. */
 export async function isCredentialGroupsAvailable(
   input: CredentialGroupsAvailabilityInput
 ): Promise<boolean> {

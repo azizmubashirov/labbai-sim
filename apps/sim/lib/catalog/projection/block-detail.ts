@@ -18,7 +18,6 @@ import {
   type CatalogToolSummary,
   projectToolDetail,
 } from '@/lib/catalog/projection/tool'
-import { isCustomBlockType } from '@/blocks/custom/build-config'
 import { type BlockConfig, isHiddenFromDisplay, type SubBlockConfig } from '@/blocks/types'
 import { getTrigger, isTriggerValid } from '@/triggers'
 import { SYSTEM_SUBBLOCK_IDS } from '@/triggers/constants'
@@ -359,37 +358,11 @@ export function projectBlockTriggers(block: BlockConfig): CatalogBlockTrigger[] 
   return triggers
 }
 
-/**
- * A custom (deploy-as-block) block's detail.
- *
- * A custom block runs a bound workflow through an internal executor, so it has
- * no operations and no author-visible tools — only its own input fields and the
- * outputs the bound workflow produces.
- */
-function projectCustomBlockDetail(block: BlockConfig): CatalogBlockDetail {
-  const visibleFields = (block.subBlocks ?? []).filter(
-    (subBlock) => !subBlock.hidden && !subBlock.hideFromCopilot
-  )
-  return {
-    ...projectBlockSummary(block),
-    inputSchema: visibleFields.map(projectSubBlock),
-    operationInputSchema: {},
-    inputDefinitions: {},
-    operations: {},
-    tools: [],
-    triggers: [],
-    outputs: projectBlockOutputs(block.outputs),
-    ...(block.bestPractices !== undefined ? { bestPractices: block.bestPractices } : {}),
-  }
-}
-
 /** Projects one block config to its full catalog detail. */
 export function projectBlockDetail(
   block: BlockConfig,
   options: BlockDetailProjectionOptions
 ): CatalogBlockDetail {
-  if (isCustomBlockType(block.type)) return projectCustomBlockDetail(block)
-
   const describeTool = options.describeTool ?? ((tool: CatalogToolSummary) => tool.description)
   const hidden = hiddenParamKeys(block)
   const inputDefinitions = computeBlockLevelInputs(block, hidden)

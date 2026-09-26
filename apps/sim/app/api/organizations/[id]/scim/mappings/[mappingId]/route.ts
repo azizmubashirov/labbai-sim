@@ -5,7 +5,7 @@ import {
   internalRateLimits,
   internalSessionAuth,
 } from '@/lib/api/server/routes'
-import { deleteScimGroupMapping } from '@/ee/scim/lib/application/admin/mappings'
+import { deleteScimGroupMapping } from '@/lib/labbai/scim/application/admin/mappings'
 
 export const DELETE = defineInternalJsonRoute({
   contract: deleteScimGroupMappingContract,

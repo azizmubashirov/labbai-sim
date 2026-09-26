@@ -1,6 +1,5 @@
 import {
   credential,
-  customBlock,
   customTools,
   document,
   folder as folderTable,
@@ -17,8 +16,6 @@ import {
   workspaceSandbox,
 } from '@sim/db/schema'
 import { and, asc, count, eq, exists, gt, inArray, isNull, sql } from 'drizzle-orm'
-import { alias } from 'drizzle-orm/pg-core'
-import type { ForkCopyableKind } from '@/lib/api/contracts/workspace-fork'
 import type { DbOrTx } from '@/lib/db/types'
 import { MAX_FOLDERS_PER_WORKSPACE } from '@/lib/folders/constants'
 import { parseFolderPath, ROOT_FOLDER_PATH } from '@/lib/folders/paths'
@@ -148,57 +145,6 @@ const skillCandidatesQuery = (
     : ids
       ? query
       : query.limit(CANDIDATE_LIMIT)
-}
-
-/**
- * Custom-block mapping candidates, keyed by BLOCK TYPE (`custom_block_<slug>`), not
- * `custom_block.id` — a placed block references the type, and every kind keys by whatever
- * the workflow references (`file` by storage key, `env-var` by name).
- *
- * The ONLY candidate query scoped by ORGANIZATION rather than workspace: `custom_block` is
- * keyed `(organization_id, type)` and binds a workflow in the PUBLISHER's workspace, so the
- * blocks a workspace may place are its org's, not its own. A fork inherits its parent's
- * organization, so both sides of an edge see the SAME candidate set — which is exactly why
- * an environment must be told which of them to bind. Two environments' blocks usually share
- * a name, so the label carries the source workspace to make that choice legible.
- *
- * Disabled blocks are excluded: `getCustomBlockAuthority` refuses them at execution, so
- * mapping onto one would produce a block that fails every run with `unavailable`.
- */
-const customBlockCandidatesQuery = async (
-  executor: DbOrTx,
-  workspaceId: string,
-  types?: string[]
-): Promise<ForkResourceCandidate[]> => {
-  const [consumerWorkspace] = await executor
-    .select({ organizationId: workspace.organizationId })
-    .from(workspace)
-    .where(eq(workspace.id, workspaceId))
-    .limit(1)
-  if (!consumerWorkspace?.organizationId) return []
-
-  const sourceWorkspace = alias(workspace, 'custom_block_source_workspace')
-  const query = executor
-    .select({
-      id: customBlock.type,
-      name: customBlock.name,
-      sourceWorkspaceName: sourceWorkspace.name,
-    })
-    .from(customBlock)
-    .innerJoin(workflow, eq(workflow.id, customBlock.workflowId))
-    .leftJoin(sourceWorkspace, eq(sourceWorkspace.id, workflow.workspaceId))
-    .where(
-      and(
-        eq(customBlock.organizationId, consumerWorkspace.organizationId),
-        eq(customBlock.enabled, true),
-        types ? inArray(customBlock.type, types) : undefined
-      )
-    )
-  const rows = await (types ? query : query.limit(CANDIDATE_LIMIT))
-  return rows.map((row) => ({
-    id: row.id,
-    label: row.sourceWorkspaceName ? `${row.name} (${row.sourceWorkspaceName})` : row.name,
-  }))
 }
 
 const mcpServerCandidatesQuery = (
@@ -347,7 +293,6 @@ export async function listForkResourceCandidates(
     skills,
     files,
     fileFolders,
-    customBlocks,
     sandboxes,
   ] = await Promise.all([
     executor
@@ -379,7 +324,6 @@ export async function listForkResourceCandidates(
     skillCandidatesQuery(executor, workspaceId),
     fileCandidatesQuery(executor, workspaceId),
     fileFolderCandidatesQuery(executor, workspaceId),
-    customBlockCandidatesQuery(executor, workspaceId),
     sandboxCandidatesQuery(executor, workspaceId),
   ])
 
@@ -400,7 +344,6 @@ export async function listForkResourceCandidates(
     'knowledge-base': kbs,
     'mcp-server': servers,
     'custom-tool': tools,
-    'custom-block': customBlocks,
     skill: skills,
     sandbox: sandboxes,
     'knowledge-document': [],
@@ -441,7 +384,6 @@ async function loadForkResourceRows(
   const mcpIds = ids('mcp-server')
   const toolIds = ids('custom-tool')
   const skillIds = ids('skill')
-  const customBlockIds = ids('custom-block')
   const sandboxIds = ids('sandbox')
   // Files are identified by storage key (not `workspace_files.id`); a copied file's mapping
   // target is its child storage key, so existence is checked by key in the target workspace.
@@ -458,7 +400,6 @@ async function loadForkResourceRows(
     skills,
     files,
     fileFolders,
-    customBlocks,
     sandboxes,
   ] = await Promise.all([
     credIds.length === 0
@@ -511,9 +452,6 @@ async function loadForkResourceRows(
     fileFolderPaths.length === 0
       ? Promise.resolve([] as ForkResourceRow[])
       : fileFolderCandidatesQuery(executor, workspaceId, fileFolderPaths),
-    customBlockIds.length === 0
-      ? Promise.resolve([] as ForkResourceRow[])
-      : customBlockCandidatesQuery(executor, workspaceId, customBlockIds),
     sandboxIds.length === 0
       ? Promise.resolve([] as ForkResourceRow[])
       : sandboxCandidatesQuery(executor, workspaceId, sandboxIds),
@@ -531,9 +469,6 @@ async function loadForkResourceRows(
   // `fileCandidatesQuery` exposes the storage key under `id`, so file rows key by `r.id`.
   if (fileKeys.length > 0) result.file = files
   if (fileFolderPaths.length > 0) result['file-folder'] = fileFolders
-  // Resolved through the workspace's ORGANIZATION, so a block published from a sibling
-  // workspace still counts as existing here - which is the normal case for an environment.
-  if (customBlockIds.length > 0) result['custom-block'] = customBlocks
   return result
 }
 
@@ -727,147 +662,6 @@ export async function listForkCopyableResources(
     workflowMcpServers: servers,
     deployedWorkflowCount: deployed[0]?.value ?? 0,
   }
-}
-
-/**
- * A copyable reference's display label plus its folder grouping. `parentId`/`parentLabel` are
- * populated only for files (their folder id + name; null at the workspace root) and are null for
- * every other copyable kind, which the picker renders flat.
- */
-export interface ForkCopyableLabel {
-  label: string
-  parentId: string | null
-  parentLabel: string | null
-}
-
-/**
- * One copyable resource in the sync SOURCE workspace, keyed the way the promote copy addresses
- * it: files by STORAGE KEY (matching `file-upload` references + `planForkFileCopies`), every
- * other kind by row id. `parentId`/`parentLabel` carry a file's folder grouping (null for
- * non-file kinds and root files).
- */
-export interface ForkCopyableSourceResource {
-  kind: ForkCopyableKind
-  sourceId: string
-  label: string
-  parentId: string | null
-  parentLabel: string | null
-}
-
-/**
- * Every copyable-kind resource in the sync source workspace (same archived/deleted filters and
- * per-kind {@link CANDIDATE_LIMIT} cap as the copy picker), as sync-copy candidate entries. The
- * promote plan filters these down to the UNREFERENCED-and-unmapped set it offers for copy
- * alongside the referenced candidates. Covers exactly the sync-copyable kinds
- * (`forkCopyableKindSchema`): workflow-publishing MCP servers are fork-copy-only shells, and
- * credentials / env vars are never copied.
- */
-export async function listForkCopyableSourceResources(
-  executor: DbOrTx,
-  sourceWorkspaceId: string
-): Promise<ForkCopyableSourceResource[]> {
-  const [files, tables, kbs, tools, skills, mcp] = await Promise.all([
-    fileCandidatesWithFolderQuery(executor, sourceWorkspaceId),
-    tableCandidatesQuery(executor, sourceWorkspaceId),
-    knowledgeBaseCandidatesQuery(executor, sourceWorkspaceId),
-    customToolCandidatesQuery(executor, sourceWorkspaceId),
-    skillCandidatesQuery(executor, sourceWorkspaceId),
-    mcpServerCandidatesQuery(executor, sourceWorkspaceId),
-  ])
-  const flat = (
-    kind: ForkCopyableKind,
-    rows: Array<{ id: string; label: string }>
-  ): ForkCopyableSourceResource[] =>
-    rows.map((row) => ({
-      kind,
-      sourceId: row.id,
-      label: row.label,
-      parentId: null,
-      parentLabel: null,
-    }))
-  return [
-    ...files.map((row) => ({
-      kind: 'file' as const,
-      sourceId: row.key,
-      label: row.label,
-      parentId: row.folderId,
-      parentLabel: row.folderName,
-    })),
-    ...flat('table', tables),
-    ...flat('knowledge-base', kbs),
-    ...flat('custom-tool', tools),
-    ...flat('skill', skills),
-    ...flat('mcp-server', mcp),
-  ]
-}
-
-/**
- * Labels (by exact id) for the copyable resource kinds referenced-but-unmapped at promote time,
- * scoped to the source workspace and the same archived/deleted filters as the copy picker. A
- * resource absent from the result no longer exists in the source, so it can't be copied and is
- * dropped from the sync copy candidates. Keyed `${kind}:${id}` so callers can look a reference up
- * directly; file entries additionally carry their folder grouping. Only kinds with ids are queried.
- */
-export async function loadForkCopyableResourceLabels(
-  executor: DbOrTx,
-  sourceWorkspaceId: string,
-  idsByKind: Partial<Record<ForkCopyableKind, string[]>>
-): Promise<Map<string, ForkCopyableLabel>> {
-  const labels = new Map<string, ForkCopyableLabel>()
-  const ids = (kind: ForkCopyableKind): string[] => {
-    const list = idsByKind[kind]
-    return list && list.length > 0 ? list : []
-  }
-  const kbIds = ids('knowledge-base')
-  const tableIds = ids('table')
-  const toolIds = ids('custom-tool')
-  const skillIds = ids('skill')
-  const mcpIds = ids('mcp-server')
-  // Files are keyed by storage key (not `workspace_files.id`), so they label by key.
-  const fileKeys = ids('file')
-
-  const [kbs, tables, tools, skills, mcp, files] = await Promise.all([
-    kbIds.length === 0
-      ? Promise.resolve([] as Array<{ id: string; label: string }>)
-      : knowledgeBaseCandidatesQuery(executor, sourceWorkspaceId, kbIds),
-    tableIds.length === 0
-      ? Promise.resolve([] as Array<{ id: string; label: string }>)
-      : tableCandidatesQuery(executor, sourceWorkspaceId, tableIds),
-    toolIds.length === 0
-      ? Promise.resolve([] as Array<{ id: string; label: string }>)
-      : customToolCandidatesQuery(executor, sourceWorkspaceId, toolIds),
-    skillIds.length === 0
-      ? Promise.resolve([] as Array<{ id: string; label: string }>)
-      : skillCandidatesQuery(executor, sourceWorkspaceId, skillIds),
-    mcpIds.length === 0
-      ? Promise.resolve([] as Array<{ id: string; label: string }>)
-      : mcpServerCandidatesQuery(executor, sourceWorkspaceId, mcpIds),
-    fileKeys.length === 0
-      ? Promise.resolve(
-          [] as Array<{
-            key: string
-            label: string
-            folderId: string | null
-            folderName: string | null
-          }>
-        )
-      : fileCandidatesWithFolderQuery(executor, sourceWorkspaceId, { keys: fileKeys }),
-  ])
-
-  const flat = (label: string): ForkCopyableLabel => ({ label, parentId: null, parentLabel: null })
-  for (const row of kbs) labels.set(`knowledge-base:${row.id}`, flat(row.label))
-  for (const row of tables) labels.set(`table:${row.id}`, flat(row.label))
-  for (const row of tools) labels.set(`custom-tool:${row.id}`, flat(row.label))
-  for (const row of skills) labels.set(`skill:${row.id}`, flat(row.label))
-  for (const row of mcp) labels.set(`mcp-server:${row.id}`, flat(row.label))
-  for (const row of files) {
-    labels.set(`file:${row.key}`, {
-      label: row.label,
-      parentId: row.folderId,
-      parentLabel: row.folderName,
-    })
-  }
-  return labels
 }
 
 /** Resolve a credential id to its stored mapping resource type. */

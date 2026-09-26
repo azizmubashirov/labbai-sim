@@ -6,11 +6,11 @@ import { cursorRoute, cursorScopeKey } from '@/lib/api/cursor-binding'
 import { defineV2JsonRoute, v2ApiKeyAuth, v2RateLimits } from '@/lib/api/server/routes'
 import { v2AccessRequestErrorPolicy } from '@/lib/api/server/routes/access-requests'
 import { readSortedCursor, writeSortedCursor } from '@/app/api/v2/lib/response'
-import { accessRequestOperations } from '@/ee/access-requests/lib/application/operations'
+import { accessRequestOperations } from '@/lib/labbai/access-requests/application/operations'
 import {
   createAccessRequest,
   listOrganizationAccessRequests,
-} from '@/ee/access-requests/lib/application/requests'
+} from '@/lib/labbai/access-requests/application/requests'
 
 function cursorFilters(
   params: { organizationId: string },

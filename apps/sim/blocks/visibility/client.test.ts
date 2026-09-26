@@ -5,8 +5,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { mockNotify } = vi.hoisted(() => ({ mockNotify: vi.fn() }))
 
-vi.mock('@/blocks/custom/client-overlay', () => ({
-  notifyBlockOverlayChanged: mockNotify,
+vi.mock('@/blocks/visibility/version', () => ({
+  notifyBlockVisibilityChanged: mockNotify,
 }))
 
 import type { BlockVisibilityState } from '@/lib/core/config/block-visibility'
@@ -38,7 +38,7 @@ describe('hydrateBlockVisibility', () => {
     unregister()
   })
 
-  it('applies state, fires invalidators, and bumps the overlay version', () => {
+  it('applies state, fires invalidators, and bumps the visibility version', () => {
     const invalidator = vi.fn()
     const unregister = registerBlockCacheInvalidator(invalidator)
 

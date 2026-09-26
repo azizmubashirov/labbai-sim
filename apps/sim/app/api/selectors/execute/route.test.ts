@@ -77,7 +77,7 @@ import {
   SelectorOptionsUnavailableError,
 } from '@/lib/selectors/server/errors'
 import { POST } from '@/app/api/selectors/execute/route'
-import { IntegrationNotAllowedError } from '@/ee/access-control/utils/permission-check'
+import { IntegrationNotAllowedError } from '@/lib/labbai/access-control/permission-check'
 
 function project(error: unknown) {
   const result = mocks.errorPolicy?.project(error)

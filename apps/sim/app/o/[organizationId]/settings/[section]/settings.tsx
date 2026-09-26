@@ -26,7 +26,7 @@ const OrganizationSearchMcp = dynamic(() =>
   )
 )
 const OrganizationConnectedAccounts = dynamic(() =>
-  import('@/ee/credential-groups/components/organization-connected-accounts').then(
+  import('@/components/settings/credential-groups/organization-connected-accounts').then(
     (m) => m.OrganizationConnectedAccounts
   )
 )
@@ -37,35 +37,18 @@ const TeamManagement = dynamic(() =>
   )
 )
 const AccessControl = dynamic(() =>
-  import('@/ee/access-control/components/access-control').then((m) => m.AccessControl)
+  import('@/components/settings/access-control/access-control').then((m) => m.AccessControl)
 )
 const AccessRequestsSettings = dynamic(() =>
-  import('@/ee/access-requests/components/access-requests-settings').then(
+  import('@/components/access-requests/access-requests-settings').then(
     (m) => m.AccessRequestsSettings
   )
 )
 const AuditLogs = dynamic(() =>
-  import('@/ee/audit-logs/components/audit-logs').then((m) => m.AuditLogs)
-)
-const SSO = dynamic(() => import('@/ee/sso/components/sso-settings').then((m) => m.SSO))
-const DataRetentionSettings = dynamic(() =>
-  import('@/ee/data-retention/components/data-retention-settings').then(
-    (m) => m.DataRetentionSettings
-  )
-)
-const DataDrainsSettings = dynamic(() =>
-  import('@/ee/data-drains/components/data-drains-settings').then((m) => m.DataDrainsSettings)
+  import('@/components/settings/audit-logs/audit-logs').then((m) => m.AuditLogs)
 )
 const OrganizationSecuritySettings = dynamic(() =>
   import('@/components/settings/organization-security').then((m) => m.OrganizationSecuritySettings)
-)
-const UsageMonitoring = dynamic(() =>
-  import('@/ee/organization-usage/components/usage-monitoring').then((m) => m.UsageMonitoring)
-)
-const WhitelabelingSettings = dynamic(() =>
-  import('@/ee/whitelabeling/components/whitelabeling-settings').then(
-    (m) => m.WhitelabelingSettings
-  )
 )
 
 interface OrganizationSettingsProps {
@@ -107,18 +90,7 @@ export function OrganizationSettings({ section }: OrganizationSettingsProps) {
         />
       )}
       {section === 'audit-logs' && <AuditLogs organizationId={organizationId} />}
-      {section === 'usage' && (
-        <UsageMonitoring
-          organizationId={organizationId}
-          eventsHref={`${getOrganizationSettingsHref(organizationId, 'usage')}/events`}
-          auditLogsHref={getOrganizationSettingsHref(organizationId, 'audit-logs')}
-        />
-      )}
-      {section === 'sso' && <SSO organizationId={organizationId} />}
       {section === 'security' && <OrganizationSecuritySettings organizationId={organizationId} />}
-      {section === 'data-retention' && <DataRetentionSettings organizationId={organizationId} />}
-      {section === 'data-drains' && <DataDrainsSettings organizationId={organizationId} />}
-      {section === 'whitelabeling' && <WhitelabelingSettings organizationId={organizationId} />}
     </SettingsSectionProvider>
   )
 }

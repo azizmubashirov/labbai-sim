@@ -10,7 +10,6 @@ const mocks = vi.hoisted(() => ({
   resolvePermission: vi.fn(),
   allowedIntegrationTypes: vi.fn(),
   getBlockVisibility: vi.fn(),
-  listCustomBlocks: vi.fn(),
   isDeploymentAvailable: vi.fn(),
   recordAudit: vi.fn(),
   getAllBlocks: vi.fn(),
@@ -46,16 +45,8 @@ vi.mock('@/lib/core/config/block-visibility', () => ({
   getBlockVisibility: mocks.getBlockVisibility,
 }))
 
-vi.mock('@/lib/workflows/custom-blocks/operations', () => ({
-  listCustomBlocksWithInputsForWorkspace: mocks.listCustomBlocks,
-}))
-
 vi.mock('@/lib/integrations/availability.server', () => ({
   isIntegrationDeploymentAvailableForVisibility: mocks.isDeploymentAvailable,
-}))
-
-vi.mock('@/blocks/custom/server-overlay', () => ({
-  withCustomBlockOverlay: <T>(_rows: unknown, run: () => Promise<T>) => run(),
 }))
 
 vi.mock('@/blocks/visibility/server-context', () => ({
@@ -187,10 +178,10 @@ const previewBlock = block({
   preview: true,
   tools: { access: ['preview_call'] },
 })
-const customBlock = block({
-  type: 'custom_block_reports',
-  name: 'Reports',
-  description: 'Run the reports workflow.',
+const reportsBlock = block({
+  type: 'airtable',
+  name: 'Airtable',
+  description: 'Read and write Airtable records.',
 })
 /** A superseded version: present in the registry, hidden from every discovery surface. */
 const confluenceV1 = block({
@@ -261,20 +252,19 @@ describe('catalog block and tool reads', () => {
     mocks.resolvePermission.mockResolvedValue('read')
     mocks.allowedIntegrationTypes.mockResolvedValue(null)
     setVisibility(NOTHING_GATED)
-    mocks.listCustomBlocks.mockResolvedValue([])
     mocks.isDeploymentAvailable.mockReturnValue(true)
     setEnvFlags({ isHosted: true })
-    mocks.getAllBlocks.mockReturnValue([slackBlock, notionBlock, customBlock])
+    mocks.getAllBlocks.mockReturnValue([slackBlock, notionBlock, reportsBlock])
     /** `isBlockTypeAccessControlExempt` reads the pure registry lookup. */
     mocks.getBlock.mockImplementation((type: string) =>
-      [slackBlock, notionBlock, previewBlock, customBlock].find((entry) => entry.type === type)
+      [slackBlock, notionBlock, previewBlock, reportsBlock].find((entry) => entry.type === type)
     )
     mocks.getLatestBlockForViewer.mockImplementation((type: string) =>
       resolveLatestForViewer(type, [
         slackBlock,
         notionBlock,
         previewBlock,
-        customBlock,
+        reportsBlock,
         confluenceV1,
         confluenceV2,
       ])
@@ -284,11 +274,7 @@ describe('catalog block and tool reads', () => {
   it('lists blocks for a session principal and records no audit', async () => {
     const result = await listCatalogBlocks.execute({ principal: session, input: listInput })
 
-    expect(result.entries.map((entry) => entry.id)).toEqual([
-      'custom_block_reports',
-      'notion',
-      'slack',
-    ])
+    expect(result.entries.map((entry) => entry.id)).toEqual(['airtable', 'notion', 'slack'])
     expect(result.hasMore).toBe(false)
     expect(mocks.recordAudit).not.toHaveBeenCalled()
   })
@@ -305,17 +291,6 @@ describe('catalog block and tool reads', () => {
     await listCatalogBlocks.execute({ principal: session, input: listInput })
 
     expect(mocks.getBlockVisibility).toHaveBeenCalledWith({ userId: 'user-1', orgId: 'org-1' })
-  })
-
-  it('discriminates a workspace custom block from a shipped one', async () => {
-    const result = await listCatalogBlocks.execute({ principal: session, input: listInput })
-
-    const sources = Object.fromEntries(result.entries.map((entry) => [entry.id, entry.source]))
-    expect(sources).toEqual({
-      custom_block_reports: 'custom',
-      notion: 'builtin',
-      slack: 'builtin',
-    })
   })
 
   it('answers not found for a workspace the caller cannot reach', async () => {
@@ -401,7 +376,7 @@ describe('catalog block and tool reads', () => {
     mocks.isDeploymentAvailable.mockImplementation((type: string) => type !== 'notion')
 
     const result = await listCatalogBlocks.execute({ principal: session, input: listInput })
-    expect(result.entries.map((entry) => entry.id)).toEqual(['custom_block_reports', 'slack'])
+    expect(result.entries.map((entry) => entry.id)).toEqual(['airtable', 'slack'])
   })
 
   it('narrows to trigger-capable blocks without a second endpoint', async () => {
@@ -424,7 +399,7 @@ describe('catalog block and tool reads', () => {
       principal: session,
       input: { ...listInput, limit: 2 },
     })
-    expect(first.entries.map((entry) => entry.id)).toEqual(['custom_block_reports', 'notion'])
+    expect(first.entries.map((entry) => entry.id)).toEqual(['airtable', 'notion'])
     expect(first.hasMore).toBe(true)
 
     const second = await listCatalogBlocks.execute({

@@ -7,7 +7,6 @@ import {
   type SelectorKey,
 } from '@/lib/selectors/manifest'
 import type { SelectorContext } from '@/lib/selectors/types'
-import { collectForkCustomBlockReconfigs } from '@/lib/workflows/references/custom-block-reconfigs'
 import { collectForkDependentReconfigs } from '@/lib/workflows/references/dependent-reconfigs'
 import type {
   MappedImportOptions,
@@ -15,7 +14,6 @@ import type {
 } from '@/lib/workflows/references/import-plan'
 import { readReferenceValue } from '@/lib/workflows/references/manifest'
 import {
-  parseCustomBlockInputStorageKey,
   parseNestedDependentKey,
   readTargetDraftDependentValue,
 } from '@/lib/workflows/references/remap-references'
@@ -41,8 +39,7 @@ export interface ImportConfigurationField {
 /** Uses the same registered dependency graph as sync; all public identities remain source identities. */
 export async function inspectImportConfiguration(
   plan: WorkflowImportPlan,
-  options: MappedImportOptions,
-  workspaceId: string
+  options: MappedImportOptions
 ) {
   const identity = 'import'
   const items = [
@@ -50,17 +47,7 @@ export async function inspectImportConfiguration(
   ]
   const sourceStates = new Map([[identity, plan.sourceState]])
   const resolveBlock = (_workflowId: string, blockId: string) => blockId
-  const fields = [
-    ...collectForkDependentReconfigs(items, sourceStates, resolveBlock, 'create', true),
-    ...(await collectForkCustomBlockReconfigs({
-      items,
-      sourceStates,
-      resolveTargetBlockId: resolveBlock,
-      targetWorkspaceId: workspaceId,
-      resolve: (kind, id) =>
-        plan.bindings.find((binding) => binding.kind === kind && binding.sourceId === id)?.targetId,
-    })),
-  ]
+  const fields = collectForkDependentReconfigs(items, sourceStates, resolveBlock, 'create', true)
   for (const value of options.dependentValues ?? []) {
     if (
       !fields.some(
@@ -88,10 +75,11 @@ export async function inspectImportConfiguration(
   }
   return fields.map((field) => {
     const block = plan.state.blocks[field.targetBlockId]
-    const custom = parseCustomBlockInputStorageKey(field.subBlockKey)
-    const value = custom
-      ? String(block.subBlocks[custom.fieldId]?.value ?? '')
-      : readTargetDraftDependentValue(block.subBlocks, block.subBlocks, field.subBlockKey)
+    const value = readTargetDraftDependentValue(
+      block.subBlocks,
+      block.subBlocks,
+      field.subBlockKey
+    )
     let context: SelectorContext = {}
     let requiresAuthentication = false
     if (field.selectorKey) {

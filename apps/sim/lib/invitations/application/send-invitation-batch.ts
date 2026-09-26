@@ -32,7 +32,7 @@ import { createOrganizationInvitation } from '@/lib/organizations/application/in
 import { assertWorkspaceCapability } from '@/lib/permission-groups/capability-assertions'
 import { resolveActiveWorkspaceApplicationContext } from '@/lib/workspaces/application/workspace-context'
 import { getWorkspaceInvitePolicy } from '@/lib/workspaces/policy'
-import { InvitationsNotAllowedError } from '@/ee/access-control/utils/permission-check'
+import { InvitationsNotAllowedError } from '@/lib/labbai/access-control/permission-check'
 
 const logger = createLogger('InvitationBatch')
 

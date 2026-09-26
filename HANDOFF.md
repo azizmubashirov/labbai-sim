@@ -44,11 +44,18 @@ Done on the branch:
   `components/settings/audit-logs/*`, `components/settings/credential-groups/*`,
   `hooks/queries/audit-logs.ts`; credential groups always on (no enterprise gate/env).
 - SSO, whitelabeling, session policy removed; branding is static (`lib/branding/index.ts`).
+- Access requests re-implemented: `lib/labbai/access-requests/*`, `components/access-requests/*`
+  (gap: no "grant me workspace access" request; preview impact counts approximate).
+- SCIM 2.0 re-implemented: `lib/labbai/scim/*`, `components/settings/scim/*`, `hooks/queries/scim.ts`,
+  Security page section (gaps: new accounts skip signup hooks, eq-only filters, no
+  verified-domain check; `isScimEnabled` flag must stay).
+- Custom blocks fully removed (registry, executor, copilot tool, VFS, logs, catalog `source=builtin` only).
+  Leftover: remove `isCustomBlocksEnabled` (env-flags.ts + testing mock), `CUSTOM_BLOCKS_ENABLED`
+  (+ NEXT_PUBLIC) from env.ts/.env.example; `settings-sidebar.test.tsx` and
+  `workspace-section-access.test.ts` feature fixtures still list removed keys (dataDrains, sso, …).
 
 Possibly unfinished (helpers were stopped / may have been mid-edit — verify each):
-- Access requests re-implementation.
-- SCIM re-implementation (`components/settings/organization-security.tsx` still imported ee).
-- Removal of data retention, data drains, custom blocks, organization usage/search stats.
+- Removal of data retention, data drains, organization usage/search stats (custom blocks: done).
 
 Leftover TODOs reported by helpers:
 - Navigation (`components/settings/navigation.ts` + tests): remove section ids `forks`,

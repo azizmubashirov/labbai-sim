@@ -13,7 +13,7 @@ import { assertedWorkflowWorkspaceId } from '@/lib/workflows/application/princip
 import {
   PublicApiNotAllowedError,
   validatePublicApiAllowed,
-} from '@/ee/access-control/utils/permission-check'
+} from '@/lib/labbai/access-control/permission-check'
 
 export interface UpdateWorkflowPublicApiInput {
   workflowId: string

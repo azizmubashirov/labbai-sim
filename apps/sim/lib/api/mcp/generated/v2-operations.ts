@@ -148,11 +148,6 @@ import {
 } from '@/lib/api/contracts/v2/mcp-servers'
 import { v2GetMetaContract } from '@/lib/api/contracts/v2/meta'
 import {
-  v2GetOrganizationUsageBreakdownContract,
-  v2GetOrganizationUsageSummaryContract,
-  v2ListOrganizationUsageEventsContract,
-} from '@/lib/api/contracts/v2/organization-usage'
-import {
   v2CreateOrganizationInvitationContract,
   v2GetOrganizationContract,
   v2GetOrganizationInvitationContract,
@@ -292,23 +287,6 @@ import {
   v2UpdateWorkflowPublicApiContract,
   v2UpdateWorkflowVersionContract,
 } from '@/lib/api/contracts/v2/workflows'
-import {
-  v2ForkWorkspaceContract,
-  v2GetWorkspaceForkAvailabilityContract,
-  v2GetWorkspaceForkLineageContract,
-  v2GetWorkspaceForkMappingsContract,
-  v2ListWorkspaceForkChildrenContract,
-  v2ListWorkspaceForkResourcesContract,
-  v2PreviewWorkspaceForkContract,
-  v2PreviewWorkspacePullContract,
-  v2PreviewWorkspacePushContract,
-  v2PullWorkspaceContract,
-  v2PushWorkspaceContract,
-  v2RollbackWorkspaceForkContract,
-  v2UnlinkWorkspaceForkContract,
-  v2UpdateWorkspaceForkExclusionsContract,
-  v2UpdateWorkspaceForkMappingsContract,
-} from '@/lib/api/contracts/v2/workspace-fork'
 import { v2CreateWorkspaceInvitationsContract } from '@/lib/api/contracts/v2/workspace-invitations'
 import {
   v2GetWorkspaceOperationContract,
@@ -1141,15 +1119,6 @@ export const V2_MCP_OPERATIONS = {
     handler: () =>
       import('@/app/api/v2/workflows/[workflowId]/export/route').then((route) => route.GET),
   },
-  forkWorkspace: {
-    contract: v2ForkWorkspaceContract,
-    summary: 'Fork Workspace',
-    description:
-      'Create a child workspace with undeployed workflow drafts. Requires the reviewed preview fingerprint and a stable request ID. Identical retries return the same operation; reuse with different inputs returns 409. Poll Get Workspace Operation until selected resource copies complete. Workspace API keys return `403`; use a personal API key or scoped OAuth token.\n\nOAuth scope: `api:write`.',
-    workspaceKeyUnsupported: true,
-    handler: () =>
-      import('@/app/api/v2/workspaces/[workspaceId]/fork/route').then((route) => route.POST),
-  },
   getAuditLog: {
     contract: v2GetAuditLogContract,
     summary: 'Get Audit Log',
@@ -1313,28 +1282,6 @@ export const V2_MCP_OPERATIONS = {
         (route) => route.GET
       ),
   },
-  getOrganizationUsageBreakdown: {
-    contract: v2GetOrganizationUsageBreakdownContract,
-    summary: 'Get Organization Usage Breakdown',
-    description:
-      'Read ranked organization usage by member, workspace, workflow, model, BYOK provider, or source. Requires organization administrator access and Usage Monitoring. Omitted usage is summarized in other. BYOK ranks tokens; other dimensions rank cost. More than 10,000 underlying groups returns 413; narrow the window or workspace. Workspace API keys return `403`; use a personal API key or scoped OAuth token.\n\nOAuth scope: `api:read`.',
-    workspaceKeyUnsupported: true,
-    handler: () =>
-      import('@/app/api/v2/organizations/[organizationId]/usage/breakdown/route').then(
-        (route) => route.GET
-      ),
-  },
-  getOrganizationUsageSummary: {
-    contract: v2GetOrganizationUsageSummaryContract,
-    summary: 'Get Organization Usage Summary',
-    description:
-      'Read pooled credits, a usage series, and an exact previous-period comparison when available. Requires organization administrator access and Usage Monitoring (Enterprise on hosted; enabled on self-hosted). Defaults to 30 days. Custom dates include both dates in the selected timezone and cannot exceed 92 days. Billing windows exceeding 366 days are rejected. Workspace API keys return `403`; use a personal API key or scoped OAuth token.\n\nOAuth scope: `api:read`.',
-    workspaceKeyUnsupported: true,
-    handler: () =>
-      import('@/app/api/v2/organizations/[organizationId]/usage/summary/route').then(
-        (route) => route.GET
-      ),
-  },
   getPermissionGroup: {
     contract: v2GetPermissionGroupContract,
     summary: 'Get Permission Group',
@@ -1481,37 +1428,6 @@ export const V2_MCP_OPERATIONS = {
     summary: 'Get Workspace',
     description: 'Get metadata for an accessible workspace.\n\nOAuth scope: `api:read`.',
     handler: () => import('@/app/api/v2/workspaces/[workspaceId]/route').then((route) => route.GET),
-  },
-  getWorkspaceForkAvailability: {
-    contract: v2GetWorkspaceForkAvailabilityContract,
-    summary: 'Get Workspace Fork Availability',
-    description:
-      'Inspect workspace fork information and copyable resources. Lineage does not grant access to the other workspace; fork creation requires source admin and sync requires admin on both sides. Workspace API keys return `403`; use a personal API key or scoped OAuth token.\n\nOAuth scope: `api:read`.',
-    workspaceKeyUnsupported: true,
-    handler: () =>
-      import('@/app/api/v2/workspaces/[workspaceId]/fork/availability/route').then(
-        (route) => route.GET
-      ),
-  },
-  getWorkspaceForkLineage: {
-    contract: v2GetWorkspaceForkLineageContract,
-    summary: 'Get Workspace Fork Lineage',
-    description:
-      'Inspect workspace fork information and copyable resources. Lineage does not grant access to the other workspace; fork creation requires source admin and sync requires admin on both sides. Workspace API keys return `403`; use a personal API key or scoped OAuth token.\n\nOAuth scope: `api:read`.',
-    workspaceKeyUnsupported: true,
-    handler: () =>
-      import('@/app/api/v2/workspaces/[workspaceId]/fork/lineage/route').then((route) => route.GET),
-  },
-  getWorkspaceForkMappings: {
-    contract: v2GetWorkspaceForkMappingsContract,
-    summary: 'Get Workspace Fork Mappings',
-    description:
-      'Read persisted mappings in the requested source-to-target direction. Candidate discovery uses the destination resource and selector listing operations. Workspace API keys return `403`; use a personal API key or scoped OAuth token.\n\nOAuth scope: `api:read`.',
-    workspaceKeyUnsupported: true,
-    handler: () =>
-      import('@/app/api/v2/workspaces/[workspaceId]/fork/mappings/route').then(
-        (route) => route.GET
-      ),
   },
   getWorkspaceOperation: {
     contract: v2GetWorkspaceOperationContract,
@@ -1799,17 +1715,6 @@ export const V2_MCP_OPERATIONS = {
     workspaceKeyUnsupported: true,
     handler: () => import('@/app/api/v2/organizations/route').then((route) => route.GET),
   },
-  listOrganizationUsageEvents: {
-    contract: v2ListOrganizationUsageEventsContract,
-    summary: 'List Organization Usage Events',
-    description:
-      'Page through usage events, including zero-cost reporting. Requires organization administrator access and Usage Monitoring. Defaults to 30 days. Cursors retain the initial reporting window; keep filters and sort unchanged while paging. The sim-chat source covers both chat surfaces. Per-event rounding can produce credits=0 with hasCost=true. Workspace API keys return `403`; use a personal API key or scoped OAuth token.\n\nOAuth scope: `api:read`.',
-    workspaceKeyUnsupported: true,
-    handler: () =>
-      import('@/app/api/v2/organizations/[organizationId]/usage/events/route').then(
-        (route) => route.GET
-      ),
-  },
   listOrganizationWorkspaces: {
     contract: v2ListOrganizationWorkspacesContract,
     summary: 'List Organization Workspaces',
@@ -1970,28 +1875,6 @@ export const V2_MCP_OPERATIONS = {
     handler: () =>
       import('@/app/api/v2/workflows/[workflowId]/versions/route').then((route) => route.GET),
   },
-  listWorkspaceForkChildren: {
-    contract: v2ListWorkspaceForkChildrenContract,
-    summary: 'List Workspace Fork Children',
-    description:
-      'Inspect workspace fork information and copyable resources. Lineage does not grant access to the other workspace; fork creation requires source admin and sync requires admin on both sides. Workspace API keys return `403`; use a personal API key or scoped OAuth token.\n\nOAuth scope: `api:read`.',
-    workspaceKeyUnsupported: true,
-    handler: () =>
-      import('@/app/api/v2/workspaces/[workspaceId]/fork/children/route').then(
-        (route) => route.GET
-      ),
-  },
-  listWorkspaceForkResources: {
-    contract: v2ListWorkspaceForkResourcesContract,
-    summary: 'List Workspace Fork Resources',
-    description:
-      'Inspect workspace fork information and copyable resources. Lineage does not grant access to the other workspace; fork creation requires source admin and sync requires admin on both sides. Workspace API keys return `403`; use a personal API key or scoped OAuth token.\n\nOAuth scope: `api:read`.',
-    workspaceKeyUnsupported: true,
-    handler: () =>
-      import('@/app/api/v2/workspaces/[workspaceId]/fork/resources/route').then(
-        (route) => route.GET
-      ),
-  },
   listWorkspaceMembers: {
     contract: v2ListWorkspaceMembersContract,
     summary: 'List Workspace Members',
@@ -2054,57 +1937,6 @@ export const V2_MCP_OPERATIONS = {
       'Validate destination mappings and dependent choices without creating a workflow. Returns unresolved fields, discovery instructions, and a fingerprint required by mapped import. No source workspace is queried from imported provenance.\n\nOAuth scope: `api:write`.',
     handler: () =>
       import('@/app/api/v2/workflows/import/preview/route').then((route) => route.POST),
-  },
-  previewWorkspaceFork: {
-    contract: v2PreviewWorkspaceForkContract,
-    summary: 'Preview Workspace Fork',
-    description:
-      'Preview the deployed workflows and explicitly selected resources that a new workspace fork would copy. The result is read-only and supplies the fingerprint required by Fork Workspace. Workspace API keys return `403`; use a personal API key or scoped OAuth token.\n\nOAuth scope: `api:write`.',
-    workspaceKeyUnsupported: true,
-    handler: () =>
-      import('@/app/api/v2/workspaces/[workspaceId]/fork/preview/route').then(
-        (route) => route.POST
-      ),
-  },
-  previewWorkspacePull: {
-    contract: v2PreviewWorkspacePullContract,
-    summary: 'Preview Workspace Pull',
-    description:
-      'Preview deployed source workflows replacing mapped targets along a direct fork edge. Push sends the current workspace to the other; pull brings the other into the current workspace. Proposed mappings are not saved. Dependent choices use source workflow, block, and field identities. Workspace API keys return `403`; use a personal API key or scoped OAuth token.\n\nOAuth scope: `api:write`.',
-    workspaceKeyUnsupported: true,
-    handler: () =>
-      import('@/app/api/v2/workspaces/[workspaceId]/fork/pull/preview/route').then(
-        (route) => route.POST
-      ),
-  },
-  previewWorkspacePush: {
-    contract: v2PreviewWorkspacePushContract,
-    summary: 'Preview Workspace Push',
-    description:
-      'Preview deployed source workflows replacing mapped targets along a direct fork edge. Push sends the current workspace to the other; pull brings the other into the current workspace. Proposed mappings are not saved. Dependent choices use source workflow, block, and field identities. Workspace API keys return `403`; use a personal API key or scoped OAuth token.\n\nOAuth scope: `api:write`.',
-    workspaceKeyUnsupported: true,
-    handler: () =>
-      import('@/app/api/v2/workspaces/[workspaceId]/fork/push/preview/route').then(
-        (route) => route.POST
-      ),
-  },
-  pullWorkspace: {
-    contract: v2PullWorkspaceContract,
-    summary: 'Pull Workspace',
-    description:
-      'Apply a reviewed push or pull with inline mappings in one transaction. Requires confirmation, the preview fingerprint, and a stable request ID. Unresolved or changed plans return 409 without applying. The receipt distinguishes committed changes from copy and deployment readiness; poll Get Workspace Operation before treating the target as ready. Workspace API keys return `403`; use a personal API key or scoped OAuth token.\n\nOAuth scope: `api:write`.',
-    workspaceKeyUnsupported: true,
-    handler: () =>
-      import('@/app/api/v2/workspaces/[workspaceId]/fork/pull/route').then((route) => route.POST),
-  },
-  pushWorkspace: {
-    contract: v2PushWorkspaceContract,
-    summary: 'Push Workspace',
-    description:
-      'Apply a reviewed push or pull with inline mappings in one transaction. Requires confirmation, the preview fingerprint, and a stable request ID. Unresolved or changed plans return 409 without applying. The receipt distinguishes committed changes from copy and deployment readiness; poll Get Workspace Operation before treating the target as ready. Workspace API keys return `403`; use a personal API key or scoped OAuth token.\n\nOAuth scope: `api:write`.',
-    workspaceKeyUnsupported: true,
-    handler: () =>
-      import('@/app/api/v2/workspaces/[workspaceId]/fork/push/route').then((route) => route.POST),
   },
   queryRows: {
     contract: v2QueryRowsContract,
@@ -2342,17 +2174,6 @@ export const V2_MCP_OPERATIONS = {
     handler: () =>
       import('@/app/api/v2/workflows/[workflowId]/rollback/route').then((route) => route.POST),
   },
-  rollbackWorkspaceFork: {
-    contract: v2RollbackWorkspaceForkContract,
-    summary: 'Rollback Workspace Fork',
-    description:
-      'Restore the latest sync into this workspace using its prior deployed versions. Requires target admin. It does not restore arbitrary drafts or remove every copied resource. Pending activations are reported. Workspace API keys return `403`; use a personal API key or scoped OAuth token.\n\nOAuth scope: `api:write`.',
-    workspaceKeyUnsupported: true,
-    handler: () =>
-      import('@/app/api/v2/workspaces/[workspaceId]/fork/rollback/route').then(
-        (route) => route.POST
-      ),
-  },
   searchFileContent: {
     contract: v2SearchFileContentContract,
     summary: 'Search File Content',
@@ -2423,15 +2244,6 @@ export const V2_MCP_OPERATIONS = {
       import('@/app/api/v2/workflow-mcp-servers/[serverId]/tools/[workflowId]/route').then(
         (route) => route.DELETE
       ),
-  },
-  unlinkWorkspaceFork: {
-    contract: v2UnlinkWorkspaceForkContract,
-    summary: 'Unlink Workspace Fork',
-    description:
-      'Remove the direct fork relationship and its mappings. Requires admin on the acting workspace. Existing workflow and resource content remains available. Workspace API keys return `403`; use a personal API key or scoped OAuth token.\n\nOAuth scope: `api:write`.',
-    workspaceKeyUnsupported: true,
-    handler: () =>
-      import('@/app/api/v2/workspaces/[workspaceId]/fork/unlink/route').then((route) => route.POST),
   },
   unzipFile: {
     contract: v2UnzipFileContract,
@@ -2655,28 +2467,6 @@ export const V2_MCP_OPERATIONS = {
     handler: () =>
       import('@/app/api/v2/workflows/[workflowId]/versions/[version]/route').then(
         (route) => route.PATCH
-      ),
-  },
-  updateWorkspaceForkExclusions: {
-    contract: v2UpdateWorkspaceForkExclusionsContract,
-    summary: 'Update Workspace Fork Exclusions',
-    description:
-      'Include or exclude selected workflows from fork sync. Excluded workflows are skipped as sources and targets. Missing, archived, and unchanged workflow IDs are skipped. Workspace API keys return `403`; use a personal API key or scoped OAuth token.\n\nOAuth scope: `api:write`.',
-    workspaceKeyUnsupported: true,
-    handler: () =>
-      import('@/app/api/v2/workspaces/[workspaceId]/fork/exclusions/route').then(
-        (route) => route.PUT
-      ),
-  },
-  updateWorkspaceForkMappings: {
-    contract: v2UpdateWorkspaceForkMappingsContract,
-    summary: 'Update Workspace Fork Mappings',
-    description:
-      'Update edge mappings after validating destination resource membership and credential provider compatibility. Push addresses current-to-other mappings; pull addresses other-to-current mappings. Workspace API keys return `403`; use a personal API key or scoped OAuth token.\n\nOAuth scope: `api:write`.',
-    workspaceKeyUnsupported: true,
-    handler: () =>
-      import('@/app/api/v2/workspaces/[workspaceId]/fork/mappings/route').then(
-        (route) => route.PUT
       ),
   },
   upsertFileShare: {

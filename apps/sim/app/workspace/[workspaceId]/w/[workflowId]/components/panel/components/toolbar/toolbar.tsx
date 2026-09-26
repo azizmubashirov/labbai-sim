@@ -34,15 +34,11 @@ import { useToolbarItemInteractions } from '@/app/workspace/[workspaceId]/w/[wor
 import { LoopTool } from '@/app/workspace/[workspaceId]/w/[workflowId]/components/subflows/loop/loop-config'
 import { ParallelTool } from '@/app/workspace/[workspaceId]/w/[workflowId]/components/subflows/parallel/parallel-config'
 import { BlockTile } from '@/blocks/block-tile'
-import { buildCustomBlockConfig, isCustomBlockType } from '@/blocks/custom/build-config'
-import { useCustomBlockOverlayVersion } from '@/blocks/custom/client-overlay'
-import { getCustomBlockTile } from '@/blocks/custom/custom-block-icon'
 import { getCanonicalBlocksByCategory } from '@/blocks/registry'
 import type { BlockConfig } from '@/blocks/types'
-import { useWorkspaceAccessRequestFeatures } from '@/ee/access-requests/components/permission-access-boundary'
-import { RequestAccessModal } from '@/ee/access-requests/components/request-access-action'
-import { useOrgBrandConfig } from '@/ee/whitelabeling/components/branding-provider'
-import { useCustomBlocks } from '@/hooks/queries/custom-blocks'
+import { useBlockVisibilityVersion } from '@/blocks/visibility/version'
+import { useWorkspaceAccessRequestFeatures } from '@/components/access-requests/permission-access-boundary'
+import { RequestAccessModal } from '@/components/access-requests/request-access-action'
 import { usePermissionConfig } from '@/hooks/use-permission-config'
 import { useSandboxBlockConstraints } from '@/hooks/use-sandbox-block-constraints'
 import { useToolbarStore } from '@/stores/panel'
@@ -154,29 +150,29 @@ const ToolbarItem = memo(function ToolbarItem({
 let cachedTriggers: BlockItem[] | null = null
 
 /**
- * Block-overlay version the caches below were built against. The registry's
+ * Block-visibility version the caches below were built against. The registry's
  * output is no longer static — a block-visibility hydrate (preview reveal /
- * kill switch) bumps the shared overlay version — so the caches are keyed to
+ * kill switch) bumps the shared visibility version — so the caches are keyed to
  * it and dropped when it moves. -1 = never built.
  */
-let cachedAtOverlayVersion = -1
+let cachedAtVisibilityVersion = -1
 
-/** Drop all three caches when the overlay version moved since they were built. */
-function syncCachesToOverlayVersion(version: number) {
-  if (cachedAtOverlayVersion === version) return
-  cachedAtOverlayVersion = version
+/** Drop all three caches when the visibility version moved since they were built. */
+function syncCachesToVisibilityVersion(version: number) {
+  if (cachedAtVisibilityVersion === version) return
+  cachedAtVisibilityVersion = version
   cachedTriggers = null
   cachedBlocks = null
   cachedTools = null
 }
 
 /**
- * Gets triggers data, computing it once per overlay version and caching for
+ * Gets triggers data, computing it once per visibility version and caching for
  * subsequent calls. Non-integration triggers (Start, Schedule, Webhook Trigger) are
  * prioritized first, followed by all other triggers sorted alphabetically.
  */
-function getTriggers(overlayVersion: number): BlockItem[] {
-  syncCachesToOverlayVersion(overlayVersion)
+function getTriggers(visibilityVersion: number): BlockItem[] {
+  syncCachesToVisibilityVersion(visibilityVersion)
   if (cachedTriggers === null) {
     const allTriggers = getTriggersForSidebar()
     const priorityOrder = ['Start', 'Schedule', 'Webhook Trigger']
@@ -220,14 +216,8 @@ let cachedTools: BlockItem[] | null = null
 function ensureBlockCaches() {
   if (cachedBlocks !== null && cachedTools !== null) return
 
-  // Exclude custom (deploy-as-block) blocks — they render in their own reactive
-  // "Custom Blocks" section, never in the static Core Blocks / Integrations caches.
-  const regularBlockConfigs = getCanonicalBlocksByCategory('blocks').filter(
-    (b) => !isCustomBlockType(b.type)
-  )
-  const toolConfigs = getCanonicalBlocksByCategory('tools').filter(
-    (b) => !isCustomBlockType(b.type)
-  )
+  const regularBlockConfigs = getCanonicalBlocksByCategory('blocks')
+  const toolConfigs = getCanonicalBlocksByCategory('tools')
 
   const regularBlockItems: BlockItem[] = regularBlockConfigs.map((block) => ({
     name: block.name,
@@ -268,14 +258,14 @@ function ensureBlockCaches() {
   cachedTools = toolItems
 }
 
-function getBlocks(overlayVersion: number): BlockItem[] {
-  syncCachesToOverlayVersion(overlayVersion)
+function getBlocks(visibilityVersion: number): BlockItem[] {
+  syncCachesToVisibilityVersion(visibilityVersion)
   ensureBlockCaches()
   return cachedBlocks as BlockItem[]
 }
 
-function getTools(overlayVersion: number): BlockItem[] {
-  syncCachesToOverlayVersion(overlayVersion)
+function getTools(visibilityVersion: number): BlockItem[] {
+  syncCachesToVisibilityVersion(visibilityVersion)
   ensureBlockCaches()
   return cachedTools as BlockItem[]
 }
@@ -386,13 +376,11 @@ export const Toolbar = memo(
     const searchInputRef = useRef<HTMLInputElement>(null)
     const triggerItemRefs = useRef<Array<HTMLDivElement | null>>([])
     const blockItemRefs = useRef<Array<HTMLDivElement | null>>([])
-    const customBlockItemRefs = useRef<Array<HTMLDivElement | null>>([])
     const toolItemRefs = useRef<Array<HTMLDivElement | null>>([])
     const restrictedItemRefs = useRef<Array<HTMLDivElement | null>>([])
 
     const triggerRefCallbacks = useRef<Record<number, (el: HTMLDivElement | null) => void>>({})
     const blockRefCallbacks = useRef<Record<number, (el: HTMLDivElement | null) => void>>({})
-    const customBlockRefCallbacks = useRef<Record<number, (el: HTMLDivElement | null) => void>>({})
     const toolRefCallbacks = useRef<Record<number, (el: HTMLDivElement | null) => void>>({})
     const restrictedRefCallbacks = useRef<Record<number, (el: HTMLDivElement | null) => void>>({})
 
@@ -412,15 +400,6 @@ export const Toolbar = memo(
         }
       }
       return blockRefCallbacks.current[index]
-    }, [])
-
-    const getCustomBlockRefCallback = useCallback((index: number) => {
-      if (!customBlockRefCallbacks.current[index]) {
-        customBlockRefCallbacks.current[index] = (el) => {
-          customBlockItemRefs.current[index] = el
-        }
-      }
-      return customBlockRefCallbacks.current[index]
     }, [])
 
     const getToolRefCallback = useCallback((index: number) => {
@@ -483,17 +462,12 @@ export const Toolbar = memo(
 
     const params = useParams()
     const workspaceId = params?.workspaceId as string | undefined
-    const currentWorkflowId = params?.workflowId as string | undefined
-    const { data: customBlocksData } = useCustomBlocks(workspaceId)
-    /** No-icon custom blocks use the access-authorized workspace host logo, then the glyph. */
-    const fallbackIconUrl = useOrgBrandConfig().logoUrl ?? null
 
-    // Re-read the block lists whenever the overlay version bumps (custom-block
-    // or block-visibility hydrate) — the module caches are keyed to it.
-    const blockOverlayVersion = useCustomBlockOverlayVersion()
-    const allTriggers = getTriggers(blockOverlayVersion)
-    const allBlocks = getBlocks(blockOverlayVersion)
-    const allTools = getTools(blockOverlayVersion)
+    // Re-read the block lists whenever the block-visibility version bumps — the module caches are keyed to it.
+    const blockVisibilityVersion = useBlockVisibilityVersion()
+    const allTriggers = getTriggers(blockVisibilityVersion)
+    const allBlocks = getBlocks(blockVisibilityVersion)
+    const allTools = getTools(blockVisibilityVersion)
     const requestedBlock = requestedBlockType
       ? (allTriggers.find((item) => item.type === requestedBlockType) ??
         allBlocks.find((item) => item.type === requestedBlockType) ??
@@ -506,36 +480,6 @@ export const Toolbar = memo(
     ) {
       setRequestedBlockType(null)
     }
-
-    // Published custom blocks are their own section. Exclude disabled blocks (still
-    // resolvable so placed instances survive, but not offered for new placement) and
-    // the block bound to the CURRENT workflow — adding a workflow's own block recurses.
-    const allCustomBlocks = useMemo(() => {
-      if (!customBlocksData?.length) return []
-      return customBlocksData
-        .filter((cb) => cb.enabled && cb.workflowId !== currentWorkflowId)
-        .map((cb) => {
-          const { icon, bgColor } = getCustomBlockTile(cb.iconUrl, fallbackIconUrl)
-          return {
-            name: cb.name,
-            type: cb.type,
-            config: buildCustomBlockConfig(
-              {
-                type: cb.type,
-                name: cb.name,
-                description: cb.description,
-                workflowId: cb.workflowId,
-                exposedOutputs: cb.exposedOutputs,
-              },
-              cb.inputFields,
-              { icon, bgColor }
-            ),
-            icon,
-            bgColor,
-          } satisfies BlockItem
-        })
-        .sort((a, b) => a.name.localeCompare(b.name))
-    }, [customBlocksData, currentWorkflowId, fallbackIconUrl])
 
     const handleRequestItemClick = useCallback(
       (type: string) => {
@@ -555,12 +499,6 @@ export const Toolbar = memo(
       return permitted.filter((b) => sandboxAllowedBlocks.includes(b.type))
     }, [filterBlocks, allBlocks, sandboxAllowedBlocks])
 
-    const visibleCustomBlocks = useMemo(() => {
-      const permitted = filterBlocks(allCustomBlocks)
-      if (sandboxAllowedBlocks === null) return permitted
-      return permitted.filter((b) => sandboxAllowedBlocks.includes(b.type))
-    }, [filterBlocks, allCustomBlocks, sandboxAllowedBlocks])
-
     const visibleTools = useMemo(() => {
       const permitted = filterBlocks(allTools)
       if (sandboxAllowedBlocks === null) return permitted
@@ -578,7 +516,6 @@ export const Toolbar = memo(
         items
           .filter(
             (item) =>
-              !isCustomBlockType(item.type) &&
               isBlockRequestable(item.type) &&
               (sandboxAllowedBlocks === null || sandboxAllowedBlocks.includes(item.type))
           )
@@ -608,13 +545,6 @@ export const Toolbar = memo(
       return visibleBlocks.filter((block) => block.name.toLowerCase().includes(normalizedQuery))
     }, [visibleBlocks, isSearching, normalizedQuery])
 
-    const filteredCustomBlocks = useMemo(() => {
-      if (!isSearching) return visibleCustomBlocks
-      return visibleCustomBlocks.filter((block) =>
-        block.name.toLowerCase().includes(normalizedQuery)
-      )
-    }, [visibleCustomBlocks, isSearching, normalizedQuery])
-
     const filteredTools = useMemo(() => {
       if (!isSearching) return visibleTools
       return visibleTools.filter((tool) => tool.name.toLowerCase().includes(normalizedQuery))
@@ -631,7 +561,6 @@ export const Toolbar = memo(
      */
     triggerItemRefs.current.length = filteredTriggers.length
     blockItemRefs.current.length = filteredBlocks.length
-    customBlockItemRefs.current.length = filteredCustomBlocks.length
     toolItemRefs.current.length = filteredTools.length
     restrictedItemRefs.current.length = filteredRestrictedItems.length
 
@@ -643,7 +572,6 @@ export const Toolbar = memo(
     const sectionExpanded: Record<ToolbarSectionKey, boolean> = {
       triggers: isSearching ? filteredTriggers.length > 0 : expandedSections.triggers,
       blocks: isSearching ? filteredBlocks.length > 0 : expandedSections.blocks,
-      customBlocks: isSearching ? filteredCustomBlocks.length > 0 : expandedSections.customBlocks,
       tools: isSearching ? filteredTools.length > 0 : expandedSections.tools,
     }
 
@@ -730,7 +658,7 @@ export const Toolbar = memo(
      *
      * - Active only when the toolbar tab is active and search mode is on.
      * - Skips collapsed or empty sections so focus only lands on visible items.
-     * - ArrowDown traverses search → triggers → blocks → custom blocks → tools → access required.
+     * - ArrowDown traverses search → triggers → blocks → tools → access required.
      * - ArrowUp moves backward; from the first item of the first visible section
      *   it wraps back to the search input.
      */
@@ -760,12 +688,6 @@ export const Toolbar = memo(
             key: 'blocks',
             items: sectionExpanded.blocks
               ? blockItemRefs.current.filter((el): el is HTMLDivElement => el !== null)
-              : [],
-          },
-          {
-            key: 'customBlocks',
-            items: sectionExpanded.customBlocks
-              ? customBlockItemRefs.current.filter((el): el is HTMLDivElement => el !== null)
               : [],
           },
           {
@@ -853,7 +775,6 @@ export const Toolbar = memo(
       isSearchActive,
       sectionExpanded.triggers,
       sectionExpanded.blocks,
-      sectionExpanded.customBlocks,
       sectionExpanded.tools,
     ])
 
@@ -938,23 +859,6 @@ export const Toolbar = memo(
             onItemClick={handleItemClick}
             onContextMenu={handleItemContextMenu}
           />
-          {allCustomBlocks.length > 0 && (
-            <ToolbarSection
-              label='Custom Blocks'
-              tooltip='Workflows published as reusable blocks across your organization'
-              sectionKey='customBlocks'
-              items={filteredCustomBlocks}
-              isTrigger={false}
-              expanded={sectionExpanded.customBlocks}
-              searching={isSearching}
-              animate={animationsEnabled}
-              onToggle={handleSectionToggle}
-              getItemRef={getCustomBlockRefCallback}
-              onDragStart={handleDragStart}
-              onItemClick={handleItemClick}
-              onContextMenu={handleItemContextMenu}
-            />
-          )}
           <ToolbarSection
             label='Integrations'
             tooltip='Connect agents to external services'

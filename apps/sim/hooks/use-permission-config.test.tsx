@@ -13,12 +13,12 @@ const { mockRequestJson, mockUseUserPermissionConfig } = vi.hoisted(() => ({
 
 vi.mock('@/lib/api/client/request', () => ({ requestJson: mockRequestJson }))
 vi.mock('next/navigation', () => ({ useParams: () => ({ workspaceId: 'workspace-1' }) }))
-vi.mock('@/blocks/custom/client-overlay', () => ({ useCustomBlockOverlayVersion: () => 0 }))
+vi.mock('@/blocks/visibility/version', () => ({ useBlockVisibilityVersion: () => 0 }))
 vi.mock('@/blocks/visibility/context', () => ({
   overlayVisibility: () => null,
   isHiddenUnder: () => false,
 }))
-vi.mock('@/ee/access-control/hooks/permission-groups', () => ({
+vi.mock('@/hooks/queries/permission-groups', () => ({
   useUserPermissionConfig: mockUseUserPermissionConfig,
 }))
 vi.mock('@/app/workspace/[workspaceId]/providers/workspace-host-provider', () => ({

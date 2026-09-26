@@ -34,7 +34,7 @@ vi.mock('nuqs', () => ({
   useQueryStates: () => [{ search: '', connector: [], content: [], owner: [] }, vi.fn()],
 }))
 vi.mock('@/hooks/use-permission-config', () => ({ usePermissionConfig: () => ({ config: {} }) }))
-vi.mock('@/ee/access-control/hooks/permission-groups', () => ({
+vi.mock('@/hooks/queries/permission-groups', () => ({
   useUserPermissionConfig: () => ({ data: { config: {} }, isPending: false }),
 }))
 vi.mock('@/hooks/queries/access-requests', () => ({

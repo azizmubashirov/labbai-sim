@@ -22,7 +22,7 @@ import {
   type WorkspaceInvitationResult,
 } from '@/lib/invitations/workspace-invitations'
 import { quickValidateEmail } from '@/lib/messaging/email/validation'
-import { validateInvitationsAllowed } from '@/ee/access-control/utils/permission-check'
+import { validateInvitationsAllowed } from '@/lib/labbai/access-control/permission-check'
 
 const logger = createLogger('OrganizationInvitations')
 

@@ -4,10 +4,9 @@
  * Consolidates every user on a self-hosted deployment into one organization so
  * org-scoped enterprise features apply deployment-wide.
  *
- * Membership alone is not enough. Session policies and SSO provisioning resolve
- * the governing org from the user's `member` row, but whitelabeling, PII
- * redaction, permission groups, data drains, and audit scoping all resolve it
- * from `workspace.organization_id`. This script therefore does both: it adds
+ * Membership alone is not enough. Session revocation resolves the governing org
+ * from the user's `member` row, but PII redaction, permission groups, data
+ * drains, and audit scoping all resolve it from `workspace.organization_id`. This script therefore does both: it adds
  * every user to the target org AND attaches their personal/grandfathered
  * workspaces to it.
  *

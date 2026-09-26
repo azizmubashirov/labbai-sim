@@ -62,8 +62,6 @@ import { setEnvironmentVariablesServerTool } from '@/lib/copilot/tools/server/us
 import { editWorkflowServerTool } from '@/lib/copilot/tools/server/workflow/edit-workflow'
 import { queryLogsServerTool } from '@/lib/copilot/tools/server/workflow/query-logs'
 import { OrchestrationError } from '@/lib/core/orchestration/types'
-import { listCustomBlocksWithInputsForWorkspace } from '@/lib/workflows/custom-blocks/operations'
-import { withCustomBlockOverlay } from '@/blocks/custom/server-overlay'
 import { withBlockVisibility } from '@/blocks/visibility/server-context'
 
 export type ExecuteResponseSuccess = z.output<typeof ExecuteResponseSuccessSchema>
@@ -74,12 +72,6 @@ const ExecuteResponseSuccessSchema = z.object({
 })
 
 const logger = createLogger('ServerToolRouter')
-
-/**
- * Tools that resolve blocks through the registry (`getBlock`/`getAllBlocks`) and
- * must run inside the custom-block overlay so `custom_block_*` types resolve.
- */
-const CUSTOM_BLOCK_OVERLAY_TOOLS = new Set(['edit_workflow', 'get_blocks_metadata'])
 
 /**
  * Discovery tools that consume the viewer's block-visibility context to hide
@@ -261,23 +253,14 @@ export async function routeExecution(
 
   assertServerToolNotAborted(context, `User stop signal aborted ${toolName} after validation`)
 
-  // Execute. The registry-dependent tools resolve blocks via getBlock/getAllBlocks;
-  // wrap them in the custom-block overlay for the workspace's org so `custom_block_*`
-  // types resolve (metadata lookup + edit-workflow validation) instead of being
-  // rejected as unknown, and wrap discovery tools in the viewer's block-visibility
-  // context so gated blocks stay hidden. The two ALS scopes are independent and
-  // nest in either order. Other tools skip the extra queries.
+  // Execute. Wrap discovery tools in the viewer's block-visibility context so
+  // gated blocks stay hidden. Other tools skip the extra query.
   let run = () => tool.execute(args, context)
   if (VISIBILITY_GATED_TOOLS.has(toolName) && context?.userId) {
     // Memoized per (userId, workspaceId) ~30s — a multi-tool turn resolves once.
     const vis = await getBlockVisibilityForCopilot(context.userId, context.workspaceId)
     const inner = run
     run = () => withBlockVisibility(vis, inner)
-  }
-  if (CUSTOM_BLOCK_OVERLAY_TOOLS.has(toolName) && context?.workspaceId) {
-    const rows = await listCustomBlocksWithInputsForWorkspace(context.workspaceId)
-    const inner = run
-    run = () => withCustomBlockOverlay(rows, inner)
   }
   const result = await run()
 

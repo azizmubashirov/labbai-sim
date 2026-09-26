@@ -59,7 +59,7 @@ import { v2Data, v2Error } from '@/app/api/v2/lib/response'
 import {
   PublicApiNotAllowedError,
   validatePublicApiAllowed,
-} from '@/ee/access-control/utils/permission-check'
+} from '@/lib/labbai/access-control/permission-check'
 
 const logger = createLogger('V2WorkflowExecuteAPI')
 

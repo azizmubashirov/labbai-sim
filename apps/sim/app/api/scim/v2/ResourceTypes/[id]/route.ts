@@ -1,6 +1,6 @@
 import { defineScimDiscoveryRoute } from '@/lib/api/server/routes'
-import { resourceTypes } from '@/ee/scim/lib/protocol/discovery'
-import { notFound } from '@/ee/scim/lib/protocol/errors'
+import { resourceTypes } from '@/lib/labbai/scim/protocol/discovery'
+import { notFound } from '@/lib/labbai/scim/protocol/errors'
 
 export const GET = defineScimDiscoveryRoute((baseUrl, params) => {
   const id = typeof params.id === 'string' ? params.id : ''

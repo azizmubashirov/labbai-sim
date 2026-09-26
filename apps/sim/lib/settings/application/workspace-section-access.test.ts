@@ -14,7 +14,6 @@ const mocks = vi.hoisted(() => ({
     features: {
       accessControl: false,
       auditLogs: false,
-      customBlocks: false,
       dataDrains: false,
       dataRetention: false,
       sessionPolicies: false,
@@ -24,8 +23,6 @@ const mocks = vi.hoisted(() => ({
     },
   },
   getOrganizationSettingsFeatures: vi.fn((hasEnterprisePlan: boolean) => ({ hasEnterprisePlan })),
-  isCustomBlocksEligibleForOrganization: vi.fn(),
-  isForkingAvailableForWorkspace: vi.fn(),
   isOrganizationOnEnterprisePlan: vi.fn(),
   isOrganizationSettingsSectionAvailable: vi.fn(),
   isScopedCredentialGroupsAvailable: vi.fn(),
@@ -48,15 +45,13 @@ vi.mock('@/components/settings/navigation', () => ({
   UNIFIED_TO_WORKSPACE_SECTION: {
     requests: 'requests',
     secrets: 'secrets',
-    forks: 'forks',
-    'custom-blocks': 'custom-blocks',
   },
   workspaceSectionUsesPermissionConfig: vi.fn((section: string) =>
     ['secrets', 'api-keys', 'mcp', 'custom-tools'].includes(section)
   ),
   WORKSPACE_PERMISSION_CONFIG_KEYS: { secrets: 'hideSecretsTab' },
 }))
-vi.mock('@/ee/access-requests/lib/settings', () => ({
+vi.mock('@/lib/labbai/access-requests/settings', () => ({
   isAccessRequestEnabled: mocks.isAccessRequestEnabled,
 }))
 vi.mock('@/lib/billing/core/subscription', () => ({
@@ -79,17 +74,11 @@ vi.mock('@/lib/organizations/settings-access', () => ({
   canOpenOrganizationSettingsSection: mocks.canOpenOrganizationSettingsSection,
 }))
 vi.mock('@/lib/permissions/super-user', () => ({ isPlatformAdmin: mocks.isPlatformAdmin }))
-vi.mock('@/lib/workflows/custom-blocks/operations', () => ({
-  isCustomBlocksEligibleForOrganization: mocks.isCustomBlocksEligibleForOrganization,
-}))
 vi.mock('@/lib/workspaces/permissions/utils', () => ({
   checkWorkspaceAccess: mocks.checkWorkspaceAccess,
 }))
-vi.mock('@/ee/access-control/utils/permission-check', () => ({
+vi.mock('@/lib/labbai/access-control/permission-check', () => ({
   resolveVerifiedUserAccessControlContext: mocks.resolveVerifiedUserAccessControlContext,
-}))
-vi.mock('@/ee/workspace-forking/lib/lineage/authz', () => ({
-  isForkingAvailableForWorkspace: mocks.isForkingAvailableForWorkspace,
 }))
 
 import { authorizeWorkspaceSettingsSection } from '@/lib/settings/application/workspace-section-access'
@@ -125,8 +114,6 @@ describe('authorizeWorkspaceSettingsSection', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.checkWorkspaceAccess.mockResolvedValue(PERSONAL_ACCESS)
-    mocks.isCustomBlocksEligibleForOrganization.mockResolvedValue(true)
-    mocks.isForkingAvailableForWorkspace.mockResolvedValue(true)
     mocks.isOrganizationOnEnterprisePlan.mockResolvedValue(true)
     mocks.isOrganizationSettingsSectionAvailable.mockReturnValue(true)
     mocks.isScopedCredentialGroupsAvailable.mockResolvedValue(true)
@@ -271,7 +258,6 @@ describe('authorizeWorkspaceSettingsSection', () => {
     expect(mocks.resolveWorkspaceNavigation).toHaveBeenCalledWith(
       expect.objectContaining({
         deployment: mocks.deploymentShape,
-        entitlements: expect.objectContaining({ forks: false }),
       })
     )
 
@@ -314,18 +300,6 @@ describe('authorizeWorkspaceSettingsSection', () => {
       allowed: false,
       disposition: 'redirect-general',
     })
-  })
-
-  it('resolves the exact entitlement source only for gated workspace sections', async () => {
-    mocks.checkWorkspaceAccess.mockResolvedValue(PERSONAL_ACCESS)
-    mocks.resolveWorkspaceNavigation.mockReturnValue([{ id: 'forks' }])
-    await authorize('forks')
-    expect(mocks.isForkingAvailableForWorkspace).toHaveBeenCalledWith(null, 'viewer-1')
-
-    mocks.checkWorkspaceAccess.mockResolvedValue(ORGANIZATION_ACCESS)
-    mocks.resolveWorkspaceNavigation.mockReturnValue([{ id: 'custom-blocks' }])
-    await authorize('custom-blocks')
-    expect(mocks.isCustomBlocksEligibleForOrganization).toHaveBeenCalledWith('organization-1')
   })
 
   it('allows the member roster', async () => {

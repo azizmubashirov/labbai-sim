@@ -1,5 +1,4 @@
 import type { BillingAttributionSnapshot } from '@/lib/billing/core/billing-attribution'
-import type { CustomBlockInputFieldType } from '@/blocks/custom/build-config'
 import type { ProviderTimingSegment, StreamingExecution, UserFile } from '@/executor/types'
 
 /** Labbai: OpenAI is the only LLM provider (for now). */
@@ -139,14 +138,6 @@ export interface ProviderToolConfig {
    * provenance registry incomplete.
    */
   jsonShapedParamKeys?: readonly string[]
-  /**
-   * A custom (deploy-as-block) block's Start input fields, resolved from its binding
-   * rather than the block config — the server overlay builds those with `inputFields: []`.
-   *
-   * The resolved-secret projection reassembles `inputMapping` and must decode it against
-   * the identical fields, or its shape diverges from the executed copy.
-   */
-  customBlockInputFields?: readonly CustomBlockInputFieldType[]
 }
 
 export interface Message {
@@ -230,8 +221,8 @@ export interface ProviderRequest {
   /**
    * The invoking run's execution id. Propagated into the `_context` of every
    * tool the LLM invokes so a tool that starts its own child execution (a
-   * custom block) can correlate that child back to a REAL invoking run rather
-   * than a freshly-minted id, and can honour its cancellation.
+   * workflow tool) can correlate that child back to a REAL invoking run rather
+   * than a freshly-minted id.
    */
   executionId?: string
   /**

@@ -133,7 +133,6 @@ export const DOCS_MANIFEST: readonly string[] = [
   'platform/enterprise.mdx',
   'platform/enterprise/access-control.mdx',
   'platform/enterprise/audit-logs.mdx',
-  'platform/enterprise/custom-blocks.mdx',
   'platform/enterprise/data-drains.mdx',
   'platform/enterprise/data-retention.mdx',
   'platform/enterprise/forks.mdx',

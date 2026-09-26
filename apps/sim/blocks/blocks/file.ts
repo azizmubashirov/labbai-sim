@@ -1726,7 +1726,6 @@ export const FileV5Block: BlockConfig<FileParserV3Output> = {
         { label: 'Anyone with the link', id: 'public' },
         { label: 'Password protected', id: 'password' },
         { label: 'Email allowlist', id: 'email' },
-        { label: 'SSO', id: 'sso' },
       ],
       value: () => 'public',
       condition: { field: 'operation', value: 'file_manage_sharing' },
@@ -1756,12 +1755,12 @@ export const FileV5Block: BlockConfig<FileParserV3Output> = {
       condition: {
         field: 'operation',
         value: 'file_manage_sharing',
-        and: { field: 'shareVisibility', value: ['email', 'sso'] },
+        and: { field: 'shareVisibility', value: 'email' },
       },
       required: {
         field: 'operation',
         value: 'file_manage_sharing',
-        and: { field: 'shareVisibility', value: ['email', 'sso'] },
+        and: { field: 'shareVisibility', value: 'email' },
       },
     },
     {

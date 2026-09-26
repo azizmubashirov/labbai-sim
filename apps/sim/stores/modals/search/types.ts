@@ -13,8 +13,6 @@ export interface SearchBlockItem {
   type: string
   config?: BlockConfig
   searchValue?: string
-  /** Custom blocks only: bound source workflow id — hidden on that workflow's canvas. */
-  sourceWorkflowId?: string
 }
 
 /**

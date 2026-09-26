@@ -11,7 +11,7 @@ import postgres from 'postgres'
 /**
  * Exercises a running local app and a disposable local PostgreSQL database.
  * SQL seeds prerequisites and inspects persistence; SCIM and administration
- * operations cross the real HTTP boundary. See ee/scim/TESTING.md.
+ * operations cross the real HTTP boundary.
  */
 const logger = createLogger('ScimE2E')
 const USER_SCHEMA = 'urn:ietf:params:scim:schemas:core:2.0:User'

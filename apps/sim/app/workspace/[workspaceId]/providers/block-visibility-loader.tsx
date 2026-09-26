@@ -8,7 +8,7 @@ import { useBlockVisibility } from '@/hooks/queries/block-visibility'
 /**
  * Hydrates the client block-visibility overlay for the active workspace so the
  * registry accessors project the viewer's revealed/disabled preview blocks.
- * Mounted once in the workspace layout, next to `CustomBlocksLoader`.
+ * Mounted once in the workspace layout.
  *
  * First paint needs no prefetch: `preview: true` blocks are fail-closed until
  * this hydrate lands, so the fetch only ever reveals (benign pop-in) or applies

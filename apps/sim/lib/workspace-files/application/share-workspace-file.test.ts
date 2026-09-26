@@ -26,7 +26,7 @@ vi.mock('@/lib/uploads/contexts/workspace/workspace-file-manager', () => ({
   loadActiveWorkspaceContext: mocks.loadWorkspace,
 }))
 
-vi.mock('@/ee/access-control/utils/permission-check', () => ({
+vi.mock('@/lib/labbai/access-control/permission-check', () => ({
   validatePublicFileSharing: vi.fn(),
 }))
 

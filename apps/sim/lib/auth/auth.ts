@@ -1,6 +1,5 @@
 import { cache } from 'react'
 import { oauthProvider } from '@better-auth/oauth-provider'
-import { sso } from '@better-auth/sso'
 import { db } from '@sim/db'
 import * as schema from '@sim/db/schema'
 import { createLogger, setRequestAuth } from '@sim/logger'
@@ -12,7 +11,6 @@ import {
   getSessionFromCtx,
   setShouldSkipSessionRefresh,
 } from 'better-auth/api'
-import { deleteSessionCookie, setSessionCookie } from 'better-auth/cookies'
 import { nextCookies } from 'better-auth/next-js'
 import {
   admin,
@@ -56,10 +54,7 @@ import {
 import { bindOAuthIssuedResource, oauthResourcePlugin } from '@/lib/auth/oauth-resource'
 import { getSessionCookieCacheVersion } from '@/lib/auth/security-policy'
 import { prepareSessionForCreation } from '@/lib/auth/session-hooks'
-import { clampExpiryForSession } from '@/lib/auth/session-policy'
 import { createSimAuthAdapter } from '@/lib/auth/sim-auth-adapter'
-import { admitSsoUser } from '@/lib/auth/sso/application/admit-sso-user'
-import { resolveSsoCallbackProviderId } from '@/lib/auth/sso/callback-provider'
 import { handleNewUser } from '@/lib/billing/core/usage'
 import { env } from '@/lib/core/config/env'
 import {
@@ -74,9 +69,7 @@ import {
   isOrganizationsEnabled,
   isRegistrationDisabled,
   isSignupMxValidationEnabled,
-  isSsoEnabled,
 } from '@/lib/core/config/env-flags'
-import { validateCallbackUrl } from '@/lib/core/security/input-validation'
 import { PlatformEvents } from '@/lib/core/telemetry'
 import { trustedProxies } from '@/lib/core/utils/request'
 import { getBaseUrl, isLocalhostUrl, parseOriginList } from '@/lib/core/utils/urls'
@@ -91,7 +84,6 @@ import { quickValidateEmail } from '@/lib/messaging/email/validation'
 import { validateSignupEmailMx } from '@/lib/messaging/email/validation.server'
 import { isEmailVerificationEffectivelyEnabled } from '@/lib/messaging/email/verification'
 import { scheduleLifecycleEmail } from '@/lib/messaging/lifecycle'
-import { APP_ENTRY_PATH } from '@/lib/navigation/paths'
 import {
   getMicrosoftRefreshTokenExpiry,
   isMicrosoftProvider,
@@ -102,34 +94,12 @@ import { capabilityRefusal } from '@/lib/permission-groups/capability-assertions
 import { isCapabilityWithheldForUser } from '@/lib/permission-groups/user-scope.server'
 import { captureServerEvent, getPostHogClient } from '@/lib/posthog/server'
 import { disableUserResources } from '@/lib/workflows/lifecycle'
-import { SSO_TRUSTED_PROVIDERS } from '@/ee/sso/constants'
 
 const logger = createLogger('Auth')
-
-function buildSsoAdmissionErrorUrl(code: string, callbackLocation?: string | null): string {
-  const callbackUrl =
-    callbackLocation && validateCallbackUrl(callbackLocation) ? callbackLocation : APP_ENTRY_PATH
-  const params = new URLSearchParams({ error: code, callbackUrl })
-  return `${getBaseUrl()}/sso?${params.toString()}`
-}
 
 const additionalTrustedOrigins = parseOriginList(env.TRUSTED_ORIGINS, (value) =>
   logger.warn('Ignoring invalid entry in TRUSTED_ORIGINS', { value })
 )
-
-/**
- * Extra provider IDs appended to `trustedProviders`, from `SSO_PROVIDER_ID` and
- * `SSO_TRUSTED_PROVIDER_IDS`. Empty when SSO is disabled.
- *
- * These no longer affect SSO sign-in: the plugin passes `trustProviderByName:
- * false`, disabling the name-based branch, so SSO trust comes only from
- * `domainVerified`. Kept because non-SSO providers still link by name.
- */
-const additionalTrustedSsoProviders = isSsoEnabled
-  ? [env.SSO_PROVIDER_ID, ...(env.SSO_TRUSTED_PROVIDER_IDS?.split(',') ?? [])]
-      .map((id) => id?.trim())
-      .filter((id): id is string => Boolean(id))
-  : []
 
 if (env.NODE_ENV === 'production') {
   const baseUrl = getBaseUrl()
@@ -434,12 +404,7 @@ export const auth = betterAuth({
 
             if (accountCount === 1) {
               const { providerId } = account
-              const authMethod =
-                providerId === 'credential'
-                  ? 'email'
-                  : SSO_TRUSTED_PROVIDERS.includes(providerId)
-                    ? 'sso'
-                    : 'oauth'
+              const authMethod = providerId === 'credential' ? 'email' : 'oauth'
 
               captureServerEvent(
                 account.userId,
@@ -483,27 +448,6 @@ export const auth = betterAuth({
       create: {
         before: prepareSessionForCreation,
       },
-      update: {
-        /**
-         * Better Auth's sliding refresh rewrites `expiresAt` to
-         * `now + expiresIn` (30 days), which would silently stretch a
-         * policy-shortened session back out — re-clamp on every refresh.
-         * The current session row is read from the endpoint context; when
-         * it is unavailable (non-refresh update paths) the update passes
-         * through untouched and the next refresh re-clamps.
-         */
-        before: async (data, ctx) => {
-          if (!data.expiresAt) return { data }
-          const current = ctx?.context?.session?.session
-          if (!current) return { data }
-          const expiresAt = await clampExpiryForSession(
-            { ...current, expiresAt: new Date(data.expiresAt) },
-            undefined,
-            getAuthDatabase()
-          )
-          return { data: { ...data, expiresAt } }
-        },
-      },
     },
   },
   account: {
@@ -522,20 +466,9 @@ export const auth = betterAuth({
        * nOAuth account takeover. Microsoft sign-in still works — it just links
        * to an existing account only when the IdP asserts a verified email.
        */
-      trustedProviders: [
-        'google',
-        'github',
-        'email-password',
-        ...SSO_TRUSTED_PROVIDERS,
-        ...additionalTrustedSsoProviders,
-      ],
+      trustedProviders: ['google', 'github', 'email-password'],
     },
   },
-  /**
-   * SSO is deliberately outside the registration gate: it runs on
-   * `/sign-in/sso` against admin-configured, domain-verified providers, which
-   * is its own allowlist.
-   */
   socialProviders: applyRegistrationGate(
     {
       ...(!isGithubAuthDisabled && {
@@ -794,7 +727,7 @@ export const auth = betterAuth({
         const emailPasswordPaths = ['/sign-in/email', '/sign-up/email', '/email-otp']
         if (emailPasswordPaths.some((path) => ctx.path.startsWith(path)))
           throw new APIError('FORBIDDEN', {
-            message: 'Email/password authentication is disabled. Please use SSO to sign in.',
+            message: 'Email/password authentication is disabled. Please use another sign-in method.',
           })
       }
 
@@ -823,7 +756,7 @@ export const auth = betterAuth({
           }
         }
 
-        // Blocked emails/domains gate both signup and sign-in. OAuth/SSO sign-ins
+        // Blocked emails/domains gate both signup and sign-in. OAuth sign-ins
         // have no email in the body here; the session.create.before hook covers them.
         if (isEmailBlockedByAccessControl(requestEmail, accessControl)) {
           throw new APIError('FORBIDDEN', {
@@ -851,95 +784,6 @@ export const auth = betterAuth({
       }
 
       return
-    }),
-    after: createAuthMiddleware(async (ctx) => {
-      if (!isSsoEnabled) return
-      const oauthState = ctx.path === '/sso/callback' ? await getOAuthState() : null
-      const providerId = resolveSsoCallbackProviderId({
-        path: ctx.path,
-        routeProviderId: ctx.params?.providerId,
-        stateProviderId: oauthState?.ssoProviderId,
-      })
-      if (!providerId) return
-
-      const newSession = ctx.context.newSession
-      if (!newSession?.session || !newSession.user) return
-
-      let admissionErrorCode: string | null = null
-      try {
-        const admission = await admitSsoUser.execute({
-          principal: {
-            kind: 'session',
-            userId: newSession.user.id,
-            sessionId: newSession.session.id,
-          },
-          input: { providerId },
-        })
-
-        if (admission.kind === 'denied') {
-          admissionErrorCode =
-            admission.reason === 'seats-unavailable'
-              ? 'sso_no_seats'
-              : admission.reason === 'organization-conflict'
-                ? 'sso_account_conflict'
-                : 'sso_provisioning_failed'
-          logger.warn('Rejected SSO organization admission', {
-            userId: newSession.user.id,
-            providerId,
-            reason: admission.reason,
-          })
-        } else if (admission.kind === 'provisioned' || admission.kind === 'already-member') {
-          const expiresAt = await clampExpiryForSession(
-            newSession.session,
-            admission.organizationId
-          )
-          const updatedSession = await ctx.context.internalAdapter.updateSession(
-            newSession.session.token,
-            {
-              activeOrganizationId: admission.organizationId,
-              ...(expiresAt ? { expiresAt } : {}),
-            }
-          )
-          if (!updatedSession) {
-            admissionErrorCode = 'sso_provisioning_failed'
-            logger.error('Failed to activate organization on the new SSO session', {
-              userId: newSession.user.id,
-              providerId,
-              organizationId: admission.organizationId,
-            })
-          } else {
-            deleteSessionCookie(ctx, true)
-            await setSessionCookie(ctx, {
-              session: updatedSession,
-              user: newSession.user,
-            })
-          }
-        }
-      } catch (error) {
-        admissionErrorCode = 'sso_provisioning_failed'
-        logger.error('SSO organization admission failed', {
-          userId: newSession.user.id,
-          providerId,
-          error,
-        })
-      }
-
-      if (!admissionErrorCode) return
-
-      try {
-        await ctx.context.internalAdapter.deleteSession(newSession.session.token)
-      } catch (error) {
-        logger.error('Failed to delete rejected SSO session', {
-          userId: newSession.user.id,
-          providerId,
-          sessionId: newSession.session.id,
-          error,
-        })
-      }
-      deleteSessionCookie(ctx)
-      throw ctx.redirect(
-        buildSsoAdmissionErrorUrl(admissionErrorCode, ctx.context.responseHeaders?.get('location'))
-      )
     }),
   },
   plugins: [
@@ -1106,64 +950,6 @@ export const auth = betterAuth({
             codeExpiresIn: OAUTH_CODE_TTL_SECONDS,
           }),
           oauthResourcePlugin(),
-        ]
-      : []),
-    /**
-     * Include SSO plugin when enabled. Resolved through `isSsoEnabled` rather
-     * than the raw env var so the `ENTERPRISE_ENABLED` suite switch registers
-     * the plugin too — reading `env.SSO_ENABLED` here would leave the settings
-     * section visible and `hasSSOAccess` passing while sign-in silently had no
-     * SSO provider behind it.
-     */
-    ...(isSsoEnabled
-      ? [
-          sso({
-            /**
-             * MUST stay false. Better Auth's link gate is
-             * `!isTrustedProvider && !userInfo.emailVerified`, so a true
-             * `email_verified` claim substitutes for the domain binding
-             * entirely: an IdP could assert any address — including one from a
-             * domain it does not own — and auto-link into that user's existing
-             * account. Since a provider row can be registered by any
-             * organization owner or admin (or by an operator via the register
-             * script), trusting the claim makes every account reachable from
-             * any tenant's IdP.
-             *
-             * Turning it on only ever set `emailVerified` on the local row; it
-             * was never what made linking work. Entra omits the claim, and SAML
-             * ignores it without an explicit `mapping.emailVerified` that the
-             * register contract does not accept — so SSO users are created
-             * unverified either way, and `domainVerification` below is the sole
-             * linking trust source, which is what `trustProviderByName: false`
-             * already assumes.
-             */
-            trustEmailVerified: false,
-            /**
-             * Marks a provider authoritative for its domain, which is what lets an
-             * SSO sign-in auto-link to an existing same-email account. Without it
-             * `isTrustedProvider` is always false and every user who already had a
-             * Sim account is stranded on "account not linked".
-             *
-             * Sim does not use Better Auth's DNS challenge endpoints: ownership is
-             * proven by the `sso_domain` flow before registration, and the register
-             * route mirrors that decision onto this flag.
-             *
-             * With `trustEmailVerified` off this is the only path to linking, and
-             * it is domain-scoped: `isTrustedProvider` additionally requires
-             * `validateEmailDomain(userInfo.email, provider.domain)`, so a
-             * provider can only ever claim identities inside the domain it proved.
-             */
-            domainVerification: { enabled: true },
-            organizationProvisioning: {
-              /**
-               * Better Auth writes member rows directly and bypasses Sim's seat,
-               * billing, session-policy, and audit invariants. Admission is owned
-               * by the application use case in the callback hook above.
-               */
-              disabled: true,
-              defaultRole: 'member',
-            },
-          }),
         ]
       : []),
     ...(isOrganizationsEnabled

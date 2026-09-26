@@ -106,10 +106,6 @@ describe('getToolActivityLabel', () => {
     expect(getToolActivityLabel('save_upload')).toBe('saved files')
     expect(getToolActivityLabel('share_file')).toBe('shared files')
     expect(getToolActivityLabel('share_file', { action: 'unshare' })).toBe('stopped sharing files')
-    expect(getToolActivityLabel('publish_custom_block')).toBe('published custom blocks')
-    expect(getToolActivityLabel('publish_custom_block', { action: 'undeploy' })).toBe(
-      'unpublished custom blocks'
-    )
   })
 
   it.each([

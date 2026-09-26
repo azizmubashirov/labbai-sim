@@ -24,7 +24,7 @@ vi.mock('@/lib/auth/auth-client', () => ({ useSession: mockUseSession, signOut: 
 vi.mock('@/lib/core/config/deployment-shape', () => ({
   useDeploymentShape: () => ({ hosted: false }),
 }))
-vi.mock('@/ee/whitelabeling', () => ({ useBrandConfig: () => ({ logoUrl: '/logo.png' }) }))
+vi.mock('@/lib/branding', () => ({ useBrandConfig: () => ({ logoUrl: '/logo.png' }) }))
 vi.mock('@/stores', () => ({ clearUserData: vi.fn() }))
 vi.mock('@/hooks/queries/general-settings', () => ({
   useGeneralSettings: () => ({ data: {}, isLoading: false }),

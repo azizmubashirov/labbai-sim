@@ -50,7 +50,7 @@ vi.mock('@/lib/internal/tool-operations/registry.server', () => ({
   getInternalToolOperationHandler: vi.fn(async () => operation),
 }))
 vi.mock('@/lib/internal/function/execute', () => ({ executeFunctionTool: vi.fn() }))
-vi.mock('@/ee/access-control/utils/permission-check', () => ({
+vi.mock('@/lib/labbai/access-control/permission-check', () => ({
   assertPermissionsAllowed: permissions,
 }))
 

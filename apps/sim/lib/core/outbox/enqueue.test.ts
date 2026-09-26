@@ -64,7 +64,6 @@ describe('outbox processor enqueue', () => {
     const output = {
       result: { processed: 4, retried: 0, deadLettered: 0, leaseLost: 0, reaped: 0 },
       recoveredDocuments: 2,
-      reapedBackgroundWork: 1,
     }
     mocks.processor.mockResolvedValueOnce(output)
     await expect(enqueueOutboxProcessor()).resolves.toEqual({ backend: 'inline', output })

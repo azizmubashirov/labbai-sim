@@ -87,7 +87,7 @@ import {
   CMDK_SECTION_GAP_CLASS,
 } from '@/app/workspace/[workspaceId]/w/components/sidebar/constants'
 import { SIDEBAR_SCROLL_EVENT } from '@/app/workspace/[workspaceId]/w/components/sidebar/sidebar'
-import { useWorkspaceAccessRequestFeatures } from '@/ee/access-requests/components/permission-access-boundary'
+import { useWorkspaceAccessRequestFeatures } from '@/components/access-requests/permission-access-boundary'
 import { useFolderMap } from '@/hooks/queries/folders'
 import { useKnowledgeBasesQuery } from '@/hooks/queries/kb/knowledge'
 import { useTablesList } from '@/hooks/queries/tables'
@@ -156,7 +156,6 @@ function SearchModalContent({
   const router = useRouter()
   const { chatEnabled } = useDeploymentShape()
   const workspaceId = params.workspaceId as string
-  const currentWorkflowId = params.workflowId as string | undefined
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const nativeSurfaceReady = useNativeSurfaceOcclusionReady(true, 'modal')
@@ -1025,24 +1024,8 @@ function SearchModalContent({
       sim: available.filter((action) => getActionGroupLabel(action) === 'Sim'),
     }
   }, [actions, pageContext])
-  const availableBlocks = useMemo(
-    () =>
-      onCanvas
-        ? blocks.filter(
-            (block) => !block.sourceWorkflowId || block.sourceWorkflowId !== currentWorkflowId
-          )
-        : [],
-    [onCanvas, blocks, currentWorkflowId]
-  )
-  const availableTools = useMemo(
-    () =>
-      onCanvas
-        ? tools.filter(
-            (tool) => !tool.sourceWorkflowId || tool.sourceWorkflowId !== currentWorkflowId
-          )
-        : [],
-    [onCanvas, tools, currentWorkflowId]
-  )
+  const availableBlocks = useMemo(() => (onCanvas ? blocks : []), [onCanvas, blocks])
+  const availableTools = useMemo(() => (onCanvas ? tools : []), [onCanvas, tools])
   /** Palette triggers carry a display suffix; `baseName` keeps the true name rankable. */
   const displayTriggers = useMemo(
     () =>

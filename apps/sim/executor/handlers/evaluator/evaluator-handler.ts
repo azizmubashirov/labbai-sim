@@ -1,7 +1,7 @@
 import { createLogger } from '@sim/logger'
 import { projectResolvedModelInput } from '@/lib/execution/model-input-provenance'
 import type { BlockOutput } from '@/blocks/types'
-import { validateModelProvider } from '@/ee/access-control/utils/permission-check'
+import { validateModelProvider } from '@/lib/labbai/access-control/permission-check'
 import { BlockType, DEFAULTS, EVALUATOR } from '@/executor/constants'
 import type { BlockHandler, BlockNodeMetadata, ExecutionContext } from '@/executor/types'
 import { isJSONString, parseJSON, stringifyJSON } from '@/executor/utils/json'

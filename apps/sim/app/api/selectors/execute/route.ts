@@ -17,7 +17,7 @@ import {
   SelectorContextUnavailableError,
   SelectorOptionsUnavailableError,
 } from '@/lib/selectors/server/errors'
-import { IntegrationNotAllowedError } from '@/ee/access-control/utils/permission-check'
+import { IntegrationNotAllowedError } from '@/lib/labbai/access-control/permission-check'
 
 const PRIVATE_NO_STORE = { 'Cache-Control': 'private, no-store' } as const
 const SELECTOR_SCOPE_NOT_FOUND = 'Selector scope not found'

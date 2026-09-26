@@ -20,7 +20,7 @@ import {
   WORKSPACE_API_KEY_DENIED,
 } from '@/lib/api/contracts/v2/openapi/shared'
 import { defineOpenApiRoute } from '@/lib/api/openapi/types'
-import { accessRequestOperations } from '@/ee/access-requests/lib/application/operations'
+import { accessRequestOperations } from '@/lib/labbai/access-requests/application/operations'
 
 const requestExample = {
   id: 'request-123',

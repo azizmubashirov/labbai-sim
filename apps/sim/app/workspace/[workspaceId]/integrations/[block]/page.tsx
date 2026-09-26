@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation'
 import { INTEGRATIONS } from '@/lib/integrations'
 import { IntegrationBlockDetail } from '@/app/workspace/[workspaceId]/integrations/[block]/integration-block-detail'
 import { IntegrationBlockDetailFallback } from '@/app/workspace/[workspaceId]/integrations/[block]/integration-block-detail-fallback'
-import { PermissionAccessBoundary } from '@/ee/access-requests/components/permission-access-boundary'
+import { PermissionAccessBoundary } from '@/components/access-requests/permission-access-boundary'
 
 export async function generateMetadata({
   params,

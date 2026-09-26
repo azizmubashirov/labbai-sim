@@ -98,7 +98,6 @@ import {
   isEdgeHighlighted,
 } from '@/app/workspace/[workspaceId]/w/[workflowId]/utils/edge-highlight'
 import { hasBlockAccent } from '@/blocks/accent'
-import { useCustomBlockOverlayVersion } from '@/blocks/custom/client-overlay'
 import { getBlock } from '@/blocks/registry'
 import {
   type BlockConfig,
@@ -542,16 +541,11 @@ const SubBlockRow = memo(function SubBlockRow({
     [subBlock, rawValue, workflowVariables]
   )
 
-  /**
-   * Hydrates tool references to display names. The overlay version is a dep
-   * because resolveToolsLabel reads getBlock, whose custom-block results
-   * change when the client overlay hydrates (see client-overlay.ts).
-   */
+  /** Hydrates tool references to display names. */
   const { data: customTools = [] } = useCustomTools(workspaceId || '')
-  const customBlockOverlayVersion = useCustomBlockOverlayVersion()
   const toolsDisplayValue = useMemo(
     () => resolveToolsLabel(subBlock, rawValue, customTools, mcpToolNamesById),
-    [subBlock, rawValue, customTools, mcpToolNamesById, customBlockOverlayVersion]
+    [subBlock, rawValue, customTools, mcpToolNamesById]
   )
 
   const filterDisplayValue = useMemo(

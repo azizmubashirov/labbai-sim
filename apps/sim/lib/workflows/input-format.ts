@@ -10,22 +10,15 @@ import type { UserFile } from '@/executor/types'
 export interface WorkflowInputField {
   /**
    * Stable per-field id seeded at field creation (`InputFormatFieldState.id`).
-   * Custom blocks anchor their input sub-block on this so renaming a field
-   * never orphans a consumer's placed value. Absent on legacy fields.
+   * Absent on legacy fields.
    */
   id?: string
   name: string
   type: string
   description?: string
-  /**
-   * Consumer-facing placeholder hint for a custom block's curated input. Authored
-   * in the Custom Blocks settings UI; has no source on the workflow's Start block.
-   */
+  /** Optional placeholder hint; has no source on the workflow's Start block. */
   placeholder?: string
-  /**
-   * Consumers must fill this custom-block input. Authored in the Custom Blocks
-   * settings UI; has no source on the workflow's Start block.
-   */
+  /** Whether the input must be filled; has no source on the workflow's Start block. */
   required?: boolean
 }
 

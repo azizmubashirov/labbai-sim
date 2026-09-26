@@ -42,7 +42,7 @@ vi.mock('@sim/db', () => ({
   },
   workflow: {},
 }))
-vi.mock('@/ee/access-control/utils/permission-check', () => ({
+vi.mock('@/lib/labbai/access-control/permission-check', () => ({
   PublicApiNotAllowedError: MockPublicApiNotAllowedError,
   validatePublicApiAllowed: mocks.validatePublicApiAllowed,
 }))

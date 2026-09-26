@@ -1026,34 +1026,6 @@ describe('Tool Parameters Utils', () => {
   })
 })
 
-describe('custom block agent-tool rendering', () => {
-  // Mirrors buildCustomBlockConfig: hidden workflowId/inputMapping wiring + per-field
-  // sub-blocks keyed by the source field's stable id.
-  const customBlockConfig = {
-    subBlocks: [
-      { id: 'workflowId', type: 'short-input', hidden: true },
-      { id: 'inputMapping', type: 'code', language: 'json', hidden: true },
-      { id: 'field-question', title: 'Question', type: 'short-input', required: true },
-      { id: 'field-files', title: 'Attachments', type: 'file-upload', multiple: true },
-    ],
-  } as any
-
-  describe('getSubBlocksForToolInput', () => {
-    it('returns field sub-blocks as user-or-llm and drops reserved/hidden wiring', () => {
-      const result = getSubBlocksForToolInput(
-        'workflow_executor',
-        'custom_block_abc',
-        undefined,
-        undefined,
-        customBlockConfig
-      )
-      expect(result).not.toBeNull()
-      expect(result!.subBlocks.map((sb) => sb.id)).toEqual(['field-question', 'field-files'])
-      expect(result!.subBlocks.every((sb) => sb.paramVisibility === 'user-or-llm')).toBe(true)
-    })
-  })
-})
-
 describe('getSubBlocksForToolInput synthesis', () => {
   it('synthesizes a field for every user-facing param the block does not declare', () => {
     const result = getSubBlocksForToolInput('test_tool', 'test_block', undefined, undefined, {
