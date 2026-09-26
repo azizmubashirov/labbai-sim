@@ -793,6 +793,7 @@ export async function runLocalCopilotMothershipLifecycle(
     const messageText = getErrorMessage(error, 'Arena Copilot failed')
     logger.error('Arena Copilot mothership lifecycle failed', {
       error: messageText,
+      stack: error instanceof Error ? error.stack : undefined,
       workspaceId,
       workflowId: workflowId ?? null,
       durationMs: Date.now() - startedAt,

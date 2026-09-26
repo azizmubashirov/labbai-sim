@@ -483,7 +483,7 @@ export function formatToolResultForLlm(
     const { workflowState, workflowLint: _workflowLint, ...rest } = record
     const next: Record<string, unknown> = { ...rest }
 
-    if (workflowState && typeof workflowState === 'object') {
+    if (workflowState && typeof workflowState === 'object' && isRawWorkflowState(workflowState)) {
       const state = workflowState as WorkflowState
       next.copilotSanitizedWorkflowState = sanitizeForCopilot({
         blocks: state.blocks ?? {},
@@ -491,6 +491,10 @@ export function formatToolResultForLlm(
         loops: state.loops ?? {},
         parallels: state.parallels ?? {},
       })
+    } else if (workflowState && typeof workflowState === 'object') {
+      // Sim's edit_workflow already returns the copilot-sanitized shape (blocks without
+      // subBlocks); sanitizing it again throws inside sanitizeSubBlocks.
+      next.copilotSanitizedWorkflowState = workflowState
     } else if (record.copilotSanitizedWorkflowState) {
       next.copilotSanitizedWorkflowState = record.copilotSanitizedWorkflowState
     }
@@ -736,4 +740,14 @@ export function buildFollowUpContinuationMessage(followUps: MandatoryFollowUp[])
   const hints = followUps.map((item) => `- ${item.hint}`).join('\n')
   const tools = [...new Set(followUps.flatMap((item) => item.resolveWith))].join(', ')
   return `[System] The user's request is not complete yet. Required follow-up:\n${hints}\n\nCall the needed tools now (${tools}) before responding. Do not end the turn until the task is finished.`
+}
+
+/** True when the state is a raw workflow graph (blocks carry subBlocks), not the copilot-sanitized shape. */
+function isRawWorkflowState(state: object): boolean {
+  const blocks = (state as { blocks?: unknown }).blocks
+  if (!blocks || typeof blocks !== 'object') return false
+  return Object.values(blocks as Record<string, unknown>).some(
+    (block) =>
+      !!block && typeof block === 'object' && 'subBlocks' in (block as Record<string, unknown>)
+  )
 }
