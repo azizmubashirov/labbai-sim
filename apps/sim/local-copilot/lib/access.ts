@@ -15,22 +15,20 @@ import {
 const logger = createLogger('LocalCopilotAccess')
 
 /**
- * Resolved Arena Copilot access flags for a user.
+ * Resolved Arena Copilot access for a user. The local copilot is the only
+ * copilot backend, so there is nothing to switch between.
  *
- * - `hasAccess` — user may use Local and switch to Cloud (both options shown).
- * - `localOnly` — user is restricted to Local; the switch is hidden and the
- *   backend is forced to `local`. Takes precedence over `hasAccess`.
+ * - `hasAccess` — user may use the copilot (the allowlist row has `has_access`
+ *   or `local_only` set; both columns now mean the same thing).
  * - `defaultModel` — Local catalog id from `local_copilot_user_access.default_model`.
  */
 export interface LocalCopilotUserAccess {
   hasAccess: boolean
-  localOnly: boolean
   defaultModel: LocalCopilotCatalogId
 }
 
 const DENIED_ACCESS: LocalCopilotUserAccess = {
   hasAccess: false,
-  localOnly: false,
   defaultModel: DEFAULT_LOCAL_COPILOT_CATALOG_ID,
 }
 
@@ -58,8 +56,7 @@ export async function getLocalCopilotUserAccess(
 
     if (!row) return DENIED_ACCESS
     return {
-      hasAccess: Boolean(row.hasAccess),
-      localOnly: Boolean(row.localOnly),
+      hasAccess: Boolean(row.hasAccess || row.localOnly),
       defaultModel: resolveLocalCopilotCatalogId(row.defaultModel),
     }
   } catch (error) {
@@ -72,15 +69,15 @@ export async function getLocalCopilotUserAccess(
 }
 
 /**
- * Persists the user's Local picker selection onto `default_model`. Cloud
- * mothership `chat.model` is left alone so switching backends does not mix ids.
+ * Persists the user's Local picker selection onto `default_model`. The
+ * mothership `chat.model` column is left alone.
  */
 export async function updateLocalCopilotDefaultModel(
   userId: string,
   defaultModel: LocalCopilotCatalogId
 ): Promise<LocalCopilotUserAccess | null> {
   const access = await getLocalCopilotUserAccess(userId)
-  if (!access.hasAccess && !access.localOnly) return null
+  if (!access.hasAccess) return null
 
   try {
     const [row] = await db
@@ -99,8 +96,7 @@ export async function updateLocalCopilotDefaultModel(
 
     if (!row) return null
     return {
-      hasAccess: Boolean(row.hasAccess),
-      localOnly: Boolean(row.localOnly),
+      hasAccess: Boolean(row.hasAccess || row.localOnly),
       defaultModel: resolveLocalCopilotCatalogId(row.defaultModel),
     }
   } catch (error) {
@@ -114,14 +110,13 @@ export async function updateLocalCopilotDefaultModel(
 }
 
 /**
- * Returns true when the user may use the Local copilot at all — either full
- * access (`hasAccess`) or local-restricted access (`localOnly`).
+ * Returns true when the user is on the Local copilot allowlist.
  */
 export async function isUserAllowedForLocalCopilot(
   userId: string | undefined | null
 ): Promise<boolean> {
-  const { hasAccess, localOnly } = await getLocalCopilotUserAccess(userId)
-  return hasAccess || localOnly
+  const { hasAccess } = await getLocalCopilotUserAccess(userId)
+  return hasAccess
 }
 
 /**
@@ -135,7 +130,7 @@ export async function isLocalCopilotEnabledForUser(
 
 export function localCopilotUserAccessDeniedResponse(): NextResponse {
   return NextResponse.json(
-    { error: 'Arena Copilot is not enabled for your account. Using external copilot.' },
+    { error: 'Arena Copilot is not enabled for your account.' },
     { status: 403 }
   )
 }

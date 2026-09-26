@@ -9,7 +9,6 @@ import {
   ChipInput,
   ChipModalError,
   ChipModalField,
-  ChipSelect,
   Label,
   OverflowText,
   Search,
@@ -18,7 +17,6 @@ import {
 } from '@sim/emcn'
 import { getErrorMessage } from '@sim/utils/errors'
 import { useQueryStates } from 'nuqs'
-import type { MothershipEnvironment } from '@/lib/api/contracts'
 import { useSession } from '@/lib/auth/auth-client'
 import { APP_ENTRY_PATH } from '@/lib/navigation/paths'
 import { AddUserModal } from '@/app/workspace/[workspaceId]/settings/components/admin/add-user-modal'
@@ -65,13 +63,6 @@ const USER_TABLE_HEADER = (
 type PendingUserAction =
   | { type: 'ban'; userId: string }
   | { type: 'role'; userId: string; nextRole: 'admin' | 'user' }
-
-const MOTHERSHIP_ENV_OPTIONS: { value: MothershipEnvironment; label: string }[] = [
-  { value: 'default', label: 'Default' },
-  { value: 'dev', label: 'Dev' },
-  { value: 'staging', label: 'Staging' },
-  { value: 'prod', label: 'Prod' },
-]
 
 export function Admin() {
   const { data: session } = useSession()
@@ -128,15 +119,6 @@ export function Admin() {
   const handleSuperUserModeToggle = async (checked: boolean) => {
     if (checked !== settings?.superUserModeEnabled && !updateSetting.isPending) {
       await updateSetting.mutateAsync({ key: 'superUserModeEnabled', value: checked })
-    }
-  }
-
-  const handleMothershipEnvironmentChange = async (nextEnvironment: MothershipEnvironment) => {
-    if (nextEnvironment !== settings?.mothershipEnvironment && !updateSetting.isPending) {
-      await updateSetting.mutateAsync({
-        key: 'mothershipEnvironment',
-        value: nextEnvironment,
-      })
     }
   }
 
@@ -310,30 +292,6 @@ export function Admin() {
             onCheckedChange={handleSuperUserModeToggle}
           />
         </div>
-
-        {settings?.superUserModeEnabled && (
-          <>
-            <div className='flex items-center justify-between gap-3'>
-              <div className='flex flex-col gap-1'>
-                <Label>Mothership Environment</Label>
-                <p className='text-[var(--text-secondary)] text-caption'>
-                  Default uses the configured Sim agent URL.
-                </p>
-              </div>
-              <ChipSelect
-                align='start'
-                dropdownWidth={160}
-                value={settings?.mothershipEnvironment ?? 'default'}
-                onChange={(value) =>
-                  handleMothershipEnvironmentChange(value as MothershipEnvironment)
-                }
-                placeholder='Select environment'
-                disabled={updateSetting.isPending}
-                options={MOTHERSHIP_ENV_OPTIONS}
-              />
-            </div>
-          </>
-        )}
       </div>
 
       <div className='h-px bg-[var(--border)]' />

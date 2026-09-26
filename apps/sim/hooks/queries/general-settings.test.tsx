@@ -25,7 +25,6 @@ import { useGeneralSettings } from '@/hooks/queries/general-settings'
 const HYDRATED_SETTINGS: GeneralSettings = {
   autoConnect: true,
   superUserModeEnabled: false,
-  mothershipEnvironment: 'prod',
   theme: 'dark',
   telemetryEnabled: true,
   billingUsageNotificationsEnabled: true,

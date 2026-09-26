@@ -20,7 +20,6 @@ import {
   rewriteResourceFileRefs,
 } from '@/lib/copilot/chat/rewrite-file-references'
 import { publishChatStatusChanged } from '@/lib/copilot/chat-status'
-import { fetchGo } from '@/lib/copilot/request/go/fetch'
 import {
   authenticateCopilotRequestSessionOnly,
   createBadRequestResponse,
@@ -31,8 +30,6 @@ import {
 } from '@/lib/copilot/request/http'
 import { removeChatResources } from '@/lib/copilot/resources/persistence'
 import { type MothershipResource, sanitizeChatResources } from '@/lib/copilot/resources/types'
-import { getMothershipBaseURL, getMothershipSourceEnvHeaders } from '@/lib/copilot/server/agent-url'
-import { env } from '@/lib/core/config/env'
 import { asOrchestrationError } from '@/lib/core/orchestration/types'
 import { withRouteHandler } from '@/lib/core/utils/with-route-handler'
 import { captureServerEvent } from '@/lib/posthog/server'
@@ -224,47 +221,6 @@ export const POST = withRouteHandler(
           copied,
           failed,
         })
-      }
-
-      // Clone copilot-service conversation state (messages, active_messages, memory files).
-      // Best-effort: if the copilot service doesn't have a row for the source chat yet, skip.
-      // The service stamps MessageID only on USER messages (assistant rows carry
-      // Sim-local ids it has never seen), so hand it the kept slice's last user
-      // message — it clones through the end of that turn, matching this route's cut.
-      let goCutMessageId = upToMessageId
-      for (let i = forkedMessages.length - 1; i >= 0; i--) {
-        if (forkedMessages[i].role === 'user') {
-          goCutMessageId = forkedMessages[i].id
-          break
-        }
-      }
-      try {
-        const copilotHeaders: Record<string, string> = { 'Content-Type': 'application/json' }
-        if (env.COPILOT_API_KEY) {
-          copilotHeaders['x-api-key'] = env.COPILOT_API_KEY
-        }
-        Object.assign(copilotHeaders, getMothershipSourceEnvHeaders())
-        const mothershipBaseURL = await getMothershipBaseURL({ userId })
-        const copilotRes = await fetchGo(`${mothershipBaseURL}/api/chats/fork`, {
-          method: 'POST',
-          headers: copilotHeaders,
-          body: JSON.stringify({
-            sourceChatId: chatId,
-            newChatId: newId,
-            upToMessageId: goCutMessageId,
-            userId,
-          }),
-          spanName: 'sim → go /api/chats/fork',
-          operation: 'fork_chat',
-        })
-        if (!copilotRes.ok) {
-          const text = await copilotRes.text().catch(() => '')
-          logger.warn('Copilot fork returned non-OK', { status: copilotRes.status, body: text })
-        }
-      } catch (err) {
-        // The copilot service may not have a row for this chat if no messages
-        // have been sent yet, or if it's unreachable. Log and continue.
-        logger.warn('Failed to fork copilot-service conversation, skipping', { err })
       }
 
       publishChatStatusChanged({ ...parent, userId }, { chatId: newId, type: 'created' })

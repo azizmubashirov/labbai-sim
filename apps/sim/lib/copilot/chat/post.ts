@@ -44,7 +44,10 @@ import {
 import { finalizeAssistantTurn } from '@/lib/copilot/chat/terminal-state'
 import { generateWorkspaceSnapshot } from '@/lib/copilot/chat/workspace-context'
 import { publishChatStatusChanged } from '@/lib/copilot/chat-status'
-import { COPILOT_REQUEST_MODES } from '@/lib/copilot/constants'
+import {
+  COPILOT_ASSISTANT_MODE_UNAVAILABLE_MESSAGE,
+  COPILOT_REQUEST_MODES,
+} from '@/lib/copilot/constants'
 import { computeWorkspaceEntitlements } from '@/lib/copilot/entitlements'
 import { prepareCopilotEnvironmentContext } from '@/lib/copilot/environment-context'
 import {
@@ -84,13 +87,12 @@ import {
   isWorkspaceAccessDeniedError,
   type PermissionType,
 } from '@/lib/workspaces/permissions/utils'
-import { getLocalCopilotUserAccess } from '@/local-copilot/lib/access'
+import {
+  getLocalCopilotUserAccess,
+  localCopilotUserAccessDeniedResponse,
+} from '@/local-copilot/lib/access'
 import { DEFAULT_LOCAL_COPILOT_MODEL } from '@/local-copilot/lib/config'
 import { extractWorkflowIdFromResources } from '@/local-copilot/lib/context/open-workflow'
-import {
-  type CopilotBackendPreference,
-  parseCopilotBackendPreference,
-} from '@/local-copilot/lib/copilot-backend-preference'
 import {
   remapLegacyLocalCopilotCatalogId,
   resolveLocalCopilotRequestCatalogId,
@@ -258,7 +260,6 @@ const ChatMessageSchema = z
     contexts: z.array(ChatContextSchema).optional(),
     commands: z.array(z.string()).optional(),
     userTimezone: z.string().optional(),
-    copilotBackend: z.enum(['local', 'external']).optional(),
   })
   .refine(
     (body) =>
@@ -279,8 +280,6 @@ type UnifiedChatBranch =
       mode: UnifiedChatRequest['mode']
       provider?: string
       goRoute: '/api/copilot'
-      titleModel: string
-      titleProvider?: string
       notifyChatStatus: false
       buildPayload: (params: {
         message: string
@@ -320,8 +319,6 @@ type UnifiedChatBranch =
       workspacePermission: PermissionType | null
       effectiveModel: string
       goRoute: '/api/mothership'
-      titleModel: string
-      titleProvider?: undefined
       notifyChatStatus: boolean
       buildPayload: (params: {
         message: string
@@ -853,7 +850,6 @@ async function resolveBranch(params: {
       workspacePermission: null,
       effectiveModel: DEFAULT_MODEL,
       goRoute: '/api/mothership',
-      titleModel: DEFAULT_MODEL,
       notifyChatStatus: true,
       buildPayload: async (payloadParams) =>
         buildCopilotRequestPayload(
@@ -902,8 +898,6 @@ async function resolveBranch(params: {
       mode: mode ?? 'agent',
       provider,
       goRoute: '/api/copilot',
-      titleModel: selectedModel,
-      titleProvider: provider,
       notifyChatStatus: false,
       buildPayload: async (payloadParams) =>
         buildCopilotRequestPayload(
@@ -967,7 +961,6 @@ async function resolveBranch(params: {
     workspacePermission,
     effectiveModel: localCatalogId || DEFAULT_MODEL,
     goRoute: '/api/mothership',
-    titleModel: localCatalogId || DEFAULT_MODEL,
     notifyChatStatus: true,
     buildPayload: async (payloadParams) =>
       buildCopilotRequestPayload(
@@ -1092,46 +1085,25 @@ export async function handleUnifiedChatPost(req: NextRequest) {
       typeof session.user.name === 'string' ? session.user.name : undefined
 
     const body = ChatMessageSchema.parse(await req.json())
-    if (
-      body.mode === 'assistant' &&
-      (body.workflowId ||
-        body.workflowName ||
-        (body.fileAttachments?.length && !body.organizationId) ||
-        body.contexts?.length)
-    ) {
-      return createBadRequestResponse(
-        'Assistant uses the Enterprise Search index. Switch to Build to use workspace resources or workflows.'
-      )
+    // Assistant mode (organization Assistant / Enterprise Search) only ran on
+    // the removed hosted copilot; the local copilot does not implement it.
+    if (body.mode === 'assistant' || body.organizationId) {
+      return createBadRequestResponse(COPILOT_ASSISTANT_MODE_UNAVAILABLE_MESSAGE)
     }
 
-    const requestedCopilotBackend = parseCopilotBackendPreference(body.copilotBackend)
-    const { hasAccess, localOnly, defaultModel } =
-      await getLocalCopilotUserAccess(authenticatedUserId)
-    const userAllowedForLocal = hasAccess || localOnly
-    // Local-only users are pinned to Local regardless of any stored or forged
-    // `external` preference, mirroring the server-side routing guard so chat
-    // title generation and routing never leak to the cloud mothership.
-    const copilotBackend: CopilotBackendPreference | undefined = localOnly
-      ? 'local'
-      : requestedCopilotBackend === 'local' && userAllowedForLocal
-        ? 'local'
-        : requestedCopilotBackend === 'external'
-          ? 'external'
-          : userAllowedForLocal
-            ? 'local'
-            : 'external'
-
-    let localCatalogId: string | undefined
-    if (copilotBackend === 'local') {
-      const storedChatModel = body.chatId
-        ? await migrateLegacyLocalCopilotChatModel(body.chatId, authenticatedUserId)
-        : undefined
-      localCatalogId = resolveLocalCopilotRequestCatalogId(
-        body.model?.trim(),
-        defaultModel,
-        storedChatModel
-      )
+    const { hasAccess, defaultModel } = await getLocalCopilotUserAccess(authenticatedUserId)
+    if (!hasAccess) {
+      return localCopilotUserAccessDeniedResponse()
     }
+
+    const storedChatModel = body.chatId
+      ? await migrateLegacyLocalCopilotChatModel(body.chatId, authenticatedUserId)
+      : undefined
+    const localCatalogId = resolveLocalCopilotRequestCatalogId(
+      body.model?.trim(),
+      defaultModel,
+      storedChatModel
+    )
 
     const userMetadata = {
       ...(authenticatedUserName ? { name: authenticatedUserName } : {}),
@@ -1591,17 +1563,13 @@ export async function handleUnifiedChatPost(req: NextRequest) {
         activeOtelRoot.span.setAttribute(TraceAttr.WorkspaceId, workspaceId)
       }
 
-      const localOpenWorkflowId =
-        copilotBackend === 'local'
-          ? resolveOpenWorkflowIdForLocalCopilot({
-              branchWorkflowId: branch.kind === 'workflow' ? branch.workflowId : undefined,
-              chatWorkflowId:
-                currentChat && 'workflowId' in currentChat ? currentChat.workflowId : null,
-              resourceAttachments: body.resourceAttachments,
-              chatResources:
-                currentChat && 'resources' in currentChat ? currentChat.resources : undefined,
-            })
-          : undefined
+      const localOpenWorkflowId = resolveOpenWorkflowIdForLocalCopilot({
+        branchWorkflowId: branch.kind === 'workflow' ? branch.workflowId : undefined,
+        chatWorkflowId: currentChat && 'workflowId' in currentChat ? currentChat.workflowId : null,
+        resourceAttachments: body.resourceAttachments,
+        chatResources:
+          currentChat && 'resources' in currentChat ? currentChat.resources : undefined,
+      })
       const orchestratorWorkflowId =
         localOpenWorkflowId ?? (branch.kind === 'workflow' ? branch.workflowId : undefined)
 
@@ -1622,15 +1590,12 @@ export async function handleUnifiedChatPost(req: NextRequest) {
         currentChat,
         isNewChat: conversationHistory.length === 0,
         message: body.message,
-        titleModel: branch.titleModel,
-        ...(branch.titleProvider ? { titleProvider: branch.titleProvider } : {}),
         requestId,
         workspaceId,
         ...(branch.kind === 'organization' ? { organizationId: branch.organizationId } : {}),
         otelRoot: activeOtelRoot,
         orchestrateOptions: {
           userId: authenticatedUserId,
-          copilotBackend,
           ...(orchestratorWorkflowId ? { workflowId: orchestratorWorkflowId } : {}),
           ...(workspaceId ? { workspaceId } : {}),
           ...(branch.kind === 'organization' ? { organizationId: branch.organizationId } : {}),

@@ -43,7 +43,6 @@ describe('prefetchStandaloneGeneral', () => {
     mockGetUserSettings.mockResolvedValue({
       autoConnect: true,
       superUserModeEnabled: false,
-      mothershipEnvironment: 'default',
       theme: 'dark',
       telemetryEnabled: true,
       billingUsageNotificationsEnabled: true,

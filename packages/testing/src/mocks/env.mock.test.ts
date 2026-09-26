@@ -26,8 +26,8 @@ describe('env mock', () => {
   })
 
   it('supports direct property assignment on the env object', () => {
-    mockEnvObject.COPILOT_SOURCE_ENV = 'dev'
-    expect(envMock.env.COPILOT_SOURCE_ENV).toBe('dev')
+    mockEnvObject.COPILOT_STREAM_TTL_SECONDS = 60
+    expect(envMock.env.COPILOT_STREAM_TTL_SECONDS).toBe(60)
   })
 
   it('falls back to process.env for keys not pinned in state', () => {

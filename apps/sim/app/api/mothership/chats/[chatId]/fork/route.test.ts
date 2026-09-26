@@ -1,14 +1,7 @@
 /**
  * @vitest-environment node
  */
-import {
-  copilotHttpMock,
-  copilotHttpMockFns,
-  dbChainMockFns,
-  resetDbChainMock,
-  resetEnvMock,
-  setEnv,
-} from '@sim/testing'
+import { copilotHttpMock, copilotHttpMockFns, dbChainMockFns, resetDbChainMock } from '@sim/testing'
 import { NextRequest } from 'next/server'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -20,7 +13,6 @@ const {
   mockLoadCopilotChatMessages,
   mockAppendCopilotChatMessages,
   mockAssertActiveWorkspaceAccess,
-  mockFetchGo,
   mockPublishStatusChanged,
   mockCaptureServerEvent,
   mockRemoveChatResources,
@@ -37,7 +29,6 @@ const {
   mockLoadCopilotChatMessages: vi.fn(),
   mockAppendCopilotChatMessages: vi.fn(),
   mockAssertActiveWorkspaceAccess: vi.fn(),
-  mockFetchGo: vi.fn(),
   mockPublishStatusChanged: vi.fn(),
   mockCaptureServerEvent: vi.fn(),
   mockRemoveChatResources: vi.fn(),
@@ -66,15 +57,6 @@ vi.mock('@/lib/copilot/chat/messages-store', () => ({
 
 vi.mock('@/lib/copilot/chat-status', () => ({
   publishChatStatusChanged: mockPublishStatusChanged,
-}))
-
-vi.mock('@/lib/copilot/request/go/fetch', () => ({
-  fetchGo: mockFetchGo,
-}))
-
-vi.mock('@/lib/copilot/server/agent-url', () => ({
-  getMothershipBaseURL: vi.fn().mockResolvedValue('http://mothership.test'),
-  getMothershipSourceEnvHeaders: vi.fn().mockReturnValue({}),
 }))
 
 vi.mock('@/lib/posthog/server', () => ({
@@ -140,7 +122,6 @@ describe('POST /api/mothership/chats/[chatId]/fork', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     resetDbChainMock()
-    setEnv({ COPILOT_API_KEY: undefined })
     copilotHttpMockFns.mockAuthenticateCopilotRequestSessionOnly.mockResolvedValue({
       userId: 'user-1',
       isAuthenticated: true,
@@ -158,12 +139,10 @@ describe('POST /api/mothership/chats/[chatId]/fork', () => {
     mockAppendCopilotChatMessages.mockResolvedValue(undefined)
     mockRemoveChatResources.mockResolvedValue(undefined)
     mockAssertActiveWorkspaceAccess.mockResolvedValue(undefined)
-    mockFetchGo.mockResolvedValue({ ok: true })
   })
 
   afterAll(() => {
     resetDbChainMock()
-    resetEnvMock()
   })
 
   it('rejects unauthenticated callers', async () => {
@@ -246,7 +225,7 @@ describe('POST /api/mothership/chats/[chatId]/fork', () => {
     expect(appended[1].map((m: { id: string }) => m.id)).toEqual(['msg-1', 'msg-2'])
   })
 
-  it('forks the chat: copies kept uploads, rewrites references, clones agent state', async () => {
+  it('forks the chat: copies kept uploads and rewrites references', async () => {
     const blobTasks = [
       {
         sourceKey: 'workspace/ws-1/old-cat.png',
@@ -278,18 +257,6 @@ describe('POST /api/mothership/chats/[chatId]/fork', () => {
     expect(appended[1][0].content).toBe(`See ![cat](/api/files/view/${NEW_FILE_ID})`)
 
     expect(mockExecuteChatFileBlobCopies).toHaveBeenCalledWith(blobTasks)
-
-    const goCall = mockFetchGo.mock.calls[0]
-    expect(goCall[0]).toBe('http://mothership.test/api/chats/fork')
-    const goBody = JSON.parse(goCall[1].body)
-    // The copilot service only knows USER message ids, so the clone cut is the
-    // kept slice's last user message (msg-1), not the clicked assistant (msg-2).
-    expect(goBody).toEqual({
-      sourceChatId: 'chat-1',
-      newChatId: body.id,
-      upToMessageId: 'msg-1',
-      userId: 'user-1',
-    })
 
     expect(mockPublishStatusChanged).toHaveBeenCalledWith(
       expect.objectContaining({ workspaceId: 'ws-1' }),
@@ -332,12 +299,6 @@ describe('POST /api/mothership/chats/[chatId]/fork', () => {
     expect(dbChainMockFns.values.mock.calls[0][0].resources).toEqual([
       { type: 'file', id: 'file-1', title: 'report.csv' },
     ])
-  })
-
-  it('still succeeds when the copilot-service clone fails (best-effort)', async () => {
-    mockFetchGo.mockRejectedValue(new Error('mothership unreachable'))
-    const res = await POST(createRequest('chat-1'), makeContext('chat-1'))
-    expect(res.status).toBe(200)
   })
 
   it('surfaces failed blob copies and cleans up their dead rows + resource chips', async () => {

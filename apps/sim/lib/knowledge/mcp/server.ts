@@ -5,18 +5,13 @@ import { createLogger } from '@sim/logger'
 import { isPlainRecord } from '@sim/utils/object'
 import { parseRetryAfter } from '@sim/utils/retry'
 import type { NextRequest } from 'next/server'
-import {
-  chatSearchMcpSchema,
-  readDocumentMcpSchema,
-  searchMcpSchema,
-} from '@/lib/api/contracts/knowledge/mcp'
+import { readDocumentMcpSchema, searchMcpSchema } from '@/lib/api/contracts/knowledge/mcp'
 import type { V2ApiKeyAuthContext } from '@/lib/api/server/routes/v2-api-key-auth'
 import { v2RateLimits } from '@/lib/api/server/routes/v2-json-route'
 import type { ApplicationOperation } from '@/lib/core/application'
 import type { ResourceScope } from '@/lib/core/resource-scope'
 import { afterResponse } from '@/lib/core/utils/after-response'
 import { getBaseUrl } from '@/lib/core/utils/urls'
-import { organizationSearchChatOperation } from '@/lib/knowledge/application/chat-operations'
 import { knowledgeOperations } from '@/lib/knowledge/application/operations'
 import { readIndexedKnowledgeDocument } from '@/lib/knowledge/application/read-indexed-document'
 import { searchKnowledge } from '@/lib/knowledge/application/search'
@@ -242,31 +237,6 @@ export function createKnowledgeMcpServer(context: KnowledgeMcpContext): McpServe
           )
         }
       )
-  )
-
-  server.registerTool(
-    'chat',
-    {
-      title: 'Chat',
-      description:
-        'Ask the Sim Assistant to answer a question using your accessible organization sources. Returns an answer with citations and starts a new private conversation. Use source, modifiedAfter, or documentIds to narrow the evidence. No web search or source changes. Use search instead when you need raw passages.',
-      inputSchema: chatSearchMcpSchema,
-      annotations: {
-        readOnlyHint: false,
-        destructiveHint: false,
-        idempotentHint: false,
-        openWorldHint: false,
-      },
-    },
-    async ({ query, ...filters }, extra) =>
-      execute('chat', organizationSearchChatOperation, extra.signal, async (registry, signal) => {
-        const { organizationSearchChat } = await import('@/lib/knowledge/application/chat')
-        const result = await organizationSearchChat.execute({
-          principal,
-          input: { organizationId, query, filters, resultSecretRegistry: registry, signal },
-        })
-        return projectResult(result, registry)
-      })
   )
 
   return server

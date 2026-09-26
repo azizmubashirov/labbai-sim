@@ -15,7 +15,6 @@ const {
   mockGenerateWorkspaceContext,
   mockGetPersonalAndWorkspaceEnv,
   mockProcessContextsServer,
-  mockRequestExplicitStreamAbort,
   mockRequireBillingAttributionHeader,
   mockRunHeadlessCopilotLifecycle,
 } = vi.hoisted(() => ({
@@ -29,7 +28,6 @@ const {
   mockGenerateWorkspaceContext: vi.fn(),
   mockGetPersonalAndWorkspaceEnv: vi.fn(),
   mockProcessContextsServer: vi.fn(),
-  mockRequestExplicitStreamAbort: vi.fn(),
   mockRequireBillingAttributionHeader: vi.fn(),
   mockRunHeadlessCopilotLifecycle: vi.fn(),
 }))
@@ -83,10 +81,6 @@ vi.mock('@/lib/copilot/mcp-tools', () => ({
 
 vi.mock('@/lib/copilot/request/lifecycle/headless', () => ({
   runHeadlessCopilotLifecycle: mockRunHeadlessCopilotLifecycle,
-}))
-
-vi.mock('@/lib/copilot/request/session/explicit-abort', () => ({
-  requestExplicitStreamAbort: mockRequestExplicitStreamAbort,
 }))
 
 vi.mock('@/lib/core/config/env-flags', () => ({
@@ -162,7 +156,6 @@ describe('mothership private trace provenance transport', () => {
     mockComputeWorkspaceEntitlements.mockResolvedValue([])
     mockDecryptSecret.mockResolvedValue({ decrypted: 'secret-value' })
     mockProcessContextsServer.mockResolvedValue([])
-    mockRequestExplicitStreamAbort.mockResolvedValue(undefined)
   })
 
   function successResult() {

@@ -10,27 +10,15 @@ const {
   mockAuthenticate,
   mockGetLatestRunForStream,
   mockReleasePendingChatStream,
-  mockRequestExplicitStreamAbort,
   mockWaitForPendingChatStream,
-  order,
-} = vi.hoisted(() => {
-  const order: string[] = []
-  return {
-    order,
-    mockGetAccessibleChat: vi.fn(),
-    mockAbortActiveStream: vi.fn(async () => {
-      order.push('abortActiveStream')
-      return true
-    }),
-    mockRequestExplicitStreamAbort: vi.fn(async () => {
-      order.push('requestExplicitStreamAbort')
-    }),
-    mockAuthenticate: vi.fn(),
-    mockGetLatestRunForStream: vi.fn(),
-    mockWaitForPendingChatStream: vi.fn(),
-    mockReleasePendingChatStream: vi.fn(),
-  }
-})
+} = vi.hoisted(() => ({
+  mockGetAccessibleChat: vi.fn(),
+  mockAbortActiveStream: vi.fn(async () => true),
+  mockAuthenticate: vi.fn(),
+  mockGetLatestRunForStream: vi.fn(),
+  mockWaitForPendingChatStream: vi.fn(),
+  mockReleasePendingChatStream: vi.fn(),
+}))
 
 vi.mock('@/lib/copilot/chat/lifecycle', () => ({
   getAccessibleCopilotChatForCancellation: mockGetAccessibleChat,
@@ -47,9 +35,6 @@ vi.mock('@/lib/copilot/request/session', () => ({
   waitForPendingChatStream: mockWaitForPendingChatStream,
   releasePendingChatStream: mockReleasePendingChatStream,
 }))
-vi.mock('@/lib/copilot/request/session/explicit-abort', () => ({
-  requestExplicitStreamAbort: mockRequestExplicitStreamAbort,
-}))
 
 import { POST } from '@/app/api/copilot/chat/abort/route'
 
@@ -60,30 +45,13 @@ function abortRequest() {
 describe('POST /api/copilot/chat/abort', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    order.length = 0
     mockGetAccessibleChat.mockResolvedValue({ id: 'chat-1' })
     mockAuthenticate.mockResolvedValue({ userId: 'user-1', isAuthenticated: true })
     mockGetLatestRunForStream.mockResolvedValue({ chatId: 'chat-1', workspaceId: 'workspace-1' })
     mockWaitForPendingChatStream.mockResolvedValue(true)
   })
 
-  /**
-   * The ordering invariant, not an implementation detail: `abortActiveStream`
-   * is what drops the SSE, and Go decides "user stop vs. client disconnect"
-   * the instant it sees that drop by consuming a marker exactly once. Marking
-   * Go second lost that race on ~84% of stops and persisted deliberate stops
-   * as unexpected terminations carrying a synthetic `provider_error`.
-   */
-  it('writes the Go abort marker before tearing down the local stream', async () => {
-    const response = await POST(abortRequest())
-
-    expect(response.status).toBe(200)
-    expect(order).toEqual(['requestExplicitStreamAbort', 'abortActiveStream'])
-  })
-
-  it('still aborts locally when the Go marker write fails', async () => {
-    mockRequestExplicitStreamAbort.mockRejectedValueOnce(new Error('go unreachable'))
-
+  it('aborts the local stream and waits for it to settle', async () => {
     const response = await POST(abortRequest())
 
     expect(response.status).toBe(200)
@@ -100,29 +68,18 @@ describe('POST /api/copilot/chat/abort', () => {
     expect(mockReleasePendingChatStream).toHaveBeenCalledWith('chat-1', 'stream-1')
   })
 
-  it('authorizes org Stop using the cancellation lookup and forwards the canonical scope', async () => {
+  it('authorizes Stop using the cancellation lookup', async () => {
     const principal = { kind: 'session', userId: 'user-1', sessionId: 'session-1' }
     mockAuthenticate.mockResolvedValueOnce({ userId: 'user-1', isAuthenticated: true, principal })
-    mockGetLatestRunForStream.mockResolvedValueOnce({ chatId: 'chat-1', workspaceId: null })
-    mockGetAccessibleChat.mockResolvedValueOnce({ id: 'chat-1', organizationId: 'org-1' })
     const response = await POST(abortRequest())
     expect(response.status).toBe(200)
     expect(mockGetAccessibleChat).toHaveBeenCalledWith('chat-1', 'user-1', { principal })
-    expect(mockRequestExplicitStreamAbort).toHaveBeenCalledWith(
-      expect.objectContaining({
-        chatId: 'chat-1',
-        userId: 'user-1',
-        organizationId: 'org-1',
-        workspaceId: undefined,
-      })
-    )
   })
 
-  it('refuses an inaccessible organization chat before changing stream state', async () => {
+  it('refuses an inaccessible chat before changing stream state', async () => {
     mockGetAccessibleChat.mockResolvedValueOnce(null)
     const response = await POST(abortRequest())
     expect(response.status).toBe(404)
-    expect(mockRequestExplicitStreamAbort).not.toHaveBeenCalled()
     expect(mockAbortActiveStream).not.toHaveBeenCalled()
   })
 
@@ -133,13 +90,12 @@ describe('POST /api/copilot/chat/abort', () => {
     expect(mockAbortActiveStream).not.toHaveBeenCalled()
   })
 
-  it('rejects an unauthenticated caller without touching either abort path', async () => {
+  it('rejects an unauthenticated caller without touching the stream', async () => {
     mockAuthenticate.mockResolvedValue({ userId: undefined, isAuthenticated: false })
 
     const response = await POST(abortRequest())
 
     expect(response.status).toBe(401)
-    expect(mockRequestExplicitStreamAbort).not.toHaveBeenCalled()
     expect(mockAbortActiveStream).not.toHaveBeenCalled()
   })
 })

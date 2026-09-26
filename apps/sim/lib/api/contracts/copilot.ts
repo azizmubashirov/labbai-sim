@@ -1,41 +1,11 @@
 import { z } from 'zod'
-import { workspaceSearchFiltersSchema } from '@/lib/api/contracts/knowledge/search'
 import { requiredFieldSchema } from '@/lib/api/contracts/primitives'
 import { type ContractJsonResponse, defineRouteContract } from '@/lib/api/contracts/types'
 import {
   ASYNC_TOOL_CONFIRMATION_STATUS,
   type AsyncConfirmationStatus,
 } from '@/lib/copilot/async-runs/lifecycle'
-import {
-  BILLING_ACCOUNT_DECISION_HEADER,
-  BILLING_ACCOUNT_DECISION_HEADER_MAX_BYTES,
-  BILLING_ATTRIBUTION_HEADER,
-  BILLING_ATTRIBUTION_HEADER_MAX_BYTES,
-  BILLING_REQUEST_ID_HEADER,
-  COPILOT_BILLING_PROTOCOL_HEADER,
-  COPILOT_BILLING_PROTOCOL_VALUES,
-  COPILOT_VALIDATION_PURPOSE,
-  COPILOT_VALIDATION_PURPOSE_VALUES,
-} from '@/lib/copilot/generated/billing-protocol-v1'
 import { PERSISTED_RESOURCE_TYPES } from '@/lib/copilot/resources/types'
-
-export const copilotApiKeySchema = z.object({
-  id: z.string(),
-  displayKey: z.string(),
-  name: z.string().nullable(),
-  createdAt: z.string().nullable(),
-  lastUsed: z.string().nullable(),
-})
-
-export type CopilotApiKey = z.output<typeof copilotApiKeySchema>
-
-export const deleteCopilotApiKeyQuerySchema = z.object({
-  id: z.string().min(1),
-})
-
-export const generateCopilotApiKeyBodySchema = z.object({
-  name: z.string().min(1, 'Name is required').max(255, 'Name is too long'),
-})
 
 export const submitCopilotFeedbackBodySchema = z.object({
   chatId: z.string().uuid('Chat ID must be a valid UUID'),
@@ -155,36 +125,6 @@ export const copilotChatAbortBodySchema = z.object({
 })
 export type CopilotChatAbortBody = z.input<typeof copilotChatAbortBodySchema>
 
-export const copilotToolExecuteInternalBodySchema = z
-  .object({
-    requestMode: z.enum(['assistant', 'agent', 'build', 'plan']).optional(),
-    assistantSearch: workspaceSearchFiltersSchema.optional(),
-    toolCallId: z.string().min(1, 'toolCallId is required'),
-    toolName: z.string().min(1, 'toolName is required'),
-    params: z.record(z.string(), z.unknown()).default({}),
-    userId: z.string().min(1, 'userId is required'),
-    workflowId: z.string().optional(),
-    workspaceId: z.string().optional(),
-    organizationId: z.string().min(1).max(200).optional(),
-    chatId: z.string().optional(),
-    messageId: z.string().optional(),
-    parentToolCallId: z.string().optional(),
-    userPermission: z.string().optional(),
-  })
-  .refine(
-    (body) =>
-      !body.organizationId ||
-      (!body.workspaceId &&
-        !body.workflowId &&
-        body.requestMode === 'assistant' &&
-        Boolean(body.chatId)),
-    {
-      message:
-        'Organization tools require Assistant mode and a private chat without workspace or workflow scope',
-    }
-  )
-export type CopilotToolExecuteInternalBody = z.input<typeof copilotToolExecuteInternalBodySchema>
-
 export const copilotChatGetQuerySchema = z
   .object({
     workflowId: z.string().optional(),
@@ -258,66 +198,6 @@ export const deleteCopilotChatBodySchema = z.object({
 })
 export type DeleteCopilotChatBody = z.input<typeof deleteCopilotChatBodySchema>
 
-export const validateCopilotApiKeyHeadersSchema = z.object({
-  [BILLING_ACCOUNT_DECISION_HEADER]: z
-    .string()
-    .max(BILLING_ACCOUNT_DECISION_HEADER_MAX_BYTES)
-    .optional(),
-  [COPILOT_BILLING_PROTOCOL_HEADER]: z.enum(COPILOT_BILLING_PROTOCOL_VALUES).optional(),
-  [BILLING_REQUEST_ID_HEADER]: z.string().uuid().optional(),
-  [BILLING_ATTRIBUTION_HEADER]: z.string().max(BILLING_ATTRIBUTION_HEADER_MAX_BYTES).optional(),
-})
-
-export const validateCopilotApiKeyErrorSchema = z
-  .object({
-    error: z.string().min(1).max(500),
-    details: z.array(z.unknown()).optional(),
-  })
-  .strict()
-export type ValidateCopilotApiKeyError = z.output<typeof validateCopilotApiKeyErrorSchema>
-
-export const validateCopilotApiKeyBodySchema = z
-  .object({
-    userId: z.string().min(1, 'userId is required'),
-    /** Selected by authenticated Go lifecycle handlers, never by public callers. */
-    purpose: z.enum(COPILOT_VALIDATION_PURPOSE_VALUES).default(COPILOT_VALIDATION_PURPOSE.newTurn),
-    /**
-     * Originating execution workspace. Hosted attribution-v1 binds it to Sim's
-     * immutable payer snapshot. Markerless legacy-v0 resolves a locally known
-     * workspace's current payer for aligned payer-pool and member admission.
-     * For direct-v1 Chat/Copilot API keys it may be a self-hosted local ID and is
-     * never used to select or authorize a hosted payer, so direct-v1 callers may
-     * omit it entirely.
-     */
-    workspaceId: z.string().min(1).optional(),
-    organizationId: z.string().min(1).max(200).optional(),
-    chatId: z.string().min(1).max(200).optional(),
-  })
-  .refine((body) => !(body.workspaceId && body.organizationId), {
-    message: 'workspaceId and organizationId are mutually exclusive',
-  })
-export type ValidateCopilotApiKeyBody = z.input<typeof validateCopilotApiKeyBodySchema>
-
-export const validateCopilotApiKeyResponseSchema = z.object({
-  /**
-   * Server-derived entitlement for the validated key owner. Mothership treats
-   * a missing or false value as ineligible for enterprise-only capabilities.
-   */
-  isEnterprise: z.boolean(),
-})
-export type ValidateCopilotApiKeyResponse = z.output<typeof validateCopilotApiKeyResponseSchema>
-
-export const listCopilotApiKeysContract = defineRouteContract({
-  method: 'GET',
-  path: '/api/copilot/api-keys',
-  response: {
-    mode: 'json',
-    schema: z.object({
-      keys: z.array(copilotApiKeySchema),
-    }),
-  },
-})
-
 export const copilotChatListItemSchema = z.object({
   id: z.string(),
   title: z.string().nullable(),
@@ -336,36 +216,6 @@ export const listCopilotChatsContract = defineRouteContract({
     schema: z.object({
       success: z.literal(true),
       chats: z.array(copilotChatListItemSchema),
-    }),
-  },
-})
-
-export const generateCopilotApiKeyContract = defineRouteContract({
-  method: 'POST',
-  path: '/api/copilot/api-keys/generate',
-  body: generateCopilotApiKeyBodySchema,
-  response: {
-    mode: 'json',
-    schema: z.object({
-      success: z.literal(true),
-      key: z.object({
-        id: z.string(),
-        apiKey: z.string(),
-      }),
-    }),
-  },
-})
-
-export type GenerateCopilotApiKeyResult = ContractJsonResponse<typeof generateCopilotApiKeyContract>
-
-export const deleteCopilotApiKeyContract = defineRouteContract({
-  method: 'DELETE',
-  path: '/api/copilot/api-keys',
-  query: deleteCopilotApiKeyQuerySchema,
-  response: {
-    mode: 'json',
-    schema: z.object({
-      success: z.literal(true),
     }),
   },
 })
@@ -430,88 +280,6 @@ const copilotChatGetListItemSchema = z
     updatedAt: z.string().nullable(),
   })
   .passthrough()
-
-export const validateCopilotApiKeyContract = defineRouteContract({
-  method: 'POST',
-  path: '/api/copilot/api-keys/validate',
-  headers: validateCopilotApiKeyHeadersSchema,
-  body: validateCopilotApiKeyBodySchema,
-  response: { mode: 'json', schema: validateCopilotApiKeyResponseSchema },
-  error: validateCopilotApiKeyErrorSchema,
-})
-
-export const validateCopilotByokBodySchema = z.object({
-  workspaceId: z.string().min(1, 'workspaceId is required'),
-  userId: z.string().min(1, 'userId is required'),
-})
-export type ValidateCopilotByokBody = z.input<typeof validateCopilotByokBodySchema>
-
-/**
- * Server-to-server entitlement gate called by the mothership (Go) before it
- * uses a workspace's own provider key. Empty 200/401/403 responses signal the
- * outcome; the Go caller fails closed to hosted keys on anything but a 200.
- */
-export const validateCopilotByokContract = defineRouteContract({
-  method: 'POST',
-  path: '/api/copilot/byok/validate',
-  body: validateCopilotByokBodySchema,
-  response: { mode: 'empty' },
-})
-
-export const listCopilotByokKeysQuerySchema = z.object({
-  workspaceId: z.string().min(1, 'workspaceId is required'),
-})
-export type ListCopilotByokKeysQuery = z.input<typeof listCopilotByokKeysQuerySchema>
-
-export const upsertCopilotByokKeyBodySchema = z.object({
-  workspaceId: z.string().min(1, 'workspaceId is required'),
-  provider: z.string().min(1, 'provider is required'),
-  apiKey: z.string().min(1, 'apiKey is required'),
-})
-export type UpsertCopilotByokKeyBody = z.input<typeof upsertCopilotByokKeyBodySchema>
-
-export const deleteCopilotByokKeyQuerySchema = z.object({
-  workspaceId: z.string().min(1, 'workspaceId is required'),
-  provider: z.string().min(1, 'provider is required'),
-})
-export type DeleteCopilotByokKeyQuery = z.input<typeof deleteCopilotByokKeyQuerySchema>
-
-/**
- * Superuser-gated proxies to the copilot's `/api/admin/byok` endpoints. The
- * responses are owned by the copilot service and forwarded verbatim.
- */
-export const listCopilotByokKeysContract = defineRouteContract({
-  method: 'GET',
-  path: '/api/copilot/byok',
-  query: listCopilotByokKeysQuerySchema,
-  response: {
-    mode: 'json',
-    // untyped-response: forwards the copilot /api/admin/byok response unchanged; shape is owned by the copilot service
-    schema: z.unknown(),
-  },
-})
-
-export const upsertCopilotByokKeyContract = defineRouteContract({
-  method: 'POST',
-  path: '/api/copilot/byok',
-  body: upsertCopilotByokKeyBodySchema,
-  response: {
-    mode: 'json',
-    // untyped-response: forwards the copilot /api/admin/byok response unchanged; shape is owned by the copilot service
-    schema: z.unknown(),
-  },
-})
-
-export const deleteCopilotByokKeyContract = defineRouteContract({
-  method: 'DELETE',
-  path: '/api/copilot/byok',
-  query: deleteCopilotByokKeyQuerySchema,
-  response: {
-    mode: 'json',
-    // untyped-response: forwards the copilot /api/admin/byok response unchanged; shape is owned by the copilot service
-    schema: z.unknown(),
-  },
-})
 
 export const createWorkflowCopilotChatContract = defineRouteContract({
   method: 'POST',

@@ -1,11 +1,12 @@
-import { resolveSimAgentApiUrl } from '@/local-copilot/lib/sim-agent-url'
 import { OPENAI_MODEL_GPT_5_5 } from '@/providers/openai/model-ids'
 
-export const SIM_AGENT_API_URL_DEFAULT = 'https://www.copilot.sim.ai'
-export const SIM_AGENT_VERSION = '3.0.0'
-
-/** Resolved copilot backend URL — reads from env with fallback to default. */
-export const SIM_AGENT_API_URL = resolveSimAgentApiUrl(SIM_AGENT_API_URL_DEFAULT)
+/**
+ * Assistant mode (organization Assistant / Enterprise Search and the knowledge
+ * MCP search chat) was served only by the hosted copilot service, which has
+ * been removed. The local copilot does not implement it.
+ */
+export const COPILOT_ASSISTANT_MODE_UNAVAILABLE_MESSAGE =
+  'Assistant mode is not available: this deployment only runs the local copilot'
 
 /** Default timeout for the copilot orchestration stream loop (60 min). */
 export const ORCHESTRATION_TIMEOUT_MS = 3_600_000

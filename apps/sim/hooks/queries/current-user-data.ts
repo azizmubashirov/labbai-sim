@@ -1,8 +1,4 @@
-import type {
-  MothershipEnvironment,
-  UserProfileApiUser,
-  UserSettingsApi,
-} from '@/lib/api/contracts/user'
+import type { UserProfileApiUser, UserSettingsApi } from '@/lib/api/contracts/user'
 
 export const USER_PROFILE_STALE_TIME = 5 * 60 * 1000
 
@@ -32,7 +28,6 @@ export const GENERAL_SETTINGS_STALE_TIME = 60 * 60 * 1000
 export interface GeneralSettings {
   autoConnect: boolean
   superUserModeEnabled: boolean
-  mothershipEnvironment: MothershipEnvironment
   theme: 'light' | 'dark' | 'system'
   telemetryEnabled: boolean
   billingUsageNotificationsEnabled: boolean
@@ -51,7 +46,6 @@ export function mapGeneralSettingsResponse(data: UserSettingsApi): GeneralSettin
   return {
     autoConnect: data.autoConnect,
     superUserModeEnabled: data.superUserModeEnabled,
-    mothershipEnvironment: data.mothershipEnvironment,
     theme: data.theme,
     telemetryEnabled: data.telemetryEnabled,
     billingUsageNotificationsEnabled: data.billingUsageNotificationsEnabled,

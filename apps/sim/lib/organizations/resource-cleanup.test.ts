@@ -6,19 +6,13 @@ import { copilotChats, document, organization, workspaceFiles } from '@sim/db/sc
 import { dbChainMockFns, hasMockCondition, queueTableRows, resetDbChainMock } from '@sim/testing'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { mockDeleteFile, mockCleanupCopilotBackend, mockEnqueueOutboxEvent, mockEnv } = vi.hoisted(
-  () => ({
-    mockDeleteFile: vi.fn(),
-    mockCleanupCopilotBackend: vi.fn(),
-    mockEnqueueOutboxEvent: vi.fn(),
-    mockEnv: { COPILOT_API_KEY: 'test-key' as string | undefined },
-  })
-)
+const { mockDeleteFile, mockEnqueueOutboxEvent } = vi.hoisted(() => ({
+  mockDeleteFile: vi.fn(),
+  mockEnqueueOutboxEvent: vi.fn(),
+}))
 
 vi.mock('@/lib/uploads/core/storage-service', () => ({ deleteFile: mockDeleteFile }))
-vi.mock('@/lib/cleanup/chat-cleanup', () => ({ cleanupCopilotBackend: mockCleanupCopilotBackend }))
 vi.mock('@/lib/core/outbox/service', () => ({ enqueueOutboxEvent: mockEnqueueOutboxEvent }))
-vi.mock('@/lib/core/config/env', () => ({ env: mockEnv }))
 
 import type { OutboxEventContext } from '@/lib/core/outbox/service'
 import {
@@ -54,10 +48,8 @@ function filesPayload() {
 beforeEach(() => {
   vi.clearAllMocks()
   resetDbChainMock()
-  mockEnv.COPILOT_API_KEY = 'test-key'
   mockDeleteFile.mockResolvedValue(undefined)
   mockEnqueueOutboxEvent.mockResolvedValue('event')
-  mockCleanupCopilotBackend.mockResolvedValue({ deleted: 1, failed: 0 })
 })
 
 afterAll(resetDbChainMock)
@@ -130,7 +122,6 @@ describe('enqueueOrganizationResourceCleanup', () => {
       )
     ).toBe(true)
     expect(mockDeleteFile).not.toHaveBeenCalled()
-    expect(mockCleanupCopilotBackend).not.toHaveBeenCalled()
   })
 
   it('pages by canonical IDs and bounds every persisted cleanup payload', async () => {
@@ -193,7 +184,6 @@ describe('enqueueOrganizationResourceCleanup', () => {
 
     expect(dbChainMockFns.from).not.toHaveBeenCalledWith(copilotChats)
     expect(mockDeleteFile).not.toHaveBeenCalled()
-    expect(mockCleanupCopilotBackend).not.toHaveBeenCalled()
   })
 })
 
@@ -277,48 +267,15 @@ describe('organization resource cleanup worker', () => {
     expect(mockDeleteFile).toHaveBeenCalledTimes(21)
   })
 
-  it('purges only chats still missing at execution and safely retries the same IDs', async () => {
-    const payload = { kind: 'chats', organizationId: ORG_ID, chatIds: [CHAT_ID, SURVIVING_CHAT_ID] }
-    queueTableRows(copilotChats, [{ id: SURVIVING_CHAT_ID }])
-    mockCleanupCopilotBackend.mockResolvedValueOnce({ deleted: 0, failed: 1 })
-
-    await expect(handleCleanup(payload, context())).rejects.toThrow(
-      'Organization chat backend cleanup failed'
-    )
-
-    queueTableRows(copilotChats, [{ id: SURVIVING_CHAT_ID }])
-    await expect(handleCleanup(payload, context())).resolves.toBeUndefined()
-    expect(mockCleanupCopilotBackend).toHaveBeenNthCalledWith(
-      1,
-      [CHAT_ID],
-      'OrganizationCleanup:cleanup-event'
-    )
-    expect(mockCleanupCopilotBackend).toHaveBeenNthCalledWith(
-      2,
-      [CHAT_ID],
-      'OrganizationCleanup:cleanup-event'
-    )
-    expect(mockDeleteFile).not.toHaveBeenCalled()
-  })
-
-  it('does not complete unconfigured backend cleanup silently', async () => {
-    mockEnv.COPILOT_API_KEY = undefined
-
+  it('completes chat cleanup events without external effects', async () => {
     await expect(
-      handleCleanup({ kind: 'chats', organizationId: ORG_ID, chatIds: [CHAT_ID] }, context())
-    ).rejects.toThrow('Copilot cleanup is not configured')
-
-    expect(mockCleanupCopilotBackend).not.toHaveBeenCalled()
-  })
-
-  it('does not require backend configuration when every chat survives', async () => {
-    mockEnv.COPILOT_API_KEY = undefined
-    queueTableRows(copilotChats, [{ id: CHAT_ID }])
-
-    await expect(
-      handleCleanup({ kind: 'chats', organizationId: ORG_ID, chatIds: [CHAT_ID] }, context())
+      handleCleanup(
+        { kind: 'chats', organizationId: ORG_ID, chatIds: [CHAT_ID, SURVIVING_CHAT_ID] },
+        context()
+      )
     ).resolves.toBeUndefined()
-    expect(mockCleanupCopilotBackend).not.toHaveBeenCalled()
+    expect(dbChainMockFns.from).not.toHaveBeenCalledWith(copilotChats)
+    expect(mockDeleteFile).not.toHaveBeenCalled()
   })
 
   it('rejects malformed or oversized jobs before reading or deleting any resource', async () => {
@@ -355,6 +312,5 @@ describe('organization resource cleanup worker', () => {
 
     expect(dbChainMockFns.select).not.toHaveBeenCalled()
     expect(mockDeleteFile).not.toHaveBeenCalled()
-    expect(mockCleanupCopilotBackend).not.toHaveBeenCalled()
   })
 })

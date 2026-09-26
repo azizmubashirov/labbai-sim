@@ -12,7 +12,6 @@ import {
 } from 'react'
 import {
   Chip,
-  ChipSwitch,
   cn,
   DropdownMenu,
   DropdownMenuContent,
@@ -173,20 +172,9 @@ const UserInputImpl = forwardRef<UserInputHandle, UserInputProps>(function UserI
     userId,
     onContextAdd,
     onContextRemove,
-    canSwitchCopilotBackend,
-    copilotBackend,
-    setCopilotBackend,
     localCopilotCatalogId,
     setLocalCopilotCatalogId,
   } = useChatSurface()
-
-  const showLocalModelPicker =
-    Boolean(canSwitchCopilotBackend) &&
-    copilotBackend === 'local' &&
-    localCopilotCatalogId !== undefined &&
-    setLocalCopilotCatalogId !== undefined
-
-  const showSessionMemoryInspector = copilotBackend === 'local' && Boolean(chatId)
 
   const [initialValue] = useState(() => {
     if (defaultValue) return defaultValue
@@ -692,33 +680,13 @@ const UserInputImpl = forwardRef<UserInputHandle, UserInputProps>(function UserI
             </Tooltip.Trigger>
             <Tooltip.Content side='top'>Skills</Tooltip.Content>
           </Tooltip.Root>
-          {canSwitchCopilotBackend && copilotBackend && setCopilotBackend ? (
-            <Tooltip.Root>
-              <Tooltip.Trigger asChild>
-                <div className='ml-1'>
-                  <ChipSwitch
-                    value={copilotBackend}
-                    onChange={setCopilotBackend}
-                    aria-label='Copilot backend'
-                    options={[
-                      { value: 'local', label: 'Local' },
-                      { value: 'external', label: 'Cloud' },
-                    ]}
-                  />
-                </div>
-              </Tooltip.Trigger>
-              <Tooltip.Content side='top'>
-                Local runs the copilot in your deployment. Cloud uses external Mothership.
-              </Tooltip.Content>
-            </Tooltip.Root>
-          ) : null}
-          {showLocalModelPicker && localCopilotCatalogId && setLocalCopilotCatalogId ? (
+          {localCopilotCatalogId && setLocalCopilotCatalogId ? (
             <LocalCopilotModelPicker
               catalogId={localCopilotCatalogId}
               onCatalogIdChange={setLocalCopilotCatalogId}
             />
           ) : null}
-          {showSessionMemoryInspector ? <SessionMemoryInspector chatId={chatId} /> : null}
+          {chatId ? <SessionMemoryInspector chatId={chatId} /> : null}
         </div>
         <div className='flex items-center gap-1.5'>
           {isSttSupported && (

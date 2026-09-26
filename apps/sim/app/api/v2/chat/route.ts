@@ -4,7 +4,7 @@ import {
   type PersonalApiKeyPrincipal,
 } from '@sim/auth/principal'
 import { createLogger } from '@sim/logger'
-import { getErrorMessage, toError } from '@sim/utils/errors'
+import { getErrorMessage } from '@sim/utils/errors'
 import { generateId } from '@sim/utils/id'
 import { truncate } from '@sim/utils/string'
 import type { NextRequest, NextResponse } from 'next/server'
@@ -38,7 +38,6 @@ import {
   MothershipStreamV1TextChannel,
 } from '@/lib/copilot/generated/mothership-stream-v1'
 import { runHeadlessCopilotLifecycle } from '@/lib/copilot/request/lifecycle/headless'
-import { requestExplicitStreamAbort } from '@/lib/copilot/request/session/explicit-abort'
 import type { OrchestratorResult, StreamEvent } from '@/lib/copilot/request/types'
 import { normalizeSecretMountPolicy } from '@/lib/copilot/secret-mount-policy'
 import {
@@ -358,30 +357,11 @@ export const POST = withRouteHandler(
         ...(entitlements.length > 0 ? { entitlements } : {}),
       }
 
-      let allowExplicitAbort = true
-      let explicitAbortRequest: Promise<void> | undefined
       const lifecycleAbortController = new AbortController()
-      const requestExplicitAbortOnce = () => {
-        if (!allowExplicitAbort || explicitAbortRequest) {
-          return
-        }
-
-        explicitAbortRequest = requestExplicitStreamAbort({
-          streamId: messageId,
-          userId,
-          chatId,
-          workspaceId,
-        }).catch((error) => {
-          reqLogger.warn('Failed to send explicit abort for chat request', {
-            error: toError(error).message,
-          })
-        })
-      }
       const abortLifecycle = (reason?: unknown) => {
         if (!lifecycleAbortController.signal.aborted) {
           lifecycleAbortController.abort(reason ?? 'chat_request_aborted')
         }
-        requestExplicitAbortOnce()
       }
       const onAbort = () => {
         abortLifecycle(req.signal.reason ?? 'request_aborted')
@@ -452,7 +432,6 @@ export const POST = withRouteHandler(
                     }
                   }
                 })
-                allowExplicitAbort = false
 
                 // Persist before the cancellation check: the turn ran and was
                 // billed, so the reply belongs in the transcript even when the
@@ -499,12 +478,10 @@ export const POST = withRouteHandler(
                 })
                 send({ type: 'error', error: getErrorMessage(error, 'Internal server error') })
               } finally {
-                allowExplicitAbort = false
                 if (heartbeatId) {
                   clearInterval(heartbeatId)
                 }
                 req.signal.removeEventListener('abort', onAbort)
-                await explicitAbortRequest
                 if (!cancelled) {
                   controller.close()
                 }
@@ -530,7 +507,6 @@ export const POST = withRouteHandler(
 
       try {
         const result = await runLifecycle()
-        allowExplicitAbort = false
 
         // Persist before the cancellation check: the turn ran and was billed,
         // so the reply belongs in the transcript even when the caller stopped
@@ -552,9 +528,7 @@ export const POST = withRouteHandler(
 
         return v2Data(buildChatResultPayload(result, chatId, integrationTools))
       } finally {
-        allowExplicitAbort = false
         req.signal.removeEventListener('abort', onAbort)
-        await explicitAbortRequest
       }
     } catch (error) {
       if (req.signal.aborted || isAbortError(error)) {

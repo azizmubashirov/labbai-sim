@@ -1301,10 +1301,8 @@ export const DEPLOYMENT_CONFIGURATION_KEYS: readonly string[] = [
   ...new Set([
     ...CORE_CONFIGURATION_KEYS,
     ...ENV_CAPABILITIES.flatMap(capabilityKeys),
-    'COPILOT_API_KEY',
     'EMAIL_VERIFICATION_ENABLED',
     'NEXT_PUBLIC_CHAT_DISABLED',
-    'SIM_AGENT_API_URL',
     ...Object.values(LLM_KEY_POOLS).flatMap((pool) => [
       ...pool.keys,
       ...('fallbackKey' in pool ? [pool.fallbackKey] : []),

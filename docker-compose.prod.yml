@@ -37,10 +37,7 @@ services:
       # Authenticates the cron service against the background job endpoints.
       - CRON_SECRET=${CRON_SECRET:-}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
-      - COPILOT_API_KEY=${COPILOT_API_KEY:-}
-      - MSHIP_SYSPROMPT_OVERRIDE=${MSHIP_SYSPROMPT_OVERRIDE:-}
       - NEXT_PUBLIC_CHAT_DISABLED=${NEXT_PUBLIC_CHAT_DISABLED:-}
-      - SIM_AGENT_API_URL=${SIM_AGENT_API_URL:-}
       - SOCKET_SERVER_URL=${SOCKET_SERVER_URL:-http://realtime:3002}
       # NEXT_PUBLIC_SOCKET_URL is read by the browser. Leave it unset for this
       # stack: the client already falls back to localhost:3002 for a localhost

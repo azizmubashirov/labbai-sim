@@ -48,16 +48,10 @@ const forceHosted = !isProd && isTruthy(getEnv('NEXT_PUBLIC_FORCE_HOSTED'))
 export const isHosted = forceHosted || appHostname === 'sim.ai' || appHostname.endsWith('.sim.ai')
 
 /**
- * Are the Chat module's surfaces shown. On by default, so a deployment that
- * already has `COPILOT_API_KEY` keeps Chat without setting anything; the setup
- * wizard writes the opt-out when you skip the key.
- *
- * This governs presentation only. Whether Chat can actually reach the mothership
- * is a separate question answered by `COPILOT_API_KEY`, which gates the paths
- * that need it (the Sim Chat block, prompt-job claims, inbox execution). Keeping
- * them separate is what lets this be a single variable: the secret key could
- * never be read in the browser, but `NEXT_PUBLIC_CHAT_DISABLED` can — no twin to
- * keep in sync.
+ * Are the Chat module's surfaces shown. On by default; set
+ * `NEXT_PUBLIC_CHAT_DISABLED` to hide them. This governs presentation only —
+ * whether the local copilot can actually answer is decided by its own
+ * `COPILOT_*` configuration and the per-user allowlist.
  *
  * Read at module scope or inline during render only. Resolving it through
  * `useState`/`useEffect` would render chat surfaces before removing them.
@@ -78,16 +72,13 @@ export const isStatusNoticePreviewEnabled = isTruthy(getEnv('NEXT_PUBLIC_STATUS_
  *
  * Off by default: turning it on makes the copilot prompt on its most frequently
  * used tools, so it is an opt-in change in how the product feels, not just a
- * safety toggle. With it off nothing is stamped, gated, or persisted, and an
- * approval stamp arriving from Go is cleared on the way to the client.
+ * safety toggle. With it off nothing is stamped, gated, or persisted.
  *
  * The gate is a property of the lane, not only of the tool. Sim can hold a call
  * for a decision on the dispatch lane, where a streaming context and a decision
- * row exist. It cannot on the in-band route (`POST /api/copilot/tools/execute`),
- * which the mothership drives for background lanes, so that route refuses a
- * `requiresApproval` tool outright rather than running it ungated — see
- * `toolRequiresApprovalLane`. Any new execution lane has to answer the same
- * question before this flag is turned on.
+ * row exist. A lane without one must refuse a `requiresApproval` tool outright
+ * rather than run it ungated — see `toolRequiresApprovalLane`. Any new execution
+ * lane has to answer the same question before this flag is turned on.
  */
 export const isCopilotToolPermissionsEnabled = isTruthy(env.COPILOT_TOOL_PERMISSIONS_ENABLED)
 

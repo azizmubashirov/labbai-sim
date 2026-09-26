@@ -3,8 +3,6 @@ import { copilotChats, copilotMessages, workspaceFiles } from '@sim/db/schema'
 import { createLogger } from '@sim/logger'
 import { chunkArray } from '@sim/utils/helpers'
 import { and, inArray, isNull } from 'drizzle-orm'
-import { SIM_AGENT_API_URL } from '@/lib/copilot/constants'
-import { env } from '@/lib/core/config/env'
 import type { StorageContext } from '@/lib/uploads'
 import { isUsingCloudStorage, StorageService } from '@/lib/uploads'
 
@@ -13,7 +11,6 @@ const logger = createLogger('ChatCleanup')
 /** Chat cleanup only ever runs from cleanup jobs, so its reads use the cleanup pool. */
 const cleanupDb = dbFor('cleanup')
 
-const COPILOT_CLEANUP_BATCH_SIZE = 1000
 /** Bounds how many chats' `copilot_messages` rows are scanned per query. */
 const CHAT_FILE_COLLECT_CHUNK_SIZE = 500
 
@@ -128,61 +125,8 @@ export async function deleteStorageFiles(
 }
 
 /**
- * Call the copilot backend to delete chat data (memory_files, checkpoints, task_chains, etc.)
- * Chunked at 1000 per request.
- */
-export async function cleanupCopilotBackend(
-  chatIds: string[],
-  label: string
-): Promise<{ deleted: number; failed: number }> {
-  const stats = { deleted: 0, failed: 0 }
-
-  if (chatIds.length === 0 || !env.COPILOT_API_KEY) {
-    if (!env.COPILOT_API_KEY) {
-      logger.warn(`[${label}] COPILOT_API_KEY not set, skipping copilot backend cleanup`)
-    }
-    return stats
-  }
-
-  for (let i = 0; i < chatIds.length; i += COPILOT_CLEANUP_BATCH_SIZE) {
-    const chunk = chatIds.slice(i, i + COPILOT_CLEANUP_BATCH_SIZE)
-    try {
-      const response = await fetch(`${SIM_AGENT_API_URL}/api/tasks/cleanup`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': env.COPILOT_API_KEY,
-        },
-        body: JSON.stringify({ chatIds: chunk }),
-      })
-
-      if (!response.ok) {
-        const errorBody = await response.text().catch(() => '')
-        logger.error(`[${label}] Copilot backend cleanup failed: ${response.status}`, {
-          errorBody,
-          chatCount: chunk.length,
-        })
-        stats.failed += chunk.length
-        continue
-      }
-
-      const result = await response.json()
-      stats.deleted += result.deleted ?? 0
-      logger.info(
-        `[${label}] Copilot backend cleanup: ${result.deleted} chats deleted (batch ${Math.floor(i / COPILOT_CLEANUP_BATCH_SIZE) + 1})`
-      )
-    } catch (error) {
-      stats.failed += chunk.length
-      logger.error(`[${label}] Copilot backend cleanup request failed:`, { error })
-    }
-  }
-
-  return stats
-}
-
-/**
  * Full chat cleanup: collect file refs, then (after DB deletion by caller)
- * call copilot backend and delete storage files.
+ * delete storage files.
  *
  * Usage:
  *   const cleanup = await prepareChatCleanup(chatIds, label)
@@ -204,8 +148,8 @@ export async function prepareChatCleanup(
   return {
     execute: async () => {
       // A chat can be restored (or its delete can fail) between selection and
-      // the caller's row delete. Purge backend data and files only for chats
-      // whose rows are actually gone, so a surviving row never loses its data.
+      // the caller's row delete. Purge files only for chats whose rows are
+      // actually gone, so a surviving row never loses its data.
       const survivors = new Set<string>()
       for (const chunk of chunkArray(chatIds, CHAT_FILE_COLLECT_CHUNK_SIZE)) {
         const rows = await cleanupDb
@@ -219,16 +163,7 @@ export async function prepareChatCleanup(
           `[${label}] Skipping external cleanup for ${survivors.size} chats whose rows still exist`
         )
       }
-      const confirmedChatIds = chatIds.filter((id) => !survivors.has(id))
       const confirmedFiles = files.filter((file) => !survivors.has(file.chatId))
-
-      // Call copilot backend
-      if (confirmedChatIds.length > 0) {
-        const copilotResult = await cleanupCopilotBackend(confirmedChatIds, label)
-        logger.info(
-          `[${label}] Copilot backend: ${copilotResult.deleted} deleted, ${copilotResult.failed} failed`
-        )
-      }
 
       // Delete storage files with correct context per file
       if (confirmedFiles.length > 0) {

@@ -117,9 +117,6 @@ export const userSettingsEmailPreferencesSchema = z.object({
   unsubscribeNotifications: z.boolean().optional(),
 })
 
-export const mothershipEnvironmentSchema = z.enum(['default', 'dev', 'staging', 'prod'])
-export type MothershipEnvironment = z.infer<typeof mothershipEnvironmentSchema>
-
 /** An IANA timezone identifier (e.g. `America/New_York`), validated against the runtime's zone database. */
 export const ianaTimezoneSchema = z.string().refine(
   (tz) => {
@@ -140,7 +137,6 @@ export const userSettingsSchema = z.object({
   emailPreferences: userSettingsEmailPreferencesSchema.optional().default({}),
   billingUsageNotificationsEnabled: z.boolean().default(true),
   superUserModeEnabled: z.boolean().default(false),
-  mothershipEnvironment: mothershipEnvironmentSchema.default('default'),
   errorNotificationsEnabled: z.boolean().default(true),
   snapToGridSize: z.number().min(0).max(50).default(0),
   showActionBar: z.boolean().default(true),
@@ -162,7 +158,6 @@ export const updateUserSettingsBodySchema = z.object({
   emailPreferences: userSettingsEmailPreferencesSchema.optional(),
   billingUsageNotificationsEnabled: z.boolean().optional(),
   superUserModeEnabled: z.boolean().optional(),
-  mothershipEnvironment: mothershipEnvironmentSchema.optional(),
   errorNotificationsEnabled: z.boolean().optional(),
   snapToGridSize: z.number().min(0).max(50).optional(),
   showActionBar: z.boolean().optional(),

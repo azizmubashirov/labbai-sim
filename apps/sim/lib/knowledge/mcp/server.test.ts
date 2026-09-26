@@ -11,7 +11,6 @@ const mocks = vi.hoisted(() => ({
   >(),
   search: vi.fn(),
   read: vi.fn(),
-  chat: vi.fn(),
   rateLimit: vi.fn(),
   info: vi.fn(),
   afterResponse: vi.fn<(task: () => Promise<void>) => void>(),
@@ -46,9 +45,6 @@ vi.mock('@/lib/knowledge/application/search', () => ({
 }))
 vi.mock('@/lib/knowledge/application/read-indexed-document', () => ({
   readIndexedKnowledgeDocument: { execute: mocks.read },
-}))
-vi.mock('@/lib/knowledge/application/chat', () => ({
-  organizationSearchChat: { execute: mocks.chat },
 }))
 vi.mock('@/lib/core/utils/urls', () => ({ getBaseUrl: () => 'https://sim.example' }))
 
@@ -93,7 +89,6 @@ beforeEach(() => {
     chunks: [{ id: 'chunk-1', chunkIndex: 0, content: 'Indexed text' }],
     pagination: { total: 1, offset: 0, limit: 20, hasMore: false },
   })
-  mocks.chat.mockResolvedValue({ content: 'An answer', citations: [] })
 })
 
 describe('search', () => {
@@ -266,63 +261,21 @@ describe('filters and citations', () => {
   })
 })
 
-describe('organization chat', () => {
-  it('exposes only the three organization Search tools', () => {
+describe('organization tools', () => {
+  it('exposes only the organization Search tools', () => {
     create()
-    expect([...mocks.tools.keys()]).toEqual(['search', 'read_document', 'chat'])
-  })
-  it('uses the real caller and shared filters to ask the organization Assistant', async () => {
-    create()
-    const result = await call('chat', {
-      query: 'What changed?',
-      source: 'jira',
-      modifiedAfter: '2026-09-07T00:00:00Z',
-    })
-    expect(payload(result)).toEqual({ content: 'An answer', citations: [] })
-    expect(mocks.chat).toHaveBeenCalledWith({
-      principal,
-      input: expect.objectContaining({
-        organizationId: 'org-1',
-        query: 'What changed?',
-        filters: { source: 'jira', modifiedAfter: '2026-09-07T00:00:00Z' },
-      }),
-    })
-    expect(mocks.rateLimit).toHaveBeenCalledWith(
-      request,
-      auth,
-      expect.objectContaining({ id: 'knowledge.chat', oauthScope: 'search:read' })
-    )
-  })
-  it('stops cancelled calls before starting a conversation', async () => {
-    create()
-    expect((await call('chat', { query: 'answer' }, AbortSignal.abort())).isError).toBe(true)
-    expect(mocks.chat).not.toHaveBeenCalled()
-  })
-  it('does not run when rate limited', async () => {
-    create()
-    mocks.rateLimit.mockResolvedValueOnce(new Response(null, { status: 429 }))
-    expect((await call('chat', { query: 'answer' })).isError).toBe(true)
-    expect(mocks.chat).not.toHaveBeenCalled()
+    expect([...mocks.tools.keys()]).toEqual(['search', 'read_document'])
   })
   it('includes the actual retry delay in rate-limited tool results', async () => {
     create()
     mocks.rateLimit.mockResolvedValueOnce(
       new Response(null, { status: 429, headers: { 'Retry-After': '90' } })
     )
-    expect(await call('chat', { query: 'answer' })).toEqual({
+    expect(await call('search', { query: 'answer' })).toEqual({
       isError: true,
       content: [{ type: 'text', text: 'API rate limit exceeded. Retry in 90 seconds.' }],
     })
-    expect(mocks.chat).not.toHaveBeenCalled()
-  })
-  it('does not leak backend failures', async () => {
-    create()
-    mocks.chat.mockRejectedValueOnce(new Error('private backend detail'))
-    const result = await call('chat', { query: 'answer' })
-    expect(result).toEqual({
-      isError: true,
-      content: [{ type: 'text', text: 'Unable to complete this operation. Please try again.' }],
-    })
+    expect(mocks.search).not.toHaveBeenCalled()
   })
 })
 
@@ -367,7 +320,6 @@ describe('MCP tool completion records', () => {
   it.each([
     ['search', { query: 'private query', topK: 10 }, 'knowledge.search'],
     ['read_document', { documentId: 'doc-1' }, 'knowledge.documents.read'],
-    ['chat', { query: 'private question' }, 'knowledge.chat'],
   ] as const)('records one content-free completion for %s', async (toolName, input, operation) => {
     create()
     await call(toolName, input)
@@ -424,7 +376,7 @@ describe('MCP tool completion records', () => {
     )
   })
 
-  it.each(['search', 'read_document', 'chat'])(
+  it.each(['search', 'read_document'])(
     'records cancelled %s calls without executing the operation',
     async (toolName) => {
       create()
@@ -433,7 +385,6 @@ describe('MCP tool completion records', () => {
       expect(mocks.rateLimit).not.toHaveBeenCalled()
       expect(mocks.search).not.toHaveBeenCalled()
       expect(mocks.read).not.toHaveBeenCalled()
-      expect(mocks.chat).not.toHaveBeenCalled()
       expect(mocks.info).toHaveBeenCalledExactlyOnceWith(
         'Knowledge MCP tool completed',
         expect.objectContaining({ toolName, outcome: 'cancelled' })

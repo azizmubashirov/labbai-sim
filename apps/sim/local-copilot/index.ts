@@ -3,10 +3,7 @@ export { LocalCopilotPanel } from '@/local-copilot/components/local-copilot-pane
 export { PatchPreview } from '@/local-copilot/components/patch-preview'
 export { SessionMemoryInspector } from '@/local-copilot/components/session-memory-inspector'
 export type { WorkflowPatchWire } from '@/local-copilot/contracts/local-copilot'
-export {
-  useCopilotBackendPreference,
-  useLocalCopilotCatalogSelection,
-} from '@/local-copilot/hooks/use-copilot-backend-preference'
+export { useLocalCopilotCatalogSelection } from '@/local-copilot/hooks/use-copilot-backend-preference'
 export type {
   LocalCopilotMessage,
   UseLocalCopilotOptions,
@@ -32,4 +29,3 @@ export {
   shouldRouteToLocalCopilot,
   shouldUseLocalCopilotChat,
 } from '@/local-copilot/lib/routing'
-export { resolveSimAgentApiUrl } from '@/local-copilot/lib/sim-agent-url'

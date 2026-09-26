@@ -33,7 +33,6 @@ describe('general settings prefetch', () => {
     mockGetCurrentUserSettings.mockResolvedValue({
       autoConnect: true,
       superUserModeEnabled: false,
-      mothershipEnvironment: 'prod',
       theme: 'system',
       telemetryEnabled: true,
       billingUsageNotificationsEnabled: true,

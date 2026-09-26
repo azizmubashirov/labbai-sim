@@ -151,8 +151,6 @@ const INDIRECT_ZOD_ROUTES = new Set([
  */
 const RAW_JSON_BASELINE_ROUTES = new Set([
   'apps/sim/app/api/billing/portal/route.ts',
-  'apps/sim/app/api/copilot/api-keys/generate/route.ts',
-  'apps/sim/app/api/copilot/api-keys/validate/route.ts',
   'apps/sim/app/api/copilot/chat/abort/route.ts',
   'apps/sim/app/api/folders/[id]/restore/route.ts',
   'apps/sim/app/api/invitations/[id]/accept/route.ts',

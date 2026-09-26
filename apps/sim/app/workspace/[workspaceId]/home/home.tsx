@@ -258,13 +258,7 @@ function HomeContent({ chatId, userName, userId }: HomeProps) {
     }
   }
 
-  const {
-    canSwitchBackend,
-    copilotBackend,
-    setCopilotBackend,
-    localCopilotCatalogId,
-    setLocalCopilotCatalogId,
-  } = useLocalCopilotCatalogSelection()
+  const { localCopilotCatalogId, setLocalCopilotCatalogId } = useLocalCopilotCatalogSelection()
 
   const {
     messages,
@@ -296,7 +290,6 @@ function HomeContent({ chatId, userName, userId }: HomeProps) {
     getMothershipUseChatOptions({
       onResourceEvent: handleResourceEvent,
       activeResourceState,
-      getCopilotBackend: () => copilotBackend,
       getLocalCopilotCatalogId: () => localCopilotCatalogId,
       onRequestStarted: ({ requestId, userMessageId }) => {
         captureEvent(posthogRef.current, 'task_request_started', {
@@ -658,9 +651,6 @@ function HomeContent({ chatId, userName, userId }: HomeProps) {
                   userId={userId}
                   onContextAdd={handleContextAdd}
                   onContextRemove={handleInitialContextRemove}
-                  canSwitchCopilotBackend={canSwitchBackend}
-                  copilotBackend={copilotBackend}
-                  setCopilotBackend={setCopilotBackend}
                   localCopilotCatalogId={localCopilotCatalogId}
                   setLocalCopilotCatalogId={setLocalCopilotCatalogId}
                 >
@@ -704,9 +694,6 @@ function HomeContent({ chatId, userName, userId }: HomeProps) {
             chatId={resolvedChatId}
             onContextAdd={handleContextAdd}
             onWorkspaceResourceSelect={handleWorkspaceResourceSelect}
-            canSwitchCopilotBackend={canSwitchBackend}
-            copilotBackend={copilotBackend}
-            setCopilotBackend={setCopilotBackend}
             localCopilotCatalogId={localCopilotCatalogId}
             setLocalCopilotCatalogId={setLocalCopilotCatalogId}
             draftScopeKey={draftScopeKey}

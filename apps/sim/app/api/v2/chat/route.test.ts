@@ -21,7 +21,6 @@ const {
   mockCheckPreAuthRate,
   mockGenerateId,
   mockPersistCopilotChatTurn,
-  mockRequestExplicitStreamAbort,
   mockResolveBillingAttribution,
   mockResolveOrCreateChat,
   mockRunHeadlessCopilotLifecycle,
@@ -45,7 +44,6 @@ const {
   mockPersistCopilotChatTurn: vi.fn(),
   mockResolveBillingAttribution: vi.fn(),
   mockResolveOrCreateChat: vi.fn(),
-  mockRequestExplicitStreamAbort: vi.fn().mockResolvedValue(undefined),
   mockRunHeadlessCopilotLifecycle: vi.fn(),
 }))
 
@@ -106,10 +104,6 @@ vi.mock('@/lib/copilot/entitlements', () => ({
 
 vi.mock('@/lib/copilot/request/lifecycle/headless', () => ({
   runHeadlessCopilotLifecycle: mockRunHeadlessCopilotLifecycle,
-}))
-
-vi.mock('@/lib/copilot/request/session/explicit-abort', () => ({
-  requestExplicitStreamAbort: mockRequestExplicitStreamAbort,
 }))
 
 vi.mock('@/lib/copilot/secret-mount-policy', () => ({
@@ -260,7 +254,6 @@ describe('POST /api/v2/chat', () => {
     })
     mockResolvePermissionGroupConfig.mockResolvedValue(null)
     mockResolveBillingAttribution.mockResolvedValue(billingAttributionSnapshot)
-    mockRequestExplicitStreamAbort.mockResolvedValue(undefined)
     mockPersistCopilotChatTurn.mockResolvedValue(undefined)
     mockRunHeadlessCopilotLifecycle.mockResolvedValue(successResult)
     mockResolveOrCreateChat.mockResolvedValue({

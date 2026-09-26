@@ -28,7 +28,7 @@ const {
   registerActiveStream,
   releasePendingChatStream,
   unregisterActiveStream,
-  fetchGo,
+  generateLocalChatTitle,
 } = vi.hoisted(() => ({
   runCopilotLifecycle: vi.fn(),
   createRunSegment: vi.fn(),
@@ -44,21 +44,8 @@ const {
   registerActiveStream: vi.fn(),
   releasePendingChatStream: vi.fn(),
   unregisterActiveStream: vi.fn(),
-  fetchGo: vi.fn(),
+  generateLocalChatTitle: vi.fn(),
 }))
-
-const BILLING_ATTRIBUTION = {
-  actorUserId: 'user-1',
-  workspaceId: 'workspace-1',
-  billedAccountUserId: 'owner-1',
-  organizationId: 'org-1',
-  billingEntity: { type: 'organization' as const, id: 'org-1' },
-  billingPeriod: {
-    start: '2026-07-01T00:00:00.000Z',
-    end: '2026-08-01T00:00:00.000Z',
-  },
-  payerSubscription: null,
-}
 
 vi.mock('@/lib/copilot/request/lifecycle/run', () => ({
   runCopilotLifecycle,
@@ -122,13 +109,8 @@ vi.mock('@/lib/copilot/chat-status', () => ({
   publishChatStatusChanged: vi.fn(),
 }))
 
-vi.mock('@/lib/copilot/request/go/fetch', () => ({
-  fetchGo,
-}))
-
-vi.mock('@/lib/copilot/server/agent-url', () => ({
-  getMothershipBaseURL: vi.fn().mockResolvedValue('https://copilot.test'),
-  getMothershipSourceEnvHeaders: vi.fn().mockReturnValue({}),
+vi.mock('@/local-copilot/lib/agent/chat-title', () => ({
+  generateLocalChatTitle,
 }))
 
 import { createSSEStream, requestChatTitle } from './start'
@@ -152,14 +134,7 @@ describe('createSSEStream terminal error handling', () => {
     vi.clearAllMocks()
     resetDbChainMock()
     setEnvFlags({ isHosted: false })
-    fetchGo.mockResolvedValue(
-      new Response(JSON.stringify({ title: 'Test title' }), {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      })
-    )
+    generateLocalChatTitle.mockResolvedValue('Test title')
     trace.setGlobalTracerProvider(new BasicTracerProvider())
     propagation.setGlobalPropagator(new W3CTraceContextPropagator())
     vi.stubGlobal(
@@ -211,7 +186,6 @@ describe('createSSEStream terminal error handling', () => {
       currentChat: null,
       isNewChat: false,
       message: 'hello',
-      titleModel: 'gpt-5.4',
       requestId: 'req-1',
       orchestrateOptions: {},
     })
@@ -238,7 +212,6 @@ describe('createSSEStream terminal error handling', () => {
       currentChat: null,
       isNewChat: false,
       message: 'hello',
-      titleModel: 'gpt-5.4',
       requestId: 'req-1',
       orchestrateOptions: {},
     })
@@ -271,7 +244,6 @@ describe('createSSEStream terminal error handling', () => {
       currentChat: null,
       isNewChat: false,
       message: 'hello',
-      titleModel: 'gpt-5.4',
       requestId: 'req-cancelled',
       orchestrateOptions: {},
     })
@@ -315,7 +287,6 @@ describe('createSSEStream terminal error handling', () => {
       currentChat: null,
       isNewChat: false,
       message: 'hello',
-      titleModel: 'gpt-5.4',
       requestId: 'req-otel',
       orchestrateOptions: {
         goRoute: '/api/mothership',
@@ -341,7 +312,6 @@ describe('createSSEStream terminal error handling', () => {
       currentChat: null,
       isNewChat: false,
       message: 'hello',
-      titleModel: 'gpt-5.4',
       requestId: 'req-leak',
       orchestrateOptions: {},
     })
@@ -376,7 +346,6 @@ describe('createSSEStream terminal error handling', () => {
       currentChat: null,
       isNewChat: true,
       message: 'hello secret-value',
-      titleModel: 'gpt-5.4',
       requestId: 'req-title',
       orchestrateOptions: {
         executionContext: {
@@ -388,101 +357,24 @@ describe('createSSEStream terminal error handling', () => {
     })
 
     await drainStream(stream)
-    await vi.waitFor(() => expect(fetchGo).toHaveBeenCalled())
-    const [, request] = fetchGo.mock.calls.at(-1) ?? []
-    expect(JSON.parse(request.body)).toEqual(
-      expect.objectContaining({ message: 'hello secret-value' })
-    )
+    await vi.waitFor(() => expect(generateLocalChatTitle).toHaveBeenCalled())
+    expect(generateLocalChatTitle).toHaveBeenLastCalledWith('hello secret-value')
   })
 })
 
-describe('requestChatTitle billing protocol', () => {
-  afterAll(() => {
-    resetDbChainMock()
-  })
-
+describe('requestChatTitle', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    resetDbChainMock()
-    setEnvFlags({ isHosted: true })
-    fetchGo.mockResolvedValue(
-      new Response(JSON.stringify({ title: 'Billing Protocol' }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      })
-    )
+    generateLocalChatTitle.mockResolvedValue('Local title')
   })
 
-  it('freezes and forwards a dedicated attributed identity before title work', async () => {
-    const signal = new AbortController().signal
-    const title = await requestChatTitle({
-      message: 'explain billing',
-      model: 'claude-opus-4.8',
-      userId: 'user-1',
-      workspaceId: 'workspace-1',
-      billingAttribution: BILLING_ATTRIBUTION,
-      signal,
-    })
-
-    expect(fetchGo.mock.calls[0]?.[1]?.signal).toBe(signal)
-    expect(title).toBe('Billing Protocol')
-    const headers = fetchGo.mock.calls[0]?.[1]?.headers as Record<string, string>
-    const billingRequestId = headers['x-sim-billing-request-id']
-    expect(billingRequestId).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-    )
-    expect(headers).toMatchObject({
-      'x-sim-billing-protocol': 'attribution-v1',
-      'x-sim-billing-request-id': billingRequestId,
-    })
-    expect(JSON.parse(decodeURIComponent(headers['x-sim-billing-attribution']))).toEqual(
-      BILLING_ATTRIBUTION
-    )
+  it('generates the title with the local copilot', async () => {
+    await expect(requestChatTitle({ message: 'explain billing' })).resolves.toBe('Local title')
+    expect(generateLocalChatTitle).toHaveBeenCalledWith('explain billing')
   })
 
-  it('forwards the exact organization and private chat for title billing admission', async () => {
-    const attribution = { ...BILLING_ATTRIBUTION, workspaceId: null }
-    await expect(
-      requestChatTitle({
-        message: 'search connected sources',
-        model: 'claude-opus-4.8',
-        userId: 'user-1',
-        organizationId: 'org-1',
-        chatId: 'chat-1',
-        billingAttribution: attribution,
-      })
-    ).resolves.toBe('Billing Protocol')
-    const options = fetchGo.mock.calls[0]?.[1]
-    expect(JSON.parse(options.body)).toEqual(
-      expect.objectContaining({ organizationId: 'org-1', chatId: 'chat-1' })
-    )
-    expect(JSON.parse(options.body)).not.toHaveProperty('workspaceId')
-    expect(JSON.parse(decodeURIComponent(options.headers['x-sim-billing-attribution']))).toEqual(
-      attribution
-    )
-  })
-
-  it('does not send organization title work without a canonical private chat', async () => {
-    await expect(
-      requestChatTitle({
-        message: 'search connected sources',
-        model: 'claude-opus-4.8',
-        userId: 'user-1',
-        organizationId: 'org-1',
-        billingAttribution: { ...BILLING_ATTRIBUTION, workspaceId: null },
-      })
-    ).resolves.toBeNull()
-    expect(fetchGo).not.toHaveBeenCalled()
-  })
-
-  it('fails before hosted title egress without a billing workspace', async () => {
-    await expect(
-      requestChatTitle({
-        message: 'explain billing',
-        model: 'claude-opus-4.8',
-        userId: 'user-1',
-      })
-    ).resolves.toBeNull()
-    expect(fetchGo).not.toHaveBeenCalled()
+  it('skips title work for an empty message', async () => {
+    await expect(requestChatTitle({ message: '' })).resolves.toBeNull()
+    expect(generateLocalChatTitle).not.toHaveBeenCalled()
   })
 })

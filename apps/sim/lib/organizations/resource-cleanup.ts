@@ -3,8 +3,6 @@ import { copilotChats, document, organization, workspaceFiles } from '@sim/db/sc
 import { describeError, toError } from '@sim/utils/errors'
 import { and, asc, eq, gt, inArray, isNull } from 'drizzle-orm'
 import { z } from 'zod'
-import { cleanupCopilotBackend } from '@/lib/cleanup/chat-cleanup'
-import { env } from '@/lib/core/config/env'
 import { enqueueOutboxEvent, type OutboxHandlerRegistry } from '@/lib/core/outbox/service'
 import { mapWithConcurrency } from '@/lib/core/utils/concurrency'
 import type { DbTransaction } from '@/lib/db/types'
@@ -118,23 +116,10 @@ export const organizationResourceCleanupOutboxHandlers = {
       .limit(1)
     if (owner) return
 
-    if (payload.kind === 'chats') {
-      const surviving = await db
-        .select({ id: copilotChats.id })
-        .from(copilotChats)
-        .where(inArray(copilotChats.id, payload.chatIds))
-      const survivingIds = new Set(surviving.map(({ id }) => id))
-      const deletedIds = payload.chatIds.filter((id) => !survivingIds.has(id))
-      if (deletedIds.length === 0) return
-      context.signal.throwIfAborted()
-      if (!env.COPILOT_API_KEY) throw new Error('Copilot cleanup is not configured')
-      const result = await cleanupCopilotBackend(
-        deletedIds,
-        `OrganizationCleanup:${context.eventId}`
-      )
-      if (result.failed > 0) throw new Error('Organization chat backend cleanup failed')
-      return
-    }
+    // Chat rows are removed by the organization FK cascade. Their only
+    // external state lived in the removed hosted copilot service, so there is
+    // nothing left to purge.
+    if (payload.kind === 'chats') return
 
     const keys = payload.storageKeys
     const [bindings, documents] = await Promise.all([

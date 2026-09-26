@@ -483,7 +483,6 @@ describe('organization Search MCP with real ingestion and current access', () =>
     expect((await alice.listTools()).tools.map((tool) => tool.name)).toEqual([
       'search',
       'read_document',
-      'chat',
     ])
     const rows = await search(alice)
     expect(rows.length).toBeGreaterThan(1)

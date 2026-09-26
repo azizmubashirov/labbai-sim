@@ -22,10 +22,7 @@ services:
       - API_ENCRYPTION_KEY=${API_ENCRYPTION_KEY:-}
       - INTERNAL_API_SECRET=${INTERNAL_API_SECRET:-dev-internal-api-secret-min-32-chars}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
-      - COPILOT_API_KEY=${COPILOT_API_KEY:-}
-      - MSHIP_SYSPROMPT_OVERRIDE=${MSHIP_SYSPROMPT_OVERRIDE:-}
       - NEXT_PUBLIC_CHAT_DISABLED=${NEXT_PUBLIC_CHAT_DISABLED:-}
-      - SIM_AGENT_API_URL=${SIM_AGENT_API_URL:-}
       - SOCKET_SERVER_URL=${SOCKET_SERVER_URL:-http://realtime:3002}
       - NEXT_PUBLIC_SOCKET_URL=${NEXT_PUBLIC_SOCKET_URL:-}
     # Lets a workflow reach a service on the Docker host. Reaching it also

@@ -82,9 +82,6 @@ export function resolveSpecialistModel(
  * Credential for the configured provider: `COPILOT_PROVIDER_API_KEY` override,
  * else the platform OpenAI key pool (`OPENAI_API_KEY`, `OPENAI_API_KEY_1..3`)
  * for `openai` / `openai-compatible`. Sent as `Authorization: Bearer <key>`.
- *
- * `COPILOT_API_KEY` authenticates requests to Sim Cloud Mothership and must not
- * be used for direct provider calls (it is typically `sk-sim-copilot-*`).
  */
 function resolveApiKey(provider: LocalCopilotProviderId): string | undefined {
   const override = process.env.COPILOT_PROVIDER_API_KEY?.trim()

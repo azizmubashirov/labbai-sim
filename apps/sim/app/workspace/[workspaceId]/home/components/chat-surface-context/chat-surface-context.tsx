@@ -13,7 +13,6 @@ import {
 import { noop } from '@sim/utils/helpers'
 import type { SearchIntegrationConnectionProps } from '@/app/workspace/[workspaceId]/home/components/message-content/components/special-tags/search-integration-connection'
 import type { WorkspaceResourceRef } from '@/app/workspace/[workspaceId]/home/types'
-import type { CopilotBackendPreference } from '@/local-copilot/lib/copilot-backend-preference'
 import type { LocalCopilotCatalogId } from '@/local-copilot/lib/model-catalog'
 import type { ChatContext } from '@/stores/panel'
 
@@ -40,10 +39,6 @@ interface ChatSurfaceContextValue {
   onContextRemove: (context: ChatContext, remaining: ChatContext[]) => void
   /** Opens a workspace resource referenced from rendered message content. */
   onWorkspaceResourceSelect: (resource: WorkspaceResourceRef) => void
-  /** When true, show the Local / Cloud copilot switch in the chat input. */
-  canSwitchCopilotBackend?: boolean
-  copilotBackend?: CopilotBackendPreference
-  setCopilotBackend?: (value: CopilotBackendPreference) => void
   /** Selected Local Copilot catalog model id for this conversation. */
   localCopilotCatalogId?: LocalCopilotCatalogId
   setLocalCopilotCatalogId?: (id: LocalCopilotCatalogId) => void
@@ -62,9 +57,6 @@ interface ChatSurfaceProviderProps {
   onContextAdd?: (context: ChatContext) => void
   onContextRemove?: (context: ChatContext, remaining: ChatContext[]) => void
   onWorkspaceResourceSelect?: (resource: WorkspaceResourceRef) => void
-  canSwitchCopilotBackend?: boolean
-  copilotBackend?: CopilotBackendPreference
-  setCopilotBackend?: (value: CopilotBackendPreference) => void
   localCopilotCatalogId?: LocalCopilotCatalogId
   setLocalCopilotCatalogId?: (id: LocalCopilotCatalogId) => void
   children: ReactNode
@@ -83,9 +75,6 @@ export function ChatSurfaceProvider({
   onContextAdd,
   onContextRemove,
   onWorkspaceResourceSelect,
-  canSwitchCopilotBackend,
-  copilotBackend,
-  setCopilotBackend,
   localCopilotCatalogId,
   setLocalCopilotCatalogId,
   children,
@@ -118,9 +107,6 @@ export function ChatSurfaceProvider({
       onContextAdd: stableOnContextAdd,
       onContextRemove: stableOnContextRemove,
       onWorkspaceResourceSelect: stableOnWorkspaceResourceSelect,
-      canSwitchCopilotBackend,
-      copilotBackend,
-      setCopilotBackend,
       localCopilotCatalogId,
       setLocalCopilotCatalogId,
     }),
@@ -131,9 +117,6 @@ export function ChatSurfaceProvider({
       stableOnContextAdd,
       stableOnContextRemove,
       stableOnWorkspaceResourceSelect,
-      canSwitchCopilotBackend,
-      copilotBackend,
-      setCopilotBackend,
       localCopilotCatalogId,
       setLocalCopilotCatalogId,
     ]

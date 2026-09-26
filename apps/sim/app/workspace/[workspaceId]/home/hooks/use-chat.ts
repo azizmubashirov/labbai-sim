@@ -71,7 +71,6 @@ import {
   sanitizeChatResources,
 } from '@/lib/copilot/resources/types'
 import {
-  bindRunToolToExecution,
   cancelRunToolExecution,
   executeRunToolOnClient,
   markRunToolManuallyStopped,
@@ -128,7 +127,6 @@ import type {
   MothershipResource,
   MothershipResourceType,
   QueuedMessage,
-  ToolCallInfo,
 } from '../types'
 
 export interface SendMessageOptions {
@@ -1076,19 +1074,6 @@ export function getReplayCompletedWorkflowToolCallIds(events: StreamBatchEvent[]
   return completedToolCallIds
 }
 
-/**
- * Hosted Copilot recovers in-flight client-routed workflow tools after reload.
- * Local Copilot already runs those tools server-side and never persists a
- * binding, so recovering them POSTs `/execute` with a `copilotToolCallId` that
- * 403s. Skip recovery while a stream is live and whenever the chat is on Local.
- */
-export function shouldRecoverClientWorkflowTools(params: {
-  isSending: boolean
-  copilotBackend?: 'local' | 'external'
-}): boolean {
-  return !params.isSending && params.copilotBackend !== 'local'
-}
-
 function buildRecoverySubjectKey(
   chatId: string | undefined,
   selectedChatId: string | undefined
@@ -1217,9 +1202,7 @@ export interface UseChatOptions {
   activeResourceState?: [string | null, Dispatch<SetStateAction<string | null>>]
   /** Fired when the server's `traceparent` response header arrives, before any stream content. */
   onRequestStarted?: (info: { requestId: string; userMessageId: string }) => void
-  /** Home chat: user-selected local vs external copilot backend. */
-  getCopilotBackend?: () => 'local' | 'external'
-  /** Local Copilot catalog id to send when backend is local. */
+  /** Local Copilot catalog id to send with each turn. */
   getLocalCopilotCatalogId?: () => string
 }
 
@@ -1243,7 +1226,6 @@ export function getMothershipUseChatOptions(
     | 'initialActiveResourceId'
     | 'activeResourceState'
     | 'onRequestStarted'
-    | 'getCopilotBackend'
     | 'getLocalCopilotCatalogId'
   > = {}
 ): UseChatOptions {
@@ -1262,7 +1244,6 @@ export function getWorkflowCopilotUseChatOptions(
     | 'onTitleUpdate'
     | 'onStreamEnd'
     | 'onRequestStarted'
-    | 'getCopilotBackend'
     | 'getLocalCopilotCatalogId'
   > = {}
 ): UseChatOptions {
@@ -1321,8 +1302,6 @@ export function useChat(
   onStreamEndRef.current = options?.onStreamEnd
   const onRequestStartedRef = useRef(options?.onRequestStarted)
   onRequestStartedRef.current = options?.onRequestStarted
-  const getCopilotBackendRef = useRef(options?.getCopilotBackend)
-  getCopilotBackendRef.current = options?.getCopilotBackend
   const getLocalCopilotCatalogIdRef = useRef(options?.getLocalCopilotCatalogId)
   getLocalCopilotCatalogIdRef.current = options?.getLocalCopilotCatalogId
 
@@ -1506,7 +1485,6 @@ export function useChat(
   const streamingContentRef = useRef('')
   const streamingBlocksRef = useRef<ContentBlock[]>([])
   const handledClientWorkflowToolIdsRef = useRef<Set<string>>(new Set())
-  const recoveringClientWorkflowToolIdsRef = useRef<Set<string>>(new Set())
   const executionStream = useExecutionStream()
   const isHomePage = pathname.endsWith('/home')
 
@@ -1915,67 +1893,12 @@ export function useChat(
       if (handledClientWorkflowToolIdsRef.current.has(toolCallId)) {
         return
       }
-      if (recoveringClientWorkflowToolIdsRef.current.has(toolCallId)) {
-        return
-      }
       handledClientWorkflowToolIdsRef.current.add(toolCallId)
 
       ensureWorkflowToolResource(toolArgs)
       executeRunToolOnClient(toolCallId, toolName, toolArgs)
     },
     [ensureWorkflowToolResource]
-  )
-
-  const recoverPendingClientWorkflowTools = useCallback(
-    async (nextMessages: ChatMessage[]) => {
-      if (
-        !shouldRecoverClientWorkflowTools({
-          isSending: sendingRef.current,
-          copilotBackend: getCopilotBackendRef.current?.(),
-        })
-      ) {
-        return
-      }
-
-      const pending: ToolCallInfo[] = []
-
-      for (const message of nextMessages) {
-        for (const block of message.contentBlocks ?? []) {
-          const toolCall = block.toolCall
-          if (!toolCall || !isWorkflowToolName(toolCall.name)) continue
-          if (toolCall.status !== 'executing') continue
-          if (
-            handledClientWorkflowToolIdsRef.current.has(toolCall.id) ||
-            recoveringClientWorkflowToolIdsRef.current.has(toolCall.id)
-          ) {
-            continue
-          }
-          recoveringClientWorkflowToolIdsRef.current.add(toolCall.id)
-          pending.push(toolCall)
-        }
-      }
-
-      for (const toolCall of pending) {
-        try {
-          const toolArgs = toolCall.params ?? {}
-          const targetWorkflowId = ensureWorkflowToolResource(toolArgs)
-
-          if (targetWorkflowId) {
-            const rebound = await bindRunToolToExecution(toolCall.id, targetWorkflowId)
-            if (rebound) {
-              handledClientWorkflowToolIdsRef.current.add(toolCall.id)
-              continue
-            }
-          }
-
-          recoveringClientWorkflowToolIdsRef.current.delete(toolCall.id)
-          startClientWorkflowTool(toolCall.id, toolCall.name, toolArgs)
-        } finally {
-          recoveringClientWorkflowToolIdsRef.current.delete(toolCall.id)
-        }
-      }
-    },
-    [ensureWorkflowToolResource, startClientWorkflowTool]
   )
 
   useEffect(() => {
@@ -2116,7 +2039,6 @@ export function useChat(
 
     const activeStreamId = chatHistory.activeStreamId
     appliedChatHistoryKeyRef.current = hydrationKey
-    const mappedMessages = chatHistory.messages.map(toDisplayMessage)
     const shouldReconnectActiveStream =
       Boolean(activeStreamId) &&
       !sendingRef.current &&
@@ -2126,8 +2048,6 @@ export function useChat(
     if (!activeStreamId && locallyTerminalStreamIdRef.current) {
       locallyTerminalStreamIdRef.current = undefined
     }
-
-    void recoverPendingClientWorkflowTools(mappedMessages)
 
     const hasPersistedStreamingFile = chatHistory.resources.some((r) => r.id === 'streaming-file')
     if (hasPersistedStreamingFile) {
@@ -2273,7 +2193,6 @@ export function useChat(
     cancelActiveStreamRecovery,
     flushPendingResources,
     reconcileHydratedWorkflowResources,
-    recoverPendingClientWorkflowTools,
     seedPreviewSessions,
     setTransportIdle,
     setTransportReconnecting,
@@ -3728,10 +3647,7 @@ export function useChat(
               ? { workflowId: workflowIdRef.current }
               : {}),
             userTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-            ...(!organizationId && getCopilotBackendRef.current
-              ? { copilotBackend: getCopilotBackendRef.current() }
-              : {}),
-            ...(!organizationId && getCopilotBackendRef.current?.() === 'local'
+            ...(!organizationId
               ? {
                   model:
                     getLocalCopilotCatalogIdRef.current?.() ?? DEFAULT_LOCAL_COPILOT_CATALOG_ID,

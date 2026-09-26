@@ -21,7 +21,6 @@ import {
 } from '@/lib/copilot/generated/mothership-stream-v1'
 import { buildSelectedMcpToolSchemas, buildTaggedMcpToolSchemas } from '@/lib/copilot/mcp-tools'
 import { runHeadlessCopilotLifecycle } from '@/lib/copilot/request/lifecycle/headless'
-import { requestExplicitStreamAbort } from '@/lib/copilot/request/session/explicit-abort'
 import type { StreamEvent } from '@/lib/copilot/request/types'
 import { normalizeSecretMountPolicy } from '@/lib/copilot/secret-mount-policy'
 import { isDocSandboxEnabled } from '@/lib/core/config/env-flags'
@@ -284,11 +283,6 @@ export const POST = withRouteHandler(async (req: NextRequest) => {
       messages,
       ...(responseFormat !== undefined ? { responseFormat } : {}),
       userId,
-      // Go's auth middleware reads workspaceId off the request body to forward
-      // to /api/copilot/api-keys/validate (per-member org usage gate). Omitting
-      // it makes that validation 400 ("API key validation failed"), which kills
-      // the block. The chat path sends it via buildCopilotRequestPayload; the
-      // block path must too.
       workspaceId,
       chatId: effectiveChatId,
       mode: 'agent',
@@ -325,30 +319,11 @@ export const POST = withRouteHandler(async (req: NextRequest) => {
       ...(entitlements.length > 0 ? { entitlements } : {}),
     }
 
-    let allowExplicitAbort = true
-    let explicitAbortRequest: Promise<void> | undefined
     const lifecycleAbortController = new AbortController()
-    const requestExplicitAbortOnce = () => {
-      if (!allowExplicitAbort || explicitAbortRequest || !messageId) {
-        return
-      }
-
-      explicitAbortRequest = requestExplicitStreamAbort({
-        streamId: messageId,
-        userId,
-        chatId: effectiveChatId,
-        workspaceId,
-      }).catch((error) => {
-        reqLogger.warn('Failed to send explicit abort for mothership execution', {
-          error: toError(error).message,
-        })
-      })
-    }
     const abortLifecycle = (reason?: unknown) => {
       if (!lifecycleAbortController.signal.aborted) {
         lifecycleAbortController.abort(reason ?? 'mothership_execute_aborted')
       }
-      requestExplicitAbortOnce()
     }
     const onAbort = () => {
       abortLifecycle(req.signal.reason ?? 'request_aborted')
@@ -423,7 +398,6 @@ export const POST = withRouteHandler(async (req: NextRequest) => {
                   }
                 }
               })
-              allowExplicitAbort = false
 
               if (lifecycleAbortController.signal.aborted) {
                 send(
@@ -513,12 +487,10 @@ export const POST = withRouteHandler(async (req: NextRequest) => {
                 )
               )
             } finally {
-              allowExplicitAbort = false
               if (heartbeatId) {
                 clearInterval(heartbeatId)
               }
               req.signal.removeEventListener('abort', onAbort)
-              await explicitAbortRequest
               if (!cancelled) {
                 controller.close()
               }
@@ -545,8 +517,6 @@ export const POST = withRouteHandler(async (req: NextRequest) => {
 
     try {
       const result = await runLifecycle()
-
-      allowExplicitAbort = false
 
       if (lifecycleAbortController.signal.aborted || req.signal.aborted) {
         reqLogger.info('Mothership execute aborted after lifecycle completion')
@@ -603,9 +573,7 @@ export const POST = withRouteHandler(async (req: NextRequest) => {
         }
       )
     } finally {
-      allowExplicitAbort = false
       req.signal.removeEventListener('abort', onAbort)
-      await explicitAbortRequest
     }
   } catch (error) {
     if (req.signal.aborted || isAbortError(error)) {

@@ -58,7 +58,6 @@ import type {
 import { useOptionalWorkspacePermissionsContext } from '@/app/workspace/[workspaceId]/providers/workspace-permissions-provider'
 import { getWorkspaceFilesQueryOptions, workspaceFilesKeys } from '@/hooks/queries/workspace-files'
 import { useAutoScroll } from '@/hooks/use-auto-scroll'
-import type { CopilotBackendPreference } from '@/local-copilot/lib/copilot-backend-preference'
 import type { LocalCopilotCatalogId } from '@/local-copilot/lib/model-catalog'
 import type { ChatContext } from '@/stores/panel'
 import { MothershipChatSkeleton } from './components/mothership-chat-skeleton'
@@ -95,9 +94,6 @@ interface MothershipChatProps {
    */
   onContextRemove?: (context: ChatContext, remaining: ChatContext[]) => void
   onWorkspaceResourceSelect?: (resource: WorkspaceResourceRef) => void
-  canSwitchCopilotBackend?: boolean
-  copilotBackend?: CopilotBackendPreference
-  setCopilotBackend?: (value: CopilotBackendPreference) => void
   localCopilotCatalogId?: LocalCopilotCatalogId
   setLocalCopilotCatalogId?: (id: LocalCopilotCatalogId) => void
   draftScopeKey?: string
@@ -350,9 +346,6 @@ export function MothershipChat({
   onContextAdd,
   onContextRemove,
   onWorkspaceResourceSelect,
-  canSwitchCopilotBackend,
-  copilotBackend,
-  setCopilotBackend,
   localCopilotCatalogId,
   setLocalCopilotCatalogId,
   draftScopeKey,
@@ -780,9 +773,6 @@ export function MothershipChat({
       onContextAdd={onContextAdd}
       onContextRemove={onContextRemove}
       onWorkspaceResourceSelect={onWorkspaceResourceSelect}
-      canSwitchCopilotBackend={canSwitchCopilotBackend}
-      copilotBackend={copilotBackend}
-      setCopilotBackend={setCopilotBackend}
       localCopilotCatalogId={localCopilotCatalogId}
       setLocalCopilotCatalogId={setLocalCopilotCatalogId}
     >

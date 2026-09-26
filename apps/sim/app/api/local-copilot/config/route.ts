@@ -19,12 +19,8 @@ const logger = createLogger('LocalCopilotConfigAPI')
 
 function toConfigResponse(access: LocalCopilotUserAccess) {
   const config = getLocalCopilotConfig()
-  const enabled = access.hasAccess || access.localOnly
-  const canSwitchBackend = access.hasAccess && !access.localOnly
   return {
-    enabled,
-    canSwitchBackend,
-    localOnly: access.localOnly,
+    enabled: access.hasAccess,
     defaultCatalogId: access.defaultModel,
     provider: config.provider,
     model: config.model,
@@ -46,8 +42,6 @@ export const GET = withRouteHandler(async (request: NextRequest) => {
   const response = toConfigResponse(access)
   logger.info('Returning Arena Copilot config', {
     enabled: response.enabled,
-    canSwitchBackend: response.canSwitchBackend,
-    localOnly: response.localOnly,
     defaultCatalogId: response.defaultCatalogId,
     userId: session.user.id,
   })

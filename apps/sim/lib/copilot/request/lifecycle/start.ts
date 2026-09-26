@@ -1,16 +1,9 @@
-import { type Context, context as otelContextApi } from '@opentelemetry/api'
+import { context as otelContextApi } from '@opentelemetry/api'
 import { db } from '@sim/db'
 import { copilotChats } from '@sim/db/schema'
 import { createLogger } from '@sim/logger'
 import { getErrorMessage } from '@sim/utils/errors'
 import { and, eq, isNull } from 'drizzle-orm'
-import {
-  assertBillingAttributionSnapshot,
-  type BillingAttributionSnapshot,
-  createAttributedBillingRequestEnvelope,
-  resolveBillingAttribution,
-  resolveOrganizationBillingAttribution,
-} from '@/lib/billing/core/billing-attribution'
 import { createRunSegment } from '@/lib/copilot/async-runs/repository'
 import { publishChatStatusChanged } from '@/lib/copilot/chat-status'
 import {
@@ -47,12 +40,7 @@ import {
 } from '@/lib/copilot/request/session'
 import { SSE_RESPONSE_HEADERS } from '@/lib/copilot/request/session/sse'
 import { TraceCollector } from '@/lib/copilot/request/trace'
-import { getMothershipBaseURL, getMothershipSourceEnvHeaders } from '@/lib/copilot/server/agent-url'
-import { env } from '@/lib/core/config/env'
-import { isHosted } from '@/lib/core/config/env-flags'
-import { isLocalCopilotEnabledForUser } from '@/local-copilot/lib/access'
 import { generateLocalChatTitle } from '@/local-copilot/lib/agent/chat-title'
-import type { CopilotBackendPreference } from '@/local-copilot/lib/copilot-backend-preference'
 
 export { SSE_RESPONSE_HEADERS }
 
@@ -72,8 +60,6 @@ export interface StreamingOrchestrationParams {
   currentChat: CurrentChatSummary
   isNewChat: boolean
   message: string
-  titleModel: string
-  titleProvider?: string
   requestId: string
   workspaceId?: string
   organizationId?: string
@@ -96,8 +82,6 @@ export function createSSEStream(params: StreamingOrchestrationParams): ReadableS
     currentChat,
     isNewChat,
     message,
-    titleModel,
-    titleProvider,
     requestId,
     workspaceId,
     organizationId,
@@ -254,16 +238,11 @@ export function createSSEStream(params: StreamingOrchestrationParams): ReadableS
             currentChat,
             isNewChat,
             userId,
-            copilotBackend: orchestrateOptions.copilotBackend,
             message,
-            titleModel,
-            titleProvider,
             workspaceId,
             organizationId,
-            billingAttribution: orchestrateOptions.billingAttribution,
             requestId,
             publisher,
-            otelContext,
           })
 
           try {
@@ -461,47 +440,26 @@ function fireTitleGeneration(params: {
   currentChat: CurrentChatSummary
   isNewChat: boolean
   userId?: string
-  copilotBackend?: CopilotBackendPreference
   message: string
-  titleModel: string
-  titleProvider?: string
   workspaceId?: string
   organizationId?: string
-  billingAttribution?: BillingAttributionSnapshot
   requestId: string
   publisher: StreamWriter
-  otelContext?: Context
 }): void {
   const {
     chatId,
     currentChat,
     isNewChat,
     userId,
-    copilotBackend,
     message,
-    titleModel,
-    titleProvider,
     workspaceId,
     organizationId,
-    billingAttribution,
     requestId,
     publisher,
-    otelContext,
   } = params
   if (!chatId || currentChat?.title || !isNewChat) return
 
-  requestChatTitle({
-    chatId,
-    message,
-    model: titleModel,
-    provider: titleProvider,
-    userId,
-    copilotBackend,
-    workspaceId,
-    organizationId,
-    billingAttribution,
-    otelContext,
-  })
+  requestChatTitle({ message })
     .then(async (title) => {
       if (!title) return
       // Only stamp the generated title while the chat has none. Title
@@ -526,108 +484,8 @@ function fireTitleGeneration(params: {
     })
 }
 
-/** Requests a title through the shared Assistant backend and its attributed billing protocol. */
-export async function requestChatTitle(params: {
-  chatId?: string
-  message: string
-  model: string
-  provider?: string
-  userId?: string
-  copilotBackend?: CopilotBackendPreference
-  workspaceId?: string
-  organizationId?: string
-  billingAttribution?: BillingAttributionSnapshot
-  otelContext?: Context
-  signal?: AbortSignal
-}): Promise<string | null> {
-  const {
-    chatId,
-    message,
-    model,
-    provider,
-    userId,
-    workspaceId,
-    organizationId,
-    billingAttribution,
-    otelContext,
-    signal,
-    copilotBackend,
-  } = params
-  if (!message || !model) return null
-
-  if ((await isLocalCopilotEnabledForUser(userId)) && copilotBackend !== 'external') {
-    return generateLocalChatTitle(message)
-  }
-
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  }
-  if (env.COPILOT_API_KEY) {
-    headers['x-api-key'] = env.COPILOT_API_KEY
-  }
-  Object.assign(headers, getMothershipSourceEnvHeaders())
-
-  try {
-    if (organizationId && (!chatId || workspaceId)) {
-      throw new Error('Organization titles require a private chat without a workspace')
-    }
-    if (isHosted) {
-      if (!userId || (!workspaceId && !organizationId)) {
-        throw new Error('Title generation requires a billing actor and workspace')
-      }
-      const attribution = billingAttribution
-        ? assertBillingAttributionSnapshot(billingAttribution)
-        : organizationId
-          ? await resolveOrganizationBillingAttribution({ actorUserId: userId, organizationId })
-          : await resolveBillingAttribution({ actorUserId: userId, workspaceId: workspaceId! })
-      if (
-        attribution.actorUserId !== userId ||
-        attribution.workspaceId !== (workspaceId ?? null) ||
-        (organizationId && attribution.organizationId !== organizationId)
-      ) {
-        throw new Error('Title billing attribution does not match its actor and workspace')
-      }
-
-      const billingRequest = createAttributedBillingRequestEnvelope(attribution)
-      Object.assign(headers, billingRequest.headers)
-    }
-
-    const { fetchGo } = await import('@/lib/copilot/request/go/fetch')
-    const mothershipBaseURL = await getMothershipBaseURL({ userId })
-    const response = await fetchGo(`${mothershipBaseURL}/api/generate-chat-title`, {
-      method: 'POST',
-      signal,
-      headers,
-      body: JSON.stringify({
-        message,
-        model,
-        ...(provider ? { provider } : {}),
-        ...(workspaceId ? { workspaceId } : {}),
-        ...(organizationId ? { organizationId, chatId } : {}),
-        ...(userId ? { userId } : {}),
-      }),
-      otelContext,
-      spanName: 'sim → go /api/generate-chat-title',
-      operation: 'generate_chat_title',
-      attributes: {
-        [TraceAttr.GenAiRequestModel]: model,
-        ...(provider ? { [TraceAttr.GenAiSystem]: provider } : {}),
-      },
-    })
-
-    const payload = await response.json().catch(() => ({}))
-    if (!response.ok) {
-      logger.warn('Failed to generate chat title via copilot backend', {
-        status: response.status,
-        error: payload,
-      })
-      return null
-    }
-
-    const title = typeof payload?.title === 'string' ? payload.title.trim() : ''
-    return title || null
-  } catch (error) {
-    logger.error('Error generating chat title:', error)
-    return null
-  }
+/** Generates a chat title with the local copilot's engagement model. */
+export async function requestChatTitle(params: { message: string }): Promise<string | null> {
+  if (!params.message) return null
+  return generateLocalChatTitle(params.message)
 }

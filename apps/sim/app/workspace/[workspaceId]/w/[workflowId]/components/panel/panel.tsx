@@ -343,13 +343,7 @@ export const Panel = memo(function Panel() {
     [activeWorkflowId]
   )
 
-  const {
-    canSwitchBackend,
-    copilotBackend,
-    setCopilotBackend,
-    localCopilotCatalogId,
-    setLocalCopilotCatalogId,
-  } = useLocalCopilotCatalogSelection()
+  const { localCopilotCatalogId, setLocalCopilotCatalogId } = useLocalCopilotCatalogSelection()
 
   const {
     messages: copilotMessages,
@@ -370,7 +364,6 @@ export const Panel = memo(function Panel() {
     copilotChatId,
     getWorkflowCopilotUseChatOptions({
       workflowId: activeWorkflowId || undefined,
-      getCopilotBackend: () => copilotBackend,
       getLocalCopilotCatalogId: () => localCopilotCatalogId,
       onTitleUpdate: loadCopilotChats,
       onToolResult: handleCopilotToolResult,
@@ -931,9 +924,6 @@ export const Panel = memo(function Panel() {
                   chatId={copilotResolvedChatId}
                   draftScopeKey={copilotDraftScopeKey}
                   layout='copilot-view'
-                  canSwitchCopilotBackend={canSwitchBackend}
-                  copilotBackend={copilotBackend}
-                  setCopilotBackend={setCopilotBackend}
                   localCopilotCatalogId={localCopilotCatalogId}
                   setLocalCopilotCatalogId={setLocalCopilotCatalogId}
                 />
