@@ -1,4 +1,4 @@
-# Labbai — handoff (2026-09-25)
+# Labbai — handoff (2026-09-26)
 
 Read `LABBAI_PLAN.md` first: it is the source of truth for every product decision.
 This file is the operational state for whoever continues the work.
@@ -13,7 +13,8 @@ Owner wants: **cleanup only for now, no new features**, then the owner tests it.
 
 - `main` — last green state: cleanup steps 1–4 done, type-check + tests + next build pass,
   deployed to the test server.
-- `wip/ee-cleanup` — step 6 (remove `apps/sim/ee`) **in progress, does not compile yet**.
+- `wip/ee-cleanup` — step 6 (remove `apps/sim/ee`); latest state is on
+  `claude/peaceful-maxwell-vbuk8b` (merged with main, **type-checks**).
 - `ci-reports`, `ci-build-report` — written by CI (see below). `arena-base` — old Arena code backup.
 
 ## Cleanup status (see LABBAI_PLAN.md "Order of work")
@@ -24,7 +25,7 @@ Owner wants: **cleanup only for now, no new features**, then the owner tests it.
 | 2 Integrations trimmed to ~10% (list in LABBAI_PLAN.md) | done (main) |
 | 3 Stripe and all payments removed; entitlements permissive; cost ledger kept | done (main) |
 | 4 LLM: OpenAI only (gpt-5.5, gpt-5-mini default, gpt-4.1, gpt-4.1-mini, text-embedding-3-small); `OPENAI_BASE_URL` / `OPENAI_EXTRA_HEADERS` for a later Cloudflare switch | done (main) |
-| 6 Remove `apps/sim/ee`, re-implement kept features clean-room | **in progress on `wip/ee-cleanup`** |
+| 6 Remove `apps/sim/ee`, re-implement kept features clean-room | **almost done** — compiles; see "Status 2026-09-26" |
 | 7 Remove organization UI layer (`/o/[organizationId]`), keep DB tables | todo |
 | + Remove Sim cloud copilot path (Go mothership client, `app/api/copilot/byok/**`) and the Local/Cloud switch — local copilot only | todo |
 | + Telemetry → our own endpoint (`TELEMETRY_ENDPOINT`), never telemetry.simstudio.ai | todo |
@@ -54,26 +55,52 @@ Done on the branch:
   (+ NEXT_PUBLIC) from env.ts/.env.example; `settings-sidebar.test.tsx` and
   `workspace-section-access.test.ts` feature fixtures still list removed keys (dataDrains, sso, …).
 
-Possibly unfinished (helpers were stopped / may have been mid-edit — verify each):
-- Removal of data retention, data drains, organization usage/search stats (custom blocks: done).
+### Status 2026-09-26 (branch `claude/peaceful-maxwell-vbuk8b` = `wip/ee-cleanup` + fixes)
 
-Leftover TODOs reported by helpers:
-- Navigation (`components/settings/navigation.ts` + tests): remove section ids `forks`,
-  `sso` (and `/o` `domains`→`sso` alias), `whitelabeling`; update
-  `ENTERPRISE_GATED_SECTION_LABELS` in `lib/workspaces/admin-move-source-impact.ts`,
-  `settings/[section]/page.test.tsx`.
-- `deployment-shape.ts`: remove `features.sso/whitelabeling/sessionPolicies` (+ test fixtures
-  in `settings-sidebar.test.tsx`, `workspace-section-access.test.ts`).
-- `env-flags.ts` + `packages/testing/src/mocks/env-flags.mock.ts`: remove `isForkingEnabled`,
-  `isSsoEnabled`, `isWhitelabelingEnabled`, `isSessionPoliciesEnabled` (and other removed
-  ee flags); kept features must be always on (no enterprise flag/plan checks).
-- `env.ts` / `.env.example`: remove `FORKING_ENABLED`, `SSO_*` (incl. `SSO_MAPPING_*`,
-  `SSO_OIDC_*`, `SSO_SAML_*`), `WHITELABELING_ENABLED`, `SESSION_POLICIES_ENABLED` (+ their
-  `NEXT_PUBLIC_` variants), `NEXT_PUBLIC_BRAND_*`, `NEXT_PUBLIC_CUSTOM_CSS_URL`,
-  `NEXT_PUBLIC_SUPPORT_EMAIL`, `NEXT_PUBLIC_DOCUMENTATION_URL`; keep TERMS/PRIVACY URLs.
-- `apps/sim/package.json`: remove `@better-auth/sso` → regenerate `bun.lock` (below).
-- Grep (always with an explicit path!) for `@/ee/` and `ee/` across apps/, packages/, scripts/.
-- Biome may reorder moved imports.
+Verified in a cloud container (15 GB RAM, bun 1.4.1):
+- `tsc --noEmit` (apps/sim): **clean**.
+- CI test set (`local-copilot lib/api-key lib/mothership/inbox`): 151/151 pass.
+- `bun.lock` is consistent with `--frozen-lockfile` (checked with bun 1.4.1).
+- Wider suites (settings, labbai, workspaces, users, auth, `app/o`, contracts): 19 failures,
+  **all of them also fail on `main`** (left from steps 3/6: billing/enterprise expectations).
+  CI does not run these suites.
+- This branch is ready to merge into `wip/ee-cleanup` / `main` for a CI run.
+
+Done in this pass (all former "Leftover TODOs" are closed):
+- Navigation / deployment-shape / `ENTERPRISE_GATED_SECTION_LABELS`: were already clean on WIP.
+- `env-flags.ts` + testing mock: removed flags for SSO, whitelabeling, session policies,
+  forking, custom blocks, data retention, data drains, usage monitoring. Kept flags
+  (`isAccessControlEnabled`, `isAuditLogsEnabled`, `isScimEnabled`, `isOrganizationsEnabled`)
+  are constant `true`, and the mock now mirrors that.
+- `env.ts` / `.env.example`: removed `ENTERPRISE_ENABLED`, all per-feature `*_ENABLED`
+  overrides (+ `NEXT_PUBLIC_`), `SSO_*`, `NEXT_PUBLIC_BRAND_*`, `CUSTOM_CSS_URL`,
+  `SUPPORT_EMAIL`, `DOCUMENTATION_URL`. TERMS/PRIVACY URLs kept.
+- `bun.lock`: `@better-auth/sso` + SAML-only deps removed (package.json had already dropped it).
+- No `@/ee/` / `ee/` references left in apps/, packages/, scripts/.
+- Settings sidebar bug fixed: org-plane sections (Access Control, Audit logs, Security)
+  were visible to non-org-admin members (links 404'd) after `selfHostedOverride` was removed.
+- `audit-logs.tsx`: `Chip variant='default'` (not a valid variant; the only tsc error).
+- Biome safe fixes applied repo-wide (222 files, import order + formatting).
+
+Remaining (to do locally):
+1. Fix or delete the 19 stale failing tests (list: run the suites above; mostly
+   `app/o/[organizationId]/{integrations,settings}`, `lib/users/account-deletion*`,
+   `lib/core/config/deployment-shape.dom`, `lib/settings/application/organization-section-access`,
+   `lib/auth/sim-auth-adapter`, `lib/permission-groups/model-access`,
+   `lib/workspaces/organization-workspaces`, `components/settings/standalone-settings-shell-seeding`).
+2. Dead fork / retention code in workspace admin move: `lib/workspaces/admin-move.ts`
+   (`findCrossOrgForkEdges`, `blockingForkEdges`, `fork-lineage-conflict`,
+   `strippedRetentionRules`) and `admin-move-source-impact.ts`
+   (`countRetentionRulesForWorkspace` / `stripRetentionRulesForWorkspace`). DB columns stay.
+3. Data-drain blocker in `lib/users/account-deletion.ts` (`hasDataDrains`,
+   `data_drain_owner` in `lib/api/contracts/user.ts`); drains cannot be created any more.
+4. Biome issues that need `--unsafe` (unused imports, class sorting; ~40 warnings + 1 error):
+   `bunx biome check apps/sim packages`.
+5. Then steps 7 and the "+" rows in the table above.
+
+Note: `bun install` needs `cdn.sheetjs.com` (xlsx tarball). In a network-restricted
+environment, temporarily point `xlsx` at `0.18.5` with `bun install --no-save`, then
+`git checkout apps/sim/package.json bun.lock`.
 
 ## How to verify (no local builds — the owner's Mac has 8 GB)
 
