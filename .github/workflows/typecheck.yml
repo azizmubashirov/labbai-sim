@@ -54,12 +54,10 @@ jobs:
           set -o pipefail
           bunx vitest run local-copilot lib/api-key lib/mothership/inbox --reporter=dot 2>&1 | tee /tmp/tests.txt
 
-      # Whole apps/sim suite, report only (does not fail the job) until the stale
-      # tests left by the cleanup are fixed.
-      - name: Full unit tests (report only)
+      # Whole apps/sim suite.
+      - name: Full unit tests
         id: fulltests
         if: always()
-        continue-on-error: true
         working-directory: apps/sim
         env:
           DATABASE_URL: postgresql://user:pass@localhost:5432/dummy
