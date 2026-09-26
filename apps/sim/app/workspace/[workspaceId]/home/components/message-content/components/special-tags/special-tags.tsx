@@ -5,7 +5,6 @@ import { cn, Expandable, ExpandableContent, SecretReveal, Tooltip, toast } from 
 import { ArrowRight, Check, ChevronDown, Lock } from '@sim/emcn/icons'
 import { isRecordLike } from '@sim/utils/object'
 import { useParams } from 'next/navigation'
-import { useSession } from '@/lib/auth/auth-client'
 import { isSafeHttpUrl } from '@/lib/core/utils/urls'
 import { readLatestOAuthChatAttempt } from '@/lib/credentials/oauth-chat-attempt'
 import { resolveCredentialDisplay } from '@/lib/integrations/credential-display'
@@ -13,17 +12,8 @@ import {
   resolveOAuthServiceForSlug,
   resolveServiceAccountIntegration,
 } from '@/lib/integrations/oauth-service'
-import {
-  readSearchConnectionAttempt,
-  searchConnectionAttemptKey,
-} from '@/lib/knowledge/search/connection-attempt'
-import {
-  parseSearchConnectionBody,
-  searchConnectionTargetSchema,
-} from '@/lib/knowledge/search/connection-target'
 import { OAUTH_PROVIDERS } from '@/lib/oauth/oauth'
 import { getServiceConfigByProviderId } from '@/lib/oauth/utils'
-import { useChatSurface } from '@/app/workspace/[workspaceId]/home/components/chat-surface-context'
 import { ContextMentionIcon } from '@/app/workspace/[workspaceId]/home/components/context-mention-icon'
 import {
   INTERACTION_CARD_ROW_CLASSES,
@@ -44,7 +34,6 @@ import {
   resolveOAuthChipTarget,
   useOAuthChipConnection,
 } from '@/app/workspace/[workspaceId]/home/components/message-content/components/special-tags/use-oauth-chip-connection'
-import { usePersonalCredentialConnection } from '@/app/workspace/[workspaceId]/home/components/message-content/components/special-tags/use-personal-credential-connection'
 import { WorkflowPatchDisplay } from '@/app/workspace/[workspaceId]/home/components/message-content/components/special-tags/workflow-patch-display'
 import type {
   ChatMessageContext,
@@ -103,12 +92,6 @@ const ConnectServiceAccountModal = lazy(() =>
   import(
     '@/app/workspace/[workspaceId]/integrations/components/connect-service-account-modal/connect-service-account-modal'
   ).then((m) => ({ default: m.ConnectServiceAccountModal }))
-)
-
-const ConnectPersonalTokenModal = lazy(() =>
-  import('@/app/workspace/[workspaceId]/integrations/components/connect-personal-token-modal').then(
-    (module) => ({ default: module.ConnectPersonalTokenModal })
-  )
 )
 
 export const CREDENTIAL_TAG_TYPES = [
@@ -561,8 +544,8 @@ function isCredentialItemData(value: unknown): value is CredentialItemData {
     }
     return typeof value.provider === 'string' && value.provider.trim().length > 0
   }
-  if (value.type === 'link' && value.connectorType !== undefined)
-    return searchConnectionTargetSchema.safeParse(value).success
+  /** Search-source connection targets were the retired organization Assistant's. */
+  if (value.type === 'link' && value.connectorType !== undefined) return false
   if (value.type === 'link' && value.value === undefined) {
     return typeof value.provider === 'string' && value.provider.trim().length > 0
   }
@@ -581,8 +564,6 @@ export function parseCredentialTagBody(body: string): CredentialTagData | null {
   try {
     const parsed = JSON.parse(body) as unknown
     const items = Array.isArray(parsed) ? parsed : [parsed]
-    if (items.some((item) => isRecordLike(item) && item.connectorType !== undefined))
-      return parseSearchConnectionBody(body)
     return items.length > 0 && items.every(isCredentialItemData) ? items : null
   } catch {
     return null
@@ -1877,7 +1858,6 @@ function recoverTrailingBareOptions(segments: ContentSegment[]): void {
 
 interface SpecialTagsProps {
   segment: Exclude<ContentSegment, { type: 'text' }>
-  requestMode?: 'agent' | 'assistant'
   /** Stable identity for interaction state owned by this message/tag. */
   interactionId?: string
   /** Transcript-derived answers for this message's question card (renders the recap). */
@@ -1898,7 +1878,6 @@ interface SpecialTagsProps {
  */
 export function SpecialTags({
   segment,
-  requestMode,
   interactionId,
   questionAnswers,
   credentialSubmission,
@@ -1918,7 +1897,6 @@ export function SpecialTags({
       return (
         <CredentialDisplay
           data={segment.data}
-          requestMode={requestMode}
           interactionId={interactionId}
           submitted={credentialSubmission}
           abandoned={credentialAbandoned}
@@ -2146,7 +2124,6 @@ function getCredentialProviderDisplayName(provider: string): string {
  */
 interface CredentialControlProps {
   data: CredentialItemData
-  requestMode?: 'agent' | 'assistant'
   controlId?: string
   embedded?: boolean
   divided?: boolean
@@ -2527,95 +2504,6 @@ function CredentialLinkDisplay({
   )
 }
 
-function PersonalCredentialLinkDisplay({
-  data,
-  controlId = 'credential-link',
-  embedded = false,
-  divided = false,
-  onConnected,
-}: CredentialControlProps) {
-  const { workspaceId } = useParams<{ workspaceId: string }>()
-  const { canEdit } = useUserPermissionsContext()
-  const [tokenModalOpen, setTokenModalOpen] = useState(false)
-  const provider = data.provider?.trim() ?? ''
-  const name = getCredentialProviderDisplayName(provider)
-  const connection = usePersonalCredentialConnection({
-    provider,
-    displayName: name,
-    controlId,
-    onConnected,
-  })
-  if (!provider || (provider.toLowerCase() === 'gitlab' && !canEdit)) return null
-  const Icon = getCredentialIcon(provider) ?? Lock
-  const connected = connection.status === 'connected'
-  const label = connected
-    ? `Connected ${name}`
-    : connection.hasMetadataError
-      ? `Retry checking ${name} connections`
-      : !connection.isReady
-        ? `Checking ${name} connections…`
-        : connection.status === 'pending'
-          ? `Waiting for ${name} connection…`
-          : connection.status === 'failed'
-            ? `Not connected — connect ${name}`
-            : `Connect ${name}`
-  return (
-    <>
-      <button
-        type='button'
-        disabled={
-          (!connection.isReady && !connection.hasMetadataError) ||
-          connected ||
-          connection.isStarting
-        }
-        onClick={() => {
-          if (connection.hasMetadataError) {
-            void connection.retryMetadata()
-            return
-          }
-          if (provider.toLowerCase() === 'gitlab') {
-            connection.beginPersonalToken()
-            setTokenModalOpen(true)
-          } else connection.connectOAuth()
-        }}
-        className={cn(
-          embedded
-            ? INTERACTION_CARD_ROW_CLASSES
-            : 'flex w-full items-center gap-2 rounded-2xl border border-[var(--border)] px-3 py-2.5 text-left transition-colors',
-          embedded && divided && 'border-t',
-          'hover-hover:bg-[var(--surface-5)]'
-        )}
-      >
-        <BrandIcon icon={Icon} className='size-[16px] shrink-0' />
-        <span className='flex-1 text-[var(--text-body)] text-sm'>{label}</span>
-        {connected ? (
-          <Check className='size-[16px] shrink-0 text-[var(--text-icon)]' />
-        ) : (
-          <ArrowRight className='size-[16px] shrink-0 text-[var(--text-icon)]' />
-        )}
-      </button>
-      {connection.error && (
-        <p role='alert' className='px-3 py-2 text-[var(--text-error)] text-caption'>
-          {connection.error}
-        </p>
-      )}
-      {tokenModalOpen && (
-        <Suspense fallback={null}>
-          <ConnectPersonalTokenModal
-            open={tokenModalOpen}
-            onOpenChange={(open) => {
-              setTokenModalOpen(open)
-              if (!open) connection.cancelPersonalToken()
-            }}
-            workspaceId={workspaceId}
-            onConnected={connection.connectedPersonalToken}
-          />
-        </Suspense>
-      )}
-    </>
-  )
-}
-
 /**
  * sim_key stays in the routing set so a payload carrying one still takes the
  * card path (CredentialDisplay renders its reveal separately), but it is an
@@ -2628,17 +2516,7 @@ const CREDENTIAL_CARD_TYPES: ReadonlySet<CredentialTagType> = new Set([
   'sim_key',
 ])
 
-function isCredentialCardItemVisible(
-  item: CredentialItemData,
-  canEdit: boolean,
-  requestMode?: 'agent' | 'assistant'
-): boolean {
-  if (requestMode === 'assistant')
-    return (
-      item.type === 'link' &&
-      Boolean(item.provider?.trim()) &&
-      (item.provider?.trim().toLowerCase() !== 'gitlab' || canEdit)
-    )
+function isCredentialCardItemVisible(item: CredentialItemData, canEdit: boolean): boolean {
   if (item.type === 'sim_key') return false
   if (item.type === 'secret_input') return item.scope === 'personal' || canEdit
   if (item.type === 'link') {
@@ -2648,21 +2526,16 @@ function isCredentialCardItemVisible(
 }
 
 /** Whether a terminal credential tag produces the shared question-style card. */
-export function credentialTagHasVisibleCard(
-  data: CredentialTagData,
-  canEdit: boolean,
-  requestMode?: 'agent' | 'assistant'
-): boolean {
+export function credentialTagHasVisibleCard(data: CredentialTagData, canEdit: boolean): boolean {
   return (
     data.length > 0 &&
     data.every((item) => CREDENTIAL_CARD_TYPES.has(item.type)) &&
-    data.some((item) => isCredentialCardItemVisible(item, canEdit, requestMode))
+    data.some((item) => isCredentialCardItemVisible(item, canEdit))
   )
 }
 
 function CredentialItemDisplay({
   data,
-  requestMode,
   controlId = 'credential-link',
   embedded = false,
   divided = false,
@@ -2671,10 +2544,6 @@ function CredentialItemDisplay({
   onSaved,
   onConnected,
 }: CredentialControlProps) {
-  const { organizationId } = useParams<{ organizationId?: string }>()
-  const { SearchConnectionComponent } = useChatSurface()
-  const { data: session } = useSession()
-  if (requestMode === 'assistant' && data.type !== 'link') return null
   if (data.type === 'secret_input') {
     const secretName = data.name?.trim()
     if (embedded) {
@@ -2694,34 +2563,6 @@ function CredentialItemDisplay({
   }
 
   if (data.type === 'link') {
-    if (requestMode === 'assistant') {
-      if (organizationId) {
-        const target = searchConnectionTargetSchema.safeParse(data)
-        if (!target.success || !session?.user?.id) return null
-        if (!SearchConnectionComponent)
-          throw new Error('Search connection controls require an organization chat surface')
-        return (
-          <SearchConnectionComponent
-            organizationId={organizationId}
-            userId={session.user.id}
-            target={target.data}
-            controlId={controlId}
-            embedded={embedded}
-            divided={divided}
-            onConnected={onConnected}
-          />
-        )
-      }
-      return (
-        <PersonalCredentialLinkDisplay
-          data={data}
-          controlId={controlId}
-          embedded={embedded}
-          divided={divided}
-          onConnected={onConnected}
-        />
-      )
-    }
     return (
       <CredentialLinkDisplay
         data={data}
@@ -2756,29 +2597,23 @@ function CredentialItemDisplay({
  */
 function CredentialInputCard({
   data,
-  requestMode,
   interactionId,
   submitted,
   abandoned,
   onContinue,
 }: {
   data: CredentialTagData
-  requestMode?: 'agent' | 'assistant'
   interactionId?: string
   submitted?: CredentialSubmissionPayload
   abandoned?: boolean
   onContinue?: (message: string) => void
 }) {
-  const { workspaceId, organizationId } = useParams<{
-    workspaceId: string
-    organizationId?: string
-  }>()
-  const { data: session } = useSession()
+  const { workspaceId } = useParams<{ workspaceId: string }>()
   const { canEdit } = useUserPermissionsContext()
   const upsertWorkspace = useUpsertWorkspaceEnvironment()
   const savePersonal = useSavePersonalEnvironment()
-  const personalQuery = usePersonalEnvironment({ enabled: requestMode !== 'assistant' })
-  const attachDescriptions = useWorkspaceSecretDescriptions(requestMode === 'assistant' ? [] : data)
+  const personalQuery = usePersonalEnvironment()
+  const attachDescriptions = useWorkspaceSecretDescriptions(data)
   const [secretDrafts, setSecretDrafts] = useState<Record<number, string>>({})
   const [savedSecretRows, setSavedSecretRows] = useState<Set<number>>(() => new Set())
   const [connectedIntegrationRows, setConnectedIntegrationRows] = useState<Set<number>>(
@@ -2807,32 +2642,15 @@ function CredentialInputCard({
       if (item.type !== 'link' && item.type !== 'service_account') continue
       const index = restoreIndex++
       if (item.type !== 'link') continue
-      if (requestMode === 'assistant' && organizationId && session?.user?.id) {
-        const target = searchConnectionTargetSchema.safeParse(item)
-        if (!target.success) continue
-        const attempt = readSearchConnectionAttempt(
-          searchConnectionAttemptKey(
-            organizationId,
-            session.user.id,
-            `${controlIdPrefix}:${dataIndex}:${JSON.stringify(target.data)}`
-          )
-        )
-        if (attempt?.status === 'connected') restored.add(index)
-        continue
-      }
-      const { providerId, reconnectCredentialId } =
-        requestMode === 'assistant'
-          ? {
-              providerId:
-                resolveOAuthServiceForSlug(item.provider ?? '')?.providerId ?? item.provider ?? '',
-              reconnectCredentialId: undefined,
-            }
-          : resolveOAuthChipTarget(item.value, item.provider)
+      const { providerId, reconnectCredentialId } = resolveOAuthChipTarget(
+        item.value,
+        item.provider
+      )
       if (!providerId) continue
       const attempt = readLatestOAuthChatAttempt({
         workspaceId,
         providerId,
-        controlId: `${requestMode === 'assistant' ? 'personal:' : ''}${controlIdPrefix}:${dataIndex}`,
+        controlId: `${controlIdPrefix}:${dataIndex}`,
         credentialId: reconnectCredentialId,
       })
       if (attempt?.status === 'connected') restored.add(index)
@@ -2842,15 +2660,7 @@ function CredentialInputCard({
       if (Array.from(restored).every((index) => current.has(index))) return current
       return new Set([...current, ...restored])
     })
-  }, [
-    abandoned,
-    controlIdPrefix,
-    data,
-    workspaceId,
-    requestMode,
-    organizationId,
-    session?.user?.id,
-  ])
+  }, [abandoned, controlIdPrefix, data, workspaceId])
 
   let integrationIndex = 0
   let secretIndex = 0
@@ -2861,9 +2671,7 @@ function CredentialInputCard({
       item.type === 'link' || item.type === 'service_account' ? integrationIndex++ : undefined,
     secretIndex: item.type === 'secret_input' ? secretIndex++ : undefined,
   }))
-  const visibleRows = indexedRows.filter(({ item }) =>
-    isCredentialCardItemVisible(item, canEdit, requestMode)
-  )
+  const visibleRows = indexedRows.filter(({ item }) => isCredentialCardItemVisible(item, canEdit))
   if (visibleRows.length === 0) return null
 
   const integrationRows = visibleRows.filter(
@@ -2881,7 +2689,6 @@ function CredentialInputCard({
       <CredentialItemDisplay
         key={`${item.type}-${item.provider ?? dataIndex}-${dataIndex}`}
         data={item}
-        requestMode={requestMode}
         controlId={`${controlIdPrefix}:${dataIndex}`}
         embedded
         divided={index > 0}
@@ -3036,14 +2843,12 @@ function CredentialInputCard({
 
 export function CredentialDisplay({
   data,
-  requestMode,
   interactionId,
   submitted,
   abandoned,
   onContinue,
 }: {
   data: CredentialTagData
-  requestMode?: 'agent' | 'assistant'
   interactionId?: string
   submitted?: CredentialSubmissionPayload
   abandoned?: boolean
@@ -3058,7 +2863,7 @@ export function CredentialDisplay({
   // pairing) stay stable — the card simply renders no sim_key rows.
   const simKeyReveals = data
     .map((item, index) =>
-      item.type === 'sim_key' && requestMode !== 'assistant' ? (
+      item.type === 'sim_key' ? (
         <SecretReveal key={`sim-key-${index}`} value={item.value} />
       ) : null
     )
@@ -3069,7 +2874,6 @@ export function CredentialDisplay({
   const inputControls = usesCredentialCard ? (
     <CredentialInputCard
       data={data}
-      requestMode={requestMode}
       interactionId={interactionId}
       submitted={submitted}
       abandoned={abandoned}
@@ -3081,7 +2885,6 @@ export function CredentialDisplay({
         <CredentialItemDisplay
           key={`${item.type}-${item.provider ?? item.name ?? index}`}
           data={item}
-          requestMode={requestMode}
         />
       ))}
     </div>

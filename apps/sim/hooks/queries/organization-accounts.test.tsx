@@ -11,136 +11,17 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: mocks.refresh }
 
 import { ApiClientError } from '@/lib/api/client/errors'
 import {
-  disconnectPersonalOrganizationAccountContract,
   listOrganizationAccountPeopleContract,
   revokeOrganizationAccountEnrollmentContract,
-  updateOrganizationAccountsContract,
 } from '@/lib/api/contracts/organization-accounts'
 import { resourceScopeKey } from '@/lib/core/resource-scope'
 import {
   organizationAccountsKeys,
-  useDisconnectPersonalOrganizationAccount,
   useOrganizationAccountPeople,
   useRevokeOrganizationAccountEnrollment,
-  useUpdateOrganizationAccounts,
 } from '@/hooks/queries/organization-accounts'
 import { knowledgeKeys } from '@/hooks/queries/utils/knowledge-keys'
 import { searchSourceKeys } from '@/hooks/queries/utils/search-source-keys'
-import { selectorKeys, selectorQueryRoots } from '@/hooks/queries/utils/selector-keys'
-
-describe('personal account disconnect', () => {
-  it.each([true, false])(
-    'clears content and refreshes the router only after success=%s, including after unmount',
-    async (success) => {
-      vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
-      mocks.request.mockReset()
-      mocks.refresh.mockReset()
-      const response = Promise.withResolvers<{ success: true }>()
-      mocks.request.mockReturnValue(response.promise)
-      const client = new QueryClient()
-      const root = createRoot(document.createElement('div'))
-      let mutation: ReturnType<typeof useDisconnectPersonalOrganizationAccount>
-      function Probe() {
-        mutation = useDisconnectPersonalOrganizationAccount('org-1')
-        return null
-      }
-      const own = searchSourceKeys.pages(
-        { kind: 'organization', organizationId: 'org-1' },
-        { mine: true, search: '' }
-      )
-      const catalog = searchSourceKeys.pages(
-        { kind: 'organization', organizationId: 'org-1' },
-        { mine: false, search: '' }
-      )
-      const people = organizationAccountsKeys.people('org-1')
-      const other = searchSourceKeys.list({ kind: 'organization', organizationId: 'org-2' })
-      const results = knowledgeKeys.search(
-        resourceScopeKey({ kind: 'organization', organizationId: 'org-1' }),
-        'private content'
-      )
-      const otherResults = knowledgeKeys.search(
-        resourceScopeKey({ kind: 'organization', organizationId: 'org-2' }),
-        'private content'
-      )
-      const workspaceResults = knowledgeKeys.search('workspace-1', 'private content')
-      const ownDocument = knowledgeKeys.document('kb-1', 'document-1')
-      const chunks = knowledgeKeys.chunks('kb-2', 'document-2', '')
-      const otherDocument = knowledgeKeys.document('kb-other', 'document-other')
-      const resultOnlyDocument = knowledgeKeys.document('kb-result-only', 'document-result-only')
-      const sourcePages = {
-        pages: [
-          { sources: [{ knowledgeBaseId: 'kb-1' }], nextCursor: 'next' },
-          { sources: [{ knowledgeBaseId: 'kb-2' }], nextCursor: null },
-        ],
-        pageParams: [undefined, 'next'],
-      }
-      for (const key of [own, catalog]) client.setQueryData(key, sourcePages)
-      client.setQueryData(results, [{ knowledgeBaseId: 'kb-result-only' }])
-      for (const key of [
-        people,
-        other,
-        otherResults,
-        workspaceResults,
-        ownDocument,
-        resultOnlyDocument,
-        chunks,
-        otherDocument,
-      ])
-        client.setQueryData(key, { content: 'previously authorized content' })
-      try {
-        await act(async () =>
-          root.render(
-            <QueryClientProvider client={client}>
-              <Probe />
-            </QueryClientProvider>
-          )
-        )
-        let pending: Promise<unknown>
-        await act(async () => {
-          pending = mutation.mutateAsync('own-credential')
-        })
-        await act(async () =>
-          root.render(<QueryClientProvider client={client}>{null}</QueryClientProvider>)
-        )
-        await act(async () => {
-          if (success) {
-            response.resolve({ success: true })
-            await pending
-          } else {
-            const rejection = expect(pending).rejects.toThrow('Try again')
-            response.reject(new Error('Try again'))
-            await rejection
-          }
-        })
-        expect(mocks.request).toHaveBeenCalledExactlyOnceWith(
-          disconnectPersonalOrganizationAccountContract,
-          { params: { credentialId: 'own-credential' } }
-        )
-        for (const key of [
-          own,
-          catalog,
-          results,
-          ownDocument,
-          resultOnlyDocument,
-          chunks,
-          otherDocument,
-        ]) {
-          if (success) expect(client.getQueryData(key)).toBeUndefined()
-          else expect(client.getQueryData(key)).toBeDefined()
-        }
-        expect(client.getQueryState(people)?.isInvalidated).toBe(success)
-        expect(client.getQueryState(other)?.isInvalidated).toBe(false)
-        expect(mocks.refresh).toHaveBeenCalledTimes(success ? 1 : 0)
-        for (const key of [otherResults, workspaceResults])
-          expect(client.getQueryData(key)).toEqual({ content: 'previously authorized content' })
-      } finally {
-        await act(async () => root.unmount())
-        client.clear()
-        vi.unstubAllGlobals()
-      }
-    }
-  )
-})
 
 describe('organization account revocation', () => {
   it.each([true, false])(

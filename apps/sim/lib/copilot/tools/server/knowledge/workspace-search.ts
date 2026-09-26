@@ -3,17 +3,13 @@ import { z } from 'zod'
 import { workspaceSearchFiltersSchema } from '@/lib/api/contracts/knowledge/search'
 import {
   executeCopilotKnowledgeUseCase,
-  executeCopilotOrganizationKnowledgeUseCase,
   messageForCopilotKnowledgeError,
   requireCopilotKnowledgeScope,
 } from '@/lib/copilot/application/execute-knowledge-use-case'
 import type { BaseServerTool, ServerToolContext } from '@/lib/copilot/tools/server/base-tool'
 import { getBaseUrl } from '@/lib/core/utils/urls'
 import { readSearchDocument } from '@/lib/knowledge/application/read-search-document'
-import {
-  searchOrganizationKnowledge,
-  searchWorkspaceKnowledge,
-} from '@/lib/knowledge/application/workspace-search'
+import { searchWorkspaceKnowledge } from '@/lib/knowledge/application/workspace-search'
 import { sourceAuthor } from '@/lib/knowledge/search/author'
 import { SearchDeadlineError } from '@/lib/knowledge/search/budget'
 import { createKnowledgeDocumentCitation } from '@/lib/knowledge/search/citation'
@@ -72,22 +68,17 @@ export const searchWorkspaceServerTool: BaseServerTool = {
             query: safeQuery,
             topK,
             allowPartialResults: true,
-            filters: intersectWorkspaceSearchFilters(requestedFilters, context?.assistantSearch),
+            filters: intersectWorkspaceSearchFilters(requestedFilters),
             surface: context?.searchSurface ?? 'copilot',
             resultSecretRegistry: registry,
             signal: context?.abortSignal,
           } as const
           recordSearchStageDuration('tool_input', performance.now() - inputStarted)
           const result = await measureSearchStage('tool_application', () =>
-            scope.kind === 'organization'
-              ? executeCopilotOrganizationKnowledgeUseCase(context, searchOrganizationKnowledge, {
-                  ...input,
-                  organizationId: scope.organizationId,
-                })
-              : executeCopilotKnowledgeUseCase(context, searchWorkspaceKnowledge, {
-                  ...input,
-                  workspaceId: scope.workspaceId,
-                })
+            executeCopilotKnowledgeUseCase(context, searchWorkspaceKnowledge, {
+              ...input,
+              workspaceId: scope.workspaceId,
+            })
           )
           return await measureSearchStage('tool_presentation', () => {
             const names = new Map(result.knowledgeBases.map((base) => [base.id, base.name]))
@@ -176,20 +167,13 @@ export const readDocumentServerTool: BaseServerTool = {
           if (!registry) throw new Error('Knowledge result provenance is unavailable')
           const readInput = {
             ...input,
-            ...(scope.kind === 'organization'
-              ? { assertedOrganizationId: scope.organizationId }
-              : { assertedWorkspaceId: scope.workspaceId }),
-            filters: intersectWorkspaceSearchFilters(
-              { documentIds: [input.documentId] },
-              context?.assistantSearch
-            ),
+            assertedWorkspaceId: scope.workspaceId,
+            filters: { documentIds: [input.documentId] },
             resultSecretRegistry: registry,
             signal: context?.abortSignal,
           }
           const result = await measureSearchStage('document_read', () =>
-            scope.kind === 'organization'
-              ? executeCopilotOrganizationKnowledgeUseCase(context, readSearchDocument, readInput)
-              : executeCopilotKnowledgeUseCase(context, readSearchDocument, readInput)
+            executeCopilotKnowledgeUseCase(context, readSearchDocument, readInput)
           )
           const output = {
             success: true,

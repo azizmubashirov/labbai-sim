@@ -14,10 +14,7 @@ const dateStringSchema = z.string().refine((value) => !Number.isNaN(Date.parse(v
 export const mothershipChatScopeSchema = z.enum(['active', 'archived'])
 export type MothershipChatScope = z.output<typeof mothershipChatScopeSchema>
 
-const mothershipChatOwnerSchema = z.union([
-  z.object({ workspaceId: z.string().min(1), organizationId: z.never().optional() }),
-  z.object({ organizationId: z.string().min(1), workspaceId: z.never().optional() }),
-])
+const mothershipChatOwnerSchema = z.object({ workspaceId: z.string().min(1) })
 
 export const listMothershipChatsQuerySchema = mothershipChatOwnerSchema.and(
   z.object({

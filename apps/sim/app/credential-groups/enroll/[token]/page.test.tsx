@@ -180,7 +180,7 @@ describe('focused Search enrollment', () => {
   })
 
   it.each([true, false])(
-    'uses current Search eligibility for organization return links: %s',
+    'returns organization enrollments to Sim regardless of Search eligibility: %s',
     async (canSearch) => {
       mocks.authenticate.mockResolvedValue({
         ...principal,
@@ -189,12 +189,11 @@ describe('focused Search enrollment', () => {
       })
       mocks.read.mockResolvedValue({ enrollment, canSearch })
       await render({ returnTo: 'search', optionId: 'site-two' })
-      const label = canSearch ? 'Return to Search' : 'Open Sim'
       expect(
         Array.from(document.querySelectorAll('a'))
-          .find((link) => link.textContent === label)
+          .find((link) => link.textContent === 'Open Sim')
           ?.getAttribute('href')
-      ).toBe(canSearch ? '/o/canonical-org/search' : '/home')
+      ).toBe('/home')
     }
   )
 

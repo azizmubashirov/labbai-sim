@@ -15,7 +15,7 @@ import { CREDENTIAL_GROUP_OAUTH_FAILURE_MESSAGES } from '@/lib/credential-groups
 import { CredentialGroupProviderConfigurationError } from '@/lib/credential-groups/provider-adapter'
 import { getCredentialGroupProviderService } from '@/lib/credential-groups/providers'
 import { enforcePublicCredentialGroupIpRateLimit } from '@/lib/credential-groups/rate-limit'
-import { APP_ENTRY_PATH, organizationRoutes } from '@/lib/navigation/paths'
+import { APP_ENTRY_PATH } from '@/lib/navigation/paths'
 import { LogoShell } from '@/app/_shell/logo-shell'
 import { AuthHeader, SupportFooter } from '@/app/(auth)/components'
 import { OAuthConnectLink } from '@/app/credential-groups/enroll/[token]/oauth-reconnect-link'
@@ -182,13 +182,10 @@ export default async function CredentialGroupEnrollmentPage({
   const { enrollment } = enrollmentResult
   const canReturnToSearch =
     returnToSearch &&
-    ('canSearch' in enrollmentResult ? enrollmentResult.canSearch : !principal.organizationId)
+    !principal.organizationId &&
+    ('canSearch' in enrollmentResult ? enrollmentResult.canSearch : true)
   const returnHref = canReturnToSearch ? sourceReturnPath(principal) : APP_ENTRY_PATH
-  const returnLabel = canReturnToSearch
-    ? principal.organizationId
-      ? 'Return to Search'
-      : 'Open knowledge bases'
-    : 'Open Sim'
+  const returnLabel = canReturnToSearch ? 'Open knowledge bases' : 'Open Sim'
   if (!enrollment)
     return <UnavailableSearchConnection returnHref={returnHref} returnLabel={returnLabel} />
 
@@ -335,5 +332,5 @@ function sourceReturnPath(owner: ResourceOwner): string {
   const scope = resourceScopeFromOwner(owner)
   return scope.kind === 'workspace'
     ? `/workspace/${encodeURIComponent(scope.workspaceId)}/knowledge`
-    : organizationRoutes(scope.organizationId).search
+    : APP_ENTRY_PATH
 }

@@ -1,5 +1,4 @@
 import { type Context, context as otelContext, type Span, trace } from '@opentelemetry/api'
-import type { Principal } from '@sim/auth/principal'
 import { createLogger } from '@sim/logger'
 import { getErrorMessage } from '@sim/utils/errors'
 import { sleep } from '@sim/utils/helpers'
@@ -117,11 +116,8 @@ function buildResumeTerminalEnvelopes(options: {
 }
 
 export const GET = withRouteHandler(async (request: NextRequest) => {
-  const {
-    userId: authenticatedUserId,
-    isAuthenticated,
-    principal,
-  } = await authenticateCopilotRequestSessionOnly()
+  const { userId: authenticatedUserId, isAuthenticated } =
+    await authenticateCopilotRequestSessionOnly()
 
   if (!isAuthenticated || !authenticatedUserId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -174,7 +170,6 @@ export const GET = withRouteHandler(async (request: NextRequest) => {
         afterCursor,
         batchMode,
         authenticatedUserId,
-        principal,
         rootSpan,
         rootContext,
       })
@@ -192,7 +187,6 @@ async function handleResumeRequestBody({
   afterCursor,
   batchMode,
   authenticatedUserId,
-  principal,
   rootSpan,
   rootContext,
 }: {
@@ -201,7 +195,6 @@ async function handleResumeRequestBody({
   afterCursor: string
   batchMode: boolean
   authenticatedUserId: string
-  principal?: Principal
   rootSpan: Span
   rootContext: Context
 }) {
@@ -221,8 +214,7 @@ async function handleResumeRequestBody({
   })
   if (
     !run ||
-    (run.chatId &&
-      !(await getAccessibleCopilotChatAuth(run.chatId, authenticatedUserId, { principal })))
+    (run.chatId && !(await getAccessibleCopilotChatAuth(run.chatId, authenticatedUserId)))
   ) {
     rootSpan.setAttribute(TraceAttr.CopilotResumeOutcome, CopilotResumeOutcome.StreamNotFound)
     rootSpan.end()
@@ -335,10 +327,7 @@ async function handleResumeRequestBody({
     request.signal.addEventListener('abort', abortListener, { once: true })
 
     const flushEvents = async () => {
-      if (
-        run?.chatId &&
-        !(await getAccessibleCopilotChatAuth(run.chatId, authenticatedUserId, { principal }))
-      ) {
+      if (run?.chatId && !(await getAccessibleCopilotChatAuth(run.chatId, authenticatedUserId))) {
         closeController()
         return
       }

@@ -25,7 +25,6 @@ export function createServerToolHandler(toolId: string): ToolHandler {
         copilotToolExecution: context.copilotToolExecution,
         requestMode: context.requestMode,
         searchSurface: context.searchSurface,
-        assistantSearch: context.assistantSearch,
         billingAttribution: context.billingAttribution,
         userPermission: context.userPermission ?? undefined,
         chatId: context.chatId,

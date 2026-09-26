@@ -52,7 +52,7 @@ vi.mock('@/hooks/use-settings-navigation', () => ({
 
 vi.mock('next/navigation', () => ({
   useParams: () => ({ workspaceId: 'workspace-1' }),
-  usePathname: () => '/o/org-1/settings/integrations',
+  usePathname: () => '/workspace/workspace-1/knowledge/kb-1',
 }))
 vi.mock('@/app/workspace/[workspaceId]/providers/workspace-host-provider', () => ({
   useWorkspaceHostContext: () => ({

@@ -72,10 +72,7 @@ const deployment: DeploymentShape = {
   },
 }
 
-function makeHostContext(
-  role: 'admin' | 'member' | 'external',
-  organizationSearch?: boolean
-): WorkspaceHostContext {
+function makeHostContext(role: 'admin' | 'member' | 'external'): WorkspaceHostContext {
   return {
     workspace: {
       id: 'workspace-1',
@@ -105,7 +102,6 @@ function makeHostContext(
     },
     features: {
       credentialGroups: true,
-      organizationSearch,
       knowledgeMemberAccess: true,
       knowledgeSourceMirroredAccess: true,
     },
@@ -121,7 +117,7 @@ let container: HTMLDivElement
 beforeEach(() => {
   ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   vi.clearAllMocks()
-  hostContext = makeHostContext('admin', false)
+  hostContext = makeHostContext('admin')
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   useSettingsDirtyStore.getState().reset()
   container = document.createElement('div')
@@ -158,7 +154,7 @@ function expectWorkspaceLinks() {
   expect(workspaceLink('secrets')).toHaveTextContent('Secrets')
 }
 
-describe('workspace SettingsSidebar organization rollout', () => {
+describe('workspace SettingsSidebar organization settings', () => {
   it('hides Connected accounts when credential groups are disabled', () => {
     hostContext.features = { ...hostContext.features!, credentialGroups: false }
     renderSidebar()
@@ -179,7 +175,7 @@ describe('workspace SettingsSidebar organization rollout', () => {
   it.each(['member', 'external'] as const)(
     'offers own requests to a workspace user who is an org %s',
     (role) => {
-      hostContext = makeHostContext(role, false)
+      hostContext = makeHostContext(role)
       renderSidebar()
       expect(workspaceLink('requests')).toHaveTextContent('Requests')
     }
@@ -196,19 +192,15 @@ describe('workspace SettingsSidebar organization rollout', () => {
     expect(workspaceLink('requests')).toHaveTextContent('Requests')
   })
 
-  it.each([false, undefined])(
-    'keeps organization settings in the workspace for an admin when rollout is %s',
-    (enabled) => {
-      hostContext = makeHostContext('admin', enabled)
-      renderSidebar()
+  it('keeps organization settings in the workspace for an admin', () => {
+    renderSidebar()
 
-      expect(workspaceLink('organization')).toHaveTextContent('Members')
-      expect(workspaceLink('connected-accounts')).toHaveTextContent('Credential groups')
-      expect(workspaceLink('requests')).toHaveTextContent('Requests')
-      expect(container.querySelector('a[href^="/o/"]')).toBeNull()
-      expectWorkspaceLinks()
-    }
-  )
+    expect(workspaceLink('organization')).toHaveTextContent('Members')
+    expect(workspaceLink('connected-accounts')).toHaveTextContent('Credential groups')
+    expect(workspaceLink('requests')).toHaveTextContent('Requests')
+    expect(container.querySelector('a[href^="/o/"]')).toBeNull()
+    expectWorkspaceLinks()
+  })
 
   it('keeps existing settings when an older host context has no features object', () => {
     hostContext.features = undefined
@@ -221,25 +213,8 @@ describe('workspace SettingsSidebar organization rollout', () => {
     expectWorkspaceLinks()
   })
 
-  it.each(['admin', 'member'] as const)(
-    'replaces organization entries with one host organization link for a %s when enabled',
-    (role) => {
-      hostContext = makeHostContext(role, true)
-      renderSidebar()
-
-      const links = container.querySelectorAll<HTMLAnchorElement>('a[href^="/o/"]')
-      expect(links).toHaveLength(1)
-      expect(links[0]).toHaveAttribute('href', '/o/host-org/settings/members')
-      expect(links[0]).toHaveTextContent('Organization')
-      for (const section of ['organization', 'connected-accounts']) {
-        expect(workspaceLink(section)).toBeNull()
-      }
-      expectWorkspaceLinks()
-    }
-  )
-
-  it('keeps the member roster while preserving admin-only settings restrictions when disabled', () => {
-    hostContext = makeHostContext('member', false)
+  it('keeps the member roster while preserving admin-only settings restrictions', () => {
+    hostContext = makeHostContext('member')
     renderSidebar()
 
     expect(workspaceLink('organization')).toHaveTextContent('Members')
@@ -250,7 +225,7 @@ describe('workspace SettingsSidebar organization rollout', () => {
     expectWorkspaceLinks()
   })
 
-  it('preserves plan restrictions for a lapsed owner when disabled', () => {
+  it('preserves plan restrictions for a lapsed owner', () => {
     hostContext.ownerBilling.billingBlocked = true
     hostContext.ownerBilling.billingBlockedReason = 'payment_failed'
     renderSidebar()
@@ -263,9 +238,9 @@ describe('workspace SettingsSidebar organization rollout', () => {
   })
 
   it.each(['admin', 'member', 'external'] as const)(
-    'shows permitted inline settings for a self-hosted %s with Search disabled',
+    'shows permitted inline settings for a self-hosted %s',
     (role) => {
-      hostContext = makeHostContext(role, false)
+      hostContext = makeHostContext(role)
       hostContext.deployment = { ...deployment, hosted: false }
       renderSidebar()
 
@@ -286,17 +261,13 @@ describe('workspace SettingsSidebar organization rollout', () => {
     }
   )
 
-  it.each([false, true])(
-    'keeps external workspace admins out of organization settings when rollout is %s',
-    (enabled) => {
-      hostContext = makeHostContext('external', enabled)
-      renderSidebar()
+  it('keeps external workspace admins out of organization settings', () => {
+    hostContext = makeHostContext('external')
+    renderSidebar()
 
-      expect(container.querySelector('a[href^="/o/"]')).toBeNull()
-      for (const section of ['organization', 'connected-accounts']) {
-        expect(workspaceLink(section)).toBeNull()
-      }
-      expectWorkspaceLinks()
+    for (const section of ['organization', 'connected-accounts']) {
+      expect(workspaceLink(section)).toBeNull()
     }
-  )
+    expectWorkspaceLinks()
+  })
 })

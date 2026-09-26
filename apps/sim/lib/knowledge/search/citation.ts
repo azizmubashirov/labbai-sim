@@ -12,7 +12,7 @@ export function isKnowledgeSourceUrl(value: string): boolean {
 }
 
 interface KnowledgeDocumentCitationInput {
-  scope: ResourceScope
+  scope: Extract<ResourceScope, { kind: 'workspace' }>
   knowledgeBaseId: string
   documentId: string
   sourceUrl: string | null
@@ -22,10 +22,7 @@ interface KnowledgeDocumentCitationInput {
 /** Uses the original source when safe, otherwise the authorized Sim document page. */
 export function createKnowledgeDocumentCitation(input: KnowledgeDocumentCitationInput) {
   if (!isKnowledgeSourceUrl(input.baseUrl)) throw new Error('Invalid citation base URL')
-  const ownerPath =
-    input.scope.kind === 'organization'
-      ? `/o/${encodeURIComponent(input.scope.organizationId)}`
-      : `/workspace/${encodeURIComponent(input.scope.workspaceId)}`
+  const ownerPath = `/workspace/${encodeURIComponent(input.scope.workspaceId)}`
   const documentPath = `${ownerPath}/knowledge/${encodeURIComponent(input.knowledgeBaseId)}/${encodeURIComponent(input.documentId)}`
   const sourceUrl = input.sourceUrl?.trim()
   return {

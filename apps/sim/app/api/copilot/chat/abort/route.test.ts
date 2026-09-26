@@ -73,7 +73,7 @@ describe('POST /api/copilot/chat/abort', () => {
     mockAuthenticate.mockResolvedValueOnce({ userId: 'user-1', isAuthenticated: true, principal })
     const response = await POST(abortRequest())
     expect(response.status).toBe(200)
-    expect(mockGetAccessibleChat).toHaveBeenCalledWith('chat-1', 'user-1', { principal })
+    expect(mockGetAccessibleChat).toHaveBeenCalledWith('chat-1', 'user-1')
   })
 
   it('refuses an inaccessible chat before changing stream state', async () => {

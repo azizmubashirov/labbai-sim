@@ -5,7 +5,6 @@ import { and, eq, isNotNull } from 'drizzle-orm'
 import { type NextRequest, NextResponse } from 'next/server'
 import { restoreMothershipChatContract } from '@/lib/api/contracts/mothership-chats'
 import { parseRequest } from '@/lib/api/server'
-import { authorizeOrganizationChat } from '@/lib/copilot/chat/organization-chats'
 import { publishChatStatusChanged } from '@/lib/copilot/chat-status'
 import {
   authenticateCopilotRequestSessionOnly,
@@ -13,7 +12,6 @@ import {
   createInternalServerErrorResponse,
   createUnauthorizedResponse,
 } from '@/lib/copilot/request/http'
-import { asOrchestrationError } from '@/lib/core/orchestration/types'
 import { withRouteHandler } from '@/lib/core/utils/with-route-handler'
 import { captureServerEvent } from '@/lib/posthog/server'
 import {
@@ -33,7 +31,7 @@ const logger = createLogger('RestoreMothershipChatAPI')
 export const POST = withRouteHandler(
   async (request: NextRequest, context: { params: Promise<{ chatId: string }> }) => {
     try {
-      const { userId, isAuthenticated, principal } = await authenticateCopilotRequestSessionOnly()
+      const { userId, isAuthenticated } = await authenticateCopilotRequestSessionOnly()
       if (!isAuthenticated || !userId) {
         return createUnauthorizedResponse()
       }
@@ -58,15 +56,8 @@ export const POST = withRouteHandler(
         )
         .limit(1)
 
-      if (!chat) {
+      if (!chat || chat.organizationId) {
         return NextResponse.json({ success: false, error: 'Chat not found' }, { status: 404 })
-      }
-      if (chat.organizationId) {
-        if (!principal) return createUnauthorizedResponse()
-        await authorizeOrganizationChat.execute({
-          principal,
-          input: { organizationId: chat.organizationId },
-        })
       }
       if (chat.workspaceId) {
         await assertActiveWorkspaceAccess(chat.workspaceId, userId)
@@ -109,9 +100,6 @@ export const POST = withRouteHandler(
 
       return NextResponse.json({ success: true })
     } catch (error) {
-      const code = asOrchestrationError(error)?.code
-      if (code === 'not_found' || code === 'forbidden')
-        return NextResponse.json({ error: 'Chat not found' }, { status: 404 })
       if (isWorkspaceAccessDeniedError(error)) {
         return createForbiddenResponse('Workspace access denied')
       }

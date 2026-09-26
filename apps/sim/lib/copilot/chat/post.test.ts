@@ -25,7 +25,6 @@ const getEffectiveEnvironmentSnapshot = environmentUtilsMockFns.mockGetEffective
 
 const {
   computeWorkspaceEntitlements,
-  listPersonal,
   generateWorkspaceSnapshot,
   processContextsServer,
   resolveActiveResourceContext,
@@ -36,9 +35,6 @@ const {
   releasePendingChatStream,
   resolveOrCreateChat,
   resolveBillingAttribution,
-  resolveOrganizationBillingAttribution,
-  authorizeOrganizationChat,
-  readOrganizationAssistantImage,
   finalizeAssistantTurn,
   appendCopilotChatMessages,
   persistChatResources,
@@ -49,7 +45,6 @@ const {
   getLocalCopilotUserAccess,
 } = vi.hoisted(() => ({
   computeWorkspaceEntitlements: vi.fn(async () => []),
-  listPersonal: vi.fn(),
   generateWorkspaceSnapshot: vi.fn(),
   processContextsServer: vi.fn(),
   resolveActiveResourceContext: vi.fn(),
@@ -60,9 +55,6 @@ const {
   releasePendingChatStream: vi.fn(),
   resolveOrCreateChat: vi.fn(),
   resolveBillingAttribution: vi.fn(),
-  resolveOrganizationBillingAttribution: vi.fn(),
-  authorizeOrganizationChat: vi.fn(),
-  readOrganizationAssistantImage: vi.fn(),
   finalizeAssistantTurn: vi.fn(),
   appendCopilotChatMessages: vi.fn(),
   persistChatResources: vi.fn(),
@@ -130,20 +122,8 @@ vi.mock('@/lib/workspaces/permissions/utils', () => permissionsMock)
 
 vi.mock('@/lib/billing/core/billing-attribution', () => ({
   resolveBillingAttribution,
-  resolveOrganizationBillingAttribution,
 }))
 
-vi.mock('@/lib/copilot/chat/organization-chats', () => ({
-  authorizeOrganizationChat: { execute: authorizeOrganizationChat },
-}))
-
-vi.mock('@/lib/uploads/contexts/organization-assistant/application', () => ({
-  readOrganizationAssistantImage,
-}))
-
-vi.mock('@/lib/credentials/application/personal-credentials', () => ({
-  listPersonalCredentials: { execute: listPersonal },
-}))
 
 vi.mock('@/lib/copilot/entitlements', () => ({ computeWorkspaceEntitlements }))
 
@@ -247,23 +227,6 @@ describe('handleUnifiedChatPost', () => {
     })
     getUserEntityPermissions.mockResolvedValue('write')
     resolveBillingAttribution.mockResolvedValue(billingAttribution)
-    resolveOrganizationBillingAttribution.mockResolvedValue({
-      ...billingAttribution,
-      workspaceId: null,
-    })
-    authorizeOrganizationChat.mockResolvedValue({
-      organizationId: 'org-1',
-      userId: 'user-1',
-      role: 'member',
-    })
-    readOrganizationAssistantImage.mockResolvedValue({
-      id: 'upload-1',
-      key: 'assistant/org-1/user-1/upload-1/image.png',
-      name: 'image.png',
-      contentType: 'image/png',
-      size: 5,
-      buffer: Buffer.from('image'),
-    })
     getEffectiveEnvironmentSnapshot.mockResolvedValue({
       personalEncrypted: { API_KEY: 'encrypted-secret' },
       workspaceEncrypted: {},
@@ -314,7 +277,6 @@ describe('handleUnifiedChatPost', () => {
     await expect(response.json()).resolves.toEqual({
       error: COPILOT_ASSISTANT_MODE_UNAVAILABLE_MESSAGE,
     })
-    expect(authorizeOrganizationChat).not.toHaveBeenCalled()
     expect(resolveOrCreateChat).not.toHaveBeenCalled()
     expect(createSSEStream).not.toHaveBeenCalled()
   })
@@ -934,15 +896,6 @@ describe('handleUnifiedChatPost copilot.use capability gate', () => {
     })
     getUserEntityPermissions.mockResolvedValue('write')
     resolveBillingAttribution.mockResolvedValue(billingAttribution)
-    resolveOrganizationBillingAttribution.mockResolvedValue({
-      ...billingAttribution,
-      workspaceId: null,
-    })
-    authorizeOrganizationChat.mockResolvedValue({
-      organizationId: 'org-1',
-      userId: 'user-1',
-      role: 'member',
-    })
     getEffectiveEnvironmentSnapshot.mockResolvedValue({
       personalEncrypted: {},
       workspaceEncrypted: {},

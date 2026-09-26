@@ -2,7 +2,6 @@ import type { ComponentType } from 'react'
 import {
   ClipboardList,
   GridOffset,
-  Integration,
   Key,
   ListChecks,
   Lock,
@@ -18,17 +17,13 @@ import { type PermissionType, permissionSatisfies } from '@sim/platform-authz/wo
 import { McpIcon } from '@/components/icons'
 import type { SettingsHeaderMeta } from '@/components/settings/settings-header'
 import type { DeploymentFeatures, DeploymentShape } from '@/lib/api/contracts/workspaces'
-import { organizationRoutes } from '@/lib/navigation/paths'
 
 export type SettingsPlane = 'account' | 'workspace'
 
 export type AccountSettingsSection = 'general' | 'api-keys' | 'admin'
 
 export type OrganizationSettingsSection =
-  | 'recently-deleted'
-  | 'integrations'
   | 'connected-accounts'
-  | 'search-mcp'
   | 'members'
   | 'access-control'
   | 'requests'
@@ -250,7 +245,7 @@ export const ACCOUNT_SETTINGS_GROUPS = [
 ] as const
 
 /** Planes with their own standalone shell; the workspace plane renders inside the editor. */
-export type StandaloneSettingsPlane = Exclude<SettingsPlane, 'workspace'> | 'organization'
+export type StandaloneSettingsPlane = Exclude<SettingsPlane, 'workspace'>
 
 /** Per-plane sidebar chrome. */
 export const SETTINGS_PLANE_CHROME: Record<
@@ -258,7 +253,6 @@ export const SETTINGS_PLANE_CHROME: Record<
   { label: string; showWordmark: boolean }
 > = {
   account: { label: 'Account', showWordmark: false },
-  organization: { label: 'Organization', showWordmark: false },
 }
 
 export const SETTINGS_SECTION_REGISTRY: readonly SettingsSectionRegistryEntry[] = [
@@ -529,89 +523,6 @@ export const ORGANIZATION_PLANE_UNIFIED_SECTIONS: ReadonlySet<UnifiedSettingsSec
   )
 )
 
-export const ORGANIZATION_SETTINGS_GROUPS = [
-  { key: 'account', title: 'Account' },
-  { key: 'organization', title: 'Organization' },
-  { key: 'governance', title: 'Governance' },
-  { key: 'sim-search', title: 'Sim Search' },
-] as const
-
-type OrganizationSettingsGroup = (typeof ORGANIZATION_SETTINGS_GROUPS)[number]['key']
-
-/**
- * Every organization section under its sidebar group, in sidebar order: what
- * the organization is, how it is governed, and Sim Search. A section added to
- * the union without a row here fails to compile.
- */
-const ORGANIZATION_SECTION_GROUPS: Record<OrganizationSettingsSection, OrganizationSettingsGroup> =
-  {
-    members: 'organization',
-    'connected-accounts': 'organization',
-    'recently-deleted': 'organization',
-    requests: 'organization',
-    'audit-logs': 'governance',
-    'access-control': 'governance',
-    security: 'governance',
-    integrations: 'sim-search',
-    'search-mcp': 'sim-search',
-  }
-
-export const ORGANIZATION_SETTINGS_ITEMS: SettingsNavigationItem<OrganizationSettingsSection>[] = (
-  Object.keys(ORGANIZATION_SECTION_GROUPS) as OrganizationSettingsSection[]
-).map((id) => {
-  const group = ORGANIZATION_SECTION_GROUPS[id]
-  if (id === 'recently-deleted') {
-    return {
-      id,
-      label: 'Recently deleted',
-      description: 'Restore your deleted chats.',
-      icon: Trash,
-      group,
-    }
-  }
-  if (id === 'connected-accounts') {
-    return {
-      id,
-      label: 'Credential groups',
-      description: 'Manage integrations and workspace access for workflows and Chat.',
-      icon: GridOffset,
-      group,
-    }
-  }
-  if (id === 'integrations') {
-    return {
-      id,
-      label: 'Sources',
-      description: 'Set up the sources your organization searches.',
-      icon: Integration,
-      group,
-    }
-  }
-  if (id === 'search-mcp') {
-    return {
-      id,
-      label: 'Search MCP',
-      description: 'Search your sources from other apps.',
-      icon: Server,
-      group,
-    }
-  }
-  const item = buildUnifiedSettingsCatalog().find((entry) => entry.organizationSection === id)
-  if (!item) throw new Error(`Organization settings section "${id}" has no registry entry`)
-  return { ...item, id, group }
-})
-
-export function getOrganizationSettingsHref(
-  organizationId: string,
-  section: OrganizationSettingsSection,
-  searchParams?: SettingsHrefSearchParams
-): string {
-  return withSettingsSearchParams(
-    organizationRoutes(organizationId).settingsSection(section),
-    searchParams
-  )
-}
-
 /**
  * Unified section id to the organization-scoped section it acts on, for the gates
  * that take an {@link OrganizationSettingsSection} (`canOpenOrganizationSettingsSection`,
@@ -655,7 +566,6 @@ export function resolveOrganizationSectionAccess({
   isTargetOrganizationAdmin,
 }: ResolveOrganizationSectionAccessOptions): OrganizationSectionAccess {
   if (!isTargetOrganizationMember) return 'unavailable'
-  if (section === 'search-mcp' || section === 'recently-deleted') return 'view'
   if (section === 'members' || section === 'requests')
     return isTargetOrganizationAdmin ? 'manage' : 'view'
   return isTargetOrganizationAdmin ? 'manage' : 'unavailable'
@@ -701,15 +611,7 @@ export function isOrganizationSettingsSectionAvailable(
   section: OrganizationSettingsSection,
   features: OrganizationSettingsFeatures
 ): boolean {
-  if (
-    section === 'members' ||
-    section === 'search-mcp' ||
-    section === 'recently-deleted' ||
-    section === 'requests'
-  )
-    return true
-  /* Sim Search itself is enterprise on the hosted product; self-hosted gates it by flag, not by section. */
-  if (section === 'integrations') return !features.hosted || features.hasEnterprisePlan
+  if (section === 'members' || section === 'requests') return true
   /**
    * Access Control follows governance rather than the plan gate: its restrictions keep applying
    * through a failing payment, so hiding the page that edits them would leave an organization

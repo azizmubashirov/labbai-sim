@@ -23,7 +23,6 @@ import {
   useScrollEdges,
 } from '@sim/emcn'
 import {
-  Building,
   Database,
   Files,
   Integration,
@@ -49,7 +48,6 @@ import { buildFolderTree, getFolderPathNames } from '@/lib/folders/tree'
 import { DOCS_URL, SLACK_COMMUNITY_URL } from '@/lib/help-links'
 import { captureEvent } from '@/lib/posthog/client'
 import { LOGO_ACCEPT_ATTRIBUTE } from '@/lib/uploads/client/logo-file'
-import { getWorkspaceOrganizationHref } from '@/lib/workspaces/organization-navigation'
 import { useSidebarChrome } from '@/app/workspace/[workspaceId]/components/workspace-chrome'
 import { CONNECT_MODE } from '@/app/workspace/[workspaceId]/integrations/connect-route'
 import { useRegisterGlobalCommands } from '@/app/workspace/[workspaceId]/providers/global-commands-provider'
@@ -816,16 +814,6 @@ export const Sidebar = memo(function Sidebar() {
       href: getSettingsHref({ section: id }),
       onNavigate: () => handleOpenSettings(id),
     }))
-
-  const organizationHref = getWorkspaceOrganizationHref(hostContext)
-  if (organizationHref) {
-    profileNavigationLinks.push({
-      label: 'Organization',
-      icon: Building,
-      href: organizationHref,
-      onNavigate: () => router.push(organizationHref),
-    })
-  }
 
   const { data: fetchedChats = EMPTY_CHATS, isLoading: chatsLoading } = useMothershipChats(
     workspaceId,

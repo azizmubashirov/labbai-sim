@@ -48,10 +48,7 @@ vi.mock('@/lib/knowledge/application/search', () => ({
   afterKnowledgeSearch: mocks.afterSearch,
 }))
 
-import {
-  searchOrganizationKnowledge,
-  searchScopedKnowledge,
-} from '@/lib/knowledge/application/workspace-search'
+import { searchScopedKnowledge } from '@/lib/knowledge/application/workspace-search'
 
 const principal = { kind: 'session', userId: 'reader', sessionId: 'session' } as const
 const input = { organizationId: 'org', query: 'policy', topK: 20, surface: 'slack' } as const
@@ -71,10 +68,7 @@ beforeEach(() => {
   })
 })
 
-describe.each([
-  { name: 'organization Assistant', operation: searchOrganizationKnowledge },
-  { name: 'scoped Search', operation: searchScopedKnowledge },
-])('$name activity before an index exists', ({ operation }) => {
+describe.each([{ name: 'scoped Search', operation: searchScopedKnowledge }])('$name activity before an index exists', ({ operation }) => {
   it('records an authorized empty invocation for the acting member', async () => {
     queueTableRows(member, [{ role: 'member' }])
     expect(await operation.execute({ principal, input })).toEqual({

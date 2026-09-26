@@ -13,22 +13,6 @@ function chipContext(): ChatContext {
 }
 
 describe('MothershipHandoffStorage', () => {
-  it('keeps organization recovery separate from all workspace and other organization mounts', () => {
-    const handoff = {
-      message: 'Find the policy',
-      resumeUserMessageId: 'original-send',
-      requestMode: 'assistant' as const,
-    }
-    expect(MothershipHandoffStorage.store(handoff, { organizationId: 'org-1' })).toBe(true)
-    expect(MothershipHandoffStorage.consume('org-1')).toBeNull()
-    expect(MothershipHandoffStorage.consume({ organizationId: 'org-2' })).toBeNull()
-    expect(MothershipHandoffStorage.consume({ organizationId: 'org-1' })).toEqual({
-      ...handoff,
-      contexts: [],
-    })
-    expect(MothershipHandoffStorage.consume({ organizationId: 'org-1' })).toBeNull()
-  })
-
   beforeEach(() => {
     localStorage.clear()
   })
@@ -40,36 +24,13 @@ describe('MothershipHandoffStorage', () => {
     expect(MothershipHandoffStorage.consume(WS)).toEqual({ message: 'fix it', contexts })
   })
 
-  it('retains the selected document and filters when Search hands off to Assistant', () => {
-    const assistantSearch = {
-      source: 'slack',
-      modifiedAfter: '2026-09-01T00:00:00.000Z',
-      documentIds: ['selected-doc'],
-    }
-    MothershipHandoffStorage.store(
-      { message: 'Summarize this', requestMode: 'assistant', assistantSearch },
-      WS
-    )
-    expect(MothershipHandoffStorage.consume(WS)).toEqual({
-      message: 'Summarize this',
-      contexts: [],
-      requestMode: 'assistant',
-      assistantSearch,
-    })
-  })
-
-  it('discards a corrupted scope instead of silently widening the Assistant request', () => {
+  it('discards a legacy organization handoff instead of replaying it in a workspace', () => {
     localStorage.setItem(
       STORAGE_KEYS.MOTHERSHIP_HANDOFF,
-      JSON.stringify({
-        message: 'Summarize this',
-        workspaceId: WS,
-        timestamp: Date.now(),
-        requestMode: 'assistant',
-        assistantSearch: { documentIds: [] },
-      })
+      JSON.stringify({ message: 'Find the policy', organizationId: 'org-1', timestamp: Date.now() })
     )
     expect(MothershipHandoffStorage.consume(WS)).toBeNull()
+    expect(localStorage.getItem(STORAGE_KEYS.MOTHERSHIP_HANDOFF)).toBeNull()
   })
 
   it('is one-shot — a second consume returns null', () => {

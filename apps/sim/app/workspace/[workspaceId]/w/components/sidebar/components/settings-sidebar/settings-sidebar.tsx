@@ -13,12 +13,11 @@ import {
   scrollFadeClass,
   useScrollEdges,
 } from '@sim/emcn'
-import { ArrowUpRight, Building, ChevronLeft, Lock } from '@sim/emcn/icons'
+import { ChevronLeft, Lock } from '@sim/emcn/icons'
 import { useQueryClient } from '@tanstack/react-query'
 import { useParams, usePathname, useRouter } from 'next/navigation'
 import { useWorkspaceAccessRequestFeatures } from '@/components/access-requests/permission-access-boundary'
 import {
-  getOrganizationSettingsHref,
   getSettingsPermissionConfigKey,
   isSelfHostedOverrideEnabled,
   ORGANIZATION_PLANE_UNIFIED_SECTIONS,
@@ -110,10 +109,6 @@ export function SettingsSidebar({
   const accessRequestsEnabled = accessRequests.data?.enabled === true
 
   const isOrgAdminOrOwner = hostContext.viewer.isHostOrganizationAdmin
-  const organizationSettingsId =
-    hostContext.features?.organizationSearch && hostContext.viewer.isHostOrganizationMember
-      ? hostContext.hostOrganizationId
-      : null
   const subscriptionAccess = getSubscriptionAccessState(hostContext.ownerBilling)
   const hasEnterprisePlan = subscriptionAccess.hasUsableEnterpriseAccess
   const isEnterprisePlan = subscriptionAccess.isEnterprise
@@ -122,13 +117,6 @@ export function SettingsSidebar({
 
   const navigationItems = useMemo(() => {
     return allNavigationItems.filter((item) => {
-      if (
-        hostContext.hostOrganizationId &&
-        ORGANIZATION_PLANE_UNIFIED_SECTIONS.has(item.id) &&
-        (organizationSettingsId || !hostContext.viewer.isHostOrganizationMember)
-      ) {
-        return false
-      }
       if (item.id === 'connected-accounts') {
         return Boolean(
           hostContext.hostOrganizationId &&
@@ -221,7 +209,6 @@ export function SettingsSidebar({
     subscriptionAccess.hasUsableMaxAccess,
     hostContext,
     isOrgAdminOrOwner,
-    organizationSettingsId,
     permissionConfig,
     accessRequestsEnabled,
     isSuperUser,
@@ -301,10 +288,7 @@ export function SettingsSidebar({
                 .filter((item) => item.section === key)
                 .sort((left, right) => left.order - right.order),
             }))
-            .filter(
-              ({ key, items }) =>
-                items.length > 0 || (key === 'organization' && organizationSettingsId)
-            )
+            .filter(({ items }) => items.length > 0)
             .map(({ key, title, items: sectionItems }, index) => (
               <SidebarSection
                 key={key}
@@ -313,32 +297,6 @@ export function SettingsSidebar({
                 className={cn(index > 0 && SIDEBAR_SECTION_GAP_CLASS, 'shrink-0')}
               >
                 <div className={cn(SIDEBAR_ITEM_GAP_CLASS, 'flex flex-col px-2')}>
-                  {key === 'organization' && organizationSettingsId && (
-                    <SidebarTooltip label='Organization' enabled={showCollapsedTooltips}>
-                      <SettingsIntentLink
-                        href={getOrganizationSettingsHref(organizationSettingsId, 'members')}
-                        className={cn(chipVariants({ fullWidth: true }), SIDEBAR_RAIL_CHIP_CLASS)}
-                        onNavigate={(event) => {
-                          if (!useSettingsDirtyStore.getState().isDirty) return
-                          event.preventDefault()
-                          requestLeave(() =>
-                            router.push(
-                              getOrganizationSettingsHref(organizationSettingsId, 'members')
-                            )
-                          )
-                        }}
-                      >
-                        <Building className={chipContentIconClass} />
-                        <OverflowText
-                          label='Organization'
-                          className='sidebar-collapse-hide text-[var(--text-body)]'
-                        />
-                        <ArrowUpRight
-                          className={cn('sidebar-collapse-hide ml-auto', chipContentIconClass)}
-                        />
-                      </SettingsIntentLink>
-                    </SidebarTooltip>
-                  )}
                   {sectionItems.map((item) => {
                     const Icon = item.icon
                     const active = activeSection === item.id

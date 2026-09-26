@@ -24,9 +24,7 @@ import {
   readOAuthChatAttempt,
   setOAuthChatAttemptStatus,
 } from '@/lib/credentials/oauth-chat-attempt'
-import { organizationRoutes } from '@/lib/navigation/paths'
-import { searchSetupAccessParam } from '@/lib/sim-search/search-params'
-import { organizationSearchSetupPath } from '@/lib/sim-search/setup-navigation'
+import { APP_ENTRY_PATH } from '@/lib/navigation/paths'
 import { workspaceCredentialKeys } from '@/hooks/queries/utils/credential-keys'
 import { requireWorkspaceCredentialListResponse } from '@/hooks/queries/utils/fetch-workspace-credentials'
 import { SETTINGS_RETURN_URL_KEY } from '@/hooks/use-settings-navigation'
@@ -35,7 +33,6 @@ const OAUTH_CREDENTIAL_UPDATED_EVENT = 'oauth-credentials-updated'
 const CONTEXT_MAX_AGE_MS = 15 * 60 * 1000
 const serializeConnectorReturn = createSerializer({
   [ADD_CONNECTOR_SEARCH_PARAM]: parseAsString,
-  [searchSetupAccessParam.key]: searchSetupAccessParam.parser,
 })
 
 export interface OAuthResultMessage {
@@ -304,9 +301,7 @@ export function useOAuthReturnRouter() {
           buildKnowledgeBaseOAuthReturnUrl(
             resourceScopeFromOwner(ctx),
             ctx.knowledgeBaseId,
-            ctx.connectorType,
-            ctx.connectorId,
-            ctx.sourceAccess
+            ctx.connectorType
           )
         )
       }
@@ -339,9 +334,7 @@ export function useOAuthReturnRouter() {
         buildKnowledgeBaseOAuthReturnUrl(
           resourceScopeFromOwner(ctx),
           ctx.knowledgeBaseId,
-          ctx.connectorType,
-          ctx.connectorId,
-          ctx.sourceAccess
+          ctx.connectorType
         )
       )
       return
@@ -352,24 +345,15 @@ export function useOAuthReturnRouter() {
 export function buildKnowledgeBaseOAuthReturnUrl(
   owner: string | ResourceScope,
   knowledgeBaseId: string,
-  connectorType?: string,
-  connectorId?: string,
-  sourceAccess?: Extract<OAuthReturnContext, { origin: 'kb-connectors' }>['sourceAccess']
+  connectorType?: string
 ): string {
   const scope =
     typeof owner === 'string' ? { kind: 'workspace' as const, workspaceId: owner } : owner
-  if (scope.kind === 'organization' && connectorId) {
-    return `${organizationRoutes(scope.organizationId).searchSource(connectorId)}?view=settings`
-  }
-  const kbUrl =
-    scope.kind === 'organization'
-      ? organizationSearchSetupPath(scope.organizationId)
-      : `/workspace/${scope.workspaceId}/knowledge/${knowledgeBaseId}`
+  /** Organization-owned sources have no surface of their own to return to. */
+  if (scope.kind === 'organization') return APP_ENTRY_PATH
+  const kbUrl = `/workspace/${scope.workspaceId}/knowledge/${knowledgeBaseId}`
   return connectorType
-    ? serializeConnectorReturn(kbUrl, {
-        [ADD_CONNECTOR_SEARCH_PARAM]: connectorType,
-        [searchSetupAccessParam.key]: scope.kind === 'organization' ? sourceAccess : undefined,
-      })
+    ? serializeConnectorReturn(kbUrl, { [ADD_CONNECTOR_SEARCH_PARAM]: connectorType })
     : kbUrl
 }
 

@@ -6,7 +6,6 @@ import { requireOrganizationSearchAvailable } from '@/lib/knowledge/access/avail
 import { defineAuthorizedKnowledgeUseCase } from '@/lib/knowledge/application/authorized-knowledge-use-case'
 import {
   type KnowledgeResourceContext,
-  resolveKnowledgeOrganizationContext,
   resolveKnowledgeOwnerContext,
   resolveKnowledgeWorkspaceContext,
 } from '@/lib/knowledge/application/contexts'
@@ -31,11 +30,6 @@ export type SearchWorkspaceKnowledgeInput = Omit<
 > & {
   workspaceId: string
 }
-
-export type SearchOrganizationKnowledgeInput = Omit<
-  SearchWorkspaceKnowledgeInput,
-  'workspaceId'
-> & { organizationId: string }
 
 export type SearchScopedKnowledgeInput = Omit<
   SearchKnowledgeInput,
@@ -141,17 +135,6 @@ export const searchWorkspaceKnowledge = instrumentSearchUseCase(
     resolveContext: (input) => resolveKnowledgeWorkspaceContext(input),
     findIndex: (context) => findWorkspaceSearchIndex(context.workspaceId!),
     searchInput: (input, context) => ({ ...input, workspaceId: context.workspaceId }),
-  })
-)
-
-/** Organization Search and Assistant resolve the same index and provider ACLs. */
-export const searchOrganizationKnowledge = instrumentSearchUseCase(
-  'organization_application',
-  defineScopedSearchUseCase<SearchOrganizationKnowledgeInput>({
-    resolveContext: (input) => resolveKnowledgeOrganizationContext(input),
-    findIndex: (context) =>
-      findSearchIndex({ kind: 'organization', organizationId: context.organizationId! }),
-    searchInput: (input) => input,
   })
 )
 

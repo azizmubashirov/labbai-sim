@@ -4,7 +4,6 @@ import { act } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { MothershipChatOwner } from '@/hooks/queries/mothership-chats'
 import { mothershipChatKeys } from '@/hooks/queries/mothership-chats'
 
 const { connect, close, deployment } = vi.hoisted(() => ({
@@ -16,18 +15,18 @@ vi.mock('@/lib/events/rotating-event-source', () => ({ createRotatingEventSource
 
 import { useMothershipChatEvents } from '@/hooks/use-mothership-chat-events'
 
-function EventSubscriber({ owner }: { owner: MothershipChatOwner | undefined }) {
+function EventSubscriber({ owner }: { owner: string | undefined }) {
   useMothershipChatEvents(owner, deployment.chatEnabled)
   return null
 }
 
-function renderEvents(owner: MothershipChatOwner | undefined) {
+function renderEvents(owner: string | undefined) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const invalidate = vi.spyOn(client, 'invalidateQueries')
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
-  const rerender = ({ owner }: { owner: MothershipChatOwner | undefined }) => {
+  const rerender = ({ owner }: { owner: string | undefined }) => {
     act(() =>
       root.render(
         <QueryClientProvider client={client}>
@@ -60,12 +59,12 @@ describe('chat event subscription lifecycle', () => {
     vi.unstubAllGlobals()
   })
 
-  it('subscribes once for a stable organization, including new owner objects on rerender', () => {
-    const view = renderEvents({ organizationId: 'org-lifecycle-1' })
+  it('subscribes once for a stable workspace across rerenders', () => {
+    const view = renderEvents('ws-lifecycle-1')
     expect(connect).toHaveBeenCalledWith(
-      expect.objectContaining({ url: '/api/mothership/events?organizationId=org-lifecycle-1' })
+      expect.objectContaining({ url: '/api/mothership/events?workspaceId=ws-lifecycle-1' })
     )
-    view.rerender({ owner: { organizationId: 'org-lifecycle-1' } })
+    view.rerender({ owner: 'ws-lifecycle-1' })
     expect(connect).toHaveBeenCalledTimes(1)
     view.unmount()
     expect(close).toHaveBeenCalledTimes(1)
@@ -73,7 +72,7 @@ describe('chat event subscription lifecycle', () => {
   })
 
   it('reconciles missed changes on reconnect while leaving seamless rotation alone', () => {
-    const view = renderEvents({ organizationId: 'org-lifecycle-2' })
+    const view = renderEvents('ws-lifecycle-2')
     const connection = connect.mock.calls[0][0]
     act(() => connection.onOpen('initial'))
     expect(view.invalidate).not.toHaveBeenCalled()
@@ -81,23 +80,23 @@ describe('chat event subscription lifecycle', () => {
     expect(view.invalidate).not.toHaveBeenCalled()
     act(() => connection.onOpen('reconnect'))
     expect(view.invalidate).toHaveBeenCalledExactlyOnceWith({
-      queryKey: mothershipChatKeys.organizationLists('org-lifecycle-2'),
+      queryKey: mothershipChatKeys.workspaceLists('ws-lifecycle-2'),
     })
     view.unmount()
     view.client.clear()
   })
 
-  it('closes the old scope and reconciles when returning to a previously visited organization', () => {
-    const view = renderEvents({ organizationId: 'org-lifecycle-3' })
-    view.rerender({ owner: 'ws-lifecycle-3' })
+  it('closes the old scope and reconciles when returning to a previously visited workspace', () => {
+    const view = renderEvents('ws-lifecycle-3')
+    view.rerender({ owner: 'ws-lifecycle-4' })
     expect(close).toHaveBeenCalledTimes(1)
     expect(connect).toHaveBeenLastCalledWith(
-      expect.objectContaining({ url: '/api/mothership/events?workspaceId=ws-lifecycle-3' })
+      expect.objectContaining({ url: '/api/mothership/events?workspaceId=ws-lifecycle-4' })
     )
-    view.rerender({ owner: { organizationId: 'org-lifecycle-3' } })
+    view.rerender({ owner: 'ws-lifecycle-3' })
     act(() => connect.mock.calls[2][0].onOpen('initial'))
     expect(view.invalidate).toHaveBeenCalledExactlyOnceWith({
-      queryKey: mothershipChatKeys.organizationLists('org-lifecycle-3'),
+      queryKey: mothershipChatKeys.workspaceLists('ws-lifecycle-3'),
     })
     view.unmount()
     view.client.clear()
@@ -107,7 +106,7 @@ describe('chat event subscription lifecycle', () => {
     const view = renderEvents(undefined)
     expect(connect).not.toHaveBeenCalled()
     deployment.chatEnabled = false
-    view.rerender({ owner: { organizationId: 'org-disabled' } })
+    view.rerender({ owner: 'ws-disabled' })
     expect(connect).not.toHaveBeenCalled()
     view.unmount()
     view.client.clear()

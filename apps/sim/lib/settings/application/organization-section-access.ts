@@ -6,7 +6,6 @@ import {
 import { isOrganizationOnEnterprisePlan } from '@/lib/billing/core/subscription'
 import { getDeploymentShape } from '@/lib/core/config/deployment-shape'
 import { isScopedCredentialGroupsAvailable } from '@/lib/credential-groups/scoped-availability'
-import { isKnowledgeMemberAccessAvailable } from '@/lib/knowledge/access/availability'
 import { canOpenOrganizationSettingsSection } from '@/lib/organizations/settings-access'
 import { isOrganizationPermissionRegimeActive } from '@/lib/permission-groups/resolve.server'
 
@@ -27,8 +26,6 @@ export async function authorizeOrganizationSettingsSection({
   if (section === 'connected-accounts') {
     return isScopedCredentialGroupsAvailable({ kind: 'organization', organizationId })
   }
-  if (section === 'search-mcp' || section === 'integrations')
-    return isKnowledgeMemberAccessAvailable({ organizationId })
 
   const deployment = getDeploymentShape()
   const needsEnterprisePlan = deployment.hosted && section !== 'members' && section !== 'requests'

@@ -36,7 +36,7 @@ import {
 } from '@/lib/credentials/client-state'
 import { oauthCredentialKeys, useOAuthCredentials } from '@/hooks/queries/oauth/oauth-credentials'
 import { useCredentialRefreshTriggers } from '@/hooks/use-credential-refresh-triggers'
-import { useOAuthReturnForKBConnectors, useOAuthReturnRouter } from '@/hooks/use-oauth-return'
+import { useOAuthReturnForKBConnectors } from '@/hooks/use-oauth-return'
 
 const UPDATED_EVENT = 'oauth-credentials-updated'
 const EXISTING_CREDENTIAL = {
@@ -82,11 +82,6 @@ function Probe({
   return null
 }
 
-function RouterProbe() {
-  useOAuthReturnRouter()
-  return null
-}
-
 function SourceSettingsProbe({ connectorId }: { connectorId: string }) {
   const scope = { kind: 'organization' as const, organizationId: 'org-1' }
   const credentials = useOAuthCredentials('google-drive', { organizationId: scope.organizationId })
@@ -118,7 +113,11 @@ beforeEach(() => {
     NEW_CREDENTIAL,
   ])
   sessionStorage.clear()
-  window.history.replaceState(null, '', '/o/org-1/settings/integrations?addConnector=google_drive')
+  window.history.replaceState(
+    null,
+    '',
+    '/workspace/workspace-1/knowledge/kb-search?addConnector=google_drive'
+  )
   ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   container = document.createElement('div')
   document.body.appendChild(container)
@@ -131,104 +130,6 @@ afterEach(async () => {
   queryClient.clear()
   container.remove()
   sessionStorage.clear()
-})
-
-describe('organization source OAuth return routing', () => {
-  async function renderRouter() {
-    await act(async () => {
-      root.render(
-        <QueryClientProvider client={queryClient}>
-          <RouterProbe />
-        </QueryClientProvider>
-      )
-    })
-  }
-
-  it.each(['confluence', 'google_drive', 'github', 'jira', 'gmail', 'google_calendar', 'slack'])(
-    'preserves the %s member-source form on successful and canceled OAuth returns',
-    async (connectorType) => {
-      mocks.params = { organizationId: 'org-1' }
-      for (const canceled of [false, true]) {
-        const pending: OAuthReturnContext = {
-          ...context(),
-          workspaceId: undefined,
-          organizationId: 'org-1',
-          connectorType,
-          sourceAccess: 'members',
-        }
-        writeOAuthReturnContext(pending)
-        window.history.replaceState(
-          null,
-          '',
-          `/o/org-1/settings/integrations${canceled ? '?error=access_denied' : ''}`
-        )
-        await renderRouter()
-        expect(mocks.replace).toHaveBeenLastCalledWith(
-          `/o/org-1/settings/integrations?addConnector=${connectorType}&source-access=members`
-        )
-        expect(readOAuthReturnContext()).toEqual(canceled ? null : pending)
-        await act(async () => root.render(null))
-      }
-    }
-  )
-
-  it.each([false, true])(
-    'returns to source settings after OAuth with canceled=%s',
-    async (canceled) => {
-      mocks.params = { organizationId: 'org-1' }
-      const pending: OAuthReturnContext = {
-        ...context(),
-        workspaceId: undefined,
-        organizationId: 'org-1',
-        connectorId: 'connector-1',
-      }
-      writeOAuthReturnContext(pending)
-      window.history.replaceState(
-        null,
-        '',
-        `/o/org-1/settings/integrations${canceled ? '?error=access_denied' : ''}`
-      )
-
-      await renderRouter()
-
-      expect(mocks.replace).toHaveBeenCalledExactlyOnceWith(
-        '/o/org-1/settings/integrations/sources/connector-1?view=settings'
-      )
-      expect(readOAuthReturnContext()).toEqual(canceled ? null : pending)
-      expect(mocks.requestJson).not.toHaveBeenCalled()
-    }
-  )
-
-  it('keeps new-source OAuth returns on the existing setup form', async () => {
-    mocks.params = { organizationId: 'org-1' }
-    writeOAuthReturnContext({
-      ...context(),
-      workspaceId: undefined,
-      organizationId: 'org-1',
-    })
-
-    await renderRouter()
-
-    expect(mocks.replace).toHaveBeenCalledExactlyOnceWith(
-      '/o/org-1/settings/integrations?addConnector=google_drive'
-    )
-  })
-
-  it('does not route a pending source return through a different organization', async () => {
-    mocks.params = { organizationId: 'org-other' }
-    const pending: OAuthReturnContext = {
-      ...context(),
-      workspaceId: undefined,
-      organizationId: 'org-1',
-      connectorId: 'connector-1',
-    }
-    writeOAuthReturnContext(pending)
-
-    await renderRouter()
-
-    expect(mocks.replace).not.toHaveBeenCalled()
-    expect(readOAuthReturnContext()).toEqual(pending)
-  })
 })
 
 describe('existing source settings OAuth return', () => {

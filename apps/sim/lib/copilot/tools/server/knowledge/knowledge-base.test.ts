@@ -82,10 +82,6 @@ const {
   }
 })
 
-vi.mock('@/lib/copilot/chat/organization-chats', () => ({
-  authorizeOrganizationChatDelegation: { execute: vi.fn() },
-}))
-
 vi.mock('@/lib/copilot/generated/tool-catalog-v1', () => ({
   ManageKnowledgeBase: { id: 'manage_knowledge_base' },
 }))

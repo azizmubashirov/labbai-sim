@@ -1380,7 +1380,7 @@ describe('acceptInvitation', () => {
     })
     expect(result.success).toBe(true)
     if (result.success) {
-      expect(result.redirectPath).toBe('/o/org-1/home')
+      expect(result.redirectPath).toBe('/home')
       expect(result.acceptedWorkspaceIds).toEqual([])
     }
     expect(mockEnsureUserInOrganization).toHaveBeenCalledWith(

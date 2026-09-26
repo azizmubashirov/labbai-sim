@@ -468,8 +468,6 @@ function HomeContent({ chatId, userName, userId }: HomeProps) {
       prepareResourceViewForAgentTurn()
       sendMessage(detail.message, detail.fileAttachments, detail.contexts, {
         ...(detail.resumeUserMessageId ? { resumeUserMessageId: detail.resumeUserMessageId } : {}),
-        ...(detail.requestMode ? { requestMode: detail.requestMode } : {}),
-        ...(detail.assistantSearch ? { assistantSearch: detail.assistantSearch } : {}),
       })
     }
     window.addEventListener(MOTHERSHIP_SEND_MESSAGE_EVENT, handler)
@@ -504,8 +502,6 @@ function HomeContent({ chatId, userName, userId }: HomeProps) {
         ...(handoff.resumeUserMessageId
           ? { resumeUserMessageId: handoff.resumeUserMessageId }
           : {}),
-        ...(handoff.requestMode ? { requestMode: handoff.requestMode } : {}),
-        ...(handoff.assistantSearch ? { assistantSearch: handoff.assistantSearch } : {}),
       })
       return
     }

@@ -628,9 +628,6 @@ export function AddConnectorModal({
                     allowAdmin={allowAdmin}
                     allowWorkspace={!isSearchIndex}
                     disabled={isCreating}
-                    searchSetupSource={
-                      isSearchIndex && selectedType === 'slack' ? 'slack' : undefined
-                    }
                     slackSetupOnly={Boolean(lockedAccessMode) && slackSetupRequired}
                     onSetupNavigate={saveSetup}
                   />

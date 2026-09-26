@@ -4,15 +4,11 @@ import type { QueryClient } from '@tanstack/react-query'
 import { useQueryClient } from '@tanstack/react-query'
 import { getLiveAssistantMessageId } from '@/lib/copilot/chat/effective-transcript'
 import { createRotatingEventSource } from '@/lib/events/rotating-event-source'
-import {
-  type MothershipChatHistory,
-  type MothershipChatOwner,
-  mothershipChatKeys,
-} from '@/hooks/queries/mothership-chats'
+import { type MothershipChatHistory, mothershipChatKeys } from '@/hooks/queries/mothership-chats'
 
 const logger = createLogger('MothershipChatEvents')
 
-/** Owner scopes this process subscribed to, so returning to a scope reconciles missed events. */
+/** Workspaces this process subscribed to, so returning to one reconciles missed events. */
 const everSubscribed = new Set<string>()
 
 const CHAT_STATUS_TYPES = [
@@ -107,7 +103,7 @@ function parseChatStatusEventPayload(data: unknown): ChatStatusEventPayload | nu
 
 export function handleMothershipChatStatusEvent(
   queryClient: Pick<QueryClient, 'getQueryData' | 'invalidateQueries' | 'removeQueries'>,
-  owner: MothershipChatOwner,
+  workspaceId: string,
   data: unknown
 ): void {
   const payload = parseChatStatusEventPayload(data)
@@ -116,8 +112,8 @@ export function handleMothershipChatStatusEvent(
     return
   }
 
-  /** Delete and restore move chats between active and archived owner lists. */
-  queryClient.invalidateQueries({ queryKey: mothershipChatKeys.ownerLists(owner) })
+  /** Delete and restore move chats between active and archived workspace lists. */
+  queryClient.invalidateQueries({ queryKey: mothershipChatKeys.workspaceLists(workspaceId) })
   if (!payload.chatId) return
   if (payload.type === 'deleted') {
     queryClient.removeQueries({ queryKey: mothershipChatKeys.detail(payload.chatId) })
@@ -153,9 +149,9 @@ export function handleMothershipChatStatusEvent(
  */
 export function resyncMothershipChatCaches(
   queryClient: Pick<QueryClient, 'invalidateQueries'>,
-  owner: MothershipChatOwner
+  workspaceId: string
 ): void {
-  queryClient.invalidateQueries({ queryKey: mothershipChatKeys.ownerLists(owner) })
+  queryClient.invalidateQueries({ queryKey: mothershipChatKeys.workspaceLists(workspaceId) })
 }
 
 /**
@@ -166,37 +162,28 @@ export function resyncMothershipChatCaches(
  * without the guard every session would hold an open connection to an endpoint
  * that cannot serve it.
  */
-export function useMothershipChatEvents(
-  owner: MothershipChatOwner | undefined,
-  chatEnabled: boolean
-) {
+export function useMothershipChatEvents(workspaceId: string | undefined, chatEnabled: boolean) {
   const queryClient = useQueryClient()
-  const workspaceId = typeof owner === 'string' ? owner : undefined
-  const organizationId = typeof owner === 'object' ? owner.organizationId : undefined
 
   useEffect(() => {
-    if ((!workspaceId && !organizationId) || !chatEnabled) return
+    if (!workspaceId || !chatEnabled) return
 
-    const eventOwner = organizationId ? { organizationId } : workspaceId!
-    const ownerParam = organizationId
-      ? `organizationId=${encodeURIComponent(organizationId)}`
-      : `workspaceId=${encodeURIComponent(workspaceId!)}`
-    const isResubscribe = everSubscribed.has(ownerParam)
-    everSubscribed.add(ownerParam)
+    const isResubscribe = everSubscribed.has(workspaceId)
+    everSubscribed.add(workspaceId)
     const connection = createRotatingEventSource({
-      url: `/api/mothership/events?${ownerParam}`,
+      url: `/api/mothership/events?workspaceId=${encodeURIComponent(workspaceId)}`,
       events: {
         task_status: (event) => {
           handleMothershipChatStatusEvent(
             queryClient,
-            eventOwner,
+            workspaceId,
             event instanceof MessageEvent ? event.data : undefined
           )
         },
       },
       onOpen: (reason) => {
         if (reason === 'reconnect' || (reason === 'initial' && isResubscribe)) {
-          resyncMothershipChatCaches(queryClient, eventOwner)
+          resyncMothershipChatCaches(queryClient, workspaceId)
         }
       },
       onError: () => {
@@ -207,5 +194,5 @@ export function useMothershipChatEvents(
     return () => {
       connection.close()
     }
-  }, [workspaceId, organizationId, queryClient, chatEnabled])
+  }, [workspaceId, queryClient, chatEnabled])
 }

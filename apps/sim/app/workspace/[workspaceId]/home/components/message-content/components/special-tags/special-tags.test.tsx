@@ -40,13 +40,7 @@ vi.mock('@/lib/auth/auth-client', () => ({
   useSession: () => ({ data: { user: { id: 'person' } } }),
 }))
 vi.mock('@/app/workspace/[workspaceId]/home/components/chat-surface-context', () => ({
-  useChatSurface: () => ({
-    SearchConnectionComponent: ({ onConnected }: { onConnected?: () => void }) => (
-      <button type='button' onClick={onConnected}>
-        Test Search connection
-      </button>
-    ),
-  }),
+  useChatSurface: () => ({}),
 }))
 
 vi.mock('@/hooks/queries/credentials', () => ({
@@ -116,38 +110,6 @@ describe('CredentialDisplay link tag', () => {
     })
   })
 
-  it('keeps organization Search connection completion behind Submit', async () => {
-    mockParams.mockReturnValue({ organizationId: 'org' } as never)
-    const container = document.createElement('div')
-    const root = createRoot(container)
-    const onContinue = vi.fn()
-    act(() =>
-      root.render(
-        <SpecialTags
-          segment={{
-            type: 'credential',
-            data: [{ type: 'link', provider: 'google-email', connectorType: 'gmail' }],
-          }}
-          requestMode='assistant'
-          interactionId='org-card'
-          onOptionSelect={onContinue}
-        />
-      )
-    )
-    const connect = Array.from(container.querySelectorAll('button')).find(
-      (button) => button.textContent === 'Test Search connection'
-    )
-    act(() => connect?.click())
-    expect(onContinue).not.toHaveBeenCalled()
-    const submit = Array.from(container.querySelectorAll('button')).find(
-      (button) => button.textContent === 'Submit'
-    )
-    expect(submit).toBeDefined()
-    await act(async () => submit?.click())
-    expect(onContinue).toHaveBeenCalledOnce()
-    expect(onContinue.mock.calls[0][0]).toContain('connected')
-    act(() => root.unmount())
-  })
   it('does not render an anchor for a javascript: scheme value', () => {
     const { container, root } = renderCredentialLink({
       type: 'link',

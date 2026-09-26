@@ -41,13 +41,8 @@ vi.mock('@/lib/api/client/request', () => ({
 import {
   type ConnectorData,
   listKnowledgeConnectorDocumentsContract,
-  listSearchSourcesContract,
 } from '@/lib/api/contracts/knowledge'
-import {
-  type ConnectorDetailData,
-  type OrganizationSearchOverview,
-  readSearchIndexContract,
-} from '@/lib/api/contracts/knowledge/connectors'
+import type { ConnectorDetailData } from '@/lib/api/contracts/knowledge/connectors'
 import { MAX_KNOWLEDGE_CONNECTOR_DOCUMENT_PAGE_SIZE } from '@/lib/knowledge/constants'
 import {
   CONNECTOR_SYNC_POLL_INTERVAL_MS,
@@ -56,9 +51,6 @@ import {
   useConnectorDetail,
   useConnectorDocuments,
   useConnectorList,
-  useOrganizationSearchOverview,
-  useSearchIndex,
-  useSearchSources,
   useTriggerSync,
   useUpdateConnector,
 } from '@/hooks/queries/kb/connectors'
@@ -159,36 +151,6 @@ describe('isConnectorSyncingOrPending', () => {
       expect(isConnectorSyncingOrPending(makeConnector({ status }))).toBe(false)
     }
   )
-})
-
-describe('organization overview polling', () => {
-  it.each([
-    { isSyncing: true, hasPendingSync: false, polling: true },
-    { isSyncing: false, hasPendingSync: true, polling: true },
-    { isSyncing: false, hasPendingSync: false, polling: false },
-    { isSyncing: false, hasPendingSync: undefined, polling: false },
-  ])('polls unfinished work across worker handoffs: %j', ({ polling, ...state }) => {
-    useOrganizationSearchOverview('organization-1')
-    const { refetchInterval } = capturedQueryOptions<OrganizationSearchOverview>()
-    const interval = refetchInterval({
-      state: {
-        data: {
-          providers: [
-            {
-              connectorType: 'confluence',
-              approved: true,
-              sourceCount: 1,
-              status: 'active',
-              issue: null,
-              ...state,
-            },
-          ],
-        },
-      },
-    })
-    if (polling) expect(interval).toBeGreaterThan(0)
-    else expect(interval).toBe(false)
-  })
 })
 
 describe('useConnectorList polling', () => {
@@ -576,82 +538,5 @@ describe('connector document rolling compatibility', () => {
     expect(options.getNextPageParam(page, [page])).toBe(MAX_KNOWLEDGE_CONNECTOR_DOCUMENT_PAGE_SIZE)
     expect(options.getNextPageParam({ documents: [] }, [page, { documents: [] }])).toBeUndefined()
     expect(options.getNextPageParam({ ...page, hasMore: false }, [page])).toBeUndefined()
-  })
-})
-
-describe('useSearchSources', () => {
-  it('isolates organization sources and resolves their index without listing workspace knowledge bases', async () => {
-    const scope = { kind: 'organization' as const, organizationId: 'scope-1' }
-    const signal = new AbortController().signal
-    mocks.requestJson.mockResolvedValue({ data: { knowledgeBaseId: 'org-index' } })
-    useSearchIndex(scope)
-    const index = mocks.useQuery.mock.calls.at(-1)?.[0]
-    await expect(index.queryFn({ signal })).resolves.toEqual({ knowledgeBaseId: 'org-index' })
-    expect(mocks.requestJson).toHaveBeenCalledWith(readSearchIndexContract, {
-      query: { organizationId: 'scope-1' },
-      signal,
-    })
-    useSearchSources(scope)
-    const sources = mocks.useInfiniteQuery.mock.calls.at(-1)?.[0]
-    expect(sources.queryKey).not.toEqual(searchSourceKeys.list('scope-1'))
-    await sources.queryFn({ signal })
-    expect(mocks.requestJson).toHaveBeenLastCalledWith(listSearchSourcesContract, {
-      query: { organizationId: 'scope-1', search: '', mine: false },
-      signal,
-    })
-  })
-  it('uses a workspace-specific key and forwards request cancellation', async () => {
-    const signal = new AbortController().signal
-    mocks.requestJson.mockResolvedValueOnce({ data: { sources: [], nextCursor: null } })
-    useSearchSources('workspace-a')
-    const options = mocks.useInfiniteQuery.mock.calls.at(-1)?.[0]
-    expect(options.queryKey).toEqual(
-      searchSourceKeys.pages('workspace-a', { search: '', mine: false })
-    )
-    expect(options.enabled).toBe(true)
-    expect(options.staleTime).toBe(30_000)
-    expect(options.placeholderData).toBeUndefined()
-    await expect(options.queryFn({ signal })).resolves.toEqual({ sources: [], nextCursor: null })
-    expect(mocks.requestJson).toHaveBeenCalledWith(listSearchSourcesContract, {
-      query: { workspaceId: 'workspace-a', search: '', mine: false },
-      signal,
-    })
-  })
-
-  it('waits for a workspace and respects explicit disabling', () => {
-    useSearchSources()
-    expect(mocks.useInfiniteQuery.mock.calls.at(-1)?.[0].enabled).toBe(false)
-    useSearchSources('')
-    expect(mocks.useInfiniteQuery.mock.calls.at(-1)?.[0].enabled).toBe(false)
-    useSearchSources('workspace-a', { enabled: false })
-    expect(mocks.useInfiniteQuery.mock.calls.at(-1)?.[0].enabled).toBe(false)
-  })
-
-  it('polls while sources are syncing and stops after completion', () => {
-    useSearchSources('workspace-a')
-    const options = mocks.useInfiniteQuery.mock.calls.at(-1)?.[0]
-    expect(
-      options.refetchInterval({ state: { data: { pages: [{ sources: [{ isSyncing: true }] }] } } })
-    ).toBe(30_000)
-    expect(
-      options.refetchInterval({ state: { data: { pages: [{ sources: [{ isSyncing: false }] }] } } })
-    ).toBe(false)
-    expect(options.refetchInterval({ state: {} })).toBe(false)
-  })
-  it('binds source pages to normalized filters and forwards the next cursor', async () => {
-    const signal = new AbortController().signal
-    useSearchSources('workspace-a', { search: ' Engineering ', mine: true })
-    const options = mocks.useInfiniteQuery.mock.calls.at(-1)![0]
-    mocks.requestJson.mockResolvedValue({ data: { sources: [], nextCursor: 'next' } })
-    await options.queryFn({ signal, pageParam: 'cursor' })
-    expect(mocks.requestJson).toHaveBeenCalledWith(listSearchSourcesContract, {
-      query: { workspaceId: 'workspace-a', search: 'engineering', mine: true, cursor: 'cursor' },
-      signal,
-    })
-    expect(options.queryKey).toEqual(
-      searchSourceKeys.pages('workspace-a', { search: 'engineering', mine: true })
-    )
-    expect(options.getNextPageParam({ sources: [], nextCursor: 'next' })).toBe('next')
-    expect(options.getNextPageParam({ sources: [], nextCursor: null })).toBeNull()
   })
 })

@@ -835,7 +835,6 @@ interface MessageContentProps {
   blocks: ContentBlock[]
   fallbackContent: string
   messageId?: string
-  requestMode?: 'agent' | 'assistant'
   isStreaming: boolean
   /** Local Copilot status phrase for the in-flight turn (shimmer copy). */
   liveStatus?: string
@@ -868,7 +867,6 @@ function MessageContentInner({
   blocks,
   fallbackContent,
   messageId,
-  requestMode,
   isStreaming = false,
   liveStatus,
   isLast = false,
@@ -882,8 +880,8 @@ function MessageContentInner({
 }: MessageContentProps) {
   const { onWorkspaceResourceSelect } = useChatSurface()
   const cited = useMemo(
-    () => resolveMessageCitations(blocks, fallbackContent, requestMode === 'assistant'),
-    [blocks, fallbackContent, requestMode]
+    () => resolveMessageCitations(blocks, fallbackContent),
+    [blocks, fallbackContent]
   )
   const parsed = useMemo(
     () => (cited.blocks.length > 0 ? parseBlocks(cited.blocks) : []),
@@ -1005,7 +1003,6 @@ function MessageContentInner({
                   key={segment.id}
                   content={segment.content}
                   messageId={messageId}
-                  requestMode={requestMode}
                   isStreaming={shouldSmoothTextSegment({
                     isStreaming,
                     segmentIndex: i,

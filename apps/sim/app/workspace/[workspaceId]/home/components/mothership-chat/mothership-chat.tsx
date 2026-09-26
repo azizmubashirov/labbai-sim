@@ -1,6 +1,5 @@
 'use client'
 
-import type { ComponentType } from 'react'
 import {
   memo,
   type ReactNode,
@@ -34,7 +33,6 @@ import {
   parseLastCredentialTag,
   parseLastQuestionTag,
 } from '@/app/workspace/[workspaceId]/home/components/message-content/components/special-tags'
-import type { SearchIntegrationConnectionProps } from '@/app/workspace/[workspaceId]/home/components/message-content/components/special-tags/search-integration-connection'
 import {
   prepareCopyableMarkdown,
   toCopyableMarkdown,
@@ -64,7 +62,6 @@ import { MothershipChatSkeleton } from './components/mothership-chat-skeleton'
 import { shouldShowAssistantMessageActions } from './message-actions-visibility'
 
 interface MothershipChatProps {
-  SearchConnectionComponent?: ComponentType<SearchIntegrationConnectionProps>
   workspaceId?: string
   composer?: ReactNode
   messages: ChatMessage[]
@@ -207,7 +204,6 @@ interface AssistantMessageRowProps {
   isStreaming: boolean
   isLast: boolean
   precedingUserContent: string | undefined
-  requestMode?: ChatMessage['requestMode']
   /** Transcript-derived answers for this message's question card (renders the recap). */
   questionAnswers?: string[]
   /** Transcript-derived status payload for this message's credential card. */
@@ -225,7 +221,6 @@ const AssistantMessageRow = memo(function AssistantMessageRow({
   isStreaming,
   isLast,
   precedingUserContent,
-  requestMode,
   questionAnswers,
   credentialSubmission,
   credentialAbandoned,
@@ -264,7 +259,7 @@ const AssistantMessageRow = memo(function AssistantMessageRow({
   const endsWithCredential = trimmedContent.endsWith('</credential>')
   const trailingCredentials = endsWithCredential ? parseLastCredentialTag(trimmedContent) : null
   const showsCredentialCard = trailingCredentials
-    ? credentialTagHasVisibleCard(trailingCredentials, canEdit, message.requestMode ?? requestMode)
+    ? credentialTagHasVisibleCard(trailingCredentials, canEdit)
     : false
   const questionTag = endsWithQuestion
     ? trimmedContent.slice(trimmedContent.lastIndexOf('<question>'))
@@ -294,7 +289,6 @@ const AssistantMessageRow = memo(function AssistantMessageRow({
     <div className={cn(rowClassName, showsInteractionCard && 'pb-3')}>
       <MessageContent
         messageId={message.id}
-        requestMode={message.requestMode ?? requestMode}
         blocks={blocks}
         fallbackContent={message.content}
         isStreaming={isStreaming}
@@ -325,7 +319,6 @@ const AssistantMessageRow = memo(function AssistantMessageRow({
 })
 
 export function MothershipChat({
-  SearchConnectionComponent,
   workspaceId,
   composer,
   messages: messagesProp,
@@ -767,7 +760,6 @@ export function MothershipChat({
 
   return (
     <ChatSurfaceProvider
-      SearchConnectionComponent={SearchConnectionComponent}
       chatId={chatId}
       userId={userId}
       onContextAdd={onContextAdd}
@@ -823,7 +815,6 @@ export function MothershipChat({
                         isStreaming={isStreamActive && isLast}
                         isLast={isLast}
                         precedingUserContent={precedingUserByIndex[index]?.content}
-                        requestMode={precedingUserByIndex[index]?.requestMode}
                         questionAnswers={interactionPairing.answersByIndex[index]}
                         credentialSubmission={interactionPairing.credentialSubmissionByIndex[index]}
                         credentialAbandoned={interactionPairing.credentialAbandonedByIndex[index]}

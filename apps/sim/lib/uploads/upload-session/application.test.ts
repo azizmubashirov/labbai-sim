@@ -12,13 +12,7 @@ const mocks = vi.hoisted(() => ({
   getPrincipalSession: vi.fn(),
   reauthorizeWorkspacePurpose: vi.fn(),
   getWorkspaceFile: vi.fn(),
-  authorizeOrganizationAttachment: vi.fn(),
   authorizeOrganizationLogo: vi.fn(),
-}))
-
-vi.mock('@/lib/uploads/contexts/organization-assistant/application', () => ({
-  authorizeOrganizationAttachmentControl: mocks.authorizeOrganizationAttachment,
-  createOrganizationAssistantAttachment: vi.fn(),
 }))
 
 vi.mock('@/lib/uploads/contexts/organization-logo/application', () => ({
@@ -72,7 +66,6 @@ const actor = { id: 'user-1', name: 'Ada', email: 'ada@example.com' }
 describe('upload session application', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mocks.authorizeOrganizationAttachment.mockResolvedValue(undefined)
     mocks.authorizeOrganizationLogo.mockResolvedValue(undefined)
     const session = workspaceUploadSession()
     mocks.getOwnedSession.mockResolvedValue(session)
@@ -153,46 +146,18 @@ describe('upload session application', () => {
     )
   })
 
-  it.each(['complete', 'abort', 'parts'] as const)(
-    'rechecks organization membership before the %s control leg',
-    async (control) => {
-      const session = {
-        ...workspaceUploadSession(),
-        purpose: 'mothership_attachment' as const,
-        workspaceId: null,
-      }
-      mocks.getOwnedSession.mockResolvedValue(session)
-      const request = new NextRequest('http://localhost/api/files/uploads/upload-1/complete', {
-        headers: { host: 'localhost' },
-      })
-      const input = { uploadId: 'upload-1', uploadToken: 'upload-token', partNumbers: [1] }
-      if (control === 'complete') await completeInternalUploadSession(principal, input, request)
-      else if (control === 'abort') await abortInternalUploadSession(principal, input)
-      else await issueInternalUploadPartUrls(principal, input, request)
-      expect(mocks.assertAuthBinding).toHaveBeenCalledWith(session, principal)
-      expect(mocks.authorizeOrganizationAttachment).toHaveBeenCalledWith(principal, session)
-      expect(mocks.reauthorizeWorkspacePurpose).not.toHaveBeenCalled()
-    }
-  )
-
-  it('does not finalize when organization access is revoked after the session is claimed', async () => {
+  it('binds a retired organization attachment session to its auth check', async () => {
     const session = {
       ...workspaceUploadSession(),
       purpose: 'mothership_attachment' as const,
       workspaceId: null,
     }
     mocks.getOwnedSession.mockResolvedValue(session)
-    mocks.authorizeOrganizationAttachment
-      .mockResolvedValueOnce(undefined)
-      .mockRejectedValueOnce(new Error('Organization not found'))
-    await expect(
-      completeInternalUploadSession(
-        principal,
-        { uploadId: 'upload-1', uploadToken: 'upload-token' },
-        new NextRequest('http://localhost/api/files/uploads/upload-1/complete')
-      )
-    ).rejects.toThrow('Organization not found')
-    expect(mocks.finalizePurpose).not.toHaveBeenCalled()
+    await abortInternalUploadSession(principal, {
+      uploadId: 'upload-1',
+      uploadToken: 'upload-token',
+    })
+    expect(mocks.assertAuthBinding).toHaveBeenCalledWith(session, principal)
   })
 
   /**

@@ -7,12 +7,6 @@ import { describe, expect, it } from 'vitest'
 import { knowledgeOperations } from '@/lib/knowledge/application/operations'
 
 describe('knowledge operation registry', () => {
-  it('limits Slack member delegation to the existing search operation', () => {
-    const allowed = Object.values(knowledgeOperations).filter((operation) =>
-      operation.organizationOperation.delegatedServices?.includes('slack-search')
-    )
-    expect(allowed).toEqual([knowledgeOperations.search])
-  })
   it('defines unique stable semantic operation IDs', () => {
     const ids = Object.values(knowledgeOperations).map((operation) => operation.id)
     expect(ids).toEqual([
@@ -79,22 +73,11 @@ describe('knowledge operation registry', () => {
       'knowledge.connectors.create',
       'knowledge.connectors.update',
       'knowledge.connectors.access.update',
-      'knowledge.search.personal-integrations.connect',
-      'knowledge.search.personal-integrations.list',
-      'knowledge.search.sources.list',
-      'knowledge.search.sources.overview',
-      'knowledge.search.sources.progress',
-      'knowledge.search.integrations.list',
-      'knowledge.search.integrations.overview',
-      'knowledge.search.integrations.approve',
       'knowledge.connectors.members.list',
       'knowledge.connectors.members.enroll',
-      'knowledge.simSearch.connect',
       'knowledge.search.personalSetup.accounts.list',
       'knowledge.search.personalSetup',
       'knowledge.search.sources.connectApproved',
-      'knowledge.search.index.read',
-      'knowledge.search.sources.prepare',
       'knowledge.connectors.delete',
       'knowledge.connectors.sync',
       'knowledge.connectors.documents.list',
@@ -136,7 +119,6 @@ describe('knowledge operation registry', () => {
       knowledgeOperations.update,
       knowledgeOperations.delete,
       knowledgeOperations.uploadDocument,
-      knowledgeOperations.prepareSearchSource,
       knowledgeOperations.updateConnectorAccess,
     ]) {
       expect(operation.organizationOperation.minimumRole).toBe('admin')
@@ -150,9 +132,7 @@ describe('knowledge operation registry', () => {
     }
     for (const operation of [
       knowledgeOperations.search,
-      knowledgeOperations.readSearchIndex,
       knowledgeOperations.enrollConnectorMember,
-      knowledgeOperations.simSearchConnect,
       knowledgeOperations.listPersonalSourceSetupAccounts,
       knowledgeOperations.personalSourceSetup,
     ]) {

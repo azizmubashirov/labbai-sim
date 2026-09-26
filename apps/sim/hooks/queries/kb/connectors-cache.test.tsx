@@ -23,13 +23,10 @@ import {
   connectorKeys,
   useConnectorDetail,
   useConnectorList,
-  useConnectSimSearchConnector,
   useCreateConnector,
   useDeleteConnector,
   useExcludeConnectorDocument,
-  usePrepareSearchSource,
   useRestoreConnectorDocument,
-  useStartConnectorMemberEnrollment,
   useTriggerSync,
   useUpdateConnector,
   useUpdateConnectorAccess,
@@ -311,37 +308,6 @@ describe('connector account cache reconciliation', () => {
     expectInvalidated(queryClient, SEARCH_KEY, true)
     expectUnrelatedCacheUnchanged(queryClient)
   })
-
-  it('invalidates the Accounts detail as well as its summary after connecting a Search source', async () => {
-    const queryClient = createQueryClient()
-    const mutation = renderMutation(queryClient, useConnectSimSearchConnector)
-
-    await act(async () => {
-      await mutation().mutateAsync({ workspaceId: WORKSPACE_ID, connectorType: 'google_drive' })
-    })
-
-    expectInvalidated(queryClient, ACCOUNT_SUMMARY_KEY, true)
-    expectInvalidated(queryClient, ACCOUNT_DETAIL_KEY, true)
-    expectUnrelatedCacheUnchanged(queryClient)
-  })
-
-  it('refreshes People after starting enrollment without invalidating account configuration', async () => {
-    const queryClient = createQueryClient()
-    const mutation = renderMutation(queryClient, useStartConnectorMemberEnrollment)
-    mocks.requestJson.mockResolvedValueOnce({ data: { url: 'https://example.com/enroll' } })
-
-    await act(async () => {
-      await mutation().mutateAsync({
-        knowledgeBaseId: KNOWLEDGE_BASE_ID,
-        connectorId: CONNECTOR_ID,
-      })
-    })
-
-    expectInvalidated(queryClient, ACCOUNT_DETAIL_KEY, true)
-    expectInvalidated(queryClient, ACCOUNT_SUMMARY_KEY, false)
-    expectInvalidated(queryClient, SEARCH_KEY, false)
-    expectUnrelatedCacheUnchanged(queryClient)
-  })
 })
 
 describe('connector Search result cache reconciliation', () => {
@@ -438,18 +404,6 @@ describe('Search source list reconciliation', () => {
         updates: { status: 'paused' },
       })
     })
-    expectUnrelatedCacheUnchanged(queryClient)
-  })
-
-  it('refreshes prepared-source summaries in the affected workspace only', async () => {
-    const queryClient = createQueryClient()
-    const otherWorkspaceKey = searchSourceKeys.list('other-workspace')
-    queryClient.setQueryData(otherWorkspaceKey, [])
-    const mutation = renderMutation(queryClient, usePrepareSearchSource)
-    await act(async () => {
-      await mutation().mutateAsync({ workspaceId: WORKSPACE_ID, connectorType: 'google_drive' })
-    })
-    expectInvalidated(queryClient, otherWorkspaceKey, false)
     expectUnrelatedCacheUnchanged(queryClient)
   })
 })

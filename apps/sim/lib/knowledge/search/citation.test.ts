@@ -44,16 +44,6 @@ describe('knowledge citations', () => {
     )
   })
 
-  it('links organization documents under their own organization', () => {
-    expect(
-      createKnowledgeDocumentCitation({
-        ...input,
-        scope: { kind: 'organization', organizationId: 'org/a' },
-        sourceUrl: null,
-      }).citationUrl
-    ).toBe('https://www.sim.ai/o/org%2Fa/knowledge/kb%2Fb/doc%2Fc')
-  })
-
   it.each(['file:///tmp/app', 'javascript:alert(1)', 'https://secret@sim.ai'])(
     'rejects unsafe application URL %s',
     (baseUrl) => {

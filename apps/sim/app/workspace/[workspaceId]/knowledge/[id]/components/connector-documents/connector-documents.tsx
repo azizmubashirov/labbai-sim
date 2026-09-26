@@ -3,7 +3,6 @@
 import { Chip, ChipInput, ChipLink, Skeleton } from '@sim/emcn'
 import { RefreshCw, Search, SquareArrowUpRight } from '@sim/emcn/icons'
 import type { ConnectorDocumentFilter } from '@/lib/api/contracts/knowledge/connectors'
-import type { ResourceScope } from '@/lib/core/resource-scope'
 import { getDocumentIndexingStatus } from '@/lib/knowledge/documents/types'
 import { ConnectorDocumentStatusFilter } from '@/app/workspace/[workspaceId]/knowledge/[id]/components/connector-documents/connector-document-status-filter'
 import {
@@ -27,9 +26,7 @@ interface ConnectorDocumentsProps {
   search?: string
   searchControl?: { value: string; onChange: (value: string) => void }
   showToolbar?: boolean
-  progressScope?: ResourceScope
   isSearchIndex?: boolean
-  syncing?: boolean
   filter: ConnectorDocumentFilter
   onFilterChange: (filter: ConnectorDocumentFilter) => void
 }
@@ -41,17 +38,10 @@ export function ConnectorDocuments({
   search,
   searchControl,
   showToolbar = true,
-  progressScope,
   isSearchIndex = false,
-  syncing,
   onFilterChange,
 }: ConnectorDocumentsProps) {
-  const query = useConnectorDocuments(knowledgeBaseId, connectorId, {
-    filter,
-    search,
-    progressScope,
-    syncing,
-  })
+  const query = useConnectorDocuments(knowledgeBaseId, connectorId, { filter, search })
   const { data, hasNextPage, isFetchingNextPage, fetchNextPage } = query
   const isLoading = query.isLoading || query.isPlaceholderData
   const excludeMutation = useExcludeConnectorDocument()

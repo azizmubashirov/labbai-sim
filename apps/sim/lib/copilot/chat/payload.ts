@@ -4,12 +4,7 @@ import { toError } from '@sim/utils/errors'
 import { LRUCache } from 'lru-cache'
 import { getHighestPrioritySubscription } from '@/lib/billing/core/subscription'
 import { isPaid } from '@/lib/billing/plan-helpers'
-import {
-  isAssistantIntegrationParameter,
-  isAssistantIntegrationTool,
-} from '@/lib/copilot/assistant/tool-policy'
 import { getBlockVisibilityForCopilot, visibilitySignature } from '@/lib/copilot/block-visibility'
-import type { AssistantImageContent } from '@/lib/copilot/chat/assistant-images'
 import type { VfsSnapshotV1 } from '@/lib/copilot/generated/vfs-snapshot-v1'
 import {
   type IntegrationGateConfig,
@@ -23,11 +18,9 @@ import { encodeVfsSegment } from '@/lib/copilot/vfs/path-utils'
 import type { BlockVisibilityState } from '@/lib/core/config/block-visibility'
 import { isDocSandboxEnabled, isHosted } from '@/lib/core/config/env-flags'
 import { isOAuthServiceDeploymentAvailable } from '@/lib/integrations/availability.server'
-import type { WorkspaceSearchFilters } from '@/lib/knowledge/search/filters'
 import { trackChatUpload } from '@/lib/uploads/contexts/workspace/workspace-file-manager'
 import { buildArchiveExtractGuidance, isArchiveFileName } from '@/lib/uploads/utils/file-utils'
 import { deriveHostedApiKeySupport } from '@/tools/hosted-api-key'
-import { getToolMetadata } from '@/tools/metadata'
 
 const logger = createLogger('CopilotChatPayload')
 const INTEGRATION_TOOL_SCHEMA_CACHE_TTL_MS = 5_000
@@ -39,7 +32,6 @@ interface BuildPayloadParams {
   workflowId?: string
   workflowName?: string
   workspaceId?: string
-  organizationId?: string
   userId: string
   userMessageId: string
   mode: string
@@ -52,12 +44,10 @@ interface BuildPayloadParams {
    */
   mcpServerIds?: string[]
   fileAttachments?: Array<{ id: string; key: string; size: number; [key: string]: unknown }>
-  assistantImages?: AssistantImageContent[]
   commands?: string[]
   chatId?: string
   prefetch?: boolean
   implicitFeedback?: string
-  assistantSearch?: WorkspaceSearchFilters
   workspaceContext?: string
   vfs?: VfsSnapshotV1
   userPermission?: string
@@ -94,7 +84,6 @@ export interface ToolSchema {
 
 interface BuildIntegrationToolSchemasOptions {
   schemaSurface?: 'default' | 'copilot'
-  personalAccountsOnly?: boolean
 }
 
 interface IntegrationToolSchemaBuildContext {
@@ -151,7 +140,6 @@ export async function buildIntegrationToolSchemas(
   workspaceId?: string
 ): Promise<ToolSchema[]> {
   const schemaSurface = options.schemaSurface ?? 'copilot'
-  const personalAccountsOnly = options.personalAccountsOnly ?? false
   const vis = await getBlockVisibilityForCopilot(userId, workspaceId)
   // Resolved before the key, not inside the cached build, so the entry is keyed
   // to the policy it was produced under. The read this adds is cheap next to
@@ -166,12 +154,12 @@ export async function buildIntegrationToolSchemas(
   const cacheKey = getIntegrationToolSchemaCacheKey(
     userId,
     workspaceId,
-    personalAccountsOnly ? `${schemaSurface}:personal` : schemaSurface,
+    schemaSurface,
     visibilitySignature(vis),
     integrationGateSignature(permissionConfig)
   )
   const schemas = await integrationToolSchemaCache.fetch(cacheKey, {
-    context: { userId, options: { schemaSurface, personalAccountsOnly }, vis, permissionConfig },
+    context: { userId, options: { schemaSurface }, vis, permissionConfig },
   })
   if (!schemas) throw new Error('Integration tool catalog is unavailable')
   return structuredClone(schemas)
@@ -190,8 +178,6 @@ async function buildIntegrationToolSchemasUncached({
 
   const { tools: exposedTools } = projectIntegrationToolsForViewer(vis, permissionConfig)
   for (const { toolId, config: toolConfig, service, operation } of exposedTools) {
-    const metadata = getToolMetadata(toolId)
-    if (options.personalAccountsOnly && !isAssistantIntegrationTool(metadata)) continue
     const userSchema = createUserToolSchema(toolConfig, {
       surface: options.schemaSurface,
       // On hosted deployments the executor injects hosted keys server-side,
@@ -199,23 +185,6 @@ async function buildIntegrationToolSchemasUncached({
       // model never sees the key either way).
       hostedKeySupport: isHosted,
     })
-    if (options.personalAccountsOnly && metadata) {
-      for (const name of Object.keys(userSchema.properties ?? {})) {
-        if (!isAssistantIntegrationParameter(metadata, name)) {
-          delete userSchema.properties?.[name]
-          userSchema.required = userSchema.required?.filter((key: string) => key !== name)
-        }
-      }
-      if (metadata.personalToken) {
-        userSchema.properties ??= {}
-        userSchema.properties.credentialId = {
-          type: 'string',
-          description:
-            'ID of your connected personal account. Its token and GitLab host are supplied securely.',
-        }
-        userSchema.required = [...new Set([...(userSchema.required ?? []), 'credentialId'])]
-      }
-    }
     const catalogEntry = getToolEntry(toolId)
     integrationTools.push({
       name: toolId,
@@ -278,7 +247,6 @@ export async function buildCopilotRequestPayload(
 
   const effectiveMode = mode === 'agent' ? 'build' : mode
   const transportMode = effectiveMode === 'build' ? 'agent' : effectiveMode
-  const isAssistant = effectiveMode === 'assistant'
 
   // Track uploaded files in the DB and build context tags instead of base64 inlining.
   // Tracking writes `workspace_files` rows, so it needs the same write grant the
@@ -289,13 +257,7 @@ export async function buildCopilotRequestPayload(
   // comparing — an unrecognized value must fail the gate, not rank below it.
   const canWriteWorkspaceFiles =
     isPermissionType(params.userPermission) && permissionSatisfies(params.userPermission, 'write')
-  if (
-    !isAssistant &&
-    chatId &&
-    params.workspaceId &&
-    fileAttachments &&
-    fileAttachments.length > 0
-  ) {
+  if (chatId && params.workspaceId && fileAttachments && fileAttachments.length > 0) {
     if (!canWriteWorkspaceFiles) {
       logger.warn('Dropping chat file attachments without workspace write access', {
         chatId,
@@ -370,20 +332,20 @@ export async function buildCopilotRequestPayload(
     }
   }
 
-  const allContexts = isAssistant ? [] : [...(contexts ?? []), ...uploadContexts]
+  const allContexts = [...(contexts ?? []), ...uploadContexts]
 
   let integrationTools: ToolSchema[] = []
   let mothershipTools: ToolSchema[] = []
 
-  if (!params.organizationId && (effectiveMode === 'build' || isAssistant)) {
+  if (effectiveMode === 'build') {
     integrationTools = await buildIntegrationToolSchemas(
       userId,
-      { schemaSurface: 'copilot', personalAccountsOnly: isAssistant },
+      { schemaSurface: 'copilot' },
       params.workspaceId
     )
   }
 
-  if (!isAssistant && params.workspaceId && params.mcpServerIds?.length) {
+  if (params.workspaceId && params.mcpServerIds?.length) {
     mothershipTools = await buildTaggedMcpToolSchemas(
       userId,
       params.workspaceId,
@@ -393,18 +355,13 @@ export async function buildCopilotRequestPayload(
 
   return {
     message,
-    ...(!isAssistant && workflowId ? { workflowId } : {}),
-    ...(!isAssistant && params.workflowName ? { workflowName: params.workflowName } : {}),
+    ...(workflowId ? { workflowId } : {}),
+    ...(params.workflowName ? { workflowName: params.workflowName } : {}),
     ...(params.workspaceId ? { workspaceId: params.workspaceId } : {}),
-    ...(params.organizationId ? { organizationId: params.organizationId } : {}),
     userId,
     ...(selectedModel ? { model: selectedModel } : {}),
     ...(provider ? { provider } : {}),
     mode: transportMode,
-    ...(isAssistant && params.assistantSearch ? { assistantSearch: params.assistantSearch } : {}),
-    ...(isAssistant && params.organizationId && params.assistantImages?.length
-      ? { fileAttachments: params.assistantImages }
-      : {}),
     messageId: userMessageId,
     ...(allContexts.length > 0 ? { context: allContexts } : {}),
     ...(chatId ? { chatId } : {}),
@@ -412,11 +369,11 @@ export async function buildCopilotRequestPayload(
     ...(implicitFeedback ? { implicitFeedback } : {}),
     ...(integrationTools.length > 0 ? { integrationTools } : {}),
     ...(mothershipTools.length > 0 ? { mothershipTools } : {}),
-    ...(!isAssistant && commands && commands.length > 0 ? { commands } : {}),
+    ...(commands && commands.length > 0 ? { commands } : {}),
     ...(params.workspaceContext ? { workspaceContext: params.workspaceContext } : {}),
-    ...(!isAssistant && params.vfs ? { vfs: params.vfs } : {}),
+    ...(params.vfs ? { vfs: params.vfs } : {}),
     ...(params.userPermission ? { userPermission: params.userPermission } : {}),
-    ...(!isAssistant && params.entitlements?.length ? { entitlements: params.entitlements } : {}),
+    ...(params.entitlements?.length ? { entitlements: params.entitlements } : {}),
     ...(params.userTimezone ? { userTimezone: params.userTimezone } : {}),
     ...(params.userMetadata &&
     (params.userMetadata.name || params.userMetadata.email || params.userMetadata.timezone)

@@ -42,7 +42,6 @@ import {
   restoreKnowledgeBaseContract,
   type SaveDocumentTagDefinitionsResult,
   saveDocumentTagDefinitionsContract,
-  searchWorkspaceKnowledgeContract,
   type TagDefinitionData,
   type TagUsageData,
   type UpdateKnowledgeBaseBody,
@@ -51,19 +50,8 @@ import {
   updateKnowledgeChunkContract,
   updateKnowledgeDocumentContract,
   updateKnowledgeDocumentTagsContract,
-  WORKSPACE_KNOWLEDGE_SEARCH_LIMITS,
-  type WorkspaceKnowledgeSearchBody,
-  type WorkspaceKnowledgeSearchData,
-  type WorkspaceKnowledgeSearchLimit,
 } from '@/lib/api/contracts/knowledge'
-import type { WorkspaceSearchFilters } from '@/lib/api/contracts/knowledge/search'
-import { useSession } from '@/lib/auth/auth-client'
 import type { ChunkingStrategy, StrategyOptions } from '@/lib/chunkers/types'
-import {
-  type ResourceScope,
-  resourceScopeFields,
-  resourceScopeKey,
-} from '@/lib/core/resource-scope'
 import type { DocumentSortField, SortOrder } from '@/lib/knowledge/documents/types'
 import { connectorKeys } from '@/hooks/queries/kb/connectors'
 import { folderKeys } from '@/hooks/queries/utils/folder-keys'
@@ -90,7 +78,6 @@ export const KNOWLEDGE_DOCUMENT_DETAIL_STALE_TIME = 60 * 1000
 export const KNOWLEDGE_DOCUMENT_LIST_STALE_TIME = 60 * 1000
 export const KNOWLEDGE_CHUNK_LIST_STALE_TIME = 60 * 1000
 export const KNOWLEDGE_CHUNK_SEARCH_STALE_TIME = 60 * 1000
-export const WORKSPACE_KNOWLEDGE_SEARCH_STALE_TIME = 60 * 1000
 export const KNOWLEDGE_TAG_DEFINITION_LIST_STALE_TIME = 60 * 1000
 export const KNOWLEDGE_TAG_USAGE_STALE_TIME = 60 * 1000
 export const KNOWLEDGE_DOCUMENT_TAG_DEFINITION_LIST_STALE_TIME = 60 * 1000
@@ -1194,61 +1181,5 @@ export function useBulkDeleteKnowledgeBases(workspaceId: string) {
         queryClient.removeQueries({ queryKey: knowledgeKeys.detail(knowledgeBaseId) })
       }
     },
-  })
-}
-
-async function searchWorkspaceKnowledge(
-  body: WorkspaceKnowledgeSearchBody,
-  signal?: AbortSignal
-): Promise<WorkspaceKnowledgeSearchData> {
-  const data = await requestJson(searchWorkspaceKnowledgeContract, { body, signal })
-  return data.data
-}
-
-/** Searches the canonical index under the signed-in person's ACLs. */
-export function useWorkspaceKnowledgeSearch(
-  owner: string | ResourceScope | undefined,
-  query: string,
-  filters?: WorkspaceSearchFilters,
-  limit: WorkspaceKnowledgeSearchLimit = WORKSPACE_KNOWLEDGE_SEARCH_LIMITS.initial
-) {
-  const { data: session } = useSession()
-  const queryClient = useQueryClient()
-  const userId = session?.user?.id
-  const trimmed = query.trim()
-  const scope =
-    typeof owner === 'string'
-      ? owner
-        ? { kind: 'workspace' as const, workspaceId: owner }
-        : undefined
-      : owner
-  const scopeKey =
-    scope?.kind === 'workspace' ? scope.workspaceId : scope ? resourceScopeKey(scope) : undefined
-  return useQuery({
-    /** The limit is the key's last part, so asking for more never evicts the first paint. */
-    queryKey: [...knowledgeKeys.search(scopeKey, trimmed, filters, userId), limit],
-    queryFn: ({ signal }) =>
-      searchWorkspaceKnowledge(
-        {
-          ...(scope ? resourceScopeFields(scope) : {}),
-          query: trimmed,
-          filters,
-          topK: limit,
-        },
-        signal
-      ),
-    enabled: Boolean(scope && userId) && trimmed.length > 0,
-    staleTime: WORKSPACE_KNOWLEDGE_SEARCH_STALE_TIME,
-    retry: false,
-    placeholderData: (previous, previousQuery) =>
-      userId &&
-      previousQuery?.state.status === 'success' &&
-      !previousQuery.state.isInvalidated &&
-      knowledgeKeys
-        .searchQuery(scopeKey, trimmed, userId)
-        .every((part, index) => previousQuery.queryKey[index] === part) &&
-      queryClient.getQueryData(previousQuery.queryKey) === previous
-        ? previous
-        : undefined,
   })
 }

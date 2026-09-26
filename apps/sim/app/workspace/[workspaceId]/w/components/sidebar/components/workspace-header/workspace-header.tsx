@@ -24,18 +24,15 @@ import {
   toast,
   useScrollEdges,
 } from '@sim/emcn'
-import { ArrowLeft, MoreHorizontal, PanelLeft, Pin, Plus, Search, Send } from '@sim/emcn/icons'
+import { MoreHorizontal, PanelLeft, Pin, Plus, Search, Send } from '@sim/emcn/icons'
 import { createLogger } from '@sim/logger'
 import { getErrorMessage } from '@sim/utils/errors'
 import { useQueryClient } from '@tanstack/react-query'
 import { IdentityTile } from '@/components/identity-tile/identity-tile'
-import { SettingsGuardedLink } from '@/components/settings/settings-guarded-link'
 import { WorkspaceContextMenu } from '@/components/workspaces/workspace-context-menu'
 import { WORKSPACE_SEARCH_THRESHOLD } from '@/lib/workspaces/constants'
 import { getWorkspaceInitial } from '@/lib/workspaces/initials'
-import { getWorkspaceOrganizationHref } from '@/lib/workspaces/organization-navigation'
 import { InviteModal } from '@/app/workspace/[workspaceId]/components/invite-modal'
-import { useWorkspaceHostContext } from '@/app/workspace/[workspaceId]/providers/workspace-host-provider'
 import { useWorkspacePermissionsContext } from '@/app/workspace/[workspaceId]/providers/workspace-permissions-provider'
 import { SidebarRenameRow } from '@/app/workspace/[workspaceId]/w/components/sidebar/components/sidebar-rename-row'
 import { DeleteModal } from '@/app/workspace/[workspaceId]/w/components/sidebar/components/workflow-list/components/delete-modal/delete-modal'
@@ -269,8 +266,6 @@ function WorkspaceHeaderImpl({
   }, [isWorkspaceMenuOpen])
 
   const queryClient = useQueryClient()
-  const hostContext = useWorkspaceHostContext()
-  const organizationHref = getWorkspaceOrganizationHref(hostContext)
 
   const activeWorkspaceFull = workspaces.find((w) => w.id === workspaceId) || null
   const isWorkspaceReady = !isWorkspacesLoading && activeWorkspaceFull !== null
@@ -526,17 +521,6 @@ function WorkspaceHeaderImpl({
                screen with nothing able to scroll to them. */
             className='flex max-h-[var(--radix-dropdown-menu-content-available-height,400px)] w-64 max-w-[calc(100vw-24px)] flex-col overflow-y-auto'
           >
-            {organizationHref && (
-              <>
-                <DropdownMenuItem size='lg' className='shrink-0' asChild>
-                  <SettingsGuardedLink href={organizationHref}>
-                    <ArrowLeft className='size-[14px]' />
-                    Back to organization
-                  </SettingsGuardedLink>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator className='shrink-0' />
-              </>
-            )}
             {isWorkspacesLoading ? (
               <div className='px-2 py-[5px] text-[var(--text-secondary)] text-caption'>
                 Loading workspaces...

@@ -6,18 +6,9 @@ import { createRoot, type Root } from 'react-dom/client'
 import { renderToString } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { mockNavigateToSettings, mockWorkspacePermissions, hostContext } = vi.hoisted(() => ({
+const { mockNavigateToSettings, mockWorkspacePermissions } = vi.hoisted(() => ({
   mockNavigateToSettings: vi.fn(),
-  hostContext: {
-    hostOrganizationId: null as string | null,
-    viewer: { isHostOrganizationMember: false },
-    features: { organizationSearch: false as boolean | undefined },
-  },
   mockWorkspacePermissions: { canAdmin: true, canEdit: true, canRead: true },
-}))
-
-vi.mock('@/app/workspace/[workspaceId]/providers/workspace-host-provider', () => ({
-  useWorkspaceHostContext: () => hostContext,
 }))
 
 const onWorkspaceSwitch = vi.fn()
@@ -170,9 +161,6 @@ function typeInto(input: HTMLInputElement, value: string) {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  hostContext.hostOrganizationId = null
-  hostContext.viewer.isHostOrganizationMember = false
-  hostContext.features.organizationSearch = false
   Object.assign(mockWorkspacePermissions, { canAdmin: true, canEdit: true, canRead: true })
   // jsdom implements neither; the component scrolls the active row into view.
   Element.prototype.scrollIntoView = vi.fn()
@@ -184,15 +172,11 @@ afterEach(() => {
 })
 
 describe('WorkspaceHeader workspace switcher highlight', () => {
-  it.each([null, 'organization'])(
-    'keeps access requests out of the workspace switcher (%s)',
-    (organizationId) => {
-      hostContext.hostOrganizationId = organizationId
-      render()
-      expect(document.body).not.toHaveTextContent('My access requests')
-      expect(document.body).not.toHaveTextContent('Review access requests')
-    }
-  )
+  it('keeps access requests out of the workspace switcher', () => {
+    render()
+    expect(document.body).not.toHaveTextContent('My access requests')
+    expect(document.body).not.toHaveTextContent('Review access requests')
+  })
 
   it.each([false, true])(
     'renders prefetched workspace identity before hydration (collapsed: %s)',
@@ -414,29 +398,6 @@ describe('WorkspaceHeader workspace switcher highlight', () => {
 })
 
 describe('WorkspaceHeader context navigation', () => {
-  it('links to the current host organization for enrolled members', () => {
-    hostContext.hostOrganizationId = 'host-org'
-    hostContext.viewer.isHostOrganizationMember = true
-    hostContext.features.organizationSearch = true
-    render()
-    expect(document.querySelector('a[href="/o/host-org"]')).toHaveTextContent(
-      'Back to organization'
-    )
-  })
-
-  it.each([
-    { org: null, member: true, enabled: true },
-    { org: 'host-org', member: false, enabled: true },
-    { org: 'host-org', member: true, enabled: false },
-    { org: 'host-org', member: true, enabled: undefined },
-  ])('hides inaccessible organization navigation: %j', ({ org, member, enabled }) => {
-    hostContext.hostOrganizationId = org
-    hostContext.viewer.isHostOrganizationMember = member
-    hostContext.features.organizationSearch = enabled
-    render()
-    expect(document.querySelector('a[href^="/o/"]')).toBeNull()
-  })
-
   it('keeps settings in the profile menu instead of duplicating it in the switcher', () => {
     render()
     expect(document.querySelector('a[href="/workspace/ws-emir/settings/teammates"]')).toBeNull()

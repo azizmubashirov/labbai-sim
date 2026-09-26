@@ -9,13 +9,9 @@ const mocks = vi.hoisted(() => ({
   enterprise: vi.fn(),
   governance: vi.fn(),
   groups: vi.fn(),
-  search: vi.fn(),
 }))
 vi.mock('@/lib/credential-groups/scoped-availability', () => ({
   isScopedCredentialGroupsAvailable: mocks.groups,
-}))
-vi.mock('@/lib/knowledge/access/availability', () => ({
-  isKnowledgeMemberAccessAvailable: mocks.search,
 }))
 vi.mock('@/lib/organizations/settings-access', () => ({
   canOpenOrganizationSettingsSection: mocks.canOpen,
@@ -35,30 +31,24 @@ describe('organization settings authorization', () => {
     mocks.enterprise.mockResolvedValue(true)
     mocks.governance.mockResolvedValue(true)
     mocks.groups.mockResolvedValue(true)
-    mocks.search.mockResolvedValue(true)
   })
   afterEach(resetEnvFlagsMock)
 
-  it.each(['connected-accounts', 'search-mcp', 'search-slack', 'integrations'] as const)(
-    'gates direct %s settings links using the target org',
-    async (section) => {
-      const gate = section === 'connected-accounts' ? mocks.groups : mocks.search
-      gate.mockResolvedValue(false)
-      await expect(
-        authorizeOrganizationSettingsSection({
-          organizationId: 'target',
-          userId: 'viewer',
-          section,
-        })
-      ).resolves.toBe(false)
-      expect(gate).toHaveBeenCalledExactlyOnceWith(
-        section === 'connected-accounts'
-          ? { kind: 'organization', organizationId: 'target' }
-          : { organizationId: 'target' }
-      )
-      expect(mocks.enterprise).not.toHaveBeenCalled()
-    }
-  )
+  it('gates direct connected-accounts settings links using the target org', async () => {
+    mocks.groups.mockResolvedValue(false)
+    await expect(
+      authorizeOrganizationSettingsSection({
+        organizationId: 'target',
+        userId: 'viewer',
+        section: 'connected-accounts',
+      })
+    ).resolves.toBe(false)
+    expect(mocks.groups).toHaveBeenCalledExactlyOnceWith({
+      kind: 'organization',
+      organizationId: 'target',
+    })
+    expect(mocks.enterprise).not.toHaveBeenCalled()
+  })
 
   /**
    * Access Control configures restrictions that keep applying while a payment is failing, so the
@@ -103,51 +93,27 @@ describe('organization settings authorization', () => {
     expect(mocks.enterprise).toHaveBeenCalledWith('target')
   })
 
-  it.each([
-    { groups: false, search: false, connectedAccounts: false, integrations: false },
-    { groups: true, search: false, connectedAccounts: true, integrations: false },
-    { groups: true, search: true, connectedAccounts: true, integrations: true },
-  ])(
-    'selects the setup page with groups=$groups and search=$search',
-    async ({ groups, search, connectedAccounts, integrations }) => {
-      mocks.groups.mockResolvedValue(groups)
-      mocks.search.mockResolvedValue(search)
-      const input = { organizationId: 'target', userId: 'admin' }
-      await expect(
-        authorizeOrganizationSettingsSection({ ...input, section: 'connected-accounts' })
-      ).resolves.toBe(connectedAccounts)
-      await expect(
-        authorizeOrganizationSettingsSection({ ...input, section: 'integrations' })
-      ).resolves.toBe(integrations)
-    }
-  )
-
-  it.each(['connected-accounts', 'integrations'] as const)(
-    'checks role access before selecting the %s UI',
-    async (section) => {
-      mocks.canOpen.mockResolvedValue(false)
-      await expect(
-        authorizeOrganizationSettingsSection({
-          organizationId: 'target',
-          userId: 'member',
-          section,
-        })
-      ).resolves.toBe(false)
-      expect(mocks.groups).not.toHaveBeenCalled()
-      expect(mocks.search).not.toHaveBeenCalled()
-    }
-  )
-
-  it('keeps Credential Groups independent of Search availability', async () => {
-    mocks.search.mockRejectedValue(new Error('Feature configuration unavailable'))
+  it.each([false, true])('selects the setup page with groups=%s', async (groups) => {
+    mocks.groups.mockResolvedValue(groups)
     await expect(
       authorizeOrganizationSettingsSection({
         organizationId: 'target',
         userId: 'admin',
         section: 'connected-accounts',
       })
-    ).resolves.toBe(true)
-    expect(mocks.search).not.toHaveBeenCalled()
+    ).resolves.toBe(groups)
+  })
+
+  it('checks role access before selecting the connected-accounts UI', async () => {
+    mocks.canOpen.mockResolvedValue(false)
+    await expect(
+      authorizeOrganizationSettingsSection({
+        organizationId: 'target',
+        userId: 'member',
+        section: 'connected-accounts',
+      })
+    ).resolves.toBe(false)
+    expect(mocks.groups).not.toHaveBeenCalled()
   })
 
   it('checks current target organization membership before billing reads', async () => {
@@ -174,10 +140,9 @@ describe('organization settings authorization', () => {
     expect(mocks.enterprise).not.toHaveBeenCalled()
   })
 
-  it('keeps request review independent of the Enterprise plan and Search rollout', async () => {
+  it('keeps request review independent of the Enterprise plan', async () => {
     mocks.enterprise.mockResolvedValue(false)
     mocks.governance.mockResolvedValue(false)
-    mocks.search.mockResolvedValue(false)
 
     await expect(
       authorizeOrganizationSettingsSection({
@@ -189,7 +154,6 @@ describe('organization settings authorization', () => {
     expect(mocks.canOpen).toHaveBeenCalledWith('target', 'admin', 'requests')
     expect(mocks.enterprise).not.toHaveBeenCalled()
     expect(mocks.governance).not.toHaveBeenCalled()
-    expect(mocks.search).not.toHaveBeenCalled()
   })
 
   it('rejects request review when target organization authority is absent', async () => {

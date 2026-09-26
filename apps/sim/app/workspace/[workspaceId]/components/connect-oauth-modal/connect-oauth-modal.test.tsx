@@ -366,8 +366,8 @@ describe('ConnectOAuthModal reauthorization', () => {
         {},
         '',
         connectorId
-          ? '/o/org-1/settings/integrations/sources/connector-slack?view=settings'
-          : '/o/org-1/settings/integrations'
+          ? '/workspace/workspace-1/knowledge/kb-search?view=settings'
+          : '/workspace/workspace-1/knowledge/kb-search'
       )
       act(() => {
         root.render(

@@ -14,8 +14,5 @@ export default async function AccessRequestsPage({
   searchParams,
 }: AccessRequestsPageProps) {
   const [{ workspaceId }, query] = await Promise.all([params, searchParams])
-  redirect(
-    getAccessRequestsSettingsHref({ kind: 'workspace', workspaceId }) +
-      getLegacyAccessRequestsSettingsQuery(query)
-  )
+  redirect(getAccessRequestsSettingsHref(workspaceId) + getLegacyAccessRequestsSettingsQuery(query))
 }

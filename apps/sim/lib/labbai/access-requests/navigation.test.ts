@@ -8,13 +8,8 @@ import {
 } from '@/lib/labbai/access-requests/navigation'
 
 describe('access request navigation', () => {
-  it('builds the canonical settings destination for each scope', () => {
-    expect(getAccessRequestsSettingsHref({ kind: 'workspace', workspaceId: 'ws' })).toBe(
-      '/workspace/ws/settings/requests'
-    )
-    expect(getAccessRequestsSettingsHref({ kind: 'organization', organizationId: 'org' })).toBe(
-      '/o/org/settings/requests'
-    )
+  it('builds the canonical workspace settings destination', () => {
+    expect(getAccessRequestsSettingsHref('ws')).toBe('/workspace/ws/settings/requests')
   })
 
   it('maps legacy admin links onto the review view with reviewer keys', () => {

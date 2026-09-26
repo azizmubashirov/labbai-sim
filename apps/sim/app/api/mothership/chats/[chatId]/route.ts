@@ -36,7 +36,7 @@ const logger = createLogger('MothershipChatAPI')
 export const GET = withRouteHandler(
   async (request: NextRequest, context: { params: Promise<{ chatId: string }> }) => {
     try {
-      const { userId, isAuthenticated, principal } = await authenticateCopilotRequestSessionOnly()
+      const { userId, isAuthenticated } = await authenticateCopilotRequestSessionOnly()
       if (!isAuthenticated || !userId) {
         return createUnauthorizedResponse()
       }
@@ -45,7 +45,7 @@ export const GET = withRouteHandler(
       if (!paramsResult.success) return paramsResult.response
       const { chatId } = paramsResult.data.params
 
-      const chat = await getAccessibleCopilotChatWithMessages(chatId, userId, { principal })
+      const chat = await getAccessibleCopilotChatWithMessages(chatId, userId)
       if (!chat || chat.type !== 'mothership') {
         return NextResponse.json({ success: false, error: 'Chat not found' }, { status: 404 })
       }
@@ -154,7 +154,7 @@ export const GET = withRouteHandler(
 export const PATCH = withRouteHandler(
   async (request: NextRequest, context: { params: Promise<{ chatId: string }> }) => {
     try {
-      const { userId, isAuthenticated, principal } = await authenticateCopilotRequestSessionOnly()
+      const { userId, isAuthenticated } = await authenticateCopilotRequestSessionOnly()
       if (!isAuthenticated || !userId) {
         return createUnauthorizedResponse()
       }
@@ -163,7 +163,7 @@ export const PATCH = withRouteHandler(
       if (!parsed.success) return parsed.response
       const { chatId } = parsed.data.params
       const { title, isUnread, pinned } = parsed.data.body
-      const chat = await getAccessibleCopilotChatAuth(chatId, userId, { principal })
+      const chat = await getAccessibleCopilotChatAuth(chatId, userId)
       if (!chat || chat.type !== 'mothership') {
         return NextResponse.json({ success: false, error: 'Chat not found' }, { status: 404 })
       }
@@ -257,7 +257,7 @@ export const PATCH = withRouteHandler(
 export const DELETE = withRouteHandler(
   async (request: NextRequest, context: { params: Promise<{ chatId: string }> }) => {
     try {
-      const { userId, isAuthenticated, principal } = await authenticateCopilotRequestSessionOnly()
+      const { userId, isAuthenticated } = await authenticateCopilotRequestSessionOnly()
       if (!isAuthenticated || !userId) {
         return createUnauthorizedResponse()
       }
@@ -266,7 +266,7 @@ export const DELETE = withRouteHandler(
       if (!parsed.success) return parsed.response
       const { chatId } = parsed.data.params
 
-      const chat = await getAccessibleCopilotChatAuth(chatId, userId, { principal })
+      const chat = await getAccessibleCopilotChatAuth(chatId, userId)
       if (!chat || chat.type !== 'mothership') {
         return NextResponse.json({ success: true })
       }

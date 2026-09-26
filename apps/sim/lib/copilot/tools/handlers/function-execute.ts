@@ -515,19 +515,6 @@ export async function executeFunctionExecute(
   params: Record<string, unknown>,
   context: ToolExecutionContext
 ): Promise<ToolExecutionResult> {
-  if (context.requestMode === 'assistant') {
-    const inputs = params.inputs
-    if (
-      params.secrets !== undefined ||
-      params.inputTables !== undefined ||
-      params.outputTable !== undefined ||
-      (inputs !== null && typeof inputs === 'object' && 'tables' in inputs)
-    ) {
-      throw new Error(
-        'Assistant code can use files, but cannot mount secrets or access workspace tables'
-      )
-    }
-  }
   // `sandboxId` named a workspace Sim sandbox; those were removed, so a stale
   // selection is dropped rather than forwarded to the executor.
   const enrichedParams = omit(params, [
@@ -563,11 +550,7 @@ export async function executeFunctionExecute(
    * `secretActorUserId` was explicitly null.
    */
   const secretActorUserId =
-    context.requestMode === 'assistant'
-      ? null
-      : context.secretActorUserId === undefined
-        ? context.userId
-        : context.secretActorUserId
+    context.secretActorUserId === undefined ? context.userId : context.secretActorUserId
 
   try {
     let mounted: MaterializedCopilotCodeSecrets = { envVars: {}, catalogEntries: [] }

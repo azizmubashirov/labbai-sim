@@ -5,11 +5,6 @@ import { describe, expect, it } from 'vitest'
 import { chatUrl } from '@/app/workspace/[workspaceId]/home/hooks/chat-url'
 
 describe('chatUrl', () => {
-  it('routes organization conversations without adding a workspace or mode', () => {
-    window.history.replaceState(null, '', '/o/org-1/home?mode=assistant')
-    expect(chatUrl({ organizationId: 'org-1' }, 'chat-1')).toBe('/o/org-1/chat/chat-1')
-  })
-
   it.each(['build', 'assistant', 'search', 'unknown'])(
     'preserves the resource while dropping legacy mode %s and search filters',
     (mode) => {

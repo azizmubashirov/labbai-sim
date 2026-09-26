@@ -14,7 +14,6 @@ import {
 import type { ConnectorAccessMode } from '@/lib/api/contracts/knowledge/connectors'
 import { type ResourceScope, resourceScopeFromOwner } from '@/lib/core/resource-scope'
 import { supportsConnectorAccessMode } from '@/lib/knowledge/connectors/access-modes'
-import { slackSearchSetupHref } from '@/lib/sim-search/setup-navigation'
 import { connectorMemberProvider } from '@/app/workspace/[workspaceId]/knowledge/[id]/components/connector-access-field/connector-access'
 import {
   SettingsEmptyState,
@@ -77,7 +76,6 @@ interface ConnectorAccessFieldProps {
   allowWorkspace?: boolean
   /** Rendered under the selection, for a caller that applies the change with its own control. */
   footer?: ReactNode
-  searchSetupSource?: 'slack'
   slackSetupOnly?: boolean
   onSetupNavigate?: () => void
 }
@@ -97,7 +95,6 @@ export function ConnectorAccessField({
   allowAdmin = false,
   allowWorkspace = true,
   footer,
-  searchSetupSource,
   slackSetupOnly = false,
   onSetupNavigate,
 }: ConnectorAccessFieldProps) {
@@ -215,11 +212,7 @@ export function ConnectorAccessField({
           ) : accountsQuery.isPending ? (
             <SettingsEmptyState variant='inline'>Checking Slack setup…</SettingsEmptyState>
           ) : accountsQuery.isSuccess && !configured ? (
-            <SlackMemberSetup
-              scope={scope}
-              searchSetupSource={searchSetupSource}
-              onNavigate={onSetupNavigate}
-            />
+            <SlackMemberSetup scope={scope} onNavigate={onSetupNavigate} />
           ) : null)}
 
         {canAdmin && footer}
@@ -231,7 +224,6 @@ export function ConnectorAccessField({
 interface SlackMemberSetupProps {
   workspaceId?: string
   scope?: ResourceScope
-  searchSetupSource?: 'slack' | 'search'
   onNavigate?: () => void
 }
 
@@ -239,16 +231,16 @@ interface SlackMemberSetupProps {
 export function SlackMemberSetup({
   workspaceId,
   scope: explicitScope,
-  searchSetupSource,
   onNavigate,
 }: SlackMemberSetupProps) {
   const scope = explicitScope ?? resourceScopeFromOwner({ workspaceId })
-  const href =
-    scope.kind === 'organization'
-      ? slackSearchSetupHref(scope.organizationId, searchSetupSource ?? 'search')
-      : `/workspace/${scope.workspaceId}/settings/credential-groups`
+  /** Organization-owned sources have no setup surface of their own. */
+  if (scope.kind === 'organization') return null
   return (
-    <ChipLink href={href} onClick={onNavigate}>
+    <ChipLink
+      href={`/workspace/${scope.workspaceId}/settings/credential-groups`}
+      onClick={onNavigate}
+    >
       Set up Slack
     </ChipLink>
   )

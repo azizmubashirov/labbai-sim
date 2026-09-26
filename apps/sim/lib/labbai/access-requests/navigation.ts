@@ -4,8 +4,6 @@ import {
   ACCESS_REQUEST_MAX_SEARCH_LENGTH,
   ACCESS_REQUEST_STATUS_VALUES,
 } from '@/lib/labbai/access-requests/constants'
-import type { AccessRequestScope } from '@/lib/labbai/access-requests/targets'
-import { organizationRoutes } from '@/lib/navigation/paths'
 
 /**
  * URL helpers for the Requests settings page. Pure and dependency-light so the
@@ -59,11 +57,9 @@ export function parseAccessRequestReviewStatusParam(
     : null
 }
 
-/** The canonical settings page for a scope's requests. */
-export function getAccessRequestsSettingsHref(scope: AccessRequestScope): string {
-  return scope.kind === 'workspace'
-    ? `/workspace/${scope.workspaceId}/settings/requests`
-    : organizationRoutes(scope.organizationId).settingsSection('requests')
+/** The canonical settings page for a workspace's requests. */
+export function getAccessRequestsSettingsHref(workspaceId: string): string {
+  return `/workspace/${workspaceId}/settings/requests`
 }
 
 function toQueryString(entries: Array<[string, string]>): string {

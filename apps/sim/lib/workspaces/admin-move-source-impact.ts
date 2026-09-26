@@ -48,9 +48,6 @@ import type { DbOrTx } from '@/lib/db/types'
  * navigation module's React and icon imports.
  */
 const ENTERPRISE_GATED_SECTION_LABELS: Record<OrganizationSettingsSection, string | null> = {
-  'recently-deleted': null,
-  integrations: 'Sim Search source setup',
-  'search-mcp': null,
   'connected-accounts': 'organization connected accounts',
   members: null,
   'access-control': 'permission groups',

@@ -45,7 +45,6 @@ import {
   useKnowledgeDocumentsQuery,
   useUpdateDocument,
   useUpdateDocumentTags,
-  useWorkspaceKnowledgeSearch,
 } from '@/hooks/queries/kb/knowledge'
 import { knowledgeKeys } from '@/hooks/queries/utils/knowledge-keys'
 
@@ -134,34 +133,6 @@ function captureQuery(build: () => unknown): CapturedQuery {
 }
 
 describe('knowledge query placeholder scope', () => {
-  it('waits for a nonempty owner before searching', () => {
-    const query = captureQuery(() => useWorkspaceKnowledgeSearch('', 'query'))
-    expect(query).toMatchObject({ enabled: false })
-  })
-
-  it('forwards search cancellation and leaves provider retries to the server', async () => {
-    const data = {
-      query: 'query',
-      results: [],
-      retrieval: { status: 'partial', timedOutLegs: ['vector'] },
-    }
-    mocks.requestJson.mockResolvedValueOnce({ data })
-    const query = captureQuery(() =>
-      useWorkspaceKnowledgeSearch('workspace-1', ' query ', { source: 'slack' })
-    )
-    const controller = new AbortController()
-    await expect(query.queryFn({ signal: controller.signal })).resolves.toEqual(data)
-
-    expect(query.retry).toBe(false)
-    expect(mocks.requestJson).toHaveBeenLastCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        signal: controller.signal,
-        body: expect.objectContaining({ query: 'query' }),
-      })
-    )
-  })
-
   it('does not carry a prior workspace list or document detail into another resource', () => {
     expect(
       captureQuery(() => useKnowledgeBasesQuery('workspace-2')).placeholderData
@@ -211,14 +182,6 @@ describe('knowledge query placeholder scope', () => {
   })
 
   it('partitions search cache entries by filter and reader', () => {
-    const query = captureQuery(() =>
-      useWorkspaceKnowledgeSearch('workspace-1', 'new query', { source: 'slack' })
-    )
-    /** The limit is the key's last part, so the wider search never evicts the first paint. */
-    expect(query.queryKey).toEqual([
-      ...knowledgeKeys.search('workspace-1', 'new query', { source: 'slack' }, 'reader'),
-      20,
-    ])
     expect(knowledgeKeys.search('workspace-1', 'query', { source: 'slack' })).not.toEqual(
       knowledgeKeys.search('workspace-1', 'query', { source: 'gitlab' })
     )

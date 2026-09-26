@@ -9,12 +9,6 @@ import { getMothershipAttachmentPreviewUrl } from '@/lib/copilot/chat/attachment
 import { assertMultiFileUploadAdmission } from '@/lib/uploads/client/admission'
 import { runWithConcurrency, WHOLE_FILE_PARALLEL_UPLOADS } from '@/lib/uploads/client/concurrency'
 import { uploadInternalFileSession } from '@/lib/uploads/client/session-upload'
-import {
-  ASSISTANT_IMAGE_MAX_BYTES,
-  ASSISTANT_IMAGE_MAX_COUNT,
-  ASSISTANT_IMAGE_MAX_TOTAL_BYTES,
-  isAssistantImageType,
-} from '@/lib/uploads/shared/assistant-images'
 import { MAX_WORKSPACE_FILE_SIZE } from '@/lib/uploads/shared/types'
 import { resolveFileType } from '@/lib/uploads/utils/file-utils'
 
@@ -84,7 +78,6 @@ export interface MessageFileAttachment {
 interface UseFileAttachmentsProps {
   userId?: string
   workspaceId?: string
-  organizationId?: string
   disabled?: boolean
   isLoading?: boolean
 }
@@ -97,7 +90,7 @@ interface UseFileAttachmentsProps {
  * @returns File attachment state and operations
  */
 export function useFileAttachments(props: UseFileAttachmentsProps) {
-  const { userId, workspaceId, organizationId, disabled, isLoading } = props
+  const { userId, workspaceId, disabled, isLoading } = props
 
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([])
   const [dragCounter, setDragCounter] = useState(0)
@@ -159,29 +152,16 @@ export function useFileAttachments(props: UseFileAttachmentsProps) {
         logger.error('User ID not available for file upload')
         return
       }
-      if (!workspaceId && !organizationId) {
-        logger.error('Workspace or organization context required for attachments')
+      if (!workspaceId) {
+        logger.error('Workspace context required for attachments')
         return
       }
 
       if (fileList.length === 0) return
       try {
-        if (
-          organizationId &&
-          Array.from(fileList).some((file) => !isAssistantImageType(resolveFileType(file)))
-        ) {
-          toast.error('Attach PNG, JPEG, GIF, or WebP images.')
-          return
-        }
         assertMultiFileUploadAdmission(fileList, {
           existingFiles: attachedFilesRef.current,
-          maxFileBytes: organizationId ? ASSISTANT_IMAGE_MAX_BYTES : MAX_WORKSPACE_FILE_SIZE,
-          ...(organizationId
-            ? {
-                maxFiles: ASSISTANT_IMAGE_MAX_COUNT,
-                maxTotalBytes: ASSISTANT_IMAGE_MAX_TOTAL_BYTES,
-              }
-            : {}),
+          maxFileBytes: MAX_WORKSPACE_FILE_SIZE,
         })
       } catch (error) {
         toast.error("Couldn't add files", { description: toError(error).message })
@@ -218,7 +198,7 @@ export function useFileAttachments(props: UseFileAttachmentsProps) {
           const result = await uploadInternalFileSession({
             purpose: 'mothership_attachment',
             file,
-            ...(organizationId ? { organizationId } : { workspaceId: workspaceId! }),
+            workspaceId,
             signal: controller.signal,
           })
 
@@ -256,7 +236,7 @@ export function useFileAttachments(props: UseFileAttachmentsProps) {
         }
       })
     },
-    [userId, workspaceId, organizationId, updateAttachedFiles]
+    [userId, workspaceId, updateAttachedFiles]
   )
 
   /**

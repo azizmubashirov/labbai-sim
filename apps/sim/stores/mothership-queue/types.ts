@@ -21,10 +21,7 @@ export type QueuedMothershipMessage = QueuedMessage & {
 }
 
 // Mutable fields an in-place edit overwrites; id and index are preserved by `replaceAt`.
-export type QueuedMessageEditPatch = Pick<
-  QueuedMessage,
-  'content' | 'fileAttachments' | 'contexts' | 'requestMode' | 'assistantSearch'
->
+export type QueuedMessageEditPatch = Pick<QueuedMessage, 'content' | 'fileAttachments' | 'contexts'>
 
 export interface MothershipQueueState {
   queues: Record<string, QueuedMothershipMessage[]>

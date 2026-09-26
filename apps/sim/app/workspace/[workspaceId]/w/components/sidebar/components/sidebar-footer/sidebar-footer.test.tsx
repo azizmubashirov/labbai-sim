@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { act, type ComponentProps } from 'react'
-import { Building, Key, Trash, Users } from '@sim/emcn/icons'
+import { Key, Trash, Users } from '@sim/emcn/icons'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -152,15 +152,16 @@ describe('SidebarFooter', () => {
     expect(menuItem('Settings')).toHaveAttribute('href', '/workspace/workspace-1/settings/general')
   })
 
-  it('guards returning to the organization when settings are unsaved', async () => {
+  it('guards a navigation link when settings are unsaved', async () => {
     const onNavigate = vi.fn()
+    const href = '/workspace/workspace-1/settings/teammates'
     await renderFooter({
-      navigationLinks: [{ label: 'Organization', icon: Building, href: '/o/org-1', onNavigate }],
+      navigationLinks: [{ label: 'Members', icon: Users, href, onNavigate }],
     })
     useSettingsDirtyStore.getState().setDirty(true)
     openProfileMenu()
-    expect(menuItem('Organization')).toHaveAttribute('href', '/o/org-1')
-    act(() => menuItem('Organization').click())
+    expect(menuItem('Members')).toHaveAttribute('href', href)
+    act(() => menuItem('Members').click())
     expect(onNavigate).not.toHaveBeenCalled()
     act(() => useSettingsDirtyStore.getState().confirmLeave())
     expect(onNavigate).toHaveBeenCalledOnce()

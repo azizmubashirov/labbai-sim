@@ -122,8 +122,6 @@ export async function authorizeOrganizationOperation(
       !Number.isFinite(principal.expiresAt.getTime()) ||
       principal.issuedAt.getTime() > now ||
       principal.expiresAt.getTime() <= now ||
-      (principal.serviceId === 'slack-search' &&
-        principal.expiresAt.getTime() - principal.issuedAt.getTime() > 60_000) ||
       (principal.serviceId === 'copilot'
         ? !principal.resourceScope.chatId
         : !principal.resourceScope.installationId || !principal.resourceScope.eventId)

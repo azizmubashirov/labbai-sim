@@ -1,4 +1,3 @@
-import type { WorkspaceSearchFilters } from '@/lib/api/contracts/knowledge/search'
 import type { ManagedMcpConnectorId } from '@/lib/credential-groups/managed-mcp-connectors'
 import type { ChatContext } from '@/stores/panel'
 
@@ -23,16 +22,11 @@ export interface FileAttachmentForApi {
   path?: string
 }
 
-/** Assistant searches as the signed-in person and uses their connected accounts. */
-export type ChatRequestMode = 'assistant'
-
 export interface QueuedMessage {
   id: string
   content: string
   fileAttachments?: FileAttachmentForApi[]
   contexts?: ChatContext[]
-  requestMode?: ChatRequestMode
-  assistantSearch?: WorkspaceSearchFilters
 }
 
 export const ToolCallStatus = {

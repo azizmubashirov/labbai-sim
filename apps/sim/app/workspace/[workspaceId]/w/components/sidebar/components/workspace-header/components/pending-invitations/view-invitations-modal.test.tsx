@@ -86,7 +86,7 @@ beforeEach(() => {
     isFetching: false,
     refetch: mocks.refetch,
   }))
-  mocks.accept.mockResolvedValue({ redirectPath: '/o/org-1/home' })
+  mocks.accept.mockResolvedValue({ redirectPath: '/workspace/workspace-1/home' })
 })
 
 afterEach(async () => {
@@ -188,7 +188,7 @@ describe('ViewInvitationsModal', () => {
       disclosedWorkspaceIds: ['personal', 'archived'],
       disclosedOutcome: 'will-join',
     })
-    expect(mocks.push).toHaveBeenCalledWith('/o/org-1/home')
+    expect(mocks.push).toHaveBeenCalledWith('/workspace/workspace-1/home')
   })
 
   it('blocks an internal invitation with no preview and offers refresh', async () => {

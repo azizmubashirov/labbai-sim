@@ -14,7 +14,7 @@ const { mockPush, mockReplace, mockNavigate, mockSectionIntent } = vi.hoisted(()
 }))
 
 vi.mock('next/navigation', () => ({
-  usePathname: () => '/o/org-a/settings/members',
+  usePathname: () => '/account/settings/general',
   useRouter: () => ({ push: mockPush, replace: mockReplace }),
 }))
 vi.mock('@/components/settings/settings-intent-link', () => ({
@@ -73,16 +73,16 @@ function renderSidebar(isCollapsed = false) {
   act(() =>
     root.render(
       <SettingsSidebar
-        plane='organization'
-        activeSection='members'
-        groups={[{ key: 'organization', title: 'Organization' }]}
+        plane='account'
+        activeSection='general'
+        groups={[{ key: 'account', title: 'Account' }]}
         items={[
-          { id: 'members', label: 'Members', group: 'organization', icon: Users },
-          { id: 'search-mcp', label: 'Search MCP', group: 'organization', icon: Users },
+          { id: 'general', label: 'General', group: 'account', icon: Users },
+          { id: 'api-keys', label: 'Sim API keys', group: 'account', icon: Users },
         ]}
-        hrefForSection={(section) => `/o/org-a/settings/${section}`}
+        hrefForSection={(section) => `/account/settings/${section}`}
         onSectionIntent={mockSectionIntent}
-        backHref='/o/org-a/home'
+        backHref='/workspace'
         isCollapsed={isCollapsed}
       />
     )
@@ -102,25 +102,25 @@ describe('SettingsSidebar interactions', () => {
     renderSidebar()
     expect(mockSectionIntent).not.toHaveBeenCalled()
 
-    act(() => container.querySelector<HTMLAnchorElement>('a[href$="/members"]')?.focus())
+    act(() => container.querySelector<HTMLAnchorElement>('a[href$="/general"]')?.focus())
     expect(mockSectionIntent).not.toHaveBeenCalled()
 
-    act(() => container.querySelector<HTMLAnchorElement>('a[href$="/search-mcp"]')?.focus())
-    expect(mockSectionIntent).toHaveBeenCalledExactlyOnceWith('search-mcp')
+    act(() => container.querySelector<HTMLAnchorElement>('a[href$="/api-keys"]')?.focus())
+    expect(mockSectionIntent).toHaveBeenCalledExactlyOnceWith('api-keys')
     expect(mockNavigate).not.toHaveBeenCalled()
   })
 
   it('keeps destinations available in the icon rail after collapsing a section', () => {
     renderSidebar()
-    act(() => button('Organization').click())
+    act(() => button('Account').click())
     expect(container.querySelector('a')).toBeNull()
 
     renderSidebar(true)
     expect(container.querySelectorAll('a')).toHaveLength(2)
 
     renderSidebar()
-    expect(button('Organization')).toHaveAttribute('aria-expanded', 'false')
-    act(() => button('Organization').click())
+    expect(button('Account')).toHaveAttribute('aria-expanded', 'false')
+    act(() => button('Account').click())
     expect(container.querySelectorAll('a')).toHaveLength(2)
   })
 
@@ -135,19 +135,19 @@ describe('SettingsSidebar interactions', () => {
 
     act(() => button('Back').click())
     act(() => button('Discard changes').click())
-    expect(mockPush).toHaveBeenCalledWith('/o/org-a/home')
+    expect(mockPush).toHaveBeenCalledWith('/workspace')
   })
 
   it('blocks section navigation during a save even when the draft is already clean', () => {
     renderSidebar()
     act(() => useSettingsDirtyStore.getState().setNavigationBlocked(true))
-    act(() => container.querySelector<HTMLAnchorElement>('a[href$="search-mcp"]')?.click())
+    act(() => container.querySelector<HTMLAnchorElement>('a[href$="api-keys"]')?.click())
     expect(mockNavigate).not.toHaveBeenCalled()
     expect(mockReplace).not.toHaveBeenCalled()
     expect(useSettingsDirtyStore.getState().pendingLeave).toBeNull()
 
     act(() => useSettingsDirtyStore.getState().setNavigationBlocked(false))
-    act(() => container.querySelector<HTMLAnchorElement>('a[href$="search-mcp"]')?.click())
-    expect(mockNavigate).toHaveBeenCalledWith('/o/org-a/settings/search-mcp')
+    act(() => container.querySelector<HTMLAnchorElement>('a[href$="api-keys"]')?.click())
+    expect(mockNavigate).toHaveBeenCalledWith('/account/settings/api-keys')
   })
 })

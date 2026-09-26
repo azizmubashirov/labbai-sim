@@ -28,11 +28,8 @@ export const POST = withRouteHandler((request: NextRequest) =>
     TraceSpan.CopilotChatAbortStream,
     undefined,
     async (rootSpan) => {
-      const {
-        userId: authenticatedUserId,
-        isAuthenticated,
-        principal,
-      } = await authenticateCopilotRequestSessionOnly()
+      const { userId: authenticatedUserId, isAuthenticated } =
+        await authenticateCopilotRequestSessionOnly()
 
       if (!isAuthenticated || !authenticatedUserId) {
         rootSpan.setAttribute(TraceAttr.CopilotAbortOutcome, CopilotAbortOutcome.Unauthorized)
@@ -73,9 +70,7 @@ export const POST = withRouteHandler((request: NextRequest) =>
         return NextResponse.json({ error: 'Stream not found' }, { status: 404 })
       }
       const chat = run.chatId
-        ? await getAccessibleCopilotChatForCancellation(run.chatId, authenticatedUserId, {
-            principal,
-          })
+        ? await getAccessibleCopilotChatForCancellation(run.chatId, authenticatedUserId)
         : null
       if (run.chatId && !chat) {
         return NextResponse.json({ error: 'Stream not found' }, { status: 404 })

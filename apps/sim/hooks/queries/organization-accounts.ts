@@ -7,7 +7,6 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query'
-import { useRouter } from 'next/navigation'
 import { isApiClientError } from '@/lib/api/client/errors'
 import { requestJson } from '@/lib/api/client/request'
 import {
@@ -15,7 +14,6 @@ import {
   addOrganizationAccountMcpProviderContract,
   type ConfigureOrganizationMcpBody,
   configureOrganizationMcpContract,
-  disconnectPersonalOrganizationAccountContract,
   type EnsureOrganizationAccountsBody,
   ensureOrganizationAccountsContract,
   getOrganizationAccountsContract,
@@ -50,30 +48,6 @@ export function useReconnectPersonalOrganizationAccount() {
   return useMutation({
     mutationFn: (credentialId: string) =>
       requestJson(reconnectPersonalOrganizationAccountContract, { params: { credentialId } }),
-  })
-}
-
-/** Disconnects an owned grant; indexing and source setup do not gate this operation. */
-export function useDisconnectPersonalOrganizationAccount(organizationId: string) {
-  const queryClient = useQueryClient()
-  const router = useRouter()
-  return useMutation({
-    mutationFn: (credentialId: string) =>
-      requestJson(disconnectPersonalOrganizationAccountContract, {
-        params: { credentialId },
-      }),
-    onSuccess: async () => {
-      await Promise.all([
-        resetOrganizationSearchAccess(queryClient, organizationId),
-        queryClient.invalidateQueries({ queryKey: personalCredentialKeys.lists() }),
-        queryClient.invalidateQueries({ queryKey: mcpKeys.managedCatalog() }),
-        invalidateSelectorQueries(queryClient),
-        queryClient.invalidateQueries({
-          queryKey: organizationAccountsKeys.detail(organizationId),
-        }),
-      ])
-      router.refresh()
-    },
   })
 }
 

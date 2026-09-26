@@ -20,7 +20,6 @@ import {
 } from '@sim/emcn'
 import { useParams, useRouter } from 'next/navigation'
 import { isLiveAssistantMessageId } from '@/lib/copilot/chat/effective-transcript'
-import { organizationRoutes } from '@/lib/navigation/paths'
 import { useChatSurface } from '@/app/workspace/[workspaceId]/home/components/chat-surface-context'
 import { useSubmitCopilotFeedback } from '@/hooks/queries/copilot-feedback'
 import { useForkMothershipChat } from '@/hooks/queries/mothership-chats'
@@ -50,10 +49,8 @@ export const MessageActions = memo(function MessageActions({
   messageId,
 }: MessageActionsProps) {
   const router = useRouter()
-  const params = useParams<{ workspaceId?: string; organizationId?: string }>()
-  const owner = params.organizationId
-    ? { organizationId: params.organizationId }
-    : params.workspaceId
+  const params = useParams<{ workspaceId?: string }>()
+  const owner = params.workspaceId
   const { chatId } = useChatSurface()
   const { copied, copy: copyMessage } = useCopyToClipboard({ resetMs: 1500 })
   const [copiedRequestId, setCopiedRequestId] = useState(false)
@@ -137,12 +134,8 @@ export const MessageActions = memo(function MessageActions({
           `${result.failedFileCopies} file${result.failedFileCopies === 1 ? '' : 's'} could not be copied to the fork`
         )
       }
-      if (params.organizationId) {
-        router.push(organizationRoutes(params.organizationId).chat(result.id))
-      } else {
-        useFolderStore.getState().clearChatSelection()
-        router.push(`/workspace/${params.workspaceId}/chat/${result.id}`)
-      }
+      useFolderStore.getState().clearChatSelection()
+      router.push(`/workspace/${params.workspaceId}/chat/${result.id}`)
     } catch {
       toast.error('Failed to fork chat')
     }

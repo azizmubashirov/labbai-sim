@@ -6,7 +6,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
-  params: {} as { organizationId?: string; workspaceId?: string },
+  params: {} as { workspaceId?: string },
   push: vi.fn(),
   fork: vi.fn(),
   useFork: vi.fn(),
@@ -90,26 +90,16 @@ describe('MessageActions fork navigation', () => {
     await act(async () => button?.click())
   }
 
-  it('keeps an organization fork in its organization and leaves workspace selection untouched', async () => {
-    mocks.params = { organizationId: 'organization-1' }
-    await renderActions()
-    await forkChat()
-
-    expect(mocks.useFork).toHaveBeenCalledWith({ organizationId: 'organization-1' })
-    expect(mocks.fork).toHaveBeenCalledWith({
-      chatId: 'parent-chat',
-      upToMessageId: 'persisted-message',
-    })
-    expect(mocks.push).toHaveBeenCalledWith('/o/organization-1/chat/forked-chat')
-    expect(mocks.clearChatSelection).not.toHaveBeenCalled()
-  })
-
   it('preserves workspace fork navigation and clears the workspace chat selection', async () => {
     mocks.params = { workspaceId: 'workspace-1' }
     await renderActions()
     await forkChat()
 
     expect(mocks.useFork).toHaveBeenCalledWith('workspace-1')
+    expect(mocks.fork).toHaveBeenCalledWith({
+      chatId: 'parent-chat',
+      upToMessageId: 'persisted-message',
+    })
     expect(mocks.push).toHaveBeenCalledWith('/workspace/workspace-1/chat/forked-chat')
     expect(mocks.clearChatSelection).toHaveBeenCalledOnce()
   })

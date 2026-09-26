@@ -3,8 +3,6 @@
  */
 import { dbChainMockFns, resetDbChainMock, schemaMock, workflowAuthzMockFns } from '@sim/testing'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createTrustedOrganizationCopilotPrincipal } from '@/lib/copilot/auth/application-delegation'
-import { OrchestrationError } from '@/lib/core/orchestration/types'
 
 const {
   mockAuthorizeWorkflowByWorkspacePermission: mockAuthorizeWorkflow,
@@ -15,15 +13,6 @@ afterAll(() => {
   mockAuthorizeWorkflow.mockReset()
   mockGetActiveWorkflow.mockReset()
 })
-
-const { mockAuthorizeOrganization, mockAuthorizeCancellation } = vi.hoisted(() => ({
-  mockAuthorizeOrganization: vi.fn(),
-  mockAuthorizeCancellation: vi.fn(),
-}))
-vi.mock('@/lib/copilot/chat/organization-chats', () => ({
-  authorizeOrganizationChat: { execute: mockAuthorizeOrganization },
-  authorizeOrganizationChatCancellation: { execute: mockAuthorizeCancellation },
-}))
 
 vi.mock('@/lib/workspaces/permissions/utils', () => ({
   assertActiveWorkspaceAccess: vi.fn(),
@@ -68,11 +57,6 @@ describe('lifecycle copilot chat reads (cutover to copilot_messages)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     resetDbChainMock()
-    mockAuthorizeOrganization.mockResolvedValue({
-      organizationId: 'org-1',
-      userId: USER_ID,
-      role: 'member',
-    })
   })
 
   it('getAccessibleCopilotChatWithMessages sources messages from copilot_messages in seq order', async () => {
@@ -268,115 +252,36 @@ describe('lifecycle copilot chat reads (cutover to copilot_messages)', () => {
   })
 })
 
-const orgPrincipal = { kind: 'session' as const, userId: USER_ID, sessionId: 'session-1' }
-
-describe('organization chat isolation', () => {
+describe('organization-owned chats', () => {
+  const orgChat = { ...chatRow, organizationId: 'org-1', type: 'mothership' }
   beforeEach(() => {
     vi.clearAllMocks()
     dbChainMockFns.limit.mockReset()
     resetDbChainMock()
-    mockAuthorizeOrganization.mockResolvedValue({
-      organizationId: 'org-1',
-      userId: USER_ID,
-      role: 'member',
-    })
   })
 
-  it('allows an org member without a workspace to read their transcript', async () => {
-    dbChainMockFns.limit.mockResolvedValueOnce([
-      { ...chatRow, organizationId: 'org-1', type: 'mothership' },
-    ])
-    dbChainMockFns.orderBy.mockResolvedValueOnce([{ content: userMsg }])
-    const chat = await getAccessibleCopilotChatWithMessages(CHAT_ID, USER_ID, {
-      principal: orgPrincipal,
-    })
-    expect(chat?.messages).toEqual([userMsg])
-    expect(mockAuthorizeOrganization).toHaveBeenCalledWith({
-      principal: orgPrincipal,
-      input: { organizationId: 'org-1' },
-    })
-  })
-
-  it('does not expose org content to a legacy caller without a principal', async () => {
-    dbChainMockFns.limit.mockResolvedValueOnce([{ ...chatRow, organizationId: 'org-1' }])
+  it('never exposes an organization chat transcript', async () => {
+    dbChainMockFns.limit.mockResolvedValueOnce([orgChat])
     expect(await getAccessibleCopilotChatWithMessages(CHAT_ID, USER_ID)).toBeNull()
     expect(dbChainMockFns.orderBy).not.toHaveBeenCalled()
   })
 
-  it('rejects a principal that does not represent the chat owner', async () => {
-    dbChainMockFns.limit.mockResolvedValueOnce([{ ...chatRow, organizationId: 'org-1' }])
-    expect(
-      await getAccessibleCopilotChatWithMessages(CHAT_ID, USER_ID, {
-        principal: { ...orgPrincipal, userId: 'other-user' },
-      })
-    ).toBeNull()
-    expect(mockAuthorizeOrganization).not.toHaveBeenCalled()
-    expect(dbChainMockFns.orderBy).not.toHaveBeenCalled()
-  })
-
-  it('refuses to resume an org chat through a different organization', async () => {
-    dbChainMockFns.limit.mockResolvedValueOnce([
-      { ...chatRow, organizationId: 'org-2', type: 'mothership' },
-    ])
-    dbChainMockFns.orderBy.mockResolvedValueOnce([])
-    const result = await resolveOrCreateChat({
-      chatId: CHAT_ID,
-      userId: USER_ID,
-      organizationId: 'org-1',
-      principal: orgPrincipal,
-      model: 'm',
-      type: 'mothership',
-    })
-    expect(result.chat).toBeNull()
-    expect(result.conversationHistory).toEqual([])
-  })
-
-  it('rejects mixed organization and workspace ownership before creating a chat', async () => {
-    await expect(
-      resolveOrCreateChat({
-        userId: USER_ID,
-        organizationId: 'org-1',
-        workspaceId: 'ws-1',
-        principal: orgPrincipal,
-        model: 'm',
-      })
-    ).rejects.toThrow('cannot have workspace')
-    expect(dbChainMockFns.values).not.toHaveBeenCalled()
+  it('denies reads and cancellation of an organization chat', async () => {
+    dbChainMockFns.limit.mockResolvedValueOnce([orgChat]).mockResolvedValueOnce([orgChat])
+    expect(await getAccessibleCopilotChatAuth(CHAT_ID, USER_ID)).toBeNull()
+    expect(await getAccessibleCopilotChatForCancellation(CHAT_ID, USER_ID)).toBeNull()
   })
 })
 
 describe('owned chat cancellation policy', () => {
-  const orgChat = { ...chatRow, organizationId: 'org-1', type: 'mothership' }
   beforeEach(() => {
     vi.clearAllMocks()
     resetDbChainMock()
-    mockAuthorizeOrganization.mockReset().mockResolvedValue(undefined)
-    mockAuthorizeCancellation.mockReset().mockResolvedValue(undefined)
-  })
-
-  it('allows stopping an owned org chat after capability revocation while ordinary reads remain denied', async () => {
-    mockAuthorizeOrganization.mockRejectedValue(
-      new OrchestrationError('forbidden', 'Copilot disabled')
-    )
-    dbChainMockFns.limit.mockResolvedValueOnce([orgChat]).mockResolvedValueOnce([orgChat])
-    expect(
-      await getAccessibleCopilotChatForCancellation(CHAT_ID, USER_ID, { principal: orgPrincipal })
-    ).toEqual(orgChat)
-    expect(mockAuthorizeCancellation).toHaveBeenCalledWith({
-      principal: orgPrincipal,
-      input: { organizationId: 'org-1' },
-    })
-    expect(mockAuthorizeOrganization).not.toHaveBeenCalled()
-    expect(
-      await getAccessibleCopilotChatAuth(CHAT_ID, USER_ID, { principal: orgPrincipal })
-    ).toBeNull()
-    expect(mockAuthorizeOrganization).toHaveBeenCalledTimes(1)
-    expect(dbChainMockFns.orderBy).not.toHaveBeenCalled()
   })
 
   it('keeps the owned-live-chat predicate on cancellation', async () => {
-    dbChainMockFns.limit.mockResolvedValueOnce([orgChat])
-    await getAccessibleCopilotChatForCancellation(CHAT_ID, USER_ID, { principal: orgPrincipal })
+    dbChainMockFns.limit.mockResolvedValueOnce([chatRow])
+    expect(await getAccessibleCopilotChatForCancellation(CHAT_ID, USER_ID)).toEqual(chatRow)
     const predicate = dbChainMockFns.where.mock.calls[0][0] as { conditions: unknown[] }
     expect(predicate.conditions).toEqual([
       { type: 'eq', left: schemaMock.copilotChats.id, right: CHAT_ID },
@@ -385,58 +290,8 @@ describe('owned chat cancellation policy', () => {
     ])
   })
 
-  it('denies cancellation after organization membership removal', async () => {
-    dbChainMockFns.limit.mockResolvedValueOnce([orgChat])
-    mockAuthorizeCancellation.mockRejectedValueOnce(
-      new OrchestrationError('not_found', 'Organization not found')
-    )
-    expect(
-      await getAccessibleCopilotChatForCancellation(CHAT_ID, USER_ID, { principal: orgPrincipal })
-    ).toBeNull()
-    expect(mockAuthorizeOrganization).not.toHaveBeenCalled()
-  })
-
-  it.each([undefined, { ...orgPrincipal, userId: 'other-user' }])(
-    'denies cancellation without the matching actor principal',
-    async (principal) => {
-      dbChainMockFns.limit.mockResolvedValueOnce([orgChat])
-      expect(
-        await getAccessibleCopilotChatForCancellation(CHAT_ID, USER_ID, { principal })
-      ).toBeNull()
-      expect(mockAuthorizeCancellation).not.toHaveBeenCalled()
-    }
-  )
-
-  it('does not let delegated cancellation switch to another chat owned by the same actor', async () => {
-    dbChainMockFns.limit.mockResolvedValueOnce([orgChat])
-    const principal = createTrustedOrganizationCopilotPrincipal(
-      {
-        userId: USER_ID,
-        organizationId: 'org-1',
-        chatId: 'other-chat',
-        delegationId: 'request',
-      },
-      { audience: 'sim:copilot-cancel', ttlMs: 60000 }
-    )
-    expect(
-      await getAccessibleCopilotChatForCancellation(CHAT_ID, USER_ID, { principal })
-    ).toBeNull()
-    expect(mockAuthorizeCancellation).not.toHaveBeenCalled()
-  })
-
-  it('denies missing/deleted/non-owned chats before authorizing cancellation', async () => {
+  it('denies missing/deleted/non-owned chats', async () => {
     dbChainMockFns.limit.mockResolvedValueOnce([])
-    expect(
-      await getAccessibleCopilotChatForCancellation(CHAT_ID, USER_ID, { principal: orgPrincipal })
-    ).toBeNull()
-    expect(mockAuthorizeCancellation).not.toHaveBeenCalled()
-  })
-
-  it('propagates cancellation authorization infrastructure errors', async () => {
-    dbChainMockFns.limit.mockResolvedValueOnce([orgChat])
-    mockAuthorizeCancellation.mockRejectedValueOnce(new Error('database unavailable'))
-    await expect(
-      getAccessibleCopilotChatForCancellation(CHAT_ID, USER_ID, { principal: orgPrincipal })
-    ).rejects.toThrow('database unavailable')
+    expect(await getAccessibleCopilotChatForCancellation(CHAT_ID, USER_ID)).toBeNull()
   })
 })

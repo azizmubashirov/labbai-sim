@@ -15,12 +15,10 @@ import {
   InternalUnauthenticatedError,
   internalSessionAuth,
 } from '@/lib/api/server/routes/internal-json-route'
-import { authorizeOrganizationChatEvents } from '@/lib/copilot/chat/organization-chats'
 import { chatPubSub } from '@/lib/copilot/chat-status'
 import { isChatEnabled } from '@/lib/core/config/env-flags'
-import { asOrchestrationError } from '@/lib/core/orchestration/types'
 import { withRouteHandler } from '@/lib/core/utils/with-route-handler'
-import { createSSEStream, createWorkspaceSSE } from '@/lib/events/sse-endpoint'
+import { createWorkspaceSSE } from '@/lib/events/sse-endpoint'
 
 export const dynamic = 'force-dynamic'
 
@@ -57,39 +55,11 @@ export const GET = withRouteHandler(async (request: NextRequest) => {
       Object.fromEntries(request.nextUrl.searchParams.entries())
     )
     if (!validation.success) return validationErrorResponse(validation.error)
-    const { organizationId } = validation.data
-    if (!organizationId) return mothershipEventsHandler(request, principal)
-
-    const revalidate = async () => {
-      await authorizeOrganizationChatEvents.execute({ principal, input: { organizationId } })
-    }
-    await revalidate()
-    return createSSEStream(request, {
-      label: 'mothership-organization-events',
-      revalidate,
-      subscriptions: [
-        {
-          subscribe: (send) =>
-            chatPubSub?.onStatusChanged((event) => {
-              if (event.organizationId !== organizationId || event.userId !== principal.userId)
-                return
-              send('task_status', {
-                chatId: event.chatId,
-                type: event.type,
-                ...(event.streamId ? { streamId: event.streamId } : {}),
-                timestamp: Date.now(),
-              })
-            }) ?? (() => {}),
-        },
-      ],
-    })
+    return mothershipEventsHandler(request, principal)
   } catch (error) {
-    const code = asOrchestrationError(error)?.code
-    if (code === 'not_found' || code === 'forbidden')
-      return new Response('Organization access denied', { status: 403 })
     if (error instanceof InternalUnauthenticatedError)
       return new Response('Unauthorized', { status: 401 })
-    logger.error('Failed to subscribe to organization chats', error)
+    logger.error('Failed to subscribe to chats', error)
     return new Response('Unable to subscribe to chats', { status: 500 })
   }
 })

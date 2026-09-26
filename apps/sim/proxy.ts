@@ -429,8 +429,6 @@ export const config = {
     '/w/:path*', // Legacy /w/* redirects
     '/workspace/:path*', // New workspace routes
     '/home', // App entry
-    '/o', // Organization surface
-    '/o/:path*',
     '/login',
     '/signup',
     '/invite/:path*', // Match invitation routes

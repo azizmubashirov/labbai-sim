@@ -18,7 +18,7 @@ const logger = createLogger('MarkTaskReadAPI')
 
 export const POST = withRouteHandler(async (request: NextRequest) => {
   try {
-    const { userId, isAuthenticated, principal } = await authenticateCopilotRequestSessionOnly()
+    const { userId, isAuthenticated } = await authenticateCopilotRequestSessionOnly()
     if (!isAuthenticated || !userId) {
       return createUnauthorizedResponse()
     }
@@ -26,7 +26,7 @@ export const POST = withRouteHandler(async (request: NextRequest) => {
     const parsed = await parseRequest(markMothershipChatReadContract, request, {})
     if (!parsed.success) return parsed.response
     const { chatId } = parsed.data.body
-    const chat = await getAccessibleCopilotChatAuth(chatId, userId, { principal })
+    const chat = await getAccessibleCopilotChatAuth(chatId, userId)
     if (!chat) return NextResponse.json({ success: true })
 
     const [updatedChat] = await db

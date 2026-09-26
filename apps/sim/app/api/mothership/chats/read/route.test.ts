@@ -49,9 +49,7 @@ describe('POST /api/mothership/chats/read', () => {
   it('guards the lastSeenAt write with the unread predicate (only writes when unread)', async () => {
     const res = await POST(createRequest())
     expect(res.status).toBe(200)
-    expect(mockGetAccessibleChat).toHaveBeenCalledWith('chat-1', 'user-1', {
-      principal: { kind: 'session', userId: 'user-1', sessionId: 'session-1' },
-    })
+    expect(mockGetAccessibleChat).toHaveBeenCalledWith('chat-1', 'user-1')
 
     expect(dbChainMockFns.update).toHaveBeenCalledTimes(1)
     const whereArg = dbChainMockFns.where.mock.calls[0][0] as {

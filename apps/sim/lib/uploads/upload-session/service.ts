@@ -19,14 +19,9 @@ import {
 import { OrchestrationError } from '@/lib/core/orchestration/types'
 import { generateUniqueExecutionFileKey } from '@/lib/uploads/contexts/execution/utils'
 import { generateKnowledgeBaseFileKey } from '@/lib/uploads/contexts/knowledge-base/knowledge-base-file-manager'
-import { assertOrganizationAttachmentControlBinding } from '@/lib/uploads/contexts/organization-assistant/binding'
 import { assertOrganizationLogoControlBinding } from '@/lib/uploads/contexts/organization-logo/binding'
 import { generateWorkspaceFileKey } from '@/lib/uploads/contexts/workspace'
 import { buildStorageKeySegment } from '@/lib/uploads/core/storage-key'
-import {
-  ASSISTANT_IMAGE_MAX_BYTES,
-  isAssistantImageType,
-} from '@/lib/uploads/shared/assistant-images'
 import {
   MAX_KNOWLEDGE_DOCUMENT_FILE_SIZE,
   MAX_WORKSPACE_FILE_SIZE,
@@ -205,12 +200,6 @@ export type CreateUploadSessionParams = CreateUploadSessionBaseParams &
       }
     | { purpose: 'workspace_logo' | 'mothership_attachment'; workspaceId: string }
     | {
-        purpose: 'mothership_attachment'
-        organizationId: string
-        principal: Principal
-        workspaceId?: never
-      }
-    | {
         purpose: 'execution_attachment'
         workspaceId: string
         workflowId: string
@@ -235,19 +224,6 @@ export async function createUploadSession(
     metadata.organizationLogo = {
       organizationId: params.organizationId,
       expectedLogo: params.expectedLogo,
-      userId: params.userId,
-      sessionId: params.principal.sessionId,
-    }
-  }
-  if (params.purpose === 'mothership_attachment' && 'organizationId' in params) {
-    if (params.principal.kind !== 'session' || params.principal.userId !== params.userId) {
-      throw new UploadSessionError(
-        'forbidden',
-        'Organization attachments require the uploading session'
-      )
-    }
-    metadata.organizationAttachment = {
-      organizationId: params.organizationId,
       userId: params.userId,
       sessionId: params.principal.sessionId,
     }
@@ -548,9 +524,9 @@ export function assertUploadSessionAuthBinding(
     assertOrganizationLogoControlBinding(session, principal)
     return
   }
+  /** Organization Assistant attachments are retired; their leftover sessions accept no control. */
   if (session.purpose === 'mothership_attachment' && session.workspaceId === null) {
-    assertOrganizationAttachmentControlBinding(session, principal)
-    return
+    throw uploadNotFound()
   }
   if (!isPrincipalBoundUploadPurpose(session.purpose)) return
   const candidate = session.metadata.authBinding
@@ -1289,23 +1265,9 @@ function validateFile(params: CreateUploadSessionParams): void {
       'Organization logos must be image files with an organizationId'
     )
   }
-  const organizationAttachment =
-    params.purpose === 'mothership_attachment' && 'organizationId' in params
-  if (
-    organizationAttachment &&
-    (!params.organizationId.trim() ||
-      params.fileSize > ASSISTANT_IMAGE_MAX_BYTES ||
-      !isAssistantImageType(params.contentType))
-  ) {
-    throw new UploadSessionError(
-      'validation',
-      'Assistant attachments must be PNG, JPEG, GIF, or WebP images up to 5 MB'
-    )
-  }
   if (
     params.purpose !== 'profile_picture' &&
     params.purpose !== 'organization_logo' &&
-    !organizationAttachment &&
     !params.workspaceId?.trim()
   ) {
     throw new UploadSessionError('validation', 'workspaceId must not be empty')
@@ -1384,12 +1346,6 @@ function resolveUploadStorage(
         finalKey: `workspace-logos/${params.workspaceId}/${buildStorageKeySegment(`${id}-`, params.fileName)}`,
       }
     case 'mothership_attachment':
-      if ('organizationId' in params) {
-        return {
-          storageContext: 'mothership',
-          finalKey: `assistant/${params.organizationId}/${params.userId}/${id}/${buildStorageKeySegment('', params.fileName)}`,
-        }
-      }
       return {
         storageContext: 'mothership',
         finalKey: generateWorkspaceFileKey(params.workspaceId, params.fileName),

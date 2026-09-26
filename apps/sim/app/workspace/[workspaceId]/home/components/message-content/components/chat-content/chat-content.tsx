@@ -455,7 +455,6 @@ const MARKDOWN_COMPONENTS = {
 interface ChatContentProps {
   content: string
   messageId?: string
-  requestMode?: 'agent' | 'assistant'
   isStreaming?: boolean
   /** Transcript-derived answers for this message's question card (renders the recap). */
   questionAnswers?: string[]
@@ -479,7 +478,6 @@ interface ChatContentProps {
 function ChatContentInner({
   content,
   messageId,
-  requestMode,
   isStreaming = false,
   questionAnswers,
   credentialSubmission,
@@ -727,7 +725,6 @@ function ChatContentInner({
               questionAnswers={questionAnswers}
               credentialSubmission={credentialSubmission}
               credentialAbandoned={credentialAbandoned}
-              requestMode={requestMode}
               onOptionSelect={onOptionSelect}
               onQuestionDismiss={onQuestionDismiss}
             />

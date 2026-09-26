@@ -2,15 +2,11 @@
 import { authMockFns } from '@sim/testing'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { redirect, organizationContext, organizationAccess } = vi.hoisted(() => ({
+const { redirect, organizationAccess } = vi.hoisted(() => ({
   redirect: vi.fn(),
-  organizationContext: vi.fn(),
   organizationAccess: vi.fn(),
 }))
 vi.mock('next/navigation', () => ({ redirect }))
-vi.mock('@/lib/organizations/surface', () => ({
-  getOrganizationSurfaceContext: organizationContext,
-}))
 vi.mock('@/components/access-requests/access-requests-settings', () => ({
   AccessRequestsSettings: () => null,
 }))
@@ -77,43 +73,13 @@ describe('access request sign-in redirect', () => {
     )
   })
 
-  it('opens saved requester links in the organization shell with their filters and selection', async () => {
+  it('keeps saved requester links on the standalone route', async () => {
     authMockFns.mockGetSession.mockResolvedValue({ user: { id: 'viewer' } })
-    organizationContext.mockResolvedValue({ searchAccess: { memberScoped: true } })
-    await expect(
-      AccessRequestsPage({
-        searchParams: Promise.resolve({
-          organizationId: 'organization',
-          view: 'catalog',
-          requestId: 'request/a',
-          search: 'Slack & Notion',
-          page: '3',
-          callbackUrl: 'https://example.com/untrusted',
-        }),
-      })
-    ).rejects.toThrow('Redirect')
-    expect(organizationContext).toHaveBeenCalledWith('organization', 'viewer')
-    const destination = new URL(redirect.mock.calls[0][0], 'https://example.com')
-    expect(destination.pathname).toBe('/o/organization/settings/requests')
-    expect(Object.fromEntries(destination.searchParams)).toEqual({
-      view: 'catalog',
-      requestId: 'request/a',
-      search: 'Slack & Notion',
-      page: '3',
+    await AccessRequestsPage({
+      searchParams: Promise.resolve({ organizationId: 'organization', view: 'requests' }),
     })
+    expect(redirect).not.toHaveBeenCalled()
   })
-
-  it.each([null, { searchAccess: { memberScoped: false } }])(
-    'keeps the standalone route when the organization surface is unavailable: %j',
-    async (context) => {
-      authMockFns.mockGetSession.mockResolvedValue({ user: { id: 'viewer' } })
-      organizationContext.mockResolvedValue(context)
-      await AccessRequestsPage({
-        searchParams: Promise.resolve({ organizationId: 'organization', view: 'requests' }),
-      })
-      expect(redirect).not.toHaveBeenCalled()
-    }
-  )
 
   it('normalizes saved administrator email links without losing review state', async () => {
     authMockFns.mockGetSession.mockResolvedValue({ user: { id: 'viewer' } })
@@ -134,24 +100,6 @@ describe('access request sign-in redirect', () => {
       'request-id': 'request',
       'request-status': 'declined',
     })
-    expect(organizationContext).not.toHaveBeenCalled()
-  })
-
-  it('routes reviewer links into organization settings when the shell is available', async () => {
-    authMockFns.mockGetSession.mockResolvedValue({ user: { id: 'viewer' } })
-    organizationContext.mockResolvedValue({ searchAccess: { memberScoped: true } })
-    await expect(
-      AccessRequestsPage({
-        searchParams: Promise.resolve({
-          organizationId: 'organization',
-          view: 'review',
-          'request-id': 'request',
-        }),
-      })
-    ).rejects.toThrow('Redirect')
-    expect(redirect).toHaveBeenCalledWith(
-      '/o/organization/settings/requests?request-id=request&view=review'
-    )
   })
 
   it.each([undefined, 'invalid', ['requests', 'review']])(
@@ -173,9 +121,8 @@ describe('access request sign-in redirect', () => {
     }
   )
 
-  it('renders the standalone requester when the optional organization navigation lookup fails', async () => {
+  it('renders the standalone requester', async () => {
     authMockFns.mockGetSession.mockResolvedValue({ user: { id: 'viewer' } })
-    organizationContext.mockRejectedValue(new Error('Organization context unavailable'))
 
     const page = await AccessRequestsPage({
       searchParams: Promise.resolve({

@@ -13,7 +13,6 @@ export type SearchStage =
   | 'tool_application'
   | 'tool_presentation'
   | 'workspace_application'
-  | 'organization_application'
   | 'scoped_application'
   | 'knowledge_application'
   | 'scope_resolution'

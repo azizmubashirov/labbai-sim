@@ -110,11 +110,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               (function () {
                 var collapsedSidebarWidth = 48;
 
-                // The organization surface (/o/...) shares the workspace chrome and
-                // needs the same variables set before first paint.
+                // Only the workspace chrome needs these variables before first paint.
                 try {
                   var path = window.location.pathname;
-                  if (path.indexOf('/workspace/') === -1 && path.indexOf('/o/') !== 0) {
+                  if (path.indexOf('/workspace/') === -1) {
                     return;
                   }
                 } catch (e) {
