@@ -280,13 +280,14 @@ it('disables bulk selection while searching and ignores a completion after the u
   const view = await renderBulkSelector()
   try {
     await act(async () => mocks.combobox.mock.lastCall![0].onSearchChange?.('Eng'))
-    // Drive searches server-side, so the searched page loads before All reappears.
+    // Drive searches server-side: while a search is active, All is hidden or disabled.
+    const searchAll = () =>
+      mocks.combobox.mock.lastCall![0].options.find((item) => item.label === 'All')
     await act(async () =>
-      vi.waitFor(() => expect(view.all().disabled).toBe(true), {
-        interval: 1,
-      })
+      vi.waitFor(() => expect(searchAll()?.disabled ?? true).toBe(true), { interval: 1 })
     )
     await act(async () => mocks.combobox.mock.lastCall![0].onSearchChange?.(''))
+    await act(async () => vi.waitFor(() => expect(searchAll()).toBeDefined(), { interval: 1 }))
     await act(async () => view.all().onSelect?.())
     await act(async () => mocks.combobox.mock.lastCall![0].onMultiSelectChange?.([]))
     expect(view.change).toHaveBeenCalledTimes(1)
