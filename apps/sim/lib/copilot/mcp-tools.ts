@@ -2,12 +2,12 @@ import { createCopilotChatPrincipal } from '@/lib/copilot/auth/application-deleg
 import type { ToolSchema } from '@/lib/copilot/chat/payload'
 import { discoverMcpServerToolsAsExecutor } from '@/lib/internal/mcp/discover-tools'
 import type { InternalToolOperationContext } from '@/lib/internal/tool-operations/types'
+import { assertPermissionsAllowed } from '@/lib/labbai/access-control/permission-check'
 import { MCP_SERVER_DELEGATION_AUDIENCE } from '@/lib/mcp/application/authorization'
 import { discoverMcpServerToolsUseCase } from '@/lib/mcp/application/use-cases'
 import { resolveMcpToolBinding } from '@/lib/mcp/tool-binding'
 import type { McpTool, McpToolSchema } from '@/lib/mcp/types'
 import { createMcpToolId } from '@/lib/mcp/utils'
-import { assertPermissionsAllowed } from '@/lib/labbai/access-control/permission-check'
 import type { ToolInput } from '@/executor/handlers/agent/types'
 
 function toMothershipMcpTool(tool: {

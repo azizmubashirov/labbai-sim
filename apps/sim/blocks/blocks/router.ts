@@ -208,9 +208,7 @@ export const RouterBlock: BlockConfig<RouterResponse> = {
     },
   ],
   tools: {
-    access: [
-      'openai_chat',
-    ],
+    access: ['openai_chat'],
     config: {
       tool: (params: Record<string, any>) => getSerializedModelProviderId(params.model),
     },
@@ -305,9 +303,7 @@ export const RouterV2Block: BlockConfig<RouterV2Response> = {
     getModelFallbackSubBlock(),
   ],
   tools: {
-    access: [
-      'openai_chat',
-    ],
+    access: ['openai_chat'],
     config: {
       tool: (params: Record<string, any>) => getSerializedModelProviderId(params.model),
     },

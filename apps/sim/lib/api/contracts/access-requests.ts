@@ -5,7 +5,6 @@ import {
   workspaceIdSchema,
 } from '@/lib/api/contracts/primitives'
 import { defineRouteContract } from '@/lib/api/contracts/types'
-import { PERMISSION_GROUP_FIELDS } from '@/lib/permission-groups/fields'
 import {
   ACCESS_REQUEST_MAX_ID_LENGTH,
   ACCESS_REQUEST_MAX_OFFSET,
@@ -21,6 +20,7 @@ import {
   ACCESS_REQUEST_TARGET_KINDS,
   type AccessRequestScope as DomainAccessRequestScope,
 } from '@/lib/labbai/access-requests/targets'
+import { PERMISSION_GROUP_FIELDS } from '@/lib/permission-groups/fields'
 
 export const ACCESS_REQUEST_STATUSES = [
   'pending',

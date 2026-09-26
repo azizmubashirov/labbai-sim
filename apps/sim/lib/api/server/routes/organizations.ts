@@ -9,9 +9,9 @@ import { OrganizationMembershipNotFoundError } from '@/lib/core/application/orga
 import { isRetryableTransactionError } from '@/lib/db/transaction'
 import { InvitationNotPendingError } from '@/lib/invitations/errors'
 import { WorkspaceInvitationError } from '@/lib/invitations/workspace-invitations'
+import { InvitationsNotAllowedError } from '@/lib/labbai/access-control/permission-check'
 import { CAPABILITY_RULES, capabilityRefusal } from '@/lib/permission-groups/capabilities'
 import { v2CaughtOrchestrationError, v2Error } from '@/app/api/v2/lib/response'
-import { InvitationsNotAllowedError } from '@/lib/labbai/access-control/permission-check'
 
 export const internalOrganizationErrorPolicy = extendInternalErrorPolicy(
   internalOrchestrationErrorPolicy,

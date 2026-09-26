@@ -89,9 +89,7 @@ export function NoOrganizationView({
           </div>
 
           <div className='flex flex-col gap-2'>
-            {error && (
-              <p className='text-[var(--text-error)] text-small leading-tight'>{error}</p>
-            )}
+            {error && <p className='text-[var(--text-error)] text-small leading-tight'>{error}</p>}
             <div className='flex justify-end'>
               <Button
                 variant='primary'

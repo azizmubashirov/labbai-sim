@@ -154,11 +154,9 @@ describe('SidebarFooter', () => {
 
   it('guards returning to the organization when settings are unsaved', async () => {
     const onNavigate = vi.fn()
-    await renderFooter(
-      {
-        navigationLinks: [{ label: 'Organization', icon: Building, href: '/o/org-1', onNavigate }],
-      }
-    )
+    await renderFooter({
+      navigationLinks: [{ label: 'Organization', icon: Building, href: '/o/org-1', onNavigate }],
+    })
     useSettingsDirtyStore.getState().setDirty(true)
     openProfileMenu()
     expect(menuItem('Organization')).toHaveAttribute('href', '/o/org-1')

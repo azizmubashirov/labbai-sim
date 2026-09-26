@@ -628,7 +628,6 @@ export const Terminal = memo(function Terminal() {
   const [autoSelectEnabled, setAutoSelectEnabled] = useState(true)
   const [mainOptionsOpen, setMainOptionsOpen] = useState(false)
 
-
   const { handlePointerDown } = useTerminalResize()
   const { handlePointerDown: handleOutputPanelResizePointerDown } = useOutputPanelResize()
 

@@ -16,9 +16,7 @@ describe('credential group labels', () => {
     )
     expect(describeEnrollmentStatus({ status: 'invited', expired: true }).label).toBe('Expired')
     expect(describeEnrollmentStatus({ status: 'invited', expired: false }).label).toBe('Invited')
-    expect(describeEnrollmentStatus({ status: 'delivery_failed', expired: false }).tone).toBe(
-      'red'
-    )
+    expect(describeEnrollmentStatus({ status: 'delivery_failed', expired: false }).tone).toBe('red')
   })
 
   it('only resends unfinished requests', () => {

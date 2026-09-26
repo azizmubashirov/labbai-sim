@@ -83,4 +83,3 @@ describe('resolveClientCredentialAuthMethod', () => {
     expect(resolveClientCredentialAuthMethod(box, 'jwt_bearer')).toBeUndefined()
   })
 })
-

@@ -721,10 +721,7 @@ export const v2ListBlocksQuerySchema = catalogWorkspaceQuerySchema
       .describe(
         'Restrict to blocks that can start a workflow — the `triggers` category, blocks declaring `triggerAllowed`, and blocks with trigger-mode fields.'
       ),
-    source: z
-      .enum(['builtin'])
-      .optional()
-      .describe('Restrict to built-in blocks.'),
+    source: z.enum(['builtin']).optional().describe('Restrict to built-in blocks.'),
     ...v2SortFields(v2BlockSortFields, { sortBy: 'id', sortOrder: 'asc' }),
     ...v2PaginationFields({ description: 'Maximum blocks to return per page.' }),
   })

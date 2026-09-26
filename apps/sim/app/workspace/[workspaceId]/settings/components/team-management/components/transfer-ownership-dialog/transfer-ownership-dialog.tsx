@@ -108,8 +108,8 @@ export function TransferOwnershipDialog({
           <div className='space-y-3'>
             <p className='px-2 text-[var(--text-secondary)] text-sm'>
               As the owner, you need to hand off the organization before you can leave. Pick a
-              member to become the new owner. They'll inherit all owner-only permissions. You'll lose access to every shared workspace in this
-              organization.
+              member to become the new owner. They'll inherit all owner-only permissions. You'll
+              lose access to every shared workspace in this organization.
             </p>
 
             <ChipInput

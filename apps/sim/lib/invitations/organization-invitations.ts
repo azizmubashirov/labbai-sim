@@ -21,8 +21,8 @@ import {
   WorkspaceInvitationError,
   type WorkspaceInvitationResult,
 } from '@/lib/invitations/workspace-invitations'
-import { quickValidateEmail } from '@/lib/messaging/email/validation'
 import { validateInvitationsAllowed } from '@/lib/labbai/access-control/permission-check'
+import { quickValidateEmail } from '@/lib/messaging/email/validation'
 
 const logger = createLogger('OrganizationInvitations')
 

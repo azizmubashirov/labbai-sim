@@ -16,8 +16,8 @@ import { CredentialGroupProviderConfigurationError } from '@/lib/credential-grou
 import { getCredentialGroupProviderService } from '@/lib/credential-groups/providers'
 import { enforcePublicCredentialGroupIpRateLimit } from '@/lib/credential-groups/rate-limit'
 import { APP_ENTRY_PATH, organizationRoutes } from '@/lib/navigation/paths'
-import { AuthHeader, SupportFooter } from '@/app/(auth)/components'
 import { LogoShell } from '@/app/_shell/logo-shell'
+import { AuthHeader, SupportFooter } from '@/app/(auth)/components'
 import { OAuthConnectLink } from '@/app/credential-groups/enroll/[token]/oauth-reconnect-link'
 import { CredentialGroupOAuthToast } from '@/app/credential-groups/enroll/[token]/oauth-toast'
 import {

@@ -19,15 +19,7 @@ import {
   TerminalWindow,
   Wrench,
 } from '@sim/emcn'
-import {
-  Brain,
-  Calendar,
-  Clock,
-  ImageUp,
-  Music,
-  Square,
-  Table as TableIcon,
-} from '@sim/emcn/icons'
+import { Brain, Calendar, Clock, ImageUp, Music, Square, Table as TableIcon } from '@sim/emcn/icons'
 import type { ToolCallStatus } from '@/app/workspace/[workspaceId]/home/types'
 
 export type IconComponent = ComponentType<SVGProps<SVGSVGElement>>

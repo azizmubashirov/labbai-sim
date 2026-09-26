@@ -110,9 +110,7 @@ function resolveBaseUrl(provider: LocalCopilotProviderId): string | undefined {
 }
 
 /** `OPENAI_EXTRA_HEADERS` (JSON object) merged into every `openai` request. */
-function resolveExtraHeaders(
-  provider: LocalCopilotProviderId
-): Record<string, string> | undefined {
+function resolveExtraHeaders(provider: LocalCopilotProviderId): Record<string, string> | undefined {
   if (provider !== 'openai') return undefined
   const headers = getOpenAIExtraHeaders()
   return Object.keys(headers).length > 0 ? headers : undefined

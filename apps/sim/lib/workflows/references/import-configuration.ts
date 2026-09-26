@@ -75,11 +75,7 @@ export async function inspectImportConfiguration(
   }
   return fields.map((field) => {
     const block = plan.state.blocks[field.targetBlockId]
-    const value = readTargetDraftDependentValue(
-      block.subBlocks,
-      block.subBlocks,
-      field.subBlockKey
-    )
+    const value = readTargetDraftDependentValue(block.subBlocks, block.subBlocks, field.subBlockKey)
     let context: SelectorContext = {}
     let requiresAuthentication = false
     if (field.selectorKey) {

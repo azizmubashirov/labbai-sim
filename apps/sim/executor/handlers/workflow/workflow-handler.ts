@@ -406,11 +406,7 @@ export class WorkflowBlockHandler implements BlockHandler {
         hasLogs: (executionResult.logs?.length ?? 0) > 0,
       })
 
-      const childTraceSpans = this.captureChildWorkflowLogs(
-        executionResult,
-        childWorkflowName,
-        ctx
-      )
+      const childTraceSpans = this.captureChildWorkflowLogs(executionResult, childWorkflowName, ctx)
 
       return this.mapChildOutputToParent(
         executionResult,

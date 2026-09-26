@@ -26,10 +26,7 @@ interface ResolveSettingsHrefParams {
   workspaceId?: string
 }
 
-export function resolveSettingsHref({
-  options,
-  workspaceId,
-}: ResolveSettingsHrefParams): string {
+export function resolveSettingsHref({ options, workspaceId }: ResolveSettingsHrefParams): string {
   if (!workspaceId) return APP_ENTRY_PATH
   const section = options?.section || 'general'
 

@@ -108,22 +108,19 @@ describe('getToolActivityLabel', () => {
     expect(getToolActivityLabel('share_file', { action: 'unshare' })).toBe('stopped sharing files')
   })
 
-  it.each([
-    'query_user_table',
-    'table_manage',
-    'table_rows',
-    'table_columns',
-    'table_automations',
-  ])('keeps legacy combined table operations consistent with %s', (toolName) => {
-    const activity = TOOL_ACTIVITIES[toolName]
-    expect(typeof activity).toBe('object')
-    if (typeof activity === 'string' || !('parameter' in activity)) return
-    for (const operation of Object.keys(activity.operations)) {
-      expect(getToolActivityLabel('user_table', { operation })).toBe(
-        getToolActivityLabel(toolName, { operation })
-      )
+  it.each(['query_user_table', 'table_manage', 'table_rows', 'table_columns', 'table_automations'])(
+    'keeps legacy combined table operations consistent with %s',
+    (toolName) => {
+      const activity = TOOL_ACTIVITIES[toolName]
+      expect(typeof activity).toBe('object')
+      if (typeof activity === 'string' || !('parameter' in activity)) return
+      for (const operation of Object.keys(activity.operations)) {
+        expect(getToolActivityLabel('user_table', { operation })).toBe(
+          getToolActivityLabel(toolName, { operation })
+        )
+      }
     }
-  })
+  )
 
   it.each(['future_operation', '', null, 4, [], {}, 'constructor', 'toString', '__proto__'])(
     'uses neutral fallbacks for invalid or unknown operations: %j',

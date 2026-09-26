@@ -1,11 +1,11 @@
 import { createV2ResourceConcealmentPolicy } from '@/lib/api/server/routes/resource-concealment'
+import { IntegrationNotAllowedError } from '@/lib/labbai/access-control/permission-check'
 import {
   SelectorConnectionUnavailableError,
   SelectorContextUnavailableError,
   SelectorOptionsUnavailableError,
 } from '@/lib/selectors/server/errors'
 import { v2CaughtOrchestrationError, v2Error } from '@/app/api/v2/lib/response'
-import { IntegrationNotAllowedError } from '@/lib/labbai/access-control/permission-check'
 
 export const v2SelectorErrorPolicy = createV2ResourceConcealmentPolicy({
   notFoundMessage: 'Selector scope not found',

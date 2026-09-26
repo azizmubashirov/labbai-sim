@@ -154,8 +154,7 @@ function ScimConnectionPanel({ organizationId, connection }: ScimConnectionPanel
           inputClassName='font-mono'
         />
         <span className='text-[var(--text-muted)] text-caption'>
-          Enter this as the tenant or base URL in your identity provider, with a bearer token
-          below.
+          Enter this as the tenant or base URL in your identity provider, with a bearer token below.
         </span>
       </div>
 

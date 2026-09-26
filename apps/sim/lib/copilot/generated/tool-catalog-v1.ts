@@ -4399,8 +4399,7 @@ export const UserTable: ToolCatalogEntry = {
           },
           name: {
             type: 'string',
-            description:
-              "Table name (required for 'create').",
+            description: "Table name (required for 'create').",
           },
           newName: {
             type: 'string',

@@ -252,9 +252,7 @@ export function ConnectOAuthModal(props: ConnectOAuthModalProps) {
   const newScopes = !isConnect ? (props.newScopes ?? EMPTY_SCOPES) : EMPTY_SCOPES
 
   const newScopesSet = new Set(newScopes.filter((scope) => !isHiddenScope(scope)))
-  const displayScopes = [...requiredScopes].filter(
-    (scope) => !isHiddenScope(scope)
-  )
+  const displayScopes = [...requiredScopes].filter((scope) => !isHiddenScope(scope))
 
   if (!isConnect) {
     displayScopes.sort((a, b) => {
@@ -439,9 +437,7 @@ export function ConnectOAuthModal(props: ConnectOAuthModalProps) {
   }
 
   const createsDraft = isConnect || (!isConnect && Boolean(props.reconnectTarget))
-  const isPending =
-    (createsDraft && createDraft.isPending) ||
-    connectOAuthService.isPending
+  const isPending = (createsDraft && createDraft.isPending) || connectOAuthService.isPending
   const isDisabled = isConnect
     ? !displayName.trim() ||
       Boolean(clientConfiguration?.fields.some((field) => !oauthClientFields[field.id]?.trim())) ||

@@ -246,9 +246,7 @@ export const EvaluatorBlock: BlockConfig<EvaluatorResponse> = {
     },
   ],
   tools: {
-    access: [
-      'openai_chat',
-    ],
+    access: ['openai_chat'],
     config: {
       tool: (params: Record<string, any>) => getSerializedModelProviderId(params.model),
     },

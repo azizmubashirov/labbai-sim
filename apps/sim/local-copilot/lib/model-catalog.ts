@@ -176,9 +176,7 @@ export function resolveLocalCopilotCatalogEntry(catalogId: string): {
 export const LOCAL_COPILOT_PROVIDER_GROUPS: Array<{
   id: LocalCopilotProviderGroup
   label: string
-}> = [
-  { id: 'openai', label: 'OpenAI' },
-]
+}> = [{ id: 'openai', label: 'OpenAI' }]
 
 /** Leaf models for a provider group. */
 export function getLocalCopilotCatalogEntriesForGroup(

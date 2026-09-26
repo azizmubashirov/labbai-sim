@@ -29,7 +29,10 @@ const CURATED = new Map<string, string>(OPENAI_MODEL_IDS.map((id) => [id.toLower
 
 /** True for a GPT-5 / o-series reasoning id (no temperature; max_completion_tokens). */
 export function isOpenAIReasoningModelId(model: string): boolean {
-  const id = model.trim().toLowerCase().replace(/^openai\//, '')
+  const id = model
+    .trim()
+    .toLowerCase()
+    .replace(/^openai\//, '')
   return /^(gpt-5|gpt-6|o\d)/.test(id)
 }
 

@@ -3,15 +3,15 @@ import { member, permissionAccessRequest, user } from '@sim/db/schema'
 import { createLogger } from '@sim/logger'
 import { and, eq, inArray } from 'drizzle-orm'
 import { getEmailSubject, renderPermissionAccessRequestEmail } from '@/components/emails'
+import { enqueueOutboxEvent, type OutboxHandler } from '@/lib/core/outbox/service'
 import { getBaseUrl } from '@/lib/core/utils/urls'
 import type { DbOrTx } from '@/lib/db/types'
-import { enqueueOutboxEvent, type OutboxHandler } from '@/lib/core/outbox/service'
-import { sendEmail } from '@/lib/messaging/email/mailer'
-import { getFromEmailAddress } from '@/lib/messaging/email/utils'
 import {
   ACCESS_REQUEST_CREATED_EVENT,
   ACCESS_REQUEST_DECIDED_EVENT,
 } from '@/lib/labbai/access-requests/constants'
+import { sendEmail } from '@/lib/messaging/email/mailer'
+import { getFromEmailAddress } from '@/lib/messaging/email/utils'
 
 const logger = createLogger('AccessRequestNotifications')
 

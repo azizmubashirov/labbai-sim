@@ -83,15 +83,12 @@ describe('WorkspaceVFS dynamic render reads', () => {
 
   it('marks render exceptions as file read errors', async () => {
     const vfs = arrangeRenderRead()
-    renderDocToGrid.mockRejectedValue(
-      new Error('Document render failed: compiler unavailable')
-    )
+    renderDocToGrid.mockRejectedValue(new Error('Document render failed: compiler unavailable'))
 
     const result = await vfs.readFileContent('files/brief.pdf/render')
 
     expect(result).toEqual({
-      content:
-        '{"ok":false,"error":"Document render failed: compiler unavailable"}',
+      content: '{"ok":false,"error":"Document render failed: compiler unavailable"}',
       totalLines: 1,
       error: 'Document render failed: compiler unavailable',
     })

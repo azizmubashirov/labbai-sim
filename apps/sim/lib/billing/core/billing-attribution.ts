@@ -4,9 +4,9 @@ import { generateId, isValidUuid } from '@sim/utils/id'
 import { isRecordLike } from '@sim/utils/object'
 import { and, eq } from 'drizzle-orm'
 import { parseBillingConcurrencyLimit } from '@/lib/billing/concurrency-defaults'
-import { getOrganizationSubscription } from '@/lib/billing/core/billing'
+import type { getOrganizationSubscription } from '@/lib/billing/core/billing'
 import { defaultBillingPeriod } from '@/lib/billing/core/billing-period'
-import { getHighestPriorityPersonalSubscription } from '@/lib/billing/core/plan'
+import type { getHighestPriorityPersonalSubscription } from '@/lib/billing/core/plan'
 import {
   ENTERPRISE_REPORTING_PERIOD_ANCHOR_METADATA_KEY,
   resolveSubscriptionUsagePeriod,

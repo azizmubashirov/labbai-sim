@@ -169,7 +169,6 @@ describe('Error Extractors', () => {
   })
 
   describe('extractErrorMessage with explicit extractorId', () => {
-
     it('should use specified extractor directly (deterministic)', () => {
       const errorInfo: ErrorInfo = {
         status: 403,

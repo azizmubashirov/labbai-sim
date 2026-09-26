@@ -908,16 +908,14 @@ async function acceptLockedInvitation(
    * deployments, with a retry that rendered the same preview.
    */
   const willCreateMembership =
-    shouldJoinOrganization &&
-    !alreadyMemberOfTargetOrganization &&
-    !!workspaceOrganizationId
+    shouldJoinOrganization && !alreadyMemberOfTargetOrganization && !!workspaceOrganizationId
   if (input.disclosedOutcome !== undefined && input.disclosedOutcome !== 'blocked') {
     if ((input.disclosedOutcome === 'will-join') !== willCreateMembership) {
       return { success: false, kind: 'disclosure-outdated' }
     }
   }
 
-  let targetOrganizationId = workspaceOrganizationId
+  const targetOrganizationId = workspaceOrganizationId
 
   if (shouldJoinOrganization) {
     const alreadyMemberOfTarget = alreadyMemberOfTargetOrganization

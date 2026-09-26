@@ -23,9 +23,7 @@ import {
   ConnectServiceAccountModal,
   useServiceAccountConnectTarget,
 } from '@/app/workspace/[workspaceId]/integrations/components/connect-service-account-modal'
-import {
-  derivedAclCapFieldIds,
-} from '@/app/workspace/[workspaceId]/knowledge/[id]/components/connector-access-field/connector-access'
+import { derivedAclCapFieldIds } from '@/app/workspace/[workspaceId]/knowledge/[id]/components/connector-access-field/connector-access'
 import {
   ConnectorAccessField,
   type ConnectorAccessSelection,
@@ -235,72 +233,72 @@ export function ConnectorSettingsFields({
         </ChipModalField>
       )}
       {syncsPerMember && connectorConfig?.supportsSeparateContentCredential && (
-          <ConnectorContentCredentialField
-            credentialId={contentCredentialId}
-            onChange={onContentCredentialChange}
-            options={credentialOptions}
-            isLoading={credentialsLoading}
-            disabled={isSaving || !canAdmin}
-          />
-        )}
+        <ConnectorContentCredentialField
+          credentialId={contentCredentialId}
+          onChange={onContentCredentialChange}
+          options={credentialOptions}
+          isLoading={credentialsLoading}
+          disabled={isSaving || !canAdmin}
+        />
+      )}
       {connectorConfig && showAccessField && !hideFixedAccessMode && (
-          <ConnectorAccessField
-            scope={scope}
-            connectorConfig={connectorConfig}
-            value={access}
-            onChange={onAccessChange}
-            canAdmin={canAdmin}
-            lockAccessMode={isSearchIndex}
-            isAvailabilityReady={availability.isReady}
-            allowMembers={allowMembers}
-            allowAdmin={allowAdmin}
-            allowWorkspace={allowWorkspace}
-            disabled={isSaving}
-            footer={
-              canReenableMemberSync ? (
-                <div className='flex flex-col gap-2'>
-                  <div>
-                    <Chip
-                      variant='primary'
-                      onClick={onApplyAccess}
-                      disabled={!accessComplete || isSaving}
-                    >
-                      {isSwitchingAccess ? 'Re-enabling…' : 'Re-enable per-member sync'}
-                    </Chip>
-                  </div>
-                  <p className='text-[var(--text-muted)] text-caption leading-snug'>
-                    Members and their documents are kept; the next sync restores their access.
-                  </p>
+        <ConnectorAccessField
+          scope={scope}
+          connectorConfig={connectorConfig}
+          value={access}
+          onChange={onAccessChange}
+          canAdmin={canAdmin}
+          lockAccessMode={isSearchIndex}
+          isAvailabilityReady={availability.isReady}
+          allowMembers={allowMembers}
+          allowAdmin={allowAdmin}
+          allowWorkspace={allowWorkspace}
+          disabled={isSaving}
+          footer={
+            canReenableMemberSync ? (
+              <div className='flex flex-col gap-2'>
+                <div>
+                  <Chip
+                    variant='primary'
+                    onClick={onApplyAccess}
+                    disabled={!accessComplete || isSaving}
+                  >
+                    {isSwitchingAccess ? 'Re-enabling…' : 'Re-enable per-member sync'}
+                  </Chip>
                 </div>
-              ) : accessDirty && (!isContentCredentialChange || syncsPerMember) ? (
-                <div className='flex flex-col gap-2'>
-                  <div className='flex items-center gap-2'>
-                    <Chip
-                      variant='primary'
-                      onClick={onApplyAccess}
-                      disabled={!accessComplete || isSaving}
-                    >
-                      {isSwitchingAccess
-                        ? 'Switching…'
-                        : isContentCredentialChange
-                          ? 'Change indexing account'
-                          : 'Apply connection method'}
-                    </Chip>
-                    <Chip onClick={onResetAccess} disabled={isSaving}>
-                      {accessSetupHint ? 'Edit settings' : 'Cancel'}
-                    </Chip>
-                  </div>
-                  <p className='text-[var(--text-muted)] text-caption leading-snug'>
-                    {accessSetupHint ??
-                      (isContentCredentialChange
-                        ? 'The next sync uses this account. Members keep their connected accounts and source permissions.'
-                        : SWITCH_NOTICE[access.accessMode])}
-                  </p>
+                <p className='text-[var(--text-muted)] text-caption leading-snug'>
+                  Members and their documents are kept; the next sync restores their access.
+                </p>
+              </div>
+            ) : accessDirty && (!isContentCredentialChange || syncsPerMember) ? (
+              <div className='flex flex-col gap-2'>
+                <div className='flex items-center gap-2'>
+                  <Chip
+                    variant='primary'
+                    onClick={onApplyAccess}
+                    disabled={!accessComplete || isSaving}
+                  >
+                    {isSwitchingAccess
+                      ? 'Switching…'
+                      : isContentCredentialChange
+                        ? 'Change indexing account'
+                        : 'Apply connection method'}
+                  </Chip>
+                  <Chip onClick={onResetAccess} disabled={isSaving}>
+                    {accessSetupHint ? 'Edit settings' : 'Cancel'}
+                  </Chip>
                 </div>
-              ) : undefined
-            }
-          />
-        )}
+                <p className='text-[var(--text-muted)] text-caption leading-snug'>
+                  {accessSetupHint ??
+                    (isContentCredentialChange
+                      ? 'The next sync uses this account. Members keep their connected accounts and source permissions.'
+                      : SWITCH_NOTICE[access.accessMode])}
+                </p>
+              </div>
+            ) : undefined
+          }
+        />
+      )}
 
       {connectorConfig && needsWorkspaceCredential && canAdmin && (
         <ChipModalField

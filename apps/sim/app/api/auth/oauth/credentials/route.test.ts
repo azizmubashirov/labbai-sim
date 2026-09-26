@@ -216,17 +216,14 @@ describe('OAuth Credentials API Route', () => {
       expect(getMissingRequiredScopes(credential, grantedScopes)).toEqual([])
     })
 
-    it.each([null, '', ' \t\n '])(
-      'preserves the omitted-scope fallback for %j',
-      async (scope) => {
-        const credential = await requestCredential('google-drive', scope)
-        const requiredScopes = getCanonicalScopesForProvider('google-drive')
+    it.each([null, '', ' \t\n '])('preserves the omitted-scope fallback for %j', async (scope) => {
+      const credential = await requestCredential('google-drive', scope)
+      const requiredScopes = getCanonicalScopesForProvider('google-drive')
 
-        expect(requiredScopes.length).toBeGreaterThan(0)
-        expect(credential.scopes).toEqual(requiredScopes)
-        expect(getMissingRequiredScopes(credential, requiredScopes)).toEqual([])
-      }
-    )
+      expect(requiredScopes.length).toBeGreaterThan(0)
+      expect(credential.scopes).toEqual(requiredScopes)
+      expect(getMissingRequiredScopes(credential, requiredScopes)).toEqual([])
+    })
   })
 
   /** The session/executor split documented on {@link integrationsWithheldFromSession} in the route. */

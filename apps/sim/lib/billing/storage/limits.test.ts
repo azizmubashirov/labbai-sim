@@ -1,11 +1,7 @@
 /**
  * @vitest-environment node
  */
-import {
-  dbChainMockFns,
-  envMockFns,
-  resetDbChainMock,
-} from '@sim/testing'
+import { dbChainMockFns, envMockFns, resetDbChainMock } from '@sim/testing'
 
 const mockGetEnv = envMockFns.getEnv
 

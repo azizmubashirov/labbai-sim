@@ -8,10 +8,10 @@ import {
   resolveInvitationAdmissionOrganizationId,
 } from '@/lib/invitations/core'
 import { WorkspaceInvitationError } from '@/lib/invitations/workspace-invitations'
+import { validateInvitationsAllowed } from '@/lib/labbai/access-control/permission-check'
 import { acquirePermissionGroupOrgLock } from '@/lib/permission-groups/locks'
 import { getWorkspaceWithOwner, type WorkspaceWithOwner } from '@/lib/workspaces/permissions/utils'
 import { getWorkspaceInvitePolicy, WORKSPACE_MODE } from '@/lib/workspaces/policy'
-import { validateInvitationsAllowed } from '@/lib/labbai/access-control/permission-check'
 
 /**
  * Revalidates resend policy on the mutation connection. Invitation/workspace locks

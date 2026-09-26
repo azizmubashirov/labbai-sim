@@ -345,10 +345,7 @@ async function writeUser(
     }
     const name = accountNameOf(attributes)
     if (name !== accountNameOf(current.attributes)) {
-      await tx
-        .update(user)
-        .set({ name, updatedAt: new Date() })
-        .where(eq(user.id, current.userId))
+      await tx.update(user).set({ name, updatedAt: new Date() }).where(eq(user.id, current.userId))
     }
     return { row: updated, previous: current }
   })

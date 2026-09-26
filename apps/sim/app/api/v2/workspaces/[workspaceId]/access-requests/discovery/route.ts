@@ -2,9 +2,9 @@ import { v2DiscoverWorkspaceAccessRequestsContract } from '@/lib/api/contracts/v
 import { cursorRoute, cursorScopeKey } from '@/lib/api/cursor-binding'
 import { defineV2JsonRoute, v2ApiKeyAuth, v2RateLimits } from '@/lib/api/server/routes'
 import { v2AccessRequestErrorPolicy } from '@/lib/api/server/routes/access-requests'
-import { cursorSortKey, decodeOffsetCursor, encodeOffsetCursor } from '@/app/api/v2/lib/response'
 import { accessRequestOperations } from '@/lib/labbai/access-requests/application/operations'
 import { discoverAccessRequests } from '@/lib/labbai/access-requests/application/requests'
+import { cursorSortKey, decodeOffsetCursor, encodeOffsetCursor } from '@/app/api/v2/lib/response'
 
 function cursorFilters(
   params: { workspaceId: string },

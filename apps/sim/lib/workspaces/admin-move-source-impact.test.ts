@@ -109,11 +109,7 @@ describe('resolveMoveEntitlements', () => {
      * headline ones.
      */
     expect(result.capabilitiesLost).toEqual(
-      expect.arrayContaining([
-        'permission groups',
-        'audit logs',
-        'organization connected accounts',
-      ])
+      expect.arrayContaining(['permission groups', 'audit logs', 'organization connected accounts'])
     )
   })
 

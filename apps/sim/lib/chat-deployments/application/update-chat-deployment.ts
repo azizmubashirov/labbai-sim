@@ -23,9 +23,9 @@ import { buildChatDeploymentUrl } from '@/lib/chat-deployments/urls'
 import { defineAuthorizedWorkspaceUseCase } from '@/lib/core/application'
 import { OrchestrationError } from '@/lib/core/orchestration/types'
 import { encryptSecret } from '@/lib/core/security/encryption'
+import { validateChatDeployAuth } from '@/lib/labbai/access-control/permission-check'
 import { checkNeedsRedeployment } from '@/lib/workflows/deployment-status'
 import { getWorkflowDeploymentSummary, performFullDeploy } from '@/lib/workflows/orchestration'
-import { validateChatDeployAuth } from '@/lib/labbai/access-control/permission-check'
 
 const logger = createLogger('UpdateChatDeployment')
 

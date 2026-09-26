@@ -709,8 +709,7 @@ export function isOrganizationSettingsSectionAvailable(
   )
     return true
   /* Sim Search itself is enterprise on the hosted product; self-hosted gates it by flag, not by section. */
-  if (section === 'integrations')
-    return !features.hosted || features.hasEnterprisePlan
+  if (section === 'integrations') return !features.hosted || features.hasEnterprisePlan
   /**
    * Access Control follows governance rather than the plan gate: its restrictions keep applying
    * through a failing payment, so hiding the page that edits them would leave an organization

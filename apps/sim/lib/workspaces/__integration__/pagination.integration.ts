@@ -76,9 +76,7 @@ describe('workspace pagination against PostgreSQL', () => {
   })
 
   afterAll(async () => {
-    await db
-      .delete(workspace)
-      .where(inArray(workspace.id, [workspaceId, otherWorkspaceId]))
+    await db.delete(workspace).where(inArray(workspace.id, [workspaceId, otherWorkspaceId]))
     await db.delete(user).where(eq(user.id, userId))
     await db.$client.end()
   })

@@ -183,7 +183,7 @@ import { isLargeArrayManifest } from '@/lib/execution/payloads/large-array-manif
 import { isLargeValueRef } from '@/lib/execution/payloads/large-value-ref'
 import * as fileMaterialization from '@/lib/execution/payloads/materialization.server'
 import { executeFunctionRequest } from '@/lib/function-execution/execute-request'
-import { ResolvedSecretTraceRegistry } from '@/executor/utils/resolved-secret-trace-registry'
+import type { ResolvedSecretTraceRegistry } from '@/executor/utils/resolved-secret-trace-registry'
 
 async function POST(
   request: NextRequest,

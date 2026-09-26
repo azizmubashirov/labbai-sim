@@ -1,4 +1,3 @@
-import type { PermissionGroupConfig } from '@/lib/permission-groups/fields'
 import type { StoredAccessRequestPolicyChange } from '@/lib/labbai/access-requests/schemas'
 import {
   ACCESS_REQUEST_LIST_TARGETS,
@@ -7,6 +6,7 @@ import {
   getConfigKeyLabel,
   isFeatureRequestableInScope,
 } from '@/lib/labbai/access-requests/targets'
+import type { PermissionGroupConfig } from '@/lib/permission-groups/fields'
 
 /**
  * Pure policy arithmetic: whether a permission-group config already grants a

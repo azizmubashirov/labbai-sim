@@ -310,7 +310,9 @@ export function AddConnectorModal({
 
   const showCredentialPicker =
     !isMembersMode ||
-    connectorConfig?.configFields.some((field) => field.type === 'selector' && isFieldVisible(field))
+    connectorConfig?.configFields.some(
+      (field) => field.type === 'selector' && isFieldVisible(field)
+    )
 
   const saveSetup = () => {
     if (!setupDraftKey) return
@@ -358,8 +360,7 @@ export function AddConnectorModal({
       : null
 
   const contentCredentialField =
-    isMembersMode &&
-    connectorConfig?.supportsSeparateContentCredential ? (
+    isMembersMode && connectorConfig?.supportsSeparateContentCredential ? (
       <>
         <ConnectorContentCredentialField
           credentialId={contentCredentialId}
@@ -818,13 +819,11 @@ export function AddConnectorModal({
                     <ChipModalField
                       type='custom'
                       title='Sync Frequency'
-                      hint={
-                        connectorSyncFrequencyHint(
-                          access.accessMode,
-                          syncInterval,
-                          Boolean(contentCredentialId)
-                        )
-                      }
+                      hint={connectorSyncFrequencyHint(
+                        access.accessMode,
+                        syncInterval,
+                        Boolean(contentCredentialId)
+                      )}
                     >
                       <ChipSelect
                         fullWidth

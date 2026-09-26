@@ -28,11 +28,11 @@ import {
   WorkspaceInvitationError,
   type WorkspaceInvitationResult,
 } from '@/lib/invitations/workspace-invitations'
+import { InvitationsNotAllowedError } from '@/lib/labbai/access-control/permission-check'
 import { createOrganizationInvitation } from '@/lib/organizations/application/invitations'
 import { assertWorkspaceCapability } from '@/lib/permission-groups/capability-assertions'
 import { resolveActiveWorkspaceApplicationContext } from '@/lib/workspaces/application/workspace-context'
 import { getWorkspaceInvitePolicy } from '@/lib/workspaces/policy'
-import { InvitationsNotAllowedError } from '@/lib/labbai/access-control/permission-check'
 
 const logger = createLogger('InvitationBatch')
 

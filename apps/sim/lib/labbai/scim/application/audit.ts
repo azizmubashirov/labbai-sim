@@ -1,8 +1,4 @@
-import {
-  type AuditActionType,
-  type AuditResourceTypeValue,
-  recordAudit,
-} from '@sim/audit'
+import { type AuditActionType, type AuditResourceTypeValue, recordAudit } from '@sim/audit'
 import type { ScimConnectionPrincipal } from '@sim/auth/principal'
 import type { OrchestrationRequestContext } from '@/lib/core/orchestration/types'
 

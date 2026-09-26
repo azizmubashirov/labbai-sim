@@ -11,13 +11,13 @@ import {
 import { prefetchStandaloneGeneral } from '@/components/settings/prefetch-standalone-general'
 import { SettingsSectionProvider } from '@/components/settings/settings-panel'
 import { getSession } from '@/lib/auth'
+import { getLegacyAccessRequestsQuery } from '@/lib/labbai/access-requests/navigation'
 import { organizationRoutes } from '@/lib/navigation/paths'
 import { authorizeOrganizationSettingsSection } from '@/lib/settings/application/organization-section-access'
 import { getQueryClient } from '@/app/_shell/providers/get-query-client'
 import { buildAuthCrossLink } from '@/app/(auth)/auth-redirect'
 import { OrganizationSettings } from '@/app/o/[organizationId]/settings/[section]/settings'
 import { resolveOrganizationSurfaceSection } from '@/app/o/[organizationId]/settings/navigation'
-import { getLegacyAccessRequestsQuery } from '@/lib/labbai/access-requests/navigation'
 
 interface OrganizationSettingsSectionPageProps {
   params: Promise<{ organizationId: string; section: string }>

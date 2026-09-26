@@ -85,5 +85,4 @@ describe('OpenAI base64 embeddings', () => {
 
     expect(() => request.parse({ data: [{ embedding }] })).toThrow('base64 embedding')
   })
-
 })

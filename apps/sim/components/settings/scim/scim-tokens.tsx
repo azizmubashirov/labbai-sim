@@ -40,9 +40,7 @@ export function ScimTokens({ organizationId, credentials }: ScimTokensProps) {
 
       {secret ? (
         <div className='flex flex-col gap-2 rounded-md border border-[var(--border)] p-3'>
-          <span className='text-sm'>
-            Copy this token now. It will not be shown again.
-          </span>
+          <span className='text-sm'>Copy this token now. It will not be shown again.</span>
           <ChipCopyInput
             value={secret}
             copyLabel='Copy SCIM token'

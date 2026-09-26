@@ -552,32 +552,33 @@ describe('ShareModal', () => {
     }
   )
 
-  it.each([
-    { mode: 'Email' as const, authType: 'email' as const, entry: 'person@example.com' },
-  ])('requires an allow-list before sharing in $mode mode', async ({ mode, authType, entry }) => {
-    await renderModal()
-    await click(mode)
+  it.each([{ mode: 'Email' as const, authType: 'email' as const, entry: 'person@example.com' }])(
+    'requires an allow-list before sharing in $mode mode',
+    async ({ mode, authType, entry }) => {
+      await renderModal()
+      await click(mode)
 
-    expect(button('Share')).toBeDisabled()
+      expect(button('Share')).toBeDisabled()
 
-    await changeAllowedEmails(entry)
-    expect(button('Share')).toBeEnabled()
+      await changeAllowedEmails(entry)
+      expect(button('Share')).toBeEnabled()
 
-    await click('Share')
+      await click('Share')
 
-    expect(mockMutate).toHaveBeenLastCalledWith(
-      {
-        workspaceId: 'workspace-1',
-        fileId: 'file-1',
-        token: 'pending-token-1234567890',
-        isActive: true,
-        authType,
-        allowedEmails: [entry],
-      },
-      expect.objectContaining({ onSuccess: expect.any(Function) })
-    )
-    expect(onOpenChange).not.toHaveBeenCalled()
-  })
+      expect(mockMutate).toHaveBeenLastCalledWith(
+        {
+          workspaceId: 'workspace-1',
+          fileId: 'file-1',
+          token: 'pending-token-1234567890',
+          isActive: true,
+          authType,
+          allowedEmails: [entry],
+        },
+        expect.objectContaining({ onSuccess: expect.any(Function) })
+      )
+      expect(onOpenChange).not.toHaveBeenCalled()
+    }
+  )
 
   it.each([
     { mode: 'Password' as const, value: 'correct horse battery staple' },

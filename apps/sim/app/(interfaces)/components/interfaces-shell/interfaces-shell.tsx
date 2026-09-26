@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
-import { SupportFooter } from '@/app/(auth)/components'
 import { LogoShell } from '@/app/_shell/logo-shell'
+import { SupportFooter } from '@/app/(auth)/components'
 
 /**
  * Chrome for the `(interfaces)` route group (chat + resume) — the lightweight,

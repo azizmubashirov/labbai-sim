@@ -396,9 +396,7 @@ describe('organization setup entry points', () => {
     }
   )
 
-  it.each([
-    { type: 'google_drive', mode: 'admin', name: 'Connect Google Drive service account' },
-  ])(
+  it.each([{ type: 'google_drive', mode: 'admin', name: 'Connect Google Drive service account' }])(
     'opens the known $name configuration after preparing its missing index',
     async ({ type, mode, name }) => {
       mocks.bases = []
@@ -516,9 +514,7 @@ describe('organization setup entry points', () => {
     }
   )
 
-  it.each([
-    { type: 'google_drive', provider: 'google-drive', block: 'google_drive' },
-  ])(
+  it.each([{ type: 'google_drive', provider: 'google-drive', block: 'google_drive' }])(
     'prepares central $type without a personal OAuth rollout and refuses a disabled member entry',
     async ({ type, provider, block }) => {
       mocks.bases = []
@@ -678,9 +674,7 @@ describe('administrator source prerequisites in real connector dialogs', () => {
     }
   )
 
-  it.each([
-    { type: 'google_drive', provider: 'google-drive' },
-  ])(
+  it.each([{ type: 'google_drive', provider: 'google-drive' }])(
     'requires the Directory administrator email in $type administrator mode and refuses empty or blank subjects',
     async ({ type, provider }) => {
       mocks.credentials = [{ ...driveCredential, provider }]
@@ -716,9 +710,7 @@ describe('administrator source prerequisites in real connector dialogs', () => {
     }
   )
 
-  it.each([
-    { type: 'google_drive', provider: 'google-drive', name: 'Google Drive' },
-  ])(
+  it.each([{ type: 'google_drive', provider: 'google-drive', name: 'Google Drive' }])(
     'excludes personal OAuth accounts and stale OAuth drafts from $type administrator setup',
     async ({ type, provider, name }) => {
       const oauthCredential = {

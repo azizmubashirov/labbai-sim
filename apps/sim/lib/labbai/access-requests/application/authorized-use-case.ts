@@ -22,7 +22,10 @@ import {
   PrincipalKindAuthorizationError,
 } from '@/lib/core/application/workspace-authorization'
 import { runWithOutboundOrganization } from '@/lib/core/network/context.server'
-import { OrchestrationError, type OrchestrationRequestContext } from '@/lib/core/orchestration/types'
+import {
+  OrchestrationError,
+  type OrchestrationRequestContext,
+} from '@/lib/core/orchestration/types'
 import type { DbOrTx } from '@/lib/db/types'
 import type { AccessRequestOperation } from '@/lib/labbai/access-requests/application/operations'
 import type { AccessRequestScope } from '@/lib/labbai/access-requests/targets'
@@ -113,8 +116,7 @@ async function requireActiveAccount(userId: string, executor: DbOrTx): Promise<v
     .where(eq(user.id, userId))
     .limit(1)
   const banned =
-    Boolean(account?.banned) &&
-    !(account?.banExpires && account.banExpires.getTime() <= Date.now())
+    Boolean(account?.banned) && !(account?.banExpires && account.banExpires.getTime() <= Date.now())
   if (!account || banned || account.suspendedAt) {
     throw new OrchestrationError('forbidden', 'This account cannot make access requests')
   }
@@ -261,11 +263,9 @@ export async function authorizeAccessRequestScope(
  * lifecycle for both scopes — authorize, optionally lock and re-authorize,
  * execute, then project audit entries and run after-success effects.
  */
-export function defineAuthorizedAccessRequestUseCase<
-  const O extends AccessRequestOperation,
-  I,
-  R,
->(definition: AccessRequestUseCaseDefinition<O, I, R>): AuthorizingUseCase<O, I, R> {
+export function defineAuthorizedAccessRequestUseCase<const O extends AccessRequestOperation, I, R>(
+  definition: AccessRequestUseCaseDefinition<O, I, R>
+): AuthorizingUseCase<O, I, R> {
   async function preflight(args: {
     principal: Principal
     input: I

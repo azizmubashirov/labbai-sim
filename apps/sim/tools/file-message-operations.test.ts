@@ -53,10 +53,13 @@ function request(
 }
 
 describe('file and message operation declarations', () => {
-  it.each([pipedriveGetFilesTool])('$id uses typed operation input without HTTP metadata', (tool) => {
-    expect(tool.operation.input).toBeTypeOf('function')
-    expect('request' in tool).toBe(false)
-  })
+  it.each([pipedriveGetFilesTool])(
+    '$id uses typed operation input without HTTP metadata',
+    (tool) => {
+      expect(tool.operation.input).toBeTypeOf('function')
+      expect('request' in tool).toBe(false)
+    }
+  )
 })
 
 describe('file and message direct handlers', () => {

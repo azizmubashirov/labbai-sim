@@ -94,11 +94,7 @@ describe('RateLimiter', () => {
 
       expect(result.allowed).toBe(true)
       expect(result.remaining).toBe(mockResult.tokensRemaining)
-      expect(mockAdapter.consumeTokens).toHaveBeenCalledWith(
-        `${testUserId}:sync`,
-        1,
-        LIMITS.sync
-      )
+      expect(mockAdapter.consumeTokens).toHaveBeenCalledWith(`${testUserId}:sync`, 1, LIMITS.sync)
     })
 
     it('should use async bucket for async requests', async () => {
@@ -111,11 +107,7 @@ describe('RateLimiter', () => {
 
       await rateLimiter.checkRateLimitWithSubscription(testUserId, freeSubscription, 'api', true)
 
-      expect(mockAdapter.consumeTokens).toHaveBeenCalledWith(
-        `${testUserId}:async`,
-        1,
-        LIMITS.async
-      )
+      expect(mockAdapter.consumeTokens).toHaveBeenCalledWith(`${testUserId}:async`, 1, LIMITS.async)
     })
 
     it('should use api-endpoint bucket for api-endpoint trigger', async () => {
@@ -173,11 +165,7 @@ describe('RateLimiter', () => {
 
       await rateLimiter.checkRateLimitWithSubscription(testUserId, teamSubscription, 'api', false)
 
-      expect(mockAdapter.consumeTokens).toHaveBeenCalledWith(
-        `${orgId}:sync`,
-        1,
-        LIMITS.sync
-      )
+      expect(mockAdapter.consumeTokens).toHaveBeenCalledWith(`${orgId}:sync`, 1, LIMITS.sync)
     })
 
     it('should use user key when team subscription referenceId matches userId', async () => {
@@ -196,11 +184,7 @@ describe('RateLimiter', () => {
         false
       )
 
-      expect(mockAdapter.consumeTokens).toHaveBeenCalledWith(
-        `${testUserId}:sync`,
-        1,
-        LIMITS.sync
-      )
+      expect(mockAdapter.consumeTokens).toHaveBeenCalledWith(`${testUserId}:sync`, 1, LIMITS.sync)
     })
 
     it('should allow on storage error (fail open)', async () => {
@@ -304,10 +288,7 @@ describe('RateLimiter', () => {
       expect(status.remaining).toBe(15)
       expect(status.requestsPerMinute).toBe(LIMITS.sync.refillRate)
       expect(status.maxBurst).toBe(LIMITS.sync.maxTokens)
-      expect(mockAdapter.getTokenStatus).toHaveBeenCalledWith(
-        `${testUserId}:sync`,
-        LIMITS.sync
-      )
+      expect(mockAdapter.getTokenStatus).toHaveBeenCalledWith(`${testUserId}:sync`, LIMITS.sync)
     })
   })
 
@@ -378,11 +359,7 @@ describe('RateLimiter', () => {
 
       await rateLimiter.checkRateLimitWithSubscription(testUserId, null, 'api', false)
 
-      expect(mockAdapter.consumeTokens).toHaveBeenCalledWith(
-        `${testUserId}:sync`,
-        1,
-        LIMITS.sync
-      )
+      expect(mockAdapter.consumeTokens).toHaveBeenCalledWith(`${testUserId}:sync`, 1, LIMITS.sync)
     })
   })
 
@@ -402,11 +379,7 @@ describe('RateLimiter', () => {
         false
       )
 
-      expect(mockAdapter.consumeTokens).toHaveBeenCalledWith(
-        `${testUserId}:sync`,
-        1,
-        LIMITS.sync
-      )
+      expect(mockAdapter.consumeTokens).toHaveBeenCalledWith(`${testUserId}:sync`, 1, LIMITS.sync)
     })
 
     it('should use async bucket for schedule trigger with isAsync true', async () => {
@@ -424,11 +397,7 @@ describe('RateLimiter', () => {
         true
       )
 
-      expect(mockAdapter.consumeTokens).toHaveBeenCalledWith(
-        `${testUserId}:async`,
-        1,
-        LIMITS.async
-      )
+      expect(mockAdapter.consumeTokens).toHaveBeenCalledWith(`${testUserId}:async`, 1, LIMITS.async)
     })
   })
 

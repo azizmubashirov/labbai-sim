@@ -82,7 +82,11 @@ describe('findModelRefusal', () => {
 
   it('refuses a provider outside the allowlist', () => {
     expect(
-      findModelRefusal({ deniedModels: [], allowedModelProviders: ['anthropic'] }, 'gpt-4o', 'openai')
+      findModelRefusal(
+        { deniedModels: [], allowedModelProviders: ['anthropic'] },
+        'gpt-4o',
+        'openai'
+      )
     ).toEqual({ kind: 'provider', providerId: 'openai' })
   })
 

@@ -131,6 +131,7 @@ import {
   listKnowledgeBaseCatalog,
   listKnowledgeBases,
 } from '@/lib/knowledge/application/knowledge-bases'
+import { resolveVerifiedUserAccessControlContext } from '@/lib/labbai/access-control/permission-check'
 import { validateMermaidSource } from '@/lib/mermaid/validate'
 import { isBlockTypeAccessControlExempt } from '@/lib/permission-groups/block-access'
 import { resolvePermissionGroupConfig } from '@/lib/permission-groups/config-scope.server'
@@ -187,7 +188,6 @@ import { BLOCK_REGISTRY } from '@/blocks/registry-maps'
 import type { BlockConfig } from '@/blocks/types'
 import { isHiddenUnder, overlayVisibility } from '@/blocks/visibility/context'
 import { CONNECTOR_REGISTRY } from '@/connectors/registry.server'
-import { resolveVerifiedUserAccessControlContext } from '@/lib/labbai/access-control/permission-check'
 import type { ExecutableToolConfig } from '@/tools/types'
 import { TRIGGER_REGISTRY } from '@/triggers/registry'
 

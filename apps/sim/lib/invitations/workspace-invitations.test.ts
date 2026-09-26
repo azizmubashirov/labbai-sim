@@ -122,9 +122,9 @@ import {
   createWorkspaceInvitation,
   prepareWorkspaceInvitationContext,
 } from '@/lib/invitations/workspace-invitations'
+import { validateInvitationsAllowed } from '@/lib/labbai/access-control/permission-check'
 import { hasWorkspaceAdminAccess } from '@/lib/workspaces/permissions/utils'
 import { getWorkspaceInvitePolicy } from '@/lib/workspaces/policy'
-import { validateInvitationsAllowed } from '@/lib/labbai/access-control/permission-check'
 
 function queueWhereResponses(responses: unknown[][]) {
   const queue = [...responses]

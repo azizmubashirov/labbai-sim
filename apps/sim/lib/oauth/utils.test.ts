@@ -331,9 +331,9 @@ describe('getScopeDescription', () => {
     expect(getScopeDescription('https://www.googleapis.com/auth/drive.file')).toBe(
       'View and manage Google Drive files'
     )
-    expect(
-      getScopeDescription('https://www.googleapis.com/auth/calendar', 'google-calendar')
-    ).toBe('View and manage calendar')
+    expect(getScopeDescription('https://www.googleapis.com/auth/calendar', 'google-calendar')).toBe(
+      'View and manage calendar'
+    )
   })
 
   it.concurrent('falls back to the raw scope string for an unknown scope', () => {
@@ -452,7 +452,6 @@ describe('parseProvider', () => {
     expect(config.baseProvider).toBe('unknown')
     expect(config.featureType).toBe('default')
   })
-
 })
 
 describe('getScopesForService', () => {

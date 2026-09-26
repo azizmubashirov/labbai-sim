@@ -402,9 +402,7 @@ export function WorkflowGroupMetaCell({
 }: WorkflowGroupMetaCellProps) {
   const isEnrichment = groupType === 'enrichment'
   const wf = workflows?.find((w) => w.id === workflowId)
-  const name = isEnrichment
-    ? (groupName ?? 'Enrichment')
-    : (wf?.name ?? 'Workflow')
+  const name = isEnrichment ? (groupName ?? 'Enrichment') : (wf?.name ?? 'Workflow')
 
   const [optionsMenuOpen, setOptionsMenuOpen] = useState(false)
   const [optionsMenuPosition, setOptionsMenuPosition] = useState({ x: 0, y: 0 })

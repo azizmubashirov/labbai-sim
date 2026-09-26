@@ -143,7 +143,7 @@ describe('fixed Copilot Table application commands', () => {
       copilotDeleteTablesPolicy,
       copilotUpdateWorkflowTableGroupPolicy,
       copilotAddWorkflowTableGroupOutputPolicy,
-          copilotCreateTableFromWorkspaceFilePolicy,
+      copilotCreateTableFromWorkspaceFilePolicy,
       copilotImportWorkspaceFileIntoTablePolicy,
     ]
 

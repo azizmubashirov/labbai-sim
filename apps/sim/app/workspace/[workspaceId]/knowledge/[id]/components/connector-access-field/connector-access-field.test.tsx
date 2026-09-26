@@ -22,7 +22,9 @@ vi.mock('@/hooks/queries/source-accounts', () => ({
         credentialGroup: mocks.configured
           ? {
               status: 'active',
-              options: [{ provider: 'google-drive', status: 'active', configurationStatus: 'ready' }],
+              options: [
+                { provider: 'google-drive', status: 'active', configurationStatus: 'ready' },
+              ],
             }
           : null,
       },

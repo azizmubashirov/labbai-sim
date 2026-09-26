@@ -49,11 +49,7 @@ export type JobType =
   | 'cleanup-file-versions'
   | 'knowledge-connector-directory-sync'
 
-export type AsyncExecutionCorrelationSource =
-  | 'workflow'
-  | 'schedule'
-  | 'webhook'
-  | 'workflow_group'
+export type AsyncExecutionCorrelationSource = 'workflow' | 'schedule' | 'webhook' | 'workflow_group'
 
 export interface AsyncExecutionCorrelation {
   executionId: string

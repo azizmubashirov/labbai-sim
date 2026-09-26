@@ -3,7 +3,6 @@
  */
 import { dbChainMockFns, resetDbChainMock } from '@sim/testing'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
-
 import {
   assertBillingAttributionOwner,
   assertBillingAttributionSnapshot,
@@ -355,9 +354,7 @@ describe('checkAttributedUsageLimits', () => {
   })
 
   it('still rejects a malformed attribution snapshot', async () => {
-    await expect(
-      checkAttributedUsageLimits({ ...attribution, actorUserId: '' })
-    ).rejects.toThrow()
+    await expect(checkAttributedUsageLimits({ ...attribution, actorUserId: '' })).rejects.toThrow()
   })
 })
 

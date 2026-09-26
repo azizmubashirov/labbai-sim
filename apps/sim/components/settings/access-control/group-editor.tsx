@@ -1,15 +1,7 @@
 'use client'
 
 import { useId, useMemo, useState } from 'react'
-import {
-  Chip,
-  ChipConfirmModal,
-  ChipInput,
-  ChipSelect,
-  Label,
-  Switch,
-  toast,
-} from '@sim/emcn'
+import { Chip, ChipConfirmModal, ChipInput, ChipSelect, Label, Switch, toast } from '@sim/emcn'
 import { ArrowLeft } from '@sim/emcn/icons'
 import { getErrorMessage } from '@sim/utils/errors'
 import {
@@ -26,9 +18,9 @@ import { isAccessControlAllowlistRow } from '@/lib/permission-groups/block-acces
 import {
   isFeatureInertForGroup,
   ORGANIZATION_SCOPED_FEATURE_NOTE,
+  type PermissionGroupPlatformFeature,
   PLATFORM_CATEGORY_ORDER,
   PLATFORM_FEATURES,
-  type PermissionGroupPlatformFeature,
 } from '@/lib/permission-groups/features'
 import { FILE_SHARE_AUTH_TYPES } from '@/lib/permission-groups/fields'
 import {
@@ -187,7 +179,9 @@ export function PermissionGroupEditor({
           <div className='flex flex-col gap-3'>
             <ChipInput
               value={draft.name}
-              onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
+              onChange={(event) =>
+                setDraft((current) => ({ ...current, name: event.target.value }))
+              }
               placeholder='Group name'
               aria-label='Group name'
               maxLength={100}
@@ -445,7 +439,10 @@ function ScopeSection({
           <ChipSelect
             multiSelect
             searchable
-            options={workspaces.map((workspace) => ({ value: workspace.id, label: workspace.name }))}
+            options={workspaces.map((workspace) => ({
+              value: workspace.id,
+              label: workspace.name,
+            }))}
             multiSelectValues={draft.workspaceIds}
             onMultiSelectChange={(values) =>
               onChange((current) => ({ ...current, workspaceIds: values }))

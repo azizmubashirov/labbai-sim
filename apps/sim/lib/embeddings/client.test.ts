@@ -681,9 +681,9 @@ describe('knowledge embedding transport', () => {
     const texts = Array.from({ length: 5000 }, (_, index) => `input-${index}`)
     const projectInputs = vi.fn((inputs: string[]) => inputs)
 
-    await expect(
-      embedKnowledge(texts, { ...options, projectInputs })
-    ).rejects.toBeInstanceOf(EmbeddingOutputLimitError)
+    await expect(embedKnowledge(texts, { ...options, projectInputs })).rejects.toBeInstanceOf(
+      EmbeddingOutputLimitError
+    )
     expect(projectInputs).not.toHaveBeenCalled()
     expect(fetchMock).not.toHaveBeenCalled()
   })
@@ -792,9 +792,7 @@ describe('knowledge embedding transport', () => {
     setEnv({ OPENAI_API_KEY: 'openai-test' })
     fetchMock.mockResolvedValue(jsonResponse({ error: 'invalid key' }, 401))
 
-    await expect(embedKnowledge(['hello'], options)).rejects.toThrow(
-      /Embedding API failed: 401/
-    )
+    await expect(embedKnowledge(['hello'], options)).rejects.toThrow(/Embedding API failed: 401/)
     expect(fetchMock).toHaveBeenCalledOnce()
   })
 
@@ -1025,9 +1023,7 @@ describe('knowledge embedding transport', () => {
     const openAIQuota = new EmbeddingQuotaExhaustedError('openai')
     const secondQuota = new EmbeddingQuotaExhaustedError('openai')
 
-    expect(isEmbeddingQuotaExhaustion(new AggregateError([openAIQuota, secondQuota]))).toBe(
-      true
-    )
+    expect(isEmbeddingQuotaExhaustion(new AggregateError([openAIQuota, secondQuota]))).toBe(true)
     expect(
       isEmbeddingQuotaExhaustion(
         new AggregateError([openAIQuota, new EmbeddingAPIError('temporarily unavailable', 503)])
@@ -1057,7 +1053,9 @@ describe('knowledge embedding capacity preflight', () => {
     setEnv({ OPENAI_API_KEY: 'platform-key' })
     quotaGates.add('hosted:openai')
 
-    await expect(assertKnowledgeEmbeddingCapacity(options)).rejects.toBeInstanceOf(EmbeddingQuotaExhaustedError)
+    await expect(assertKnowledgeEmbeddingCapacity(options)).rejects.toBeInstanceOf(
+      EmbeddingQuotaExhaustedError
+    )
     expect(mockAdmit).not.toHaveBeenCalled()
     expect(fetchMock).not.toHaveBeenCalled()
   })
@@ -1084,9 +1082,7 @@ describe('knowledge embedding capacity preflight', () => {
     setEnv({ OPENAI_API_KEY: 'platform-key' })
     const failure = new Error('Quota storage unavailable')
     mockQuotaCheck.mockRejectedValueOnce(failure)
-    await expect(assertKnowledgeEmbeddingCapacity(options)).rejects.toBe(
-      failure
-    )
+    await expect(assertKnowledgeEmbeddingCapacity(options)).rejects.toBe(failure)
     expect(mockQuotaCheck).toHaveBeenCalledOnce()
     expect(fetchMock).not.toHaveBeenCalled()
   })

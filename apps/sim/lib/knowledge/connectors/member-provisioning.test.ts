@@ -363,7 +363,9 @@ describe('viewer account status within the workspace container', () => {
 
   it('suppresses a provider whose authorization app is unavailable', async () => {
     getPolicy.mockRejectedValue(
-      new CredentialGroupProviderConfigurationError('Managed Google authorization is not configured')
+      new CredentialGroupProviderConfigurationError(
+        'Managed Google authorization is not configured'
+      )
     )
     expect(await resolve()).toEqual(new Map())
   })

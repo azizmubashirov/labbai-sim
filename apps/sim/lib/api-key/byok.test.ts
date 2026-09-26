@@ -437,9 +437,7 @@ describe('getApiKeyWithBYOK (OpenAI only)', () => {
       throw new Error('No API keys configured for rotation.')
     })
 
-    await expect(getApiKeyWithBYOK('openai', 'gpt-5-mini', null)).rejects.toThrow(
-      'OPENAI_API_KEY'
-    )
+    await expect(getApiKeyWithBYOK('openai', 'gpt-5-mini', null)).rejects.toThrow('OPENAI_API_KEY')
   })
 
   it('rejects every other provider, even with a caller-supplied key', async () => {

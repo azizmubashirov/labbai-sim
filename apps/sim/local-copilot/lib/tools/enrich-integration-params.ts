@@ -58,9 +58,7 @@ function normalizeEmailToolParams(
   baseName: string,
   params: Record<string, unknown>
 ): Record<string, unknown> {
-  const isEmailDraftOrSend =
-    baseName.startsWith('gmail_draft') ||
-    baseName.startsWith('gmail_send')
+  const isEmailDraftOrSend = baseName.startsWith('gmail_draft') || baseName.startsWith('gmail_send')
   if (!isEmailDraftOrSend) return params
 
   const next: Record<string, unknown> = { ...params }

@@ -304,7 +304,10 @@ describe('provider large-file capability', () => {
     const midBand = { size: LARGE_FILE_PATH_THRESHOLD_BYTES + 1, type: 'text/plain' }
     expect(shouldUseLargeFilePath(midBand, 'openai')).toBe(true)
     expect(
-      shouldUseLargeFilePath({ size: LARGE_FILE_PATH_THRESHOLD_BYTES, type: 'text/plain' }, 'openai')
+      shouldUseLargeFilePath(
+        { size: LARGE_FILE_PATH_THRESHOLD_BYTES, type: 'text/plain' },
+        'openai'
+      )
     ).toBe(false)
   })
 

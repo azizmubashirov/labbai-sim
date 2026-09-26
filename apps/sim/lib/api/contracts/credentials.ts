@@ -344,14 +344,13 @@ export const workspaceCredentialMemberSchema = z.object({
 
 export type WorkspaceCredentialMember = z.output<typeof workspaceCredentialMemberSchema>
 
-export const createCredentialDraftBodySchema = z
-  .object({
-    workspaceId: z.string().min(1),
-    providerId: z.string().min(1),
-    displayName: z.string().min(1),
-    description: z.string().trim().max(500).optional(),
-    credentialId: z.string().min(1).optional(),
-  })
+export const createCredentialDraftBodySchema = z.object({
+  workspaceId: z.string().min(1),
+  providerId: z.string().min(1),
+  displayName: z.string().min(1),
+  description: z.string().trim().max(500).optional(),
+  credentialId: z.string().min(1).optional(),
+})
 
 export const upsertWorkspaceCredentialMemberBodySchema = z.object({
   userId: z.string().min(1),

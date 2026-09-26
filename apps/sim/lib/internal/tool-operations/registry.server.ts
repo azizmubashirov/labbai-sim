@@ -188,10 +188,7 @@ const SUPABASE_TOOL_IDS = [
 
 const IMAGE_TOOL_IDS = ['image_generate'] as const
 
-const EMBEDDINGS_TOOL_IDS = [
-  'embeddings_openai',
-  'openai_embeddings',
-] as const
+const EMBEDDINGS_TOOL_IDS = ['embeddings_openai', 'openai_embeddings'] as const
 
 const LLM_TOOL_IDS = ['llm_chat'] as const
 

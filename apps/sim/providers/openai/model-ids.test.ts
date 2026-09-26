@@ -54,9 +54,12 @@ describe('resolveOpenAIModelId', () => {
     expect(resolveOpenAIModelId(model)).toBe(OPENAI_DEFAULT_MODEL)
   })
 
-  it.each([undefined, null, '', '   '])('returns the default model for an empty id (%s)', (model) => {
-    expect(resolveOpenAIModelId(model)).toBe(OPENAI_DEFAULT_MODEL)
-  })
+  it.each([undefined, null, '', '   '])(
+    'returns the default model for an empty id (%s)',
+    (model) => {
+      expect(resolveOpenAIModelId(model)).toBe(OPENAI_DEFAULT_MODEL)
+    }
+  )
 })
 
 describe('isOpenAIReasoningModelId', () => {

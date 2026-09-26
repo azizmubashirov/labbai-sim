@@ -343,8 +343,7 @@ export interface CanonicalIdMigration {
 }
 
 /** Canonical-id renames per block type. */
-export const CANONICAL_ID_MIGRATIONS: Record<string, readonly CanonicalIdMigration[]> = {
-}
+export const CANONICAL_ID_MIGRATIONS: Record<string, readonly CanonicalIdMigration[]> = {}
 
 /**
  * Renames persisted canonical-mode keys whose block definition moved them.

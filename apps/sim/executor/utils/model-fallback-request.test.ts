@@ -146,10 +146,7 @@ describe('executeModelRequestWithFallbacks', () => {
     })
     const options = {
       ...input(),
-      fallbackModels: [
-        { model: 'claude-sonnet-5' },
-        { model: 'gpt-4o-mini' },
-      ],
+      fallbackModels: [{ model: 'claude-sonnet-5' }, { model: 'gpt-4o-mini' }],
     }
     const output = await executeModelRequestWithFallbacks(options)
     expect(output.result.model).toBe('gpt-4o-mini')

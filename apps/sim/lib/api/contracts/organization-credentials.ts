@@ -36,12 +36,11 @@ export type CreateOrganizationCredentialBody = z.input<
   typeof createOrganizationCredentialBodySchema
 >
 
-export const createOrganizationCredentialDraftBodySchema = z
-  .object({
-    ...createCredentialDraftBodySchema.shape,
-    workspaceId: z.never().optional(),
-    organizationId: organizationIdSchema,
-  })
+export const createOrganizationCredentialDraftBodySchema = z.object({
+  ...createCredentialDraftBodySchema.shape,
+  workspaceId: z.never().optional(),
+  organizationId: organizationIdSchema,
+})
 export type CreateOrganizationCredentialDraftBody = z.input<
   typeof createOrganizationCredentialDraftBodySchema
 >

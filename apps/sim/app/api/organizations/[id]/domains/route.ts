@@ -15,7 +15,10 @@ import {
 import { parseRequest, validationErrorResponse } from '@/lib/api/server'
 import { getSession } from '@/lib/auth'
 import { withRouteHandler } from '@/lib/core/utils/with-route-handler'
-import { generateVerificationToken, toDomainResponse } from '@/lib/organizations/domain-verification'
+import {
+  generateVerificationToken,
+  toDomainResponse,
+} from '@/lib/organizations/domain-verification'
 
 const logger = createLogger('OrgDomainsAPI')
 

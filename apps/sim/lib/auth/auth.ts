@@ -727,7 +727,8 @@ export const auth = betterAuth({
         const emailPasswordPaths = ['/sign-in/email', '/sign-up/email', '/email-otp']
         if (emailPasswordPaths.some((path) => ctx.path.startsWith(path)))
           throw new APIError('FORBIDDEN', {
-            message: 'Email/password authentication is disabled. Please use another sign-in method.',
+            message:
+              'Email/password authentication is disabled. Please use another sign-in method.',
           })
       }
 

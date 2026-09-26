@@ -18,8 +18,8 @@ vi.mock('@/lib/organizations/settings-access', () => ({
   getOrganizationSettingsAccess: organizationAccess,
 }))
 
-import AccessRequestsPage from '@/app/access-requests/page'
 import { AccessRequestsSettings } from '@/components/access-requests/access-requests-settings'
+import AccessRequestsPage from '@/app/access-requests/page'
 
 describe('access request sign-in redirect', () => {
   beforeEach(() => {

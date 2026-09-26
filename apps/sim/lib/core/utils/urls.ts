@@ -277,4 +277,3 @@ export function getSocketUrl(): string {
 
   return DEFAULT_SOCKET_URL
 }
-

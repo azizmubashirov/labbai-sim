@@ -13,7 +13,9 @@ describe('access request targets', () => {
     expect(getAccessRequestTargetKey({ kind: 'feature', configKey: 'hideTablesTab' })).toBe(
       'feature:hideTablesTab'
     )
-    expect(getAccessRequestTargetKey({ kind: 'integration', id: 'slack' })).toBe('integration:slack')
+    expect(getAccessRequestTargetKey({ kind: 'integration', id: 'slack' })).toBe(
+      'integration:slack'
+    )
   })
 
   it('round-trips scope keys and rejects foreign ones', () => {

@@ -109,17 +109,15 @@ export function MemberIntegrationsList({
                 />
               </div>
             ))}
-            {showEmpty &&
-              visible.length === 0 &&
-              !availability.integrationAvailabilityError && (
-                <SettingsEmptyState variant='inline'>
-                  {!availability.isIntegrationAvailabilityReady
-                    ? 'Loading integrations…'
-                    : search
-                      ? 'No matching integrations.'
-                      : 'No integrations are available to connect.'}
-                </SettingsEmptyState>
-              )}
+            {showEmpty && visible.length === 0 && !availability.integrationAvailabilityError && (
+              <SettingsEmptyState variant='inline'>
+                {!availability.isIntegrationAvailabilityReady
+                  ? 'Loading integrations…'
+                  : search
+                    ? 'No matching integrations.'
+                    : 'No integrations are available to connect.'}
+              </SettingsEmptyState>
+            )}
           </>
         )}
       </div>

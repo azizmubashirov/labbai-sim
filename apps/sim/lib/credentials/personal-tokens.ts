@@ -19,13 +19,13 @@ import { resourceScopeCondition } from '@/lib/core/resource-scope.server'
 import { lockCredentialGroupEnrollmentLifecycle } from '@/lib/credential-groups/enrollments'
 import { requireOrganizationAccountsSetup } from '@/lib/credential-groups/organization-setup'
 import { createViewerCredentialGroupEnrollment } from '@/lib/credential-groups/self-enrollment'
+import { normalizeGitLabHost } from '@/lib/credentials/gitlab-host'
 import {
   encryptPersonalToken,
   verifyGitLabPersonalToken,
 } from '@/lib/credentials/gitlab-personal-token'
 import type { CredentialRow } from '@/lib/credentials/queries'
 import type { DbOrTx } from '@/lib/db/types'
-import { normalizeGitLabHost } from '@/lib/credentials/gitlab-host'
 
 export interface PersonalTokenCredential {
   id: string

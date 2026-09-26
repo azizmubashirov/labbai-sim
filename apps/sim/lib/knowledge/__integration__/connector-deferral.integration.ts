@@ -26,6 +26,7 @@ vi.mock('@/connectors/registry.server', () => ({
 }))
 
 import { resolveBillingAttribution } from '@/lib/billing/core/billing-attribution'
+import { ProviderCapacityDeferredError } from '@/lib/core/rate-limiter/provider-capacity-error'
 import {
   createKnowledgeAclFixtureIds,
   seedKnowledgeAclFixture,
@@ -34,7 +35,6 @@ import * as connectorTokens from '@/lib/knowledge/connectors/access-token'
 import { deferConnectorSync } from '@/lib/knowledge/connectors/sync-deferral'
 import { createContentSyncLease, createMemberSyncLease } from '@/lib/knowledge/connectors/sync-lock'
 import { executeConnectorSyncJob } from '@/background/knowledge-connector-sync'
-import { ProviderCapacityDeferredError } from '@/lib/core/rate-limiter/provider-capacity-error'
 import type { SyncResult } from '@/connectors/types'
 
 const emptyResult = (): SyncResult => ({
@@ -98,7 +98,12 @@ describe('durable connector capacity deferrals', () => {
   it.each(['rate_limit', 'admission_timeout', 'admission_unavailable'] as const)(
     'the task durably defers %s and later resumes the same listing generation',
     async (reason) => {
-      fixture.list.mockRejectedValue(new ProviderCapacityDeferredError(reason, { providerId: 'github-rest', retryAfterMs: 60_000 }))
+      fixture.list.mockRejectedValue(
+        new ProviderCapacityDeferredError(reason, {
+          providerId: 'github-rest',
+          retryAfterMs: 60_000,
+        })
+      )
       const before = Date.now()
       const first = await executeConnectorSyncJob({
         connectorId: ids.connectorId,
@@ -168,7 +173,10 @@ describe('durable connector capacity deferrals', () => {
         lease,
         kind,
         result: emptyResult(),
-        error: new ProviderCapacityDeferredError('rate_limit', { providerId: 'github-rest', retryAfterMs: 60_000 }),
+        error: new ProviderCapacityDeferredError('rate_limit', {
+          providerId: 'github-rest',
+          retryAfterMs: 60_000,
+        }),
       }
       const outcomes = await Promise.allSettled([
         deferConnectorSync(input),
@@ -206,7 +214,10 @@ describe('durable connector capacity deferrals', () => {
         lease,
         kind: 'content',
         result: emptyResult(),
-        error: new ProviderCapacityDeferredError('rate_limit', { providerId: 'github-rest', retryAfterMs: 60_000 }),
+        error: new ProviderCapacityDeferredError('rate_limit', {
+          providerId: 'github-rest',
+          retryAfterMs: 60_000,
+        }),
       })
     ).rejects.toThrow('retry no longer belongs')
     const [log] = await db

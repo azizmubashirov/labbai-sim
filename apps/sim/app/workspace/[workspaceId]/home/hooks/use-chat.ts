@@ -105,8 +105,8 @@ import { getWorkflowById, getWorkflows } from '@/hooks/queries/utils/workflow-ca
 import { getWorkflowListQueryOptions } from '@/hooks/queries/utils/workflow-list-query'
 import { workflowKeys } from '@/hooks/queries/workflows'
 import { useExecutionStream } from '@/hooks/use-execution-stream'
-import { DEFAULT_LOCAL_COPILOT_CATALOG_ID } from '@/local-copilot/lib/model-catalog'
 import { snapAllSmoothText } from '@/hooks/use-smooth-text'
+import { DEFAULT_LOCAL_COPILOT_CATALOG_ID } from '@/local-copilot/lib/model-catalog'
 import { useExecutionStore } from '@/stores/execution/store'
 import { useMothershipQueueStore } from '@/stores/mothership-queue/store'
 import type {

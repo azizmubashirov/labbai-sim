@@ -75,11 +75,7 @@ describe('settings navigation boundaries', () => {
       'security',
       'admin',
     ])
-    expect(ACCOUNT_SETTINGS_ITEMS.map(({ id }) => id)).toEqual([
-      'general',
-      'api-keys',
-      'admin',
-    ])
+    expect(ACCOUNT_SETTINGS_ITEMS.map(({ id }) => id)).toEqual(['general', 'api-keys', 'admin'])
     expect(WORKSPACE_SETTINGS_ITEMS.map(({ id }) => id)).toEqual([
       'teammates',
       'secrets',

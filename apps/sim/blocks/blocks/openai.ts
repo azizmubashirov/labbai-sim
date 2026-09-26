@@ -41,9 +41,7 @@ export const OpenAIBlock: BlockConfig = {
       id: 'model',
       title: 'Model',
       type: 'dropdown',
-      options: [
-        { label: 'text-embedding-3-small', id: 'text-embedding-3-small' },
-      ],
+      options: [{ label: 'text-embedding-3-small', id: 'text-embedding-3-small' }],
       value: () => 'text-embedding-3-small',
     },
     {

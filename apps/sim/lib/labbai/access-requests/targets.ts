@@ -64,7 +64,9 @@ export const ACCESS_REQUEST_LIST_TARGETS = {
 
 export type AccessRequestListTargetKind = keyof typeof ACCESS_REQUEST_LIST_TARGETS
 
-export function isListTargetKind(kind: AccessRequestTargetKind): kind is AccessRequestListTargetKind {
+export function isListTargetKind(
+  kind: AccessRequestTargetKind
+): kind is AccessRequestListTargetKind {
   return kind in ACCESS_REQUEST_LIST_TARGETS
 }
 
@@ -122,7 +124,9 @@ export function getConfigKeyLabel(configKey: PermissionGroupConfigKey): string {
 }
 
 /** Which group a feature key is read from; list targets are always workspace-scoped. */
-export function getFeatureScope(configKey: AccessRequestFeatureKey): PermissionGroupCapabilityScope {
+export function getFeatureScope(
+  configKey: AccessRequestFeatureKey
+): PermissionGroupCapabilityScope {
   const field = PERMISSION_GROUP_FIELDS[configKey]
   return field.kind === 'boolean-restriction' ? field.feature.scope : 'workspace'
 }

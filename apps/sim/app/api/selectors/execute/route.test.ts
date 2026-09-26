@@ -71,13 +71,13 @@ vi.mock('@/lib/api/server/routes', () => {
 
 import { NoWorkspaceAccessError } from '@/lib/core/application/workspace-authorization'
 import { OrchestrationError } from '@/lib/core/orchestration/types'
+import { IntegrationNotAllowedError } from '@/lib/labbai/access-control/permission-check'
 import {
   SelectorConnectionUnavailableError,
   SelectorContextUnavailableError,
   SelectorOptionsUnavailableError,
 } from '@/lib/selectors/server/errors'
 import { POST } from '@/app/api/selectors/execute/route'
-import { IntegrationNotAllowedError } from '@/lib/labbai/access-control/permission-check'
 
 function project(error: unknown) {
   const result = mocks.errorPolicy?.project(error)

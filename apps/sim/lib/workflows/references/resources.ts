@@ -283,49 +283,39 @@ export async function listForkResourceCandidates(
   executor: DbOrTx,
   workspaceId: string
 ): Promise<Record<ForkRemapKind, ForkResourceCandidate[]>> {
-  const [
-    creds,
-    wsEnvRows,
-    tables,
-    kbs,
-    servers,
-    tools,
-    skills,
-    files,
-    fileFolders,
-    sandboxes,
-  ] = await Promise.all([
-    executor
-      .select({
-        id: credential.id,
-        displayName: credential.displayName,
-        providerId: credential.providerId,
-      })
-      .from(credential)
-      // Only real connections are mappable credentials. `env_workspace`/`env_personal`
-      // rows live in the same table but are environment variables (surfaced via the
-      // 'env-var' kind), so they must never appear as credential targets.
-      .where(
-        and(
-          eq(credential.workspaceId, workspaceId),
-          inArray(credential.type, ['oauth', 'service_account'])
+  const [creds, wsEnvRows, tables, kbs, servers, tools, skills, files, fileFolders, sandboxes] =
+    await Promise.all([
+      executor
+        .select({
+          id: credential.id,
+          displayName: credential.displayName,
+          providerId: credential.providerId,
+        })
+        .from(credential)
+        // Only real connections are mappable credentials. `env_workspace`/`env_personal`
+        // rows live in the same table but are environment variables (surfaced via the
+        // 'env-var' kind), so they must never appear as credential targets.
+        .where(
+          and(
+            eq(credential.workspaceId, workspaceId),
+            inArray(credential.type, ['oauth', 'service_account'])
+          )
         )
-      )
-      .limit(CANDIDATE_LIMIT),
-    executor
-      .select({ variables: workspaceEnvironment.variables })
-      .from(workspaceEnvironment)
-      .where(eq(workspaceEnvironment.workspaceId, workspaceId))
-      .limit(1),
-    tableCandidatesQuery(executor, workspaceId),
-    knowledgeBaseCandidatesQuery(executor, workspaceId),
-    mcpServerCandidatesQuery(executor, workspaceId),
-    customToolCandidatesQuery(executor, workspaceId),
-    skillCandidatesQuery(executor, workspaceId),
-    fileCandidatesQuery(executor, workspaceId),
-    fileFolderCandidatesQuery(executor, workspaceId),
-    sandboxCandidatesQuery(executor, workspaceId),
-  ])
+        .limit(CANDIDATE_LIMIT),
+      executor
+        .select({ variables: workspaceEnvironment.variables })
+        .from(workspaceEnvironment)
+        .where(eq(workspaceEnvironment.workspaceId, workspaceId))
+        .limit(1),
+      tableCandidatesQuery(executor, workspaceId),
+      knowledgeBaseCandidatesQuery(executor, workspaceId),
+      mcpServerCandidatesQuery(executor, workspaceId),
+      customToolCandidatesQuery(executor, workspaceId),
+      skillCandidatesQuery(executor, workspaceId),
+      fileCandidatesQuery(executor, workspaceId),
+      fileFolderCandidatesQuery(executor, workspaceId),
+      sandboxCandidatesQuery(executor, workspaceId),
+    ])
 
   const envVariables = wsEnvRows[0]?.variables
   const envKeys =
@@ -390,72 +380,62 @@ async function loadForkResourceRows(
   const fileKeys = ids('file')
   const fileFolderPaths = ids('file-folder')
 
-  const [
-    creds,
-    tables,
-    kbs,
-    docs,
-    servers,
-    tools,
-    skills,
-    files,
-    fileFolders,
-    sandboxes,
-  ] = await Promise.all([
-    credIds.length === 0
-      ? Promise.resolve([] as ForkResourceRow[])
-      : executor
-          .select({ id: credential.id, label: credential.displayName })
-          .from(credential)
-          .where(
-            and(
-              eq(credential.workspaceId, workspaceId),
-              inArray(credential.type, ['oauth', 'service_account']),
-              inArray(credential.id, credIds)
-            )
-          ),
-    tableIds.length === 0
-      ? Promise.resolve([] as ForkResourceRow[])
-      : tableCandidatesQuery(executor, workspaceId, tableIds),
-    kbIds.length === 0
-      ? Promise.resolve([] as ForkResourceRow[])
-      : knowledgeBaseCandidatesQuery(executor, workspaceId, kbIds),
-    // Documents are validated through a KB join (they are not a standalone candidate kind), so
-    // this existence check stays inline rather than sharing a per-kind candidate query.
-    docIds.length === 0
-      ? Promise.resolve([] as ForkResourceRow[])
-      : executor
-          .select({ id: document.id })
-          .from(document)
-          .innerJoin(knowledgeBase, eq(document.knowledgeBaseId, knowledgeBase.id))
-          .where(
-            and(
-              eq(knowledgeBase.workspaceId, workspaceId),
-              isNull(knowledgeBase.deletedAt),
-              isNull(document.deletedAt),
-              isNull(document.archivedAt),
-              inArray(document.id, docIds)
-            )
-          ),
-    mcpIds.length === 0
-      ? Promise.resolve([] as ForkResourceRow[])
-      : mcpServerCandidatesQuery(executor, workspaceId, mcpIds),
-    toolIds.length === 0
-      ? Promise.resolve([] as ForkResourceRow[])
-      : customToolCandidatesQuery(executor, workspaceId, toolIds),
-    skillIds.length === 0
-      ? Promise.resolve([] as ForkResourceRow[])
-      : skillCandidatesQuery(executor, workspaceId, skillIds),
-    fileKeys.length === 0
-      ? Promise.resolve([] as ForkResourceRow[])
-      : fileCandidatesQuery(executor, workspaceId, fileKeys),
-    fileFolderPaths.length === 0
-      ? Promise.resolve([] as ForkResourceRow[])
-      : fileFolderCandidatesQuery(executor, workspaceId, fileFolderPaths),
-    sandboxIds.length === 0
-      ? Promise.resolve([] as ForkResourceRow[])
-      : sandboxCandidatesQuery(executor, workspaceId, sandboxIds),
-  ])
+  const [creds, tables, kbs, docs, servers, tools, skills, files, fileFolders, sandboxes] =
+    await Promise.all([
+      credIds.length === 0
+        ? Promise.resolve([] as ForkResourceRow[])
+        : executor
+            .select({ id: credential.id, label: credential.displayName })
+            .from(credential)
+            .where(
+              and(
+                eq(credential.workspaceId, workspaceId),
+                inArray(credential.type, ['oauth', 'service_account']),
+                inArray(credential.id, credIds)
+              )
+            ),
+      tableIds.length === 0
+        ? Promise.resolve([] as ForkResourceRow[])
+        : tableCandidatesQuery(executor, workspaceId, tableIds),
+      kbIds.length === 0
+        ? Promise.resolve([] as ForkResourceRow[])
+        : knowledgeBaseCandidatesQuery(executor, workspaceId, kbIds),
+      // Documents are validated through a KB join (they are not a standalone candidate kind), so
+      // this existence check stays inline rather than sharing a per-kind candidate query.
+      docIds.length === 0
+        ? Promise.resolve([] as ForkResourceRow[])
+        : executor
+            .select({ id: document.id })
+            .from(document)
+            .innerJoin(knowledgeBase, eq(document.knowledgeBaseId, knowledgeBase.id))
+            .where(
+              and(
+                eq(knowledgeBase.workspaceId, workspaceId),
+                isNull(knowledgeBase.deletedAt),
+                isNull(document.deletedAt),
+                isNull(document.archivedAt),
+                inArray(document.id, docIds)
+              )
+            ),
+      mcpIds.length === 0
+        ? Promise.resolve([] as ForkResourceRow[])
+        : mcpServerCandidatesQuery(executor, workspaceId, mcpIds),
+      toolIds.length === 0
+        ? Promise.resolve([] as ForkResourceRow[])
+        : customToolCandidatesQuery(executor, workspaceId, toolIds),
+      skillIds.length === 0
+        ? Promise.resolve([] as ForkResourceRow[])
+        : skillCandidatesQuery(executor, workspaceId, skillIds),
+      fileKeys.length === 0
+        ? Promise.resolve([] as ForkResourceRow[])
+        : fileCandidatesQuery(executor, workspaceId, fileKeys),
+      fileFolderPaths.length === 0
+        ? Promise.resolve([] as ForkResourceRow[])
+        : fileFolderCandidatesQuery(executor, workspaceId, fileFolderPaths),
+      sandboxIds.length === 0
+        ? Promise.resolve([] as ForkResourceRow[])
+        : sandboxCandidatesQuery(executor, workspaceId, sandboxIds),
+    ])
 
   const result: Partial<Record<ForkRemapKind, ForkResourceRow[]>> = {}
   if (credIds.length > 0) result.credential = creds

@@ -335,8 +335,8 @@ function AccessControlMemberView({ requestsHref }: { requestsHref: string }) {
           ) : (
             <div className='flex flex-col gap-2'>
               <p className='text-sm'>
-                You are governed by <strong className='font-medium'>{configQuery.data.groupName}</strong>
-                .
+                You are governed by{' '}
+                <strong className='font-medium'>{configQuery.data.groupName}</strong>.
               </p>
               {restrictions.length > 0 && (
                 <ul className='list-disc pl-5 text-[var(--text-muted)] text-caption'>

@@ -13,13 +13,13 @@ import {
 } from '@/lib/execution/model-input-provenance'
 import { LlmOperationError } from '@/lib/internal/llm/errors'
 import type { LlmProviderOperationInput } from '@/lib/internal/llm/input'
-import { checkWorkspaceAccess } from '@/lib/workspaces/permissions/utils'
 import {
   assertPermissionsAllowed,
   IntegrationNotAllowedError,
   ModelNotAllowedError,
   ProviderNotAllowedError,
 } from '@/lib/labbai/access-control/permission-check'
+import { checkWorkspaceAccess } from '@/lib/workspaces/permissions/utils'
 import type { StreamingExecution } from '@/executor/types'
 import { projectResolvedSecretModelContent } from '@/executor/utils/resolved-secret-content-projection'
 import { executeProviderRequest } from '@/providers'

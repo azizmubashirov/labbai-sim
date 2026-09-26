@@ -15,13 +15,13 @@ import {
   getLiveChatDeploymentForWorkflow,
 } from '@/lib/chat-deployments/queries'
 import { OrchestrationError } from '@/lib/core/orchestration/types'
+import { validateChatDeployAuth } from '@/lib/labbai/access-control/permission-check'
 import { defineAuthorizedWorkflowUseCase } from '@/lib/workflows/application/authorized-workflow-use-case'
 import { resolveActiveWorkflowApplicationContext } from '@/lib/workflows/application/context'
 import { workflowOperations } from '@/lib/workflows/application/operations'
 import { assertedWorkflowWorkspaceId } from '@/lib/workflows/application/principal-scope'
 import { performChatDeploy, performChatUndeploy } from '@/lib/workflows/orchestration'
 import { formatInternalOutputSelector } from '@/lib/workflows/streaming/output-selector'
-import { validateChatDeployAuth } from '@/lib/labbai/access-control/permission-check'
 
 type ChatAuthType = 'public' | 'password' | 'email' | 'sso'
 type ChatOutputConfig = { workflowId?: string; blockId: string; path: string }

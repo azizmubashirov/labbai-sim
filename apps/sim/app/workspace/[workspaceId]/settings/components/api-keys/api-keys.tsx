@@ -22,13 +22,13 @@ import {
 } from '@/app/workspace/[workspaceId]/settings/components/settings-resource-row'
 import { SettingsSection } from '@/app/workspace/[workspaceId]/settings/components/settings-section/settings-section'
 import { useSettingsSearch } from '@/app/workspace/[workspaceId]/settings/components/use-settings-search'
-import { useUserPermissionConfig } from '@/hooks/queries/permission-groups'
 import type { ApiKeyScope } from '@/hooks/queries/api-key-list'
 import {
   useApiKeys,
   useDeleteApiKey,
   useUpdateWorkspaceApiKeySettings,
 } from '@/hooks/queries/api-keys'
+import { useUserPermissionConfig } from '@/hooks/queries/permission-groups'
 import { CreateApiKeyModal } from './components'
 
 const logger = createLogger('ApiKeys')

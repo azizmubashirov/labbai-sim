@@ -1874,4 +1874,3 @@ describe('organization connector credential authorization', () => {
     expect(mocks.validateConnectorConfig).not.toHaveBeenCalled()
   })
 })
-

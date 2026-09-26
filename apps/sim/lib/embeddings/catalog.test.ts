@@ -8,9 +8,9 @@ import {
   getEmbeddingModelInfo,
   getKbEligibleModels,
   getKbEmbeddingDimensions,
-  normalizeEmbeddingModelId,
   hasApproximateTokenCount,
   KB_EMBEDDING_STORAGE_DIMENSIONS,
+  normalizeEmbeddingModelId,
   resolveDimensions,
 } from '@/lib/embeddings/catalog'
 import { EMBEDDING_MODEL_PRICING } from '@/providers/models'

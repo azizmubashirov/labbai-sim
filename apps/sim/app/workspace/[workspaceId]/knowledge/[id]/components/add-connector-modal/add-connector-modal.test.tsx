@@ -87,7 +87,10 @@ vi.mock('@/hooks/use-permission-config', () => ({
       ['google_calendar_v2', { oauthAvailable: true, state: 'ready' }],
     ]),
     oauthServiceAvailability: new Map(
-      ['google-drive', 'google_drive', 'google-email', 'google-calendar'].map((providerId) => [providerId, true])
+      ['google-drive', 'google_drive', 'google-email', 'google-calendar'].map((providerId) => [
+        providerId,
+        true,
+      ])
     ),
     isIntegrationAvailabilityReady: true,
     isIntegrationAvailabilityLoading: false,

@@ -1814,7 +1814,6 @@ describe('AgentBlockHandler', () => {
       expect(mockExecuteProviderRequest).not.toHaveBeenCalled()
     })
 
-
     it('leaves the reported model alone for an explicitly selected model', async () => {
       const result = (await handler.execute(mockContext, mockBlock, {
         model: 'gpt-4o',

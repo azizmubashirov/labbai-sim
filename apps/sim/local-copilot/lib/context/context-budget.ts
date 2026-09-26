@@ -1,6 +1,7 @@
 import type { Edge } from '@xyflow/react'
 import { getAccurateTokenCount, truncateToTokenLimit } from '@/lib/tokenization/accurate'
 import { sanitizeForExport } from '@/lib/workflows/sanitization/json-sanitizer'
+import { findCatalogModel } from '@/local-copilot/lib/compat'
 import { getMessageContentText } from '@/local-copilot/lib/providers/message-content'
 import type { ChatMessage } from '@/local-copilot/lib/providers/types'
 import { sanitizeForLlm } from '@/local-copilot/lib/security/sanitize'
@@ -8,7 +9,6 @@ import type {
   LocalCopilotProviderId,
   LocalCopilotStructuredContext,
 } from '@/local-copilot/lib/types'
-import { findCatalogModel } from '@/local-copilot/lib/compat'
 
 /**
  * Stable tiktoken encoding for prompt fitting. Model ids without a tiktoken

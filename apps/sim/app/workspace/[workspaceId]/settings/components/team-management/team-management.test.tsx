@@ -124,9 +124,7 @@ describe('TeamManagement organization errors', () => {
     mockIsAdminOrOwner.mockReturnValue(true)
     mockUseOrganization.mockReturnValue({ data: { id: 'org-1' }, error: null, isLoading: false })
 
-    act(() =>
-      root.render(<TeamManagement organizationId='org-1' />)
-    )
+    act(() => root.render(<TeamManagement organizationId='org-1' />))
 
     expect(container).toHaveTextContent('organization-member-lists')
   })
@@ -140,11 +138,7 @@ describe('TeamManagement organization errors', () => {
     ({ admin, canInvite, shown, disabled }) => {
       mockIsAdminOrOwner.mockReturnValue(admin)
       mockUseOrganization.mockReturnValue({ data: { id: 'org-1' }, error: null, isLoading: false })
-      act(() =>
-        root.render(
-          <TeamManagement organizationId='org-1' canInviteMembers={canInvite} />
-        )
-      )
+      act(() => root.render(<TeamManagement organizationId='org-1' canInviteMembers={canInvite} />))
       const invite = Array.from(container.querySelectorAll('button')).find(
         (button) => button.textContent === 'Invite'
       )
@@ -159,9 +153,7 @@ describe('TeamManagement organization errors', () => {
       isLoading: false,
     })
 
-    act(() =>
-      root.render(<TeamManagement organizationId='org-1' />)
-    )
+    act(() => root.render(<TeamManagement organizationId='org-1' />))
 
     expect(container.textContent).toContain('Organization request failed')
     expect(container.textContent).not.toContain('no-organization-view')
@@ -179,9 +171,7 @@ describe('TeamManagement organization errors', () => {
       isLoading: true,
     })
 
-    act(() =>
-      root.render(<TeamManagement organizationId='org-1' />)
-    )
+    act(() => root.render(<TeamManagement organizationId='org-1' />))
 
     expect(container.textContent).toContain('Loading members…')
     expect(container.textContent).not.toContain('organization-member-lists')
@@ -199,9 +189,7 @@ describe('TeamManagement organization errors', () => {
       isLoading: false,
     })
 
-    act(() =>
-      root.render(<TeamManagement organizationId='org-1' />)
-    )
+    act(() => root.render(<TeamManagement organizationId='org-1' />))
 
     expect(container.textContent).toContain('Roster request failed')
     expect(container.textContent).not.toContain('organization-member-lists')

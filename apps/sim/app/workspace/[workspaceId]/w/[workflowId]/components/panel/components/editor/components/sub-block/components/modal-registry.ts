@@ -21,7 +21,6 @@ interface ModalSubBlockProps {
  * Keep this file client-only — it imports React components and must not be
  * pulled into trigger / block config modules.
  */
-export const MODAL_REGISTRY: Readonly<Record<string, ComponentType<ModalSubBlockProps>>> = {
-}
+export const MODAL_REGISTRY: Readonly<Record<string, ComponentType<ModalSubBlockProps>>> = {}
 
 export type ModalId = keyof typeof MODAL_REGISTRY

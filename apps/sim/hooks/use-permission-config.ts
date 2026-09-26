@@ -22,8 +22,8 @@ import { createToolAccessGate } from '@/lib/permission-groups/operation-access'
 import { useOptionalWorkspaceHostContext } from '@/app/workspace/[workspaceId]/providers/workspace-host-provider'
 import { overlayVisibility } from '@/blocks/visibility/context'
 import { useBlockVisibilityVersion } from '@/blocks/visibility/version'
-import { useUserPermissionConfig } from '@/hooks/queries/permission-groups'
 import { useIntegrationAvailability } from '@/hooks/queries/integration-availability'
+import { useUserPermissionConfig } from '@/hooks/queries/permission-groups'
 
 export interface PermissionConfigResult {
   config: PermissionGroupConfig

@@ -28,13 +28,14 @@ describe('mail submission handlers', () => {
     mocks.smtp.mockResolvedValue({ success: true, messageId: 'smtp-1' })
   })
 
-  it.each([
-    ['smtp_send_mail', executeSmtpTool],
-  ])('authenticates %s before parsing', async (toolId, execute) => {
-    const response = await execute(request(toolId, null, ''))
-    expect(response.status).toBe(401)
-    expect(mocks.resend).not.toHaveBeenCalled()
-    expect(mocks.sendGrid).not.toHaveBeenCalled()
-    expect(mocks.smtp).not.toHaveBeenCalled()
-  })
+  it.each([['smtp_send_mail', executeSmtpTool]])(
+    'authenticates %s before parsing',
+    async (toolId, execute) => {
+      const response = await execute(request(toolId, null, ''))
+      expect(response.status).toBe(401)
+      expect(mocks.resend).not.toHaveBeenCalled()
+      expect(mocks.sendGrid).not.toHaveBeenCalled()
+      expect(mocks.smtp).not.toHaveBeenCalled()
+    }
+  )
 })

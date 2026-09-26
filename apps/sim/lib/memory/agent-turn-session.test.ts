@@ -204,9 +204,7 @@ describe('durable Agent session', () => {
 
   it('does not persist an unsafe final answer (oversized)', async () => {
     const session = await openAgentTurnSession(input())
-    await expect(
-      session!.finalize('x'.repeat(100 * 1024 + 1), 'model-a')
-    ).resolves.toBeUndefined()
+    await expect(session!.finalize('x'.repeat(100 * 1024 + 1), 'model-a')).resolves.toBeUndefined()
     expect(save).not.toHaveBeenCalled()
     expect(session!.getFinalResponse()).toBeUndefined()
   })

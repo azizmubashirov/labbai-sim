@@ -18,6 +18,8 @@ import {
 import { Search } from '@sim/emcn/icons'
 import { getErrorMessage } from '@sim/utils/errors'
 import { useQueryStates } from 'nuqs'
+import { RequestAccessAction } from '@/components/access-requests/request-access-action'
+import { accessRequestSettingsSearchParams } from '@/components/access-requests/search-params'
 import type {
   AccessRequestPolicyChange,
   AccessRequestRecord,
@@ -25,8 +27,6 @@ import type {
   AccessRequestStatus,
 } from '@/lib/api/contracts/access-requests'
 import type { AccessRequestReviewStatus } from '@/lib/labbai/access-requests/navigation'
-import { RequestAccessAction } from '@/components/access-requests/request-access-action'
-import { accessRequestSettingsSearchParams } from '@/components/access-requests/search-params'
 import {
   SettingsEmptyState,
   SettingsQueryErrorState,
@@ -381,7 +381,9 @@ function ReviewDecisionModal({
         {preview.isPending ? (
           <ChipModalDescription>Loading preview…</ChipModalDescription>
         ) : preview.error || !data || !request ? (
-          <ChipModalError>{getErrorMessage(preview.error, 'Could not load the request')}</ChipModalError>
+          <ChipModalError>
+            {getErrorMessage(preview.error, 'Could not load the request')}
+          </ChipModalError>
         ) : (
           <>
             <ChipModalDescription>
@@ -414,7 +416,11 @@ function ReviewDecisionModal({
                 value={newLimit}
                 onChange={setNewLimit}
                 placeholder={`More than ${data.currentLimitCredits ?? 0}`}
-                error={newLimit && !limitValid ? 'Enter a whole number above the current limit' : undefined}
+                error={
+                  newLimit && !limitValid
+                    ? 'Enter a whole number above the current limit'
+                    : undefined
+                }
               />
             ) : null}
             {data.unavailableReason && pending ? (
@@ -432,7 +438,9 @@ function ReviewDecisionModal({
               />
             ) : null}
             <ChipModalError>
-              {resolve.error ? getErrorMessage(resolve.error, 'Could not resolve the request') : null}
+              {resolve.error
+                ? getErrorMessage(resolve.error, 'Could not resolve the request')
+                : null}
             </ChipModalError>
           </>
         )}
@@ -608,7 +616,9 @@ export function AccessRequestsSettings({
   ]
 
   return (
-    <div className={`flex flex-col gap-6 ${standalone ? 'mx-auto w-full max-w-3xl px-6 py-8' : ''}`}>
+    <div
+      className={`flex flex-col gap-6 ${standalone ? 'mx-auto w-full max-w-3xl px-6 py-8' : ''}`}
+    >
       <ChipSwitch
         aria-label='Requests view'
         options={viewOptions}

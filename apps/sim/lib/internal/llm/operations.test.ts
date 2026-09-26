@@ -153,6 +153,5 @@ describe('executeLlmProviderOperation', () => {
     const request = mocks.executeProviderRequest.mock.calls[0][1]
     expect(request).not.toHaveProperty('vertexProject')
     expect(request).not.toHaveProperty('azureEndpoint')
-
   })
 })

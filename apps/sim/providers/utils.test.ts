@@ -230,11 +230,7 @@ describe('Model Capabilities', () => {
   describe('Verbosity Values Per Model', () => {
     it('should return correct values for GPT-5 family', () => {
       expect(getVerbosityValuesForModel(OPENAI_MODEL_GPT_5_5)).toEqual(['low', 'medium', 'high'])
-      expect(getVerbosityValuesForModel(OPENAI_MODEL_GPT_5_MINI)).toEqual([
-        'low',
-        'medium',
-        'high',
-      ])
+      expect(getVerbosityValuesForModel(OPENAI_MODEL_GPT_5_MINI)).toEqual(['low', 'medium', 'high'])
     })
 
     it('should return null for non-reasoning models', () => {

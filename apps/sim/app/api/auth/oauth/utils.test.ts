@@ -27,9 +27,7 @@ vi.mock('@/lib/credentials/client-credential-accounts/server', () => ({
 
 import { db } from '@sim/db'
 import { __resetCoalesceLocallyForTests } from '@/lib/concurrency/singleflight'
-import {
-  ZOOM_SERVICE_ACCOUNT_PROVIDER_ID,
-} from '@/lib/credentials/client-credential-accounts/descriptors'
+import { ZOOM_SERVICE_ACCOUNT_PROVIDER_ID } from '@/lib/credentials/client-credential-accounts/descriptors'
 import { refreshOAuthToken } from '@/lib/oauth'
 import {
   getCredential,

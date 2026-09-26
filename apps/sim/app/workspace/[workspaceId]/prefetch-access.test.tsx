@@ -45,11 +45,11 @@ vi.mock('@/components/access-requests/request-access-action', () => ({
   ),
 }))
 
+import { PermissionAccessBoundary } from '@/components/access-requests/permission-access-boundary'
 import { ApiClientError } from '@/lib/api/client/errors'
 import { getUserPermissionConfigContract } from '@/lib/api/contracts/permission-groups'
 import { DEFAULT_PERMISSION_GROUP_CONFIG } from '@/lib/permission-groups/fields'
 import { prefetchWorkspaceAccess } from '@/app/workspace/[workspaceId]/prefetch-access'
-import { PermissionAccessBoundary } from '@/components/access-requests/permission-access-boundary'
 import {
   accessRequestKeys,
   workspaceFeatureDiscoveryQuery,

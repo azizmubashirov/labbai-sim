@@ -4,6 +4,10 @@ import { defineAuthorizedWorkspaceUseCase } from '@/lib/core/application'
 import { OrchestrationError } from '@/lib/core/orchestration/types'
 import { SIM_VIA_HEADER, serializeCallChain } from '@/lib/execution/call-chain'
 import {
+  assertPermissionsAllowed,
+  McpToolsNotAllowedError,
+} from '@/lib/labbai/access-control/permission-check'
+import {
   mcpServerExecutionDelegationPolicy,
   requireMcpCredentialUserId,
 } from '@/lib/mcp/application/authorization'
@@ -16,10 +20,6 @@ import { mcpServerOperations } from '@/lib/mcp/application/operations'
 import { mcpService } from '@/lib/mcp/service'
 import { compileMcpToolSchema } from '@/lib/mcp/tool-schema'
 import type { McpTool, McpToolCall, McpToolResult } from '@/lib/mcp/types'
-import {
-  assertPermissionsAllowed,
-  McpToolsNotAllowedError,
-} from '@/lib/labbai/access-control/permission-check'
 import type { ResolvedSecretTraceProvenanceV1 } from '@/executor/utils/resolved-secret-trace-registry'
 
 const logger = createLogger('McpToolExecution')

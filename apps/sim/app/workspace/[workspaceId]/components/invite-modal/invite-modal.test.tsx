@@ -6,18 +6,16 @@ import { resetEnvFlagsMock } from '@sim/testing'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { hostContext, mockUseAdminWorkspaces, mockMutate } = vi.hoisted(
-  () => ({
-    hostContext: {
-      current: {
-        hostOrganizationId: 'org-host',
-        viewer: { isHostOrganizationAdmin: false },
-      } as { hostOrganizationId: string; viewer: { isHostOrganizationAdmin: boolean } } | null,
-    },
-    mockUseAdminWorkspaces: vi.fn(),
-    mockMutate: vi.fn(),
-  })
-)
+const { hostContext, mockUseAdminWorkspaces, mockMutate } = vi.hoisted(() => ({
+  hostContext: {
+    current: {
+      hostOrganizationId: 'org-host',
+      viewer: { isHostOrganizationAdmin: false },
+    } as { hostOrganizationId: string; viewer: { isHostOrganizationAdmin: boolean } } | null,
+  },
+  mockUseAdminWorkspaces: vi.fn(),
+  mockMutate: vi.fn(),
+}))
 
 vi.mock('@sim/emcn', () => ({
   ChipDropdown: () => <div />,

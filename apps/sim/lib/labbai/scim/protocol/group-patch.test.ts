@@ -22,8 +22,7 @@ describe('applyGroupPatch', () => {
 
   it('removes members listed in the value, and clears on a bare remove', () => {
     expect(
-      applyGroupPatch(base, [{ op: 'remove', path: 'members', value: [{ value: 'u2' }] }])
-        .memberIds
+      applyGroupPatch(base, [{ op: 'remove', path: 'members', value: [{ value: 'u2' }] }]).memberIds
     ).toEqual(['u1'])
     expect(applyGroupPatch(base, [{ op: 'remove', path: 'members' }]).memberIds).toEqual([])
   })

@@ -33,11 +33,7 @@ import type { SubBlockConfig } from '@/blocks/types'
 import { getModelOptions } from '@/blocks/utils'
 import { overlayVisibility } from '@/blocks/visibility/context'
 import { BlockType, EDGE, normalizeName } from '@/executor/constants'
-import {
-  isCustomModelId,
-  isKnownModelId,
-  suggestModelIdsForUnknownModel,
-} from '@/providers/models'
+import { isCustomModelId, isKnownModelId, suggestModelIdsForUnknownModel } from '@/providers/models'
 import { getTool } from '@/tools/utils'
 import {
   TRIGGER_ROUTING_FIELD,

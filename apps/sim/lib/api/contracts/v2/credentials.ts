@@ -267,8 +267,7 @@ const v2CreateStandardOAuthCredentialConnectionSchema = z
   })
   .strict()
 
-const v2CreateCredentialConnectionByProviderSchema =
-  v2CreateStandardOAuthCredentialConnectionSchema
+const v2CreateCredentialConnectionByProviderSchema = v2CreateStandardOAuthCredentialConnectionSchema
 
 const v2CreateCredentialConnectionByCredentialSchema = z
   .object({
@@ -278,9 +277,7 @@ const v2CreateCredentialConnectionByCredentialSchema = z
       .trim()
       .min(1, 'credentialId cannot be empty')
       .max(255, 'credentialId must be at most 255 characters')
-      .describe(
-        'Existing OAuth credential to reconnect in place.'
-      ),
+      .describe('Existing OAuth credential to reconnect in place.'),
   })
   .strict()
 

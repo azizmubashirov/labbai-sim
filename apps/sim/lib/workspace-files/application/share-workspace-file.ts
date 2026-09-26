@@ -3,6 +3,7 @@ import { resolvePrincipalExecutionActorUserId } from '@sim/auth/principal'
 import { createLogger } from '@sim/logger'
 import type { ShareAuthType, ShareRecord } from '@/lib/api/contracts/public-shares'
 import { OrchestrationError } from '@/lib/core/orchestration/types'
+import { validatePublicFileSharing } from '@/lib/labbai/access-control/permission-check'
 import {
   getShareForResource,
   getWorkspaceSharesForResources,
@@ -17,7 +18,6 @@ import { defineAuthorizedWorkspaceFileUseCase } from '@/lib/workspace-files/appl
 import { fileOperations } from '@/lib/workspace-files/application/operations'
 import { resolveActiveWorkspaceFileContext } from '@/lib/workspace-files/application/workspace-file-context'
 import { MAX_WORKSPACE_FILE_BULK_AFFECTED_ITEMS } from '@/lib/workspace-files/limits'
-import { validatePublicFileSharing } from '@/lib/labbai/access-control/permission-check'
 
 const logger = createLogger('WorkspaceFileShare')
 

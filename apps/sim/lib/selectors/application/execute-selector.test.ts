@@ -73,6 +73,7 @@ const mockResolvePermissionGroupConfig =
   permissionGroupScopeMockFns.mockResolvePermissionGroupConfig
 
 import { selectorScopeSchema } from '@/lib/api/contracts/selectors/execute'
+import { IntegrationNotAllowedError } from '@/lib/labbai/access-control/permission-check'
 import { DEFAULT_PERMISSION_GROUP_CONFIG } from '@/lib/permission-groups/fields'
 import { executeSelector } from '@/lib/selectors/application/execute-selector'
 import { getSelectorManifestEntry } from '@/lib/selectors/manifest'
@@ -81,7 +82,6 @@ import {
   SelectorOptionsUnavailableError,
 } from '@/lib/selectors/server/errors'
 import type { ExecuteServerSelectorArgs } from '@/lib/selectors/server/types'
-import { IntegrationNotAllowedError } from '@/lib/labbai/access-control/permission-check'
 
 const principal = { kind: 'session' as const, userId: 'user-1', sessionId: 'session-1' }
 const scope = { kind: 'workspace' as const, workspaceId: 'workspace-1' }

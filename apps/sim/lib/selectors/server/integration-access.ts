@@ -5,13 +5,13 @@ import {
   allowedIntegrationTypes,
   allowedOrganizationIntegrationTypes,
 } from '@/lib/integrations/principal-scope.server'
+import { IntegrationNotAllowedError } from '@/lib/labbai/access-control/permission-check'
 import { isBlockTypeAccessControlExempt } from '@/lib/permission-groups/block-access'
 import { resolveAccessControlBlockType } from '@/lib/permission-groups/integration-allowlist'
 import type {
   SelectorCredentialPolicy,
   ServerSelectorAttachment,
 } from '@/lib/selectors/server/types'
-import { IntegrationNotAllowedError } from '@/lib/labbai/access-control/permission-check'
 
 const logger = createLogger('SelectorIntegrationAccess')
 

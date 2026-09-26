@@ -1,4 +1,3 @@
-import { organizationRoutes } from '@/lib/navigation/paths'
 import {
   ACCESS_REQUEST_MAX_ID_LENGTH,
   ACCESS_REQUEST_MAX_PAGE,
@@ -6,6 +5,7 @@ import {
   ACCESS_REQUEST_STATUS_VALUES,
 } from '@/lib/labbai/access-requests/constants'
 import type { AccessRequestScope } from '@/lib/labbai/access-requests/targets'
+import { organizationRoutes } from '@/lib/navigation/paths'
 
 /**
  * URL helpers for the Requests settings page. Pure and dependency-light so the
@@ -93,7 +93,10 @@ export function getLegacyAccessRequestsSettingsQuery(params: RawSearchParams): s
       parseAccessRequestIdParam(firstValue(params['request-id'])) ??
         parseAccessRequestIdParam(firstValue(params.requestId))
     )
-    push('request-status', parseAccessRequestReviewStatusParam(firstValue(params['request-status'])))
+    push(
+      'request-status',
+      parseAccessRequestReviewStatusParam(firstValue(params['request-status']))
+    )
     push('request-page', parseAccessRequestPageParam(firstValue(params['request-page'])))
     return toQueryString(entries)
   }

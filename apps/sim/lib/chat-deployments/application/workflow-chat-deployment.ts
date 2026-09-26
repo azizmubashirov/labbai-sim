@@ -27,8 +27,8 @@ import {
 import { buildChatDeploymentUrl } from '@/lib/chat-deployments/urls'
 import { defineAuthorizedWorkspaceUseCase } from '@/lib/core/application'
 import { OrchestrationError } from '@/lib/core/orchestration/types'
-import { performChatDeploy, performChatUndeploy } from '@/lib/workflows/orchestration'
 import { validateChatDeployAuth } from '@/lib/labbai/access-control/permission-check'
+import { performChatDeploy, performChatUndeploy } from '@/lib/workflows/orchestration'
 
 /**
  * The chat singleton of a workflow.

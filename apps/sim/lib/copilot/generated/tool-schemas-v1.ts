@@ -4191,8 +4191,7 @@ export const TOOL_RUNTIME_SCHEMAS: Record<string, ToolRuntimeSchemaEntry> = {
             },
             name: {
               type: 'string',
-              description:
-                "Table name (required for 'create').",
+              description: "Table name (required for 'create').",
             },
             newName: {
               type: 'string',

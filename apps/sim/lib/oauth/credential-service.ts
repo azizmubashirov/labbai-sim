@@ -324,7 +324,6 @@ export async function getServiceAccountToken(
   return tokenData.access_token
 }
 
-
 interface AtlassianServiceAccountSecret {
   type: typeof ATLASSIAN_SERVICE_ACCOUNT_SECRET_TYPE
   apiToken: string

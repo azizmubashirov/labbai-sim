@@ -220,10 +220,7 @@ export function SidebarFooter({
    */
   const helpMenu = (
     <DropdownMenu>
-      <SidebarTooltip
-        label='Help'
-        enabled={showCollapsedTooltips}
-      >
+      <SidebarTooltip label='Help' enabled={showCollapsedTooltips}>
         <DropdownMenuTrigger asChild>
           <Chip
             data-item-id='help'

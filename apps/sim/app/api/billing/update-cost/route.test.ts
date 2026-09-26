@@ -457,9 +457,7 @@ describe('POST /api/billing/update-cost — workspaceId attribution', () => {
     await expect(res.json()).resolves.toMatchObject({
       code: 'DUPLICATE_BILLING_EVENT',
     })
-  })
-
-(
+  })(
     'returns a distinct non-retryable conflict for an elapsed %s period and preserves usage attribution',
     async (protocol) => {
       const billingRequestId = '0190c03f-9f7d-4b79-8b58-e7f779fd29e1'

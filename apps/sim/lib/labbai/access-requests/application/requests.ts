@@ -39,7 +39,10 @@ import {
   listPendingRequestIdsByTarget,
   toAccessRequestRecord,
 } from '@/lib/labbai/access-requests/repository'
-import { getAllowAccessRequests, setAllowAccessRequests } from '@/lib/labbai/access-requests/settings'
+import {
+  getAllowAccessRequests,
+  setAllowAccessRequests,
+} from '@/lib/labbai/access-requests/settings'
 import {
   type AccessRequestScope,
   type AccessRequestTarget,

@@ -94,6 +94,10 @@ import {
   RESOLVED_SECRET_PROVENANCE_METADATA_V1,
   requestsPrivateToolMetadata,
 } from '@/lib/execution/private-tool-metadata'
+import {
+  PublicApiNotAllowedError,
+  validatePublicApiAllowed,
+} from '@/lib/labbai/access-control/permission-check'
 import { LoggingSession } from '@/lib/logs/execution/logging-session'
 import {
   MAX_MCP_WORKFLOW_RESPONSE_BYTES,
@@ -149,10 +153,6 @@ import {
 } from '@/lib/workflows/streaming/streaming'
 import { createHttpResponseFromBlock, workflowHasResponseBlock } from '@/lib/workflows/utils'
 import { getWorkspaceBillingSettings } from '@/lib/workspaces/utils'
-import {
-  PublicApiNotAllowedError,
-  validatePublicApiAllowed,
-} from '@/lib/labbai/access-control/permission-check'
 import { ExecutionSnapshot } from '@/executor/execution/snapshot'
 import type {
   BlockCompletionCallbackData,

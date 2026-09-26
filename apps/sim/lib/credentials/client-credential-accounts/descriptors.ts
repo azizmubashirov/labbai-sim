@@ -108,8 +108,7 @@ export interface ClientCredentialAccountDescriptor {
 
 export const ZOOM_SERVICE_ACCOUNT_PROVIDER_ID = 'zoom-service-account' as const
 
-export type ClientCredentialAccountProviderId =
-  | typeof ZOOM_SERVICE_ACCOUNT_PROVIDER_ID
+export type ClientCredentialAccountProviderId = typeof ZOOM_SERVICE_ACCOUNT_PROVIDER_ID
 
 export const CLIENT_CREDENTIAL_ACCOUNT_DESCRIPTORS: Record<
   ClientCredentialAccountProviderId,

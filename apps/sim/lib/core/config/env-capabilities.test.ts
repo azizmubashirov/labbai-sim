@@ -619,9 +619,9 @@ describe('env capabilities', () => {
     })
 
     it('fails fast when an OAuth client is partially configured', () => {
-      expect(() =>
-        requireOAuthClientCapability('notion', { NOTION_CLIENT_ID: 'client' })
-      ).toThrow(/NOTION_CLIENT_SECRET/)
+      expect(() => requireOAuthClientCapability('notion', { NOTION_CLIENT_ID: 'client' })).toThrow(
+        /NOTION_CLIENT_SECRET/
+      )
     })
 
     it('covers every OAuth integration', () => {
@@ -642,11 +642,7 @@ describe('env capabilities', () => {
 
     it('tracks setup-owned options as deployment configuration', () => {
       expect(DEPLOYMENT_CONFIGURATION_KEYS).toEqual(
-        expect.arrayContaining([
-          'S3_FORCE_PATH_STYLE',
-          'STORAGE_PROVIDER',
-          'OCR_PROVIDER',
-        ])
+        expect.arrayContaining(['S3_FORCE_PATH_STYLE', 'STORAGE_PROVIDER', 'OCR_PROVIDER'])
       )
     })
 

@@ -36,12 +36,12 @@ import { authorizeOrganizationOperation } from '@/lib/core/application/organizat
 import { defineOrganizationOperation } from '@/lib/core/application/organization-operation'
 import { authorizeWorkspaceOperation } from '@/lib/core/application/workspace-authorization'
 import { defineWorkspaceOperation } from '@/lib/core/application/workspace-operation'
-import { resolvePermissionGroupConfig } from '@/lib/permission-groups/config-scope.server'
-import { DEFAULT_PERMISSION_GROUP_CONFIG } from '@/lib/permission-groups/fields'
-import { withPermissionGroupScope } from '@/lib/permission-groups/request-scope.server'
 import { defineAuthorizedAccessRequestUseCase } from '@/lib/labbai/access-requests/application/authorized-use-case'
 import { accessRequestOperations } from '@/lib/labbai/access-requests/application/operations'
 import type { AccessRequestScope } from '@/lib/labbai/access-requests/targets'
+import { resolvePermissionGroupConfig } from '@/lib/permission-groups/config-scope.server'
+import { DEFAULT_PERMISSION_GROUP_CONFIG } from '@/lib/permission-groups/fields'
+import { withPermissionGroupScope } from '@/lib/permission-groups/request-scope.server'
 
 const personal: PersonalApiKeyPrincipal = {
   kind: 'personal_api_key',

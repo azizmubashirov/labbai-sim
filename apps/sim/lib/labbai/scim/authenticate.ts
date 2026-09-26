@@ -10,9 +10,7 @@ import { ScimError } from '@/lib/labbai/scim/protocol/errors'
 const logger = createLogger('ScimAuthenticate')
 
 /** Resolves a SCIM request to the connection its bearer credential belongs to. */
-export type ScimConnectionAuthenticator = (
-  request: NextRequest
-) => Promise<ScimConnectionPrincipal>
+export type ScimConnectionAuthenticator = (request: NextRequest) => Promise<ScimConnectionPrincipal>
 
 /** How stale `lastUsedAt` may get before a request refreshes it. */
 const TOUCH_INTERVAL_MS = 60_000

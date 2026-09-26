@@ -1,8 +1,8 @@
 import { createLogger } from '@sim/logger'
 import { projectResolvedModelInput } from '@/lib/execution/model-input-provenance'
+import { validateModelProvider } from '@/lib/labbai/access-control/permission-check'
 import { generateRouterPrompt, generateRouterV2Prompt } from '@/blocks/blocks/router'
 import type { BlockOutput } from '@/blocks/types'
-import { validateModelProvider } from '@/lib/labbai/access-control/permission-check'
 import {
   BlockType,
   DEFAULTS,

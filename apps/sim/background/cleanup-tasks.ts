@@ -150,9 +150,7 @@ export async function runCleanupTasks(payload: CleanupJobPayload): Promise<void>
   }
 
   const totalDeleted =
-    runChildResults.reduce((s, r) => s + r.deleted, 0) +
-    runsResult.deleted +
-    chatsResult.deleted
+    runChildResults.reduce((s, r) => s + r.deleted, 0) + runsResult.deleted + chatsResult.deleted
 
   logger.info(`[${label}] Complete: ${totalDeleted} total rows deleted`)
 

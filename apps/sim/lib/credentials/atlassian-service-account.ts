@@ -1,11 +1,7 @@
 import type { AtlassianProduct } from '@/lib/credentials/service-account-fields'
 
 /** Extracts the most specific message from an Atlassian REST error body. */
-function parseAtlassianErrorMessage(
-  status: number,
-  statusText: string,
-  errorText: string
-): string {
+function parseAtlassianErrorMessage(status: number, statusText: string, errorText: string): string {
   try {
     const errorData = JSON.parse(errorText)
     if (errorData.errorMessage) {

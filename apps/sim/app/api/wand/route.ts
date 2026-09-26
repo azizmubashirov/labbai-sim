@@ -247,7 +247,8 @@ export const POST = withRouteHandler(async (req: NextRequest) => {
       return NextResponse.json(
         {
           success: false,
-          error: usageCheck.message || 'Usage limit exceeded. Please upgrade your plan to continue.',
+          error:
+            usageCheck.message || 'Usage limit exceeded. Please upgrade your plan to continue.',
           scope: usageCheck.scope,
         },
         { status: 402 }
@@ -455,7 +456,7 @@ export const POST = withRouteHandler(async (req: NextRequest) => {
     })
 
     let clientErrorMessage = 'Wand generation failed. Please try again later.'
-    let status = typeof (error as any)?.status === 'number' ? (error as any).status : 500
+    const status = typeof (error as any)?.status === 'number' ? (error as any).status : 500
 
     if (status === 401) {
       clientErrorMessage = 'Authentication failed. Please check your API key configuration.'

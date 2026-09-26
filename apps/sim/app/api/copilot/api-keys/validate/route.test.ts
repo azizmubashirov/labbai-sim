@@ -847,20 +847,17 @@ describe('validation lifecycle purposes', () => {
   it.each([
     ['attribution-v1', false],
     ['legacy-v0', true],
-  ])(
-    'checks cancellation scope for %s (hosted=%s)',
-    async (protocol, isHosted) => {
-      setEnvFlags({ isHosted })
-      expect(
-        (
-          await POST(
-            request({ ...body, purpose: 'cancellation' }, { 'x-sim-billing-protocol': protocol })
-          )
-        ).status
-      ).toBe(200)
-      expect(mockAuthorizeCallback).toHaveBeenCalled()
-    }
-  )
+  ])('checks cancellation scope for %s (hosted=%s)', async (protocol, isHosted) => {
+    setEnvFlags({ isHosted })
+    expect(
+      (
+        await POST(
+          request({ ...body, purpose: 'cancellation' }, { 'x-sim-billing-protocol': protocol })
+        )
+      ).status
+    ).toBe(200)
+    expect(mockAuthorizeCallback).toHaveBeenCalled()
+  })
 
   it('refuses hosted cancellation without a protocol or resource scope', async () => {
     expect((await POST(request({ ...body, purpose: 'cancellation' }))).status).toBe(400)

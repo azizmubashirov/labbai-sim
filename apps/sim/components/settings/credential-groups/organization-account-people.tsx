@@ -292,8 +292,8 @@ export function OrganizationAccountPeople({
         <ChipModalHeader onClose={closeInvite}>{title}</ChipModalHeader>
         <ChipModalBody>
           <p className='text-[var(--text-secondary)] text-small'>
-            Each person gets a link to connect their own account. They do not need to be a
-            member of the organization.
+            Each person gets a link to connect their own account. They do not need to be a member of
+            the organization.
           </p>
           <ChipModalField
             type='emails'

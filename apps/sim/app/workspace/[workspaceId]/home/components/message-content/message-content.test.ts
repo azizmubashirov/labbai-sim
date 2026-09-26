@@ -916,11 +916,7 @@ describe('parseBlocks main activity controls', () => {
             : []
         )
 
-      expect(visibleTools(blocks).map((tool) => tool.id)).toEqual([
-        'permission',
-        'older',
-        'latest',
-      ])
+      expect(visibleTools(blocks).map((tool) => tool.id)).toEqual(['permission', 'older', 'latest'])
       const completed = blocks.map((block) =>
         block.toolCall?.id === 'latest'
           ? { ...block, toolCall: { ...block.toolCall, status: 'success' as const } }

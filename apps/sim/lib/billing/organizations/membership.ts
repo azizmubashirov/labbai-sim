@@ -316,11 +316,7 @@ export async function ensureUserInOrganizationTx(
   tx: DbOrTx,
   params: AddMemberParams
 ): Promise<EnsureMemberResult> {
-  const {
-    userId,
-    organizationId,
-    role,
-  } = params
+  const { userId, organizationId, role } = params
   const emptyBillingActions = {
     proUsageSnapshotted: false,
     proCancelledAtPeriodEnd: false,
@@ -1463,13 +1459,7 @@ export async function ensureUserInOrganization(
  * - Usage limit sync
  */
 export async function addUserToOrganization(params: AddMemberParams): Promise<AddMemberResult> {
-  const {
-    userId,
-    organizationId,
-    role,
-    skipSeatValidation = false,
-    acceptingInvitationId,
-  } = params
+  const { userId, organizationId, role, skipSeatValidation = false, acceptingInvitationId } = params
 
   const billingActions: AddMemberResult['billingActions'] = {
     proUsageSnapshotted: false,

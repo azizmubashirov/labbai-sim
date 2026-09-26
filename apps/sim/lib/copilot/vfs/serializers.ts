@@ -594,19 +594,14 @@ export function serializeBlockSchema(
   const hosted = options?.hosted ?? isHosted
   const explicitlyHidden = options?.hiddenInputIds ?? new Set<string>()
   const visibleSubBlocks = block.subBlocks.filter(
-    (sb) =>
-      !explicitlyHidden.has(sb.id) &&
-      !sb.hideFromCopilot &&
-      !isSubBlockHidden(sb, { hosted })
+    (sb) => !explicitlyHidden.has(sb.id) && !sb.hideFromCopilot && !isSubBlockHidden(sb, { hosted })
   )
   const visibleIds = new Set(visibleSubBlocks.map((sb) => sb.id))
   const hiddenIds = new Set(
     block.subBlocks
       .filter(
         (sb) =>
-          explicitlyHidden.has(sb.id) ||
-          sb.hideFromCopilot ||
-          isSubBlockHidden(sb, { hosted })
+          explicitlyHidden.has(sb.id) || sb.hideFromCopilot || isSubBlockHidden(sb, { hosted })
       )
       .map((sb) => sb.id)
       .filter((id) => !visibleIds.has(id))

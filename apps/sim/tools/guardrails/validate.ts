@@ -34,8 +34,7 @@ export const guardrailsValidateTool: InternalToolConfig<
 > = {
   id: 'guardrails_validate',
   name: 'Guardrails Validate',
-  description:
-    'Validate content using guardrails (JSON, regex, or hallucination check)',
+  description: 'Validate content using guardrails (JSON, regex, or hallucination check)',
   version: '1.0.0',
 
   params: {

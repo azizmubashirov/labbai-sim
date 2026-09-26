@@ -35,10 +35,7 @@ describe('getToolActivitySummary', () => {
 
   it('does not invent actions when all calls failed or were stopped', () => {
     expect(
-      getToolActivitySummary([
-        tool('apply_file_edit', 'error'),
-        tool('run_code', 'interrupted'),
-      ])
+      getToolActivitySummary([tool('apply_file_edit', 'error'), tool('run_code', 'interrupted')])
     ).toBe('Tool activity · 1 stopped')
   })
 

@@ -31,6 +31,7 @@ import {
 } from '@/lib/permission-groups/resolve.server'
 import { findProviderFromModel } from '@/providers/utils'
 
+export type { PermissionToolKind } from '@/lib/labbai/access-control/decisions'
 export {
   CustomToolsNotAllowedError,
   IntegrationNotAllowedError,
@@ -42,7 +43,6 @@ export {
   SkillsNotAllowedError,
   ToolNotAllowedError,
 } from '@/lib/labbai/access-control/errors'
-export type { PermissionToolKind } from '@/lib/labbai/access-control/decisions'
 export {
   getUserPermissionConfig,
   resolveVerifiedUserAccessControlContext,
@@ -189,10 +189,7 @@ export async function assertPermissionsAllowed(
  *
  * permission-group-enforced: public_api.use — deployed-workflow execute routes and the public-API toggle
  */
-export async function validatePublicApiAllowed(
-  userId: string,
-  workspaceId: string
-): Promise<void> {
+export async function validatePublicApiAllowed(userId: string, workspaceId: string): Promise<void> {
   const config = await resolvePermissionGroupConfig(userId, workspaceId, undefined)
   if (capabilityDeniedBy('public_api.use', config)) throw new PublicApiNotAllowedError()
 }

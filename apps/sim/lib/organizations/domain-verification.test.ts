@@ -23,7 +23,6 @@ vi.mock('node:dns/promises', () => ({
   },
 }))
 
-
 describe('domain-verification helpers', () => {
   it('builds the challenge host on the underscore-prefixed label', () => {
     expect(buildChallengeHost('acme.com')).toBe(`${SSO_CHALLENGE_HOST_PREFIX}.acme.com`)

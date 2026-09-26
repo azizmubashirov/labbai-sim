@@ -1,11 +1,11 @@
 /** @vitest-environment node */
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_PERMISSION_GROUP_CONFIG } from '@/lib/permission-groups/fields'
 import {
   applyPolicyChanges,
   computePolicyChanges,
   evaluatePermissionTarget,
 } from '@/lib/labbai/access-requests/policy'
+import { DEFAULT_PERMISSION_GROUP_CONFIG } from '@/lib/permission-groups/fields'
 
 const workspace = { kind: 'workspace', workspaceId: 'ws' } as const
 

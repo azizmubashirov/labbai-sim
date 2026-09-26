@@ -162,7 +162,6 @@ describe('OAuth Token Refresh', () => {
         }
       )
     })
-
   })
 
   describe('Body Credential Providers', () => {
@@ -324,22 +323,27 @@ describe('OAuth Token Refresh', () => {
       }
     })
 
-    it.concurrent('should return failure for body-level errors returned with HTTP 200', async () => {
-      const mockFetch = vi.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        statusText: 'OK',
-        json: async () => ({ ok: false, error: 'invalid_refresh_token' }),
-      })
-      const refreshToken = 'test_refresh_token'
+    it.concurrent(
+      'should return failure for body-level errors returned with HTTP 200',
+      async () => {
+        const mockFetch = vi.fn().mockResolvedValue({
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          json: async () => ({ ok: false, error: 'invalid_refresh_token' }),
+        })
+        const refreshToken = 'test_refresh_token'
 
-      const result = await withMockFetch(mockFetch, () => refreshOAuthToken('google', refreshToken))
+        const result = await withMockFetch(mockFetch, () =>
+          refreshOAuthToken('google', refreshToken)
+        )
 
-      expect(result.ok).toBe(false)
-      if (!result.ok) {
-        expect(result.errorCode).toBe('invalid_refresh_token')
+        expect(result.ok).toBe(false)
+        if (!result.ok) {
+          expect(result.errorCode).toBe('invalid_refresh_token')
+        }
       }
-    })
+    )
 
     it.concurrent(
       'should redact literal and encoded credentials echoed by a provider',

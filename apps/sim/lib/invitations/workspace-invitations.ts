@@ -36,6 +36,7 @@ import {
   revertPendingInvitationGrants,
   sendInvitationEmail,
 } from '@/lib/invitations/send'
+import { validateInvitationsAllowed } from '@/lib/labbai/access-control/permission-check'
 import { isScimDeploymentEnabled } from '@/lib/labbai/scim/entitlement'
 import {
   assertInviteeNotScimManaged,
@@ -49,11 +50,7 @@ import {
   type PermissionType,
   type WorkspaceWithOwner,
 } from '@/lib/workspaces/permissions/utils'
-import {
-  getWorkspaceInvitePolicy,
-  type WorkspaceInvitePolicy,
-} from '@/lib/workspaces/policy'
-import { validateInvitationsAllowed } from '@/lib/labbai/access-control/permission-check'
+import { getWorkspaceInvitePolicy, type WorkspaceInvitePolicy } from '@/lib/workspaces/policy'
 
 /**
  * What the invitee becomes in the organization. `member` and `admin` are

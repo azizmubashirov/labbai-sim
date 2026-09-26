@@ -362,4 +362,3 @@ describe('syncUsageLimitsFromSubscription', () => {
     expect(expression).toContain('creditBalance')
   })
 })
-

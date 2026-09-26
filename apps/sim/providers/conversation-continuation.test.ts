@@ -183,12 +183,7 @@ describe('durable conversation restoration and continuation', () => {
     expect(
       await restoreConversationNativeMessages(current, 'openai', 'other-model', 'other-binding')
     ).toEqual(
-      await restoreConversationNativeMessages(
-        persisted,
-        'openai',
-        'other-model',
-        'other-binding'
-      )
+      await restoreConversationNativeMessages(persisted, 'openai', 'other-model', 'other-binding')
     )
   })
 })

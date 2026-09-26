@@ -5,15 +5,15 @@ import { assertWorkflowMutable, WorkflowLockedError } from '@sim/platform-authz/
 import { eq } from 'drizzle-orm'
 import { ForbiddenOperationError } from '@/lib/core/application'
 import { OrchestrationError } from '@/lib/core/orchestration/types'
+import {
+  PublicApiNotAllowedError,
+  validatePublicApiAllowed,
+} from '@/lib/labbai/access-control/permission-check'
 import { notifyWorkflowUpdated } from '@/lib/realtime/notify'
 import { defineAuthorizedWorkflowUseCase } from '@/lib/workflows/application/authorized-workflow-use-case'
 import { resolveActiveWorkflowApplicationContext } from '@/lib/workflows/application/context'
 import { workflowOperations } from '@/lib/workflows/application/operations'
 import { assertedWorkflowWorkspaceId } from '@/lib/workflows/application/principal-scope'
-import {
-  PublicApiNotAllowedError,
-  validatePublicApiAllowed,
-} from '@/lib/labbai/access-control/permission-check'
 
 export interface UpdateWorkflowPublicApiInput {
   workflowId: string

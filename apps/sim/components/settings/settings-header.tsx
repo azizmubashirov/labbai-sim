@@ -277,9 +277,7 @@ export function SettingsHeaderShell({ meta, children }: SettingsHeaderShellProps
 
   return (
     <div className='flex h-full flex-col bg-[var(--bg)]'>
-      <div
-        className={cn(PAGE_HEADER_BAR, 'justify-between')}
-      >
+      <div className={cn(PAGE_HEADER_BAR, 'justify-between')}>
         {back ? (
           <Chip leftIcon={back.icon} onClick={() => configRef?.current?.back?.onSelect()}>
             {back.text}

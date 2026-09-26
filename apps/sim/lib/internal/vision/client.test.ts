@@ -88,9 +88,9 @@ describe('Vision client', () => {
     ['gemini-2.5-pro', 'gpt-5-mini'],
     ['gpt-4.1-mini', 'gpt-4.1-mini'],
   ])('runs a stored %s selection on the OpenAI model %s', async (stored, expected) => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      Response.json({ choices: [{ message: { content: 'ok' } }] })
-    )
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(Response.json({ choices: [{ message: { content: 'ok' } }] }))
 
     const result = await analyzeVision({
       apiKey: 'secret',
@@ -112,9 +112,9 @@ describe('Vision client', () => {
   it('uses OPENAI_BASE_URL and OPENAI_EXTRA_HEADERS without letting them replace the key', async () => {
     clientConfig.baseUrl = 'https://gateway.example/v1'
     clientConfig.extraHeaders = { 'x-gateway': 'yes', Authorization: 'Bearer other' }
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      Response.json({ choices: [{ message: { content: 'ok' } }] })
-    )
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(Response.json({ choices: [{ message: { content: 'ok' } }] }))
 
     await analyzeVision({
       apiKey: 'secret',

@@ -15,6 +15,11 @@ import {
   readWorkflowInputFieldsForTool,
   readWorkflowMetadataForTool,
 } from '@/lib/internal/workflows/read-tool-enrichment'
+import {
+  assertPermissionsAllowed,
+  validateBlockType,
+  validateModelProvider,
+} from '@/lib/labbai/access-control/permission-check'
 import { assertValidMcpServerToolBindings, MCP_SERVER_ADVANCED_TOOL_TYPE } from '@/lib/mcp/shared'
 import { resolveMcpToolBinding } from '@/lib/mcp/tool-binding'
 import type { McpToolSchema } from '@/lib/mcp/types'
@@ -45,11 +50,6 @@ import {
 import { getAllBlocks, getBlock } from '@/blocks'
 import type { BlockOutput } from '@/blocks/types'
 import { normalizeFileInput } from '@/blocks/utils'
-import {
-  assertPermissionsAllowed,
-  validateBlockType,
-  validateModelProvider,
-} from '@/lib/labbai/access-control/permission-check'
 import { AGENT, BlockType, DEFAULTS, stripCustomToolPrefix } from '@/executor/constants'
 import { isRetryableBlockError } from '@/executor/execution/block-retry'
 import {

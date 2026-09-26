@@ -39,8 +39,7 @@ type Membership = (typeof MEMBERSHIP_OPTIONS)[number]['value']
 
 const MEMBERSHIP_HINTS: Partial<Record<Membership, string>> = {
   admin: 'Joins your organization and can manage it.',
-  external:
-    'Access to the selected workspaces only, without joining the organization.',
+  external: 'Access to the selected workspaces only, without joining the organization.',
 }
 
 const EMPTY_WORKSPACE_IDS: string[] = []

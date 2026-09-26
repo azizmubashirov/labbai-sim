@@ -15,8 +15,7 @@ export const AUDIT_LOGS_PAGE_SIZE = 50
 export const auditLogKeys = {
   all: ['audit-logs'] as const,
   lists: () => [...auditLogKeys.all, 'list'] as const,
-  organizationLists: (organizationId: string) =>
-    [...auditLogKeys.lists(), organizationId] as const,
+  organizationLists: (organizationId: string) => [...auditLogKeys.lists(), organizationId] as const,
   list: (organizationId: string, query: AuditLogFilterQuery, limit: number) =>
     [
       ...auditLogKeys.organizationLists(organizationId),

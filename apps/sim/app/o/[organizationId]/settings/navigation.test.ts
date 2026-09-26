@@ -64,13 +64,7 @@ describe('organization settings navigation', () => {
         { ...enterprise, hasEnterprisePlan: false, governanceActive: true },
         available
       ).map(({ id }) => id)
-    ).toEqual([
-      'members',
-      'recently-deleted',
-      'requests',
-      'access-control',
-      'search-mcp',
-    ])
+    ).toEqual(['members', 'recently-deleted', 'requests', 'access-control', 'search-mcp'])
   })
 
   it('honors individual self-hosted feature flags', () => {

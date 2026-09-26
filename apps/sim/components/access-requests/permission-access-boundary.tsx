@@ -5,11 +5,11 @@ import { Chip } from '@sim/emcn'
 import { Lock } from '@sim/emcn/icons'
 import { useQuery } from '@tanstack/react-query'
 import { useParams } from 'next/navigation'
+import { RequestAccessAction } from '@/components/access-requests/request-access-action'
 import { EmptyState } from '@/components/empty-state/empty-state'
 import { requestJson } from '@/lib/api/client/request'
 import { getUserPermissionConfigContract } from '@/lib/api/contracts/permission-groups'
 import type { BooleanPermissionGroupConfigKey } from '@/lib/permission-groups/features'
-import { RequestAccessAction } from '@/components/access-requests/request-access-action'
 import { useDiscoverAccessRequests } from '@/hooks/queries/access-requests'
 import { workspaceFeatureDiscoveryQuery } from '@/hooks/queries/utils/access-request-keys'
 import {
@@ -45,7 +45,10 @@ function useWorkspacePolicy(workspaceId: string) {
  */
 export function useWorkspaceAccessRequestFeatures() {
   const workspaceId = useRouteWorkspaceId()
-  return useDiscoverAccessRequests(workspaceFeatureDiscoveryQuery(workspaceId), Boolean(workspaceId))
+  return useDiscoverAccessRequests(
+    workspaceFeatureDiscoveryQuery(workspaceId),
+    Boolean(workspaceId)
+  )
 }
 
 interface PermissionAccessBoundaryProps {
@@ -56,7 +59,9 @@ interface PermissionAccessBoundaryProps {
 }
 
 function CheckingAccess() {
-  return <EmptyState title='Checking access' description='Loading your organization access policy.' />
+  return (
+    <EmptyState title='Checking access' description='Loading your organization access policy.' />
+  )
 }
 
 /**
@@ -106,8 +111,7 @@ export function PermissionAccessBoundary({ configKey, children }: PermissionAcce
   if (!discovery.data.enabled) return <>{children}</>
 
   const entry = discovery.data.entries.find(
-    (candidate) =>
-      candidate.target.kind === 'feature' && candidate.target.configKey === configKey
+    (candidate) => candidate.target.kind === 'feature' && candidate.target.configKey === configKey
   )
   if (entry?.state === 'allowed') return <>{children}</>
 

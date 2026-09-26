@@ -196,7 +196,9 @@ describe('integration availability', () => {
     expect([...CREDENTIAL_CONFIGURED_OAUTH_SERVICE_IDS].sort()).toEqual(
       expectedCredentialConfiguredServiceIds.sort()
     )
-    expect(SERVICE_ACCOUNT_METADATA_BY_OAUTH_SERVICE_ID.hubspot.deploymentRequirement).toBeUndefined()
+    expect(
+      SERVICE_ACCOUNT_METADATA_BY_OAUTH_SERVICE_ID.hubspot.deploymentRequirement
+    ).toBeUndefined()
     expect(SERVICE_ACCOUNT_METADATA_BY_OAUTH_SERVICE_ID.trello.deploymentRequirement).toBe(
       'oauth-client'
     )

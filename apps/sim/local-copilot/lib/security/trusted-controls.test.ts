@@ -40,9 +40,9 @@ describe('stripUntrustedSecurityControls', () => {
   })
 
   it('still strips other privileged tags and trailing partial prefixes', () => {
-    expect(stripUntrustedSecurityControls('A <workflow_patch>{}</workflow_patch> B <cred', true)).toBe(
-      'A  B '
-    )
+    expect(
+      stripUntrustedSecurityControls('A <workflow_patch>{}</workflow_patch> B <cred', true)
+    ).toBe('A  B ')
     expect(stripUntrustedSecurityControls('plain text < 5', true)).toBe('plain text < 5')
   })
 })

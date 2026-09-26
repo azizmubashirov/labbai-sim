@@ -8,13 +8,10 @@ import type {
   AccessRequestRecord,
   ResolveAccessRequestBody,
 } from '@/lib/api/contracts/access-requests'
-import { setOrgMemberUsageLimit } from '@/lib/billing/organizations/member-limits'
 import { creditsToDollars } from '@/lib/billing/credits/conversion'
+import { setOrgMemberUsageLimit } from '@/lib/billing/organizations/member-limits'
 import { OrchestrationError } from '@/lib/core/orchestration/types'
 import type { DbOrTx } from '@/lib/db/types'
-import { parsePermissionGroupConfig } from '@/lib/permission-groups/fields'
-import { acquirePermissionGroupOrgLock } from '@/lib/permission-groups/locks'
-import { getGroupWorkspaces } from '@/lib/permission-groups/repository'
 import {
   evaluateTarget,
   readMemberLimitCredits,
@@ -35,6 +32,9 @@ import type {
 } from '@/lib/labbai/access-requests/schemas'
 import { getAllowAccessRequests } from '@/lib/labbai/access-requests/settings'
 import { parseAccessRequestScopeKey } from '@/lib/labbai/access-requests/targets'
+import { parsePermissionGroupConfig } from '@/lib/permission-groups/fields'
+import { acquirePermissionGroupOrgLock } from '@/lib/permission-groups/locks'
+import { getGroupWorkspaces } from '@/lib/permission-groups/repository'
 
 const MAX_IMPACT_WORKSPACE_NAMES = 10
 
@@ -246,7 +246,9 @@ export const resolveAccessRequest = defineAuthorizedAccessRequestUseCase({
     outcome: ResolveOutcome
   }> {
     const organizationId = actor.organizationId
-    await acquirePermissionGroupOrgLock(executor, organizationId, { lockTimeoutAlreadyBounded: true })
+    await acquirePermissionGroupOrgLock(executor, organizationId, {
+      lockTimeoutAlreadyBounded: true,
+    })
     const prepared = await prepareReview(organizationId, input.requestId, executor, {
       forUpdate: true,
     })
@@ -320,7 +322,8 @@ export const resolveAccessRequest = defineAuthorizedAccessRequestUseCase({
       }
     } else {
       const group = preview.group
-      if (!group) throw new OrchestrationError('conflict', 'No permission group governs this request')
+      if (!group)
+        throw new OrchestrationError('conflict', 'No permission group governs this request')
       const [current] = await executor
         .select({ config: permissionGroup.config })
         .from(permissionGroup)
@@ -328,7 +331,8 @@ export const resolveAccessRequest = defineAuthorizedAccessRequestUseCase({
           and(eq(permissionGroup.id, group.id), eq(permissionGroup.organizationId, organizationId))
         )
         .limit(1)
-      if (!current) throw new OrchestrationError('conflict', 'The permission group no longer exists')
+      if (!current)
+        throw new OrchestrationError('conflict', 'The permission group no longer exists')
       const config = applyPolicyChanges(parsePermissionGroupConfig(current.config), preview.changes)
       await executor
         .update(permissionGroup)

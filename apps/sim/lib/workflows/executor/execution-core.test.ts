@@ -10,7 +10,7 @@ import {
 } from '@sim/testing'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LoggingSession } from '@/lib/logs/execution/logging-session'
-import { ExecutionSnapshot } from '@/executor/execution/snapshot'
+import type { ExecutionSnapshot } from '@/executor/execution/snapshot'
 
 const {
   mergeSubblockStateWithValuesMock,

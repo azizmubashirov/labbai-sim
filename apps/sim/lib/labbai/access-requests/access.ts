@@ -6,18 +6,6 @@ import { toDecimal, toNumber } from '@/lib/billing/utils/decimal'
 import { OrchestrationError } from '@/lib/core/orchestration/types'
 import type { DbOrTx } from '@/lib/db/types'
 import {
-  isAccessControlAllowlistRow,
-  isBlockTypeAccessControlExempt,
-} from '@/lib/permission-groups/block-access'
-import type { PermissionGroupConfig } from '@/lib/permission-groups/fields'
-import { resolveAccessControlBlockType } from '@/lib/permission-groups/integration-allowlist'
-import {
-  isOrganizationPermissionRegimeActive,
-  mergeEnvAllowlist,
-  resolveDefaultGroup,
-  resolveWorkspaceGroup,
-} from '@/lib/permission-groups/resolve.server'
-import {
   type AccessRequestTargetEvaluation,
   evaluatePermissionTarget,
 } from '@/lib/labbai/access-requests/policy'
@@ -30,6 +18,18 @@ import {
   isFeatureRequestableInScope,
   isListTargetKind,
 } from '@/lib/labbai/access-requests/targets'
+import {
+  isAccessControlAllowlistRow,
+  isBlockTypeAccessControlExempt,
+} from '@/lib/permission-groups/block-access'
+import type { PermissionGroupConfig } from '@/lib/permission-groups/fields'
+import { resolveAccessControlBlockType } from '@/lib/permission-groups/integration-allowlist'
+import {
+  isOrganizationPermissionRegimeActive,
+  mergeEnvAllowlist,
+  resolveDefaultGroup,
+  resolveWorkspaceGroup,
+} from '@/lib/permission-groups/resolve.server'
 
 /**
  * Server-side access resolution: which permission group governs a requester
@@ -91,7 +91,9 @@ export async function readMemberLimitCredits(
 }
 
 /** Allowlist entries are compared in the canonical block vocabulary. */
-function canonicalizeIntegrations(config: PermissionGroupConfig | null): PermissionGroupConfig | null {
+function canonicalizeIntegrations(
+  config: PermissionGroupConfig | null
+): PermissionGroupConfig | null {
   if (!config?.allowedIntegrations) return config
   return {
     ...config,
@@ -142,7 +144,9 @@ async function loadProviderDefinitions() {
  * canonical form: an integration is stored under the block type the allowlist
  * decides on, so a request for a superseded version asks for the current one.
  */
-export async function canonicalizeTarget(target: AccessRequestTarget): Promise<AccessRequestTarget> {
+export async function canonicalizeTarget(
+  target: AccessRequestTarget
+): Promise<AccessRequestTarget> {
   if (target.kind === 'integration') {
     const id = resolveAccessControlBlockType(target.id)
     const { getBlock } = await loadBlockRegistry()

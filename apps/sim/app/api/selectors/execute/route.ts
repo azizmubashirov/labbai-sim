@@ -10,6 +10,7 @@ import {
 } from '@/lib/api/server/routes'
 import { createInternalResourceConcealmentPolicy } from '@/lib/api/server/routes/resource-concealment'
 import { asOrchestrationError } from '@/lib/core/orchestration/types'
+import { IntegrationNotAllowedError } from '@/lib/labbai/access-control/permission-check'
 import { executeSelector } from '@/lib/selectors/application/execute-selector'
 import { selectorOperations } from '@/lib/selectors/application/operations'
 import {
@@ -17,7 +18,6 @@ import {
   SelectorContextUnavailableError,
   SelectorOptionsUnavailableError,
 } from '@/lib/selectors/server/errors'
-import { IntegrationNotAllowedError } from '@/lib/labbai/access-control/permission-check'
 
 const PRIVATE_NO_STORE = { 'Cache-Control': 'private, no-store' } as const
 const SELECTOR_SCOPE_NOT_FOUND = 'Selector scope not found'

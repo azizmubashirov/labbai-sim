@@ -39,6 +39,7 @@ import {
 import { createLogger } from '@sim/logger'
 import { useParams, usePathname, useRouter } from 'next/navigation'
 import { usePostHog } from 'posthog-js/react'
+import { useWorkspaceAccessRequestFeatures } from '@/components/access-requests/permission-access-boundary'
 import { useSession } from '@/lib/auth/auth-client'
 import { SIM_RESOURCES_DRAG_TYPE } from '@/lib/copilot/resource-types'
 import { useDeploymentShape } from '@/lib/core/config/deployment-shape'
@@ -117,7 +118,6 @@ import {
 } from '@/app/workspace/[workspaceId]/w/components/sidebar/utils'
 import { useImportWorkflow } from '@/app/workspace/[workspaceId]/w/hooks'
 import { useBlockVisibilityVersion } from '@/blocks/visibility/version'
-import { useWorkspaceAccessRequestFeatures } from '@/components/access-requests/permission-access-boundary'
 import { useWorkspaceCredentials } from '@/hooks/queries/credentials'
 import { useFolderMap, useFolders } from '@/hooks/queries/folders'
 import { type LogFilters, useLogsList } from '@/hooks/queries/logs'
@@ -382,12 +382,7 @@ export const Sidebar = memo(function Sidebar() {
 
   useEffect(() => {
     initializeSearchData(filterBlocks, isToolAllowed)
-  }, [
-    initializeSearchData,
-    filterBlocks,
-    isToolAllowed,
-    blockVisibilityVersion,
-  ])
+  }, [initializeSearchData, filterBlocks, isToolAllowed, blockVisibilityVersion])
 
   const setSidebarWidth = useSidebarStore((state) => state.setSidebarWidth)
   const toggleCollapsed = useSidebarStore((state) => state.toggleCollapsed)
@@ -814,9 +809,7 @@ export const Sidebar = memo(function Sidebar() {
   }
 
   const profileNavigationLinks = allNavigationItems
-    .filter(
-      ({ id }) => id === 'teammates' || id === 'recently-deleted'
-    )
+    .filter(({ id }) => id === 'teammates' || id === 'recently-deleted')
     .map(({ id, label, icon }) => ({
       label,
       icon,

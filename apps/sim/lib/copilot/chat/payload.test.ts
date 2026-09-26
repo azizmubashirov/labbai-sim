@@ -568,7 +568,9 @@ describe('buildCopilotRequestPayload', () => {
       },
       { selectedModel: 'claude-opus-4-8' }
     )
-    expect(withEntitlements).toEqual(expect.objectContaining({ entitlements: ['organization-context'] }))
+    expect(withEntitlements).toEqual(
+      expect.objectContaining({ entitlements: ['organization-context'] })
+    )
 
     const withoutEntitlements = await buildCopilotRequestPayload(
       {

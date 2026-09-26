@@ -74,14 +74,7 @@ describe('ResourceContent handoff', () => {
 
   function render(resource: MothershipResource) {
     act(() => {
-      root.render(
-        (
-          <ResourceContent
-            workspaceId='workspace-1'
-            resource={resource}
-          />
-        ) as ReactNode
-      )
+      root.render((<ResourceContent workspaceId='workspace-1' resource={resource} />) as ReactNode)
     })
   }
 

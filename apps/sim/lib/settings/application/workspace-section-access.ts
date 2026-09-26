@@ -11,14 +11,14 @@ import {
 } from '@/components/settings/navigation'
 import { isOrganizationOnEnterprisePlan } from '@/lib/billing/core/subscription'
 import { getDeploymentShape } from '@/lib/core/config/deployment-shape'
+import { resolveVerifiedUserAccessControlContext } from '@/lib/labbai/access-control/permission-check'
+import { isAccessRequestEnabled } from '@/lib/labbai/access-requests/settings'
 import { canOpenOrganizationSettingsSection } from '@/lib/organizations/settings-access'
 import type { BooleanPermissionGroupConfigKey } from '@/lib/permission-groups/features'
 import { isOrganizationPermissionRegimeActive } from '@/lib/permission-groups/resolve.server'
 import { isPlatformAdmin } from '@/lib/permissions/super-user'
 import { authorizeOrganizationSettingsSection } from '@/lib/settings/application/organization-section-access'
 import { checkWorkspaceAccess } from '@/lib/workspaces/permissions/utils'
-import { resolveVerifiedUserAccessControlContext } from '@/lib/labbai/access-control/permission-check'
-import { isAccessRequestEnabled } from '@/lib/labbai/access-requests/settings'
 
 export type WorkspaceSettingsSectionAccess =
   | { allowed: true }

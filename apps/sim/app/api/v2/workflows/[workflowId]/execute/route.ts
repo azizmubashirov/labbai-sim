@@ -35,6 +35,10 @@ import {
   SIM_VIA_HEADER,
   validateCallChain,
 } from '@/lib/execution/call-chain'
+import {
+  PublicApiNotAllowedError,
+  validatePublicApiAllowed,
+} from '@/lib/labbai/access-control/permission-check'
 import { v2WorkflowErrorPolicies } from '@/lib/workflows/api'
 import {
   executeManualWorkflowFromBlockOperation,
@@ -56,10 +60,6 @@ import {
   hasAgentStreamPolicy,
 } from '@/lib/workflows/streaming/agent-stream-protocol'
 import { v2Data, v2Error } from '@/app/api/v2/lib/response'
-import {
-  PublicApiNotAllowedError,
-  validatePublicApiAllowed,
-} from '@/lib/labbai/access-control/permission-check'
 
 const logger = createLogger('V2WorkflowExecuteAPI')
 

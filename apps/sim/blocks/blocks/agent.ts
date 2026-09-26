@@ -473,9 +473,7 @@ Return ONLY the JSON array.`,
     },
   ],
   tools: {
-    access: [
-      'openai_chat',
-    ],
+    access: ['openai_chat'],
     config: {
       tool: (params: Record<string, any>) => {
         const model = params.model || AGENT_FALLBACK_MODEL

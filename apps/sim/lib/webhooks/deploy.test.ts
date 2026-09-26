@@ -183,7 +183,6 @@ describe('buildProviderConfig canonical collapse', () => {
     const { providerConfig } = buildProviderConfig(block, 'table_new_row', tableTrigger)
     expect(providerConfig.tableId).toBe('ACTIVE')
   })
-
 })
 
 describe('resolveTriggerCredentialId', () => {

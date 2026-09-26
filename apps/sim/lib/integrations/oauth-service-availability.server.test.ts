@@ -33,9 +33,7 @@ describe('OAuth service availability projection', () => {
   })
 
   it('does not expose deployment fields or credentials', () => {
-    const result = getOAuthServiceAvailability([
-      { providerId: 'hubspot', authType: 'oauth' },
-    ])
+    const result = getOAuthServiceAvailability([{ providerId: 'hubspot', authType: 'oauth' }])
     expect(Object.keys(result[0]).sort()).toEqual(['available', 'providerId'])
     expect(JSON.stringify(result)).not.toContain('hubspot-secret')
     expect(JSON.stringify(result)).not.toContain('HUBSPOT_CLIENT')

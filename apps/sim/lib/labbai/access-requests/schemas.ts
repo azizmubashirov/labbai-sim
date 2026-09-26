@@ -1,11 +1,14 @@
 import { z } from 'zod'
-import { PERMISSION_GROUP_FIELDS, type PermissionGroupConfigKey } from '@/lib/permission-groups/fields'
 import {
   ACCESS_REQUEST_AUTH_MODES,
   ACCESS_REQUEST_FEATURE_KEYS,
   type AccessRequestFeatureKey,
   type AccessRequestTarget,
 } from '@/lib/labbai/access-requests/targets'
+import {
+  PERMISSION_GROUP_FIELDS,
+  type PermissionGroupConfigKey,
+} from '@/lib/permission-groups/fields'
 
 /**
  * Schemas for the JSON the `permission_access_request` table stores (`target`,
@@ -114,7 +117,9 @@ export function parseStoredAccessRequestTarget(value: unknown): AccessRequestTar
 }
 
 /** Parses a stored decision; `null` when absent or unreadable. */
-export function parseStoredAccessRequestDecision(value: unknown): StoredAccessRequestDecision | null {
+export function parseStoredAccessRequestDecision(
+  value: unknown
+): StoredAccessRequestDecision | null {
   const parsed = storedAccessRequestDecisionSchema.safeParse(value)
   return parsed.success ? parsed.data : null
 }

@@ -335,9 +335,9 @@ describe('getRotatingApiKey', () => {
     setEnv({
       COHERE_API_KEY: undefined,
       OPENAI_API_KEY_1: 'test-openai-key-1',
-    OPENAI_API_KEY_2: 'test-openai-key-2',
-    OPENAI_API_KEY_3: 'test-openai-key-3',
-    COHERE_API_KEY_1: 'test-cohere-key-1',
+      OPENAI_API_KEY_2: 'test-openai-key-2',
+      OPENAI_API_KEY_3: 'test-openai-key-3',
+      COHERE_API_KEY_1: 'test-cohere-key-1',
       COHERE_API_KEY_2: 'test-cohere-key-2',
       COHERE_API_KEY_3: 'test-cohere-key-3',
     })

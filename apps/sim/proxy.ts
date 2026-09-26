@@ -280,8 +280,7 @@ function handleSecurityFiltering(request: NextRequest): NextResponse | null {
   const userAgent = request.headers.get('user-agent') || ''
   const { pathname } = request.nextUrl
   const isWebhookEndpoint =
-    pathname.startsWith('/api/webhooks/trigger/') ||
-    pathname.startsWith('/api/webhooks/tiktok')
+    pathname.startsWith('/api/webhooks/trigger/') || pathname.startsWith('/api/webhooks/tiktok')
   const isMcpEndpoint = pathname.startsWith('/api/mcp/')
   const isMcpOauthDiscoveryEndpoint =
     pathname.startsWith('/.well-known/oauth-authorization-server') ||

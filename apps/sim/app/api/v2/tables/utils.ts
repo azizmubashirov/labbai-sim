@@ -227,4 +227,3 @@ export function toApiRow(
     updatedAt: toIso(row.updatedAt),
   }
 }
-

@@ -377,9 +377,7 @@ describe('validateInputsForBlock', () => {
 
       const bad = validate([{ model: 'gpt-5-mini', reasoningEffort: 'bogus' }])
       expect(bad.valid).toBe(false)
-      expect((bad as { error: { error: string } }).error.error).toContain(
-        'reasoning effort option'
-      )
+      expect((bad as { error: { error: string } }).error.error).toContain('reasoning effort option')
 
       const notAString = validate([{ model: 'gpt-5-mini', reasoningEffort: 42 }])
       expect(notAString.valid).toBe(false)

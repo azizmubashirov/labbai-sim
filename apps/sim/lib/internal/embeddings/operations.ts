@@ -63,7 +63,10 @@ export async function executeEmbedding(
   const info = findEmbeddingModelInfo(resolvedModel)
   if (!info) return failureResponse(`Unsupported embedding model: ${resolvedModel}`, 400)
   if (info.provider !== provider) {
-    return failureResponse(`Model ${resolvedModel} belongs to ${info.provider}, not ${provider}`, 400)
+    return failureResponse(
+      `Model ${resolvedModel} belongs to ${info.provider}, not ${provider}`,
+      400
+    )
   }
   try {
     resolveDimensions(info, dimensions)
