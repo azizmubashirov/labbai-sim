@@ -20,18 +20,13 @@ import {
 
 type GoogleSelectorKey = Extract<
   ServerSelectorKey,
-  'google.tasks.lists' | 'gmail.labels' | 'google.calendar' | 'google.drive' | 'google.sheets'
+  'gmail.labels' | 'google.calendar' | 'google.drive' | 'google.sheets'
 >
 
 const GOOGLE_SELECTOR_SCOPES: Partial<Record<string, string[]>> = {
   'google-drive': ['https://www.googleapis.com/auth/drive.readonly'],
   gmail: ['https://www.googleapis.com/auth/gmail.modify'],
   'google-calendar': ['https://www.googleapis.com/auth/calendar'],
-}
-
-interface GoogleTaskList {
-  id: string
-  title: string
 }
 
 interface CalendarListItem {
@@ -103,43 +98,6 @@ async function fetchGooglePage<T, R extends { nextPageToken?: string }>(input: {
     items: input.getItems(body) ?? [],
     ...(nextCursor ? { nextCursor } : {}),
   }
-}
-
-async function listTaskLists(args: ExecuteServerSelectorArgs): Promise<GooglePage<GoogleTaskList>> {
-  const accessToken = await googleAccessToken(args, 'google-tasks')
-  return fetchGooglePage<GoogleTaskList, { items?: GoogleTaskList[]; nextPageToken?: string }>({
-    args,
-    accessToken,
-    buildUrl: (pageToken) => {
-      const url = new URL('https://tasks.googleapis.com/tasks/v1/users/@me/lists')
-      url.searchParams.set('maxResults', '1000')
-      if (pageToken) url.searchParams.set('pageToken', pageToken)
-      return url
-    },
-    getItems: (page) => page.items,
-  })
-}
-
-async function executeTaskLists(args: ExecuteServerSelectorArgs) {
-  if (args.request.kind === 'detail') {
-    const accessToken = await googleAccessToken(args, 'google-tasks')
-    const detailId = requireGoogleId(args.request.id)
-    const list = await fetchProviderJson<GoogleTaskList>(
-      `https://tasks.googleapis.com/tasks/v1/users/@me/lists/${detailId}`,
-      { headers: { Authorization: `Bearer ${accessToken}` }, signal: args.signal }
-    )
-    return detailSelectorResult(list.id && list.title ? { id: list.id, label: list.title } : null)
-  }
-  const result = await listTaskLists(args)
-  return listSelectorResult(
-    result.items
-      .filter((list) => list.id && list.title)
-      .map((list) => ({
-        id: list.id,
-        label: list.title,
-      })),
-    result.nextCursor
-  )
 }
 
 function gmailLabelName(label: GmailLabel): string {
@@ -415,11 +373,6 @@ const storedCredential = (serviceIds: readonly string[]) =>
   ({ kind: 'stored', field: 'oauthCredential', serviceIds }) as const
 
 export const googleSelectorAttachments = {
-  'google.tasks.lists': {
-    credential: storedCredential(['google-tasks']),
-    destination: 'fixed',
-    execute: executeTaskLists,
-  },
   'gmail.labels': {
     credential: storedCredential(['gmail']),
     destination: 'fixed',

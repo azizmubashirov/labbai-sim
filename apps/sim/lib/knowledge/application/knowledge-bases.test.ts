@@ -2,7 +2,7 @@
  * @vitest-environment node
  */
 
-import { dbChainMockFns } from '@sim/testing'
+import { queueTableRows, schemaMock } from '@sim/testing'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
@@ -255,7 +255,9 @@ describe('knowledge base application use cases', () => {
 
   it('loads the active knowledge catalog and tag metadata only after workspace authorization', async () => {
     mocks.listRecords.mockResolvedValueOnce({ data: [knowledgeBase], nextCursorKeys: null })
-    dbChainMockFns.orderBy.mockResolvedValueOnce([
+    // Routed by table: Access Control is always on, so the authorization funnel
+    // also runs an ordered permission-group read before this one.
+    queueTableRows(schemaMock.knowledgeBaseTagDefinitions, [
       {
         knowledgeBaseId: 'knowledge-1',
         tagSlot: 'tag1',

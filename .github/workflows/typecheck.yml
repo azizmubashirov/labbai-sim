@@ -61,6 +61,8 @@ jobs:
         if: always()
         continue-on-error: true
         working-directory: apps/sim
+        env:
+          DATABASE_URL: postgresql://user:pass@localhost:5432/dummy
         run: |
           set -o pipefail
           NODE_OPTIONS=--max-old-space-size=8192 bunx vitest run --reporter=dot 2>&1 | tee /tmp/full-tests.txt

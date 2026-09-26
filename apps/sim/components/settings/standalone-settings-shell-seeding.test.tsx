@@ -10,7 +10,7 @@ const { mockSettingsSidebar } = vi.hoisted(() => ({
   mockSettingsSidebar: vi.fn((_props: { items: { id: string }[] }) => null),
 }))
 
-vi.mock('next/navigation', () => ({ usePathname: () => '/selfhost/settings/general' }))
+vi.mock('next/navigation', () => ({ usePathname: () => '/account/settings/general' }))
 vi.mock('@/components/settings/settings-sidebar', () => ({ SettingsSidebar: mockSettingsSidebar }))
 vi.mock('@/components/settings/settings-header', () => ({
   SettingsHeaderProvider: ({ children }: { children: ReactNode }) => children,
@@ -49,8 +49,7 @@ afterEach(() => {
 })
 
 describe('StandaloneSettingsShell', () => {
-  it('filters its navigation by the server-resolved shape, not the env fallback', () => {
-    /** Inverts the fallback's hosted switch, which decides the Chat keys item. */
+  it('seeds the server-resolved shape before its children read it', () => {
     const fallback = resolveDeploymentShape()
     const deployment = {
       ...fallback,
@@ -59,14 +58,36 @@ describe('StandaloneSettingsShell', () => {
 
     act(() =>
       root.render(
-        <StandaloneSettingsShell plane='selfhost' deployment={deployment}>
+        <StandaloneSettingsShell plane='account' deployment={deployment}>
           {null}
         </StandaloneSettingsShell>
       )
     )
 
-    const itemIds = mockSettingsSidebar.mock.calls[0][0].items.map((item) => item.id)
-    expect(itemIds.includes('chat-keys')).toBe(deployment.hosted)
     expect(getDeploymentShape()).toBe(deployment)
+  })
+
+  it('shows the admin section only to superusers', () => {
+    const deployment = resolveDeploymentShape()
+
+    act(() =>
+      root.render(
+        <StandaloneSettingsShell plane='account' deployment={deployment}>
+          {null}
+        </StandaloneSettingsShell>
+      )
+    )
+    const memberItemIds = mockSettingsSidebar.mock.calls[0][0].items.map((item) => item.id)
+    expect(memberItemIds).not.toContain('admin')
+
+    act(() =>
+      root.render(
+        <StandaloneSettingsShell plane='account' deployment={deployment} isSuperUser>
+          {null}
+        </StandaloneSettingsShell>
+      )
+    )
+    const lastCall = mockSettingsSidebar.mock.calls[mockSettingsSidebar.mock.calls.length - 1]
+    expect(lastCall[0].items.map((item) => item.id)).toContain('admin')
   })
 })

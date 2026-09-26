@@ -200,14 +200,14 @@ describe('Copilot retrieval tools', () => {
   it('projects the provider name for connected-source citations instead of the index name', async () => {
     mocks.search.mockResolvedValueOnce({
       retrieval: { status: 'complete', timedOutLegs: [] },
-      knowledgeBases: [{ id: 'index', name: 'Sim Search' }],
+      knowledgeBases: [{ id: 'index', name: 'Team docs' }],
       results: [
         {
           knowledgeBaseId: 'index',
           documentId: 'doc',
           documentName: 'Launch checklist',
-          sourceUrl: 'https://mail.google.com/thread',
-          connectorType: 'gmail',
+          sourceUrl: 'https://www.notion.so/launch-checklist',
+          connectorType: 'notion',
           sourceModifiedAt: null,
           metadata: {},
           content: 'body',
@@ -222,8 +222,8 @@ describe('Copilot retrieval tools', () => {
         results: [
           expect.objectContaining({
             documentName: 'Launch checklist',
-            siteName: 'Gmail',
-            knowledgeBaseName: 'Sim Search',
+            siteName: 'Notion',
+            knowledgeBaseName: 'Team docs',
           }),
         ],
       },

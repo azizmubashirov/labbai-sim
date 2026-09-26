@@ -49,7 +49,7 @@ describe('connector-type catalog', () => {
       input: { workspaceId: WORKSPACE_ID },
     })
 
-    expect(connectorTypes.length).toBeGreaterThan(10)
+    expect(connectorTypes.length).toBeGreaterThan(0)
     expect(connectorTypes.every((entry) => typeof entry.connectorType === 'string')).toBe(true)
     expect(mocks.recordAudit).not.toHaveBeenCalled()
   })

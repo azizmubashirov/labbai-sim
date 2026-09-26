@@ -77,7 +77,7 @@ describe('SuggestedActions', () => {
     mount()
 
     expect(heading()).toBe('Suggested actions')
-    expect(rows().map((row) => row.textContent)).toContain('Integrate with Slack')
+    expect(rows().map((row) => row.textContent)).toContain('Integrate with Google Sheets')
   })
 
   it('keeps suggestion actions interactive', () => {

@@ -24,7 +24,6 @@ const {
   mockValidateGitHub,
   mockResolveStorageBillingContext,
   mockIncrementStorage,
-  mockNotifyStorage,
   mockEnqueueConnectorDeletion,
   mockEnqueueConnectorDetachment,
 } = vi.hoisted(() => ({
@@ -39,7 +38,6 @@ const {
   mockValidateGitHub: vi.fn(),
   mockResolveStorageBillingContext: vi.fn(),
   mockIncrementStorage: vi.fn(),
-  mockNotifyStorage: vi.fn(),
   mockEnqueueConnectorDeletion: vi.fn(),
   mockEnqueueConnectorDetachment: vi.fn(),
 }))
@@ -61,7 +59,6 @@ vi.mock('@/lib/billing/core/subscription', () => ({
 vi.mock('@/lib/billing/storage', () => ({
   resolveStorageBillingContext: mockResolveStorageBillingContext,
   incrementStorageUsageForBillingContextInTx: mockIncrementStorage,
-  maybeNotifyStorageLimitForBillingContext: mockNotifyStorage,
   applyStorageUsageDeltasInTx: vi.fn(),
 }))
 vi.mock('@/lib/knowledge/documents/storage-cleanup', () => ({
@@ -409,7 +406,6 @@ describe('performDeleteKnowledgeConnector', () => {
     expect(outcome).toMatchObject({ success: true, documentsKept: 2, documentsDeleted: 0 })
     expect(dbChainMockFns.delete).not.toHaveBeenCalledWith(document)
     expect(mockIncrementStorage).toHaveBeenCalledWith(expect.anything(), STORAGE_CONTEXT, 30)
-    expect(mockNotifyStorage).toHaveBeenCalledWith(STORAGE_CONTEXT, 30)
     expect(dbChainMockFns.set).toHaveBeenCalledWith(
       expect.objectContaining({ detachedAt: expect.any(Date), detachReservedBytes: 30 })
     )
@@ -579,7 +575,6 @@ describe('performDeleteKnowledgeConnector', () => {
     expect(outcome).toMatchObject({ success: false, error: 'Storage limit exceeded' })
     expect(dbChainMockFns.update).not.toHaveBeenCalled()
     expect(mockEnqueueConnectorDetachment).not.toHaveBeenCalled()
-    expect(mockNotifyStorage).not.toHaveBeenCalled()
   })
 })
 

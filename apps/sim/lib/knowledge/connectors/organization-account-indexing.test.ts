@@ -18,12 +18,12 @@ import { setOrganizationAccountIndexing } from '@/lib/knowledge/connectors/organ
 const input = {
   organizationId: 'org-1',
   credentialGroupId: 'group-1',
-  optionId: 'gmail-option',
+  optionId: 'drive-option',
   enabled: false,
 }
 const group = {
   status: 'active',
-  options: [{ id: 'gmail-option', status: 'active', provider: 'gmail' }],
+  options: [{ id: 'drive-option', status: 'active', provider: 'google-drive' }],
 }
 const source = {
   id: 'source-1',
@@ -68,7 +68,7 @@ describe('organization provider indexing changes', () => {
       { type: 'eq', left: knowledgeBase.organizationId, right: 'org-1' },
       { type: 'eq', left: knowledgeBase.isSearchIndex, right: true },
       { type: 'eq', left: knowledgeConnector.credentialGroupId, right: 'group-1' },
-      { type: 'eq', left: knowledgeConnector.credentialGroupOptionId, right: 'gmail-option' },
+      { type: 'eq', left: knowledgeConnector.credentialGroupOptionId, right: 'drive-option' },
       { type: 'eq', left: knowledgeConnector.accessMode, right: 'members' },
     ])
       expect(predicates).toContainEqual(expected)
@@ -78,7 +78,7 @@ describe('organization provider indexing changes', () => {
     queueTableRows(knowledgeConnector, [{ ...source, status: 'paused' }])
     await setOrganizationAccountIndexing({ ...input, enabled: true })
     expect(validateBinding).toHaveBeenCalledWith(
-      expect.objectContaining({ credentialGroupOptionId: 'gmail-option', group })
+      expect.objectContaining({ credentialGroupOptionId: 'drive-option', group })
     )
     expect(dbChainMockFns.set).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -108,6 +108,17 @@ describe('organization provider indexing changes', () => {
     await expect(
       setOrganizationAccountIndexing({ ...input, optionId: 'foreign-option' })
     ).rejects.toMatchObject({ code: 'not_found' })
+    expect(dbChainMockFns.update).not.toHaveBeenCalled()
+  })
+
+  it('refuses a provider no Search connector can index before touching any source', async () => {
+    resetDbChainMock()
+    queueTableRows(credentialGroup, [
+      { ...group, options: [{ id: 'drive-option', status: 'active', provider: 'gmail' }] },
+    ])
+    await expect(setOrganizationAccountIndexing(input)).rejects.toMatchObject({
+      code: 'validation',
+    })
     expect(dbChainMockFns.update).not.toHaveBeenCalled()
   })
 

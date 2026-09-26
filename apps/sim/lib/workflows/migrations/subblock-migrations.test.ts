@@ -360,7 +360,7 @@ describe('migrateSubblockIds', () => {
         type: 'function',
         subBlocks: {
           code: { id: 'code', type: 'unknown', value: 'console.log("hi")' },
-          language: { value: 'javascript' },
+          secretScope: { value: 'all' },
           undefined: { type: 'unknown', value: null },
           noId: { type: 'short-input', value: 'stale' },
           noType: { id: 'noType', value: 'stale' },
@@ -379,10 +379,10 @@ describe('migrateSubblockIds', () => {
       type: 'code',
       value: 'console.log("hi")',
     })
-    expect(blocks.b1.subBlocks.language).toEqual({
-      id: 'language',
+    expect(blocks.b1.subBlocks.secretScope).toEqual({
+      id: 'secretScope',
       type: 'dropdown',
-      value: 'javascript',
+      value: 'all',
     })
     expect(blocks.b1.subBlocks.undefined).toBeUndefined()
     expect(blocks.b1.subBlocks.noId).toBeUndefined()

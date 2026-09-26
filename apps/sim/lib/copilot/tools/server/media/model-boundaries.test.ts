@@ -42,10 +42,21 @@ vi.mock('@/lib/media/falai-audio', () => ({ generateFalAudio: mockGenerateFalAud
 vi.mock('@/lib/workspace-files/application/resolve-workspace-file-reference', () => ({
   resolveWorkspaceFileReference: mockResolveWorkspaceFileReference,
 }))
-vi.mock('@/lib/workspace-files/application/read-workspace-file-content', () => ({
-  readWorkspaceFileContent: { execute: mockReadWorkspaceFileContent },
-}))
+/** The Copilot adapter only runs use cases bound to a registered file operation. */
+vi.mock('@/lib/workspace-files/application/read-workspace-file-content', async () => {
+  const { fileOperations } = await import('@/lib/workspace-files/application/operations')
+  return {
+    readWorkspaceFileContent: {
+      operation: fileOperations.readContent,
+      execute: mockReadWorkspaceFileContent,
+    },
+  }
+})
 vi.mock('@/lib/uploads/contexts/workspace/workspace-file-secret-provenance', () => ({
+  createWorkspaceFileSecretProvenanceFromRegistry: vi.fn(async () => ({
+    safe: true,
+    provenance: { status: 'unrecorded' },
+  })),
   isOpaqueWorkspaceFileEgressSafe: mockIsOpaqueWorkspaceFileEgressSafe,
   MODEL_UNSAFE_WORKSPACE_FILE_ERROR_MESSAGE:
     'File cannot be sent to a model because its secret provenance is unavailable',

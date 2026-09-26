@@ -245,7 +245,12 @@ describe('buildSelectorContextFromBlock', () => {
 
 describe('SELECTOR_CONTEXT_FIELDS validation', () => {
   it('every entry must be a canonicalParamId (if a canonical pair exists) or a direct subblock ID', () => {
-    const explicitSurfaceFields = new Set(['excludeWorkflowId'])
+    /**
+     * `fileId` is still an allowed context key of the `google.drive` selector (its parent-folder
+     * filter), but the blocks that declared a `fileId` field (Box, Slack, 1Password) were removed
+     * in the Labbai cleanup, so no kept block supplies it.
+     */
+    const explicitSurfaceFields = new Set(['excludeWorkflowId', 'fileId'])
     const allCanonicalParamIds = new Set<string>()
     const allSubBlockIds = new Set<string>()
     const idsInCanonicalPairs = new Set<string>()

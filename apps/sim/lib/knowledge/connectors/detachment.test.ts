@@ -15,14 +15,12 @@ const mocks = vi.hoisted(() => ({
   resolveStorage: vi.fn(),
   incrementStorage: vi.fn(),
   decrementStorage: vi.fn(),
-  notifyStorage: vi.fn(),
   revoke: vi.fn(),
 }))
 vi.mock('@/lib/billing/storage', () => ({
   resolveStorageBillingContext: mocks.resolveStorage,
   incrementAdmittedStorageUsageForBillingContextInTx: mocks.incrementStorage,
   decrementStorageUsageForBillingContextInTx: mocks.decrementStorage,
-  maybeNotifyStorageLimitForBillingContext: mocks.notifyStorage,
 }))
 vi.mock('@/lib/knowledge/connectors/member-access', () => ({
   revokeKnowledgeConnectorCredentialAccess: mocks.revoke,
@@ -197,7 +195,6 @@ describe('connector detachment', () => {
     await detachKnowledgeConnector(payload, context())
 
     expect(mocks.incrementStorage).toHaveBeenCalledWith(expect.anything(), STORAGE_CONTEXT, 4)
-    expect(mocks.notifyStorage).toHaveBeenCalledWith(STORAGE_CONTEXT, 1_000)
     expect(mocks.decrementStorage).not.toHaveBeenCalled()
   })
 
@@ -261,12 +258,11 @@ describe('purged knowledge base reservations', () => {
     expect(mocks.decrementStorage).toHaveBeenCalledOnce()
     expect(mocks.decrementStorage).toHaveBeenCalledWith(expect.anything(), STORAGE_CONTEXT, 43)
     expect(mocks.incrementStorage).not.toHaveBeenCalled()
-    expect(mocks.notifyStorage).not.toHaveBeenCalled()
     /** Settlement zeroes the reservation and leaves the detach itself untouched. */
     expect(dbChainMockFns.set).toHaveBeenCalledWith({ detachReservedBytes: 0 })
   })
 
-  it('charges a net overdraft once and notifies with the final balance', async () => {
+  it('charges a net overdraft once', async () => {
     queueTableRows(knowledgeConnector, [
       { id: 'connector-a', reservedBytes: -30 },
       { id: 'connector-b', reservedBytes: 10 },
@@ -277,6 +273,5 @@ describe('purged knowledge base reservations', () => {
     expect(mocks.incrementStorage).toHaveBeenCalledOnce()
     expect(mocks.incrementStorage).toHaveBeenCalledWith(expect.anything(), STORAGE_CONTEXT, 20)
     expect(mocks.decrementStorage).not.toHaveBeenCalled()
-    expect(mocks.notifyStorage).toHaveBeenCalledWith(STORAGE_CONTEXT, 1_000)
   })
 })

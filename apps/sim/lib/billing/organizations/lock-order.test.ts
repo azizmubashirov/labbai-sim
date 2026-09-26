@@ -200,10 +200,8 @@ describe('organization ownership transfer reservation', () => {
 
   it('reassigns billed accounts through one same-payer update and preserves owner semantics', async () => {
     dbChainMockFns.limit
-      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([{ id: 'member-current', role: 'owner' }])
       .mockResolvedValueOnce([{ id: 'member-new', role: 'admin' }])
-      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([])
     dbChainMockFns.returning.mockResolvedValueOnce([
       { id: 'workspace-billed-b' },

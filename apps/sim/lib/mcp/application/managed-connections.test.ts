@@ -54,6 +54,14 @@ const metadata = {
   updatedAt: new Date('2026-09-01'),
 }
 
+/**
+ * Reads of the credential table. Access Control is always on in this build, so
+ * the authorization funnel also reads permission groups before `execute` runs;
+ * the catalog's own ordering guarantees concern credential reads only.
+ */
+const credentialReads = () =>
+  dbChainMockFns.from.mock.calls.filter(([table]) => table === schemaMock.credential).length
+
 describe('managed MCP connection catalog', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -111,7 +119,7 @@ describe('managed MCP connection catalog', () => {
       tools: [],
     })
     expect(mocks.policy).not.toHaveBeenCalled()
-    expect(dbChainMockFns.from).not.toHaveBeenCalled()
+    expect(credentialReads()).toBe(0)
   })
 
   it.each(['workspace', 'organization'])(
@@ -126,7 +134,7 @@ describe('managed MCP connection catalog', () => {
         }
       )
       expect(mocks.policy).not.toHaveBeenCalled()
-      expect(dbChainMockFns.from).not.toHaveBeenCalled()
+      expect(credentialReads()).toBe(0)
     }
   )
 
@@ -153,7 +161,7 @@ describe('managed MCP connection catalog', () => {
       servers: [],
       tools: [],
     })
-    expect(dbChainMockFns.from).not.toHaveBeenCalled()
+    expect(credentialReads()).toBe(0)
   })
 
   it('only queries connectors granted to this workspace', async () => {
@@ -176,7 +184,7 @@ describe('managed MCP connection catalog', () => {
     )
     expect(mocks.billing).not.toHaveBeenCalled()
     expect(mocks.policy).not.toHaveBeenCalled()
-    expect(dbChainMockFns.from).not.toHaveBeenCalled()
+    expect(credentialReads()).toBe(0)
   })
 
   it.each(['scopedAvailable', 'policy'] as const)(
@@ -187,7 +195,7 @@ describe('managed MCP connection catalog', () => {
       await expect(listManagedMcpConnectionsUseCase.execute({ principal, input })).rejects.toBe(
         error
       )
-      expect(dbChainMockFns.from).not.toHaveBeenCalled()
+      expect(credentialReads()).toBe(0)
     }
   )
 
@@ -199,7 +207,7 @@ describe('managed MCP connection catalog', () => {
     await expect(listManagedMcpConnectionsUseCase.execute({ principal, input })).rejects.toThrow(
       message
     )
-    expect(dbChainMockFns.from).toHaveBeenCalledTimes(1)
+    expect(credentialReads()).toBe(1)
   })
 
   it('rejects a snapshot that disappeared or grew beyond the admitted size', async () => {

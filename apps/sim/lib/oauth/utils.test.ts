@@ -337,10 +337,16 @@ describe('getScopeDescription', () => {
   })
 
   it.concurrent('falls back to the raw scope string for an unknown scope', () => {
-    expect(getScopeDescription('crm.objects.contacts.read', 'hubspot')).toBe(
-      'crm.objects.contacts.read'
+    expect(getScopeDescription('crm.objects.unknown.read', 'hubspot')).toBe(
+      'crm.objects.unknown.read'
     )
     expect(getScopeDescription('unknown-scope')).toBe('unknown-scope')
+  })
+
+  it.concurrent('describes a known scope regardless of the provider hint', () => {
+    expect(getScopeDescription('crm.objects.contacts.read', 'hubspot')).toBe(
+      'Read HubSpot contacts'
+    )
   })
 })
 

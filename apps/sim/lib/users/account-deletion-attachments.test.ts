@@ -11,18 +11,10 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
-  isSoleOwnerOfPaidOrganization: vi.fn(),
-  getPersonalSubscription: vi.fn(),
   isUsingCloudStorage: vi.fn(),
   deleteFiles: vi.fn(),
 }))
 
-vi.mock('@/lib/billing/organizations/membership', () => ({
-  isSoleOwnerOfPaidOrganization: mocks.isSoleOwnerOfPaidOrganization,
-}))
-vi.mock('@/lib/billing/core/plan', () => ({
-  getHighestPriorityPersonalSubscription: mocks.getPersonalSubscription,
-}))
 vi.mock('@/lib/uploads', () => ({
   isUsingCloudStorage: mocks.isUsingCloudStorage,
   StorageService: { deleteFiles: mocks.deleteFiles },
@@ -59,8 +51,6 @@ describe('account deletion of private organization Assistant images', () => {
     resetDbChainMock()
     vi.useFakeTimers()
     vi.setSystemTime(NOW)
-    mocks.isSoleOwnerOfPaidOrganization.mockResolvedValue({ isBlocker: false })
-    mocks.getPersonalSubscription.mockResolvedValue(null)
     mocks.isUsingCloudStorage.mockReturnValue(true)
     mocks.deleteFiles.mockResolvedValue({ deleted: 1, failed: [] })
   })
@@ -199,8 +189,8 @@ describe('account deletion of private organization Assistant images', () => {
     expect(dbChainMockFns.delete).not.toHaveBeenCalledWith(schemaMock.uploadSession)
   })
 
-  it('leaves storage untouched when deletion is blocked for an active account', async () => {
-    mocks.getPersonalSubscription.mockResolvedValueOnce({ plan: 'pro' })
+  it('leaves storage untouched when deletion is blocked by an organization membership', async () => {
+    queueTableRows(schemaMock.member, [{ name: 'Acme' }])
 
     await expect(deleteUserAccount('user-1')).rejects.toMatchObject({ code: 'conflict' })
 

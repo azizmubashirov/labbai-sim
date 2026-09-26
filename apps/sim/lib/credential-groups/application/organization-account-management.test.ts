@@ -94,11 +94,11 @@ describe('organization account people search application', () => {
   it('keeps canonical provider intent on connection requests and resends', async () => {
     mocks.group.mockResolvedValue({
       credentialGroupId: 'group-1',
-      options: [{ id: 'gmail-option', provider: 'gmail', status: 'active' }],
+      options: [{ id: 'drive-option', provider: 'google-drive', status: 'active' }],
     })
     await inviteOrganizationAccountPeople.execute({
       principal,
-      input: { organizationId: 'org-1', emails: ['person@example.com'], optionId: 'gmail-option' },
+      input: { organizationId: 'org-1', emails: ['person@example.com'], optionId: 'drive-option' },
     })
     expect(mocks.invite).toHaveBeenCalledWith(
       { kind: 'organization', organizationId: 'org-1' },
@@ -106,11 +106,11 @@ describe('organization account people search application', () => {
       'admin-1',
       'Admin',
       { emails: ['person@example.com'] },
-      { optionId: 'gmail-option', providerName: 'Gmail' }
+      { optionId: 'drive-option', providerName: 'Google Drive' }
     )
     await resendOrganizationAccountInvitation.execute({
       principal,
-      input: { organizationId: 'org-1', enrollmentId: 'person', optionId: 'gmail-option' },
+      input: { organizationId: 'org-1', enrollmentId: 'person', optionId: 'drive-option' },
     })
     expect(mocks.resend).toHaveBeenCalledWith(
       { kind: 'organization', organizationId: 'org-1' },
@@ -118,7 +118,7 @@ describe('organization account people search application', () => {
       'person',
       'admin-1',
       'Admin',
-      { optionId: 'gmail-option', providerName: 'Gmail' }
+      { optionId: 'drive-option', providerName: 'Google Drive' }
     )
   })
 

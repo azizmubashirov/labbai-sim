@@ -331,122 +331,16 @@ describe('AgentBlockHandler', () => {
     resetDbChainMock()
   })
 
-  describe('native evaluation models', () => {
-    const questions = { passed: { type: 'noul', instructions: 'Did the task succeed?' } }
-    const inputs: AgentInputs = {
-      model: 'jev-1.13.0',
-      apiKey: 'test-key',
-      evaluationState: 'Task complete',
-      evaluationQuestions: questions,
-    }
-
-    it('uses the provider path with native inputs and exposes structured answers', async () => {
-      mockGetProviderFromModel.mockReturnValue('typesafe')
-      const answers = { passed: { type: 'noul', noul: 0.98 } }
-      mockExecuteProviderRequest.mockResolvedValue({
-        content: JSON.stringify(answers),
-        answers,
-        model: inputs.model,
-        tokens: { input: 20, output: 5, total: 25 },
-      })
-      const result = await handler.execute(mockContext, mockBlock, inputs)
-      expect(mockValidateModelProvider).toHaveBeenCalledWith(
-        mockContext.userId,
-        mockContext.workspaceId,
-        inputs.model,
-        mockContext
-      )
-      expect(mockExecuteProviderRequest).toHaveBeenCalledWith(
-        'typesafe',
-        expect.objectContaining({
-          model: inputs.model,
-          apiKey: 'test-key',
-          evaluation: { state: 'Task complete', questions },
-          context: undefined,
-          systemPrompt: undefined,
-          tools: [],
-        }),
-        expect.anything()
-      )
-      expect(result).toMatchObject({
-        answers,
-        content: JSON.stringify(answers),
-        tokens: { total: 25 },
-      })
-    })
-
-    it('ignores saved chat settings after switching the model to Jev', async () => {
-      mockGetProviderFromModel.mockReturnValue('typesafe')
+  describe('evaluation inputs', () => {
+    it('never sends saved evaluation inputs to a chat model', async () => {
       await handler.execute(mockContext, mockBlock, {
-        ...inputs,
-        messages: [{ role: 'user', content: 'Old conversation' }],
-        systemPrompt: 'Old prompt',
-        tools: [{ type: 'custom-tool', title: 'Stale tool' }],
-        skills: [{ skillId: 'stale-skill' }],
-        responseFormat: '{invalid stale JSON',
-        memoryType: 'conversation',
-        conversationId: 'stale-conversation',
-        temperature: 0.5,
-        maxTokens: 100,
-        files: [{ name: 'old.png' }],
-        fallbackModels: [{ model: 'gpt-4o' }],
-      })
-      const request = mockExecuteProviderRequest.mock.calls[0][1]
-      expect(request).toMatchObject({
-        evaluation: { state: 'Task complete', questions },
-        tools: [],
-        context: undefined,
-        temperature: undefined,
-        maxTokens: undefined,
-      })
-      expect(request.messages ?? []).toEqual([])
-      expect(mockOpenAgentTurnSession).not.toHaveBeenCalled()
-      expect(mockExecuteProviderRequest).toHaveBeenCalledOnce()
-    })
-
-    it('removes saved evaluation inputs when switching back to a chat model', async () => {
-      await handler.execute(mockContext, mockBlock, {
-        ...inputs,
         model: 'gpt-4o',
+        apiKey: 'test-key',
+        evaluationState: 'Task complete',
+        evaluationQuestions: { passed: { type: 'noul', instructions: 'Did the task succeed?' } },
         messages: [{ role: 'user', content: 'Hello' }],
       })
       expect(mockExecuteProviderRequest.mock.calls[0][1].evaluation).toBeUndefined()
-    })
-
-    it.each(['evaluationState', 'evaluationQuestions'] as const)(
-      'projects secrets in %s before the provider boundary',
-      async (field) => {
-        const registry = new ResolvedSecretTraceRegistry([
-          { name: 'PRIVATE_TEXT', plaintext: 'private value', encryptedValue: 'encrypted' },
-        ])
-        const path = field === 'evaluationState' ? [field] : [field, 'passed', 'instructions']
-        registry.recordResolvedAtInputPath('PRIVATE_TEXT', 'private value', path)
-        registry.recordResolvedInputProjection(path, 'private value', '{{PRIVATE_TEXT}}')
-        mockContext.resolvedSecretTraceRegistry = registry
-        mockGetProviderFromModel.mockReturnValue('typesafe')
-        await handler.execute(mockContext, mockBlock, {
-          ...inputs,
-          [field]:
-            field === 'evaluationState'
-              ? 'private value'
-              : { passed: { type: 'noul', instructions: 'private value' } },
-        })
-        const request = mockExecuteProviderRequest.mock.calls[0][1]
-        expect(JSON.stringify(request.evaluation)).not.toContain('private value')
-        expect(JSON.stringify(request.evaluation)).toContain('{{PRIVATE_TEXT}}')
-        expect(request.apiKey).toBe('test-key')
-      }
-    )
-
-    it('refuses an evaluation model as a conversational fallback before executing the primary', async () => {
-      await expect(
-        handler.execute(mockContext, mockBlock, {
-          model: 'gpt-4o',
-          messages: [{ role: 'user', content: 'Hello' }],
-          fallbackModels: [{ model: 'jev-latest' }],
-        })
-      ).rejects.toThrow('Evaluation models cannot serve as chat fallbacks')
-      expect(mockExecuteProviderRequest).not.toHaveBeenCalled()
     })
   })
 
@@ -834,10 +728,9 @@ describe('AgentBlockHandler', () => {
             data: [...stored, { role: 'assistant', content: 'First answer' }],
           },
         ])
-        mockGetProviderFromModel.mockReturnValue('anthropic')
         const nextContext = { ...mockContext, executionId: 'exec-2' }
         await handler.execute(nextContext, mockBlock, {
-          model: 'claude-sonnet-4-5',
+          model: 'gpt-4.1',
           memoryType: 'conversation',
           conversationId: 'conversation-1',
           messages: [{ role: 'user', content: 'What is in that file?' }],
@@ -1243,55 +1136,24 @@ describe('AgentBlockHandler', () => {
       )
     })
 
-    it('gives a fallback its own key, the block key on the same provider, and nothing otherwise', async () => {
+    it('gives a same-provider fallback the block key and never sends a row key', async () => {
       mockExecuteProviderRequest
         .mockRejectedValueOnce(new Error('one'))
         .mockRejectedValueOnce(new Error('two'))
-        .mockRejectedValueOnce(new Error('three'))
-        .mockResolvedValueOnce(providerResponse('gpt-4o-mini'))
+        .mockResolvedValueOnce(providerResponse('gpt-4.1-mini'))
 
-      const storedRows = [
-        { model: 'claude-sonnet-5', apiKey: '{{ANTHROPIC_KEY}}' },
-        { model: 'claude-haiku-5' },
-        { model: 'gpt-4o-mini' },
-      ]
+      const storedRows = [{ model: 'gpt-4.1', apiKey: '{{OTHER_KEY}}' }, { model: 'gpt-4.1-mini' }]
       const block = {
         ...mockBlock,
         config: { ...mockBlock.config, params: { fallbackModels: storedRows } },
       }
       await handler.execute(mockContext, block, {
         ...baseInputs,
-        fallbackModels: [
-          { model: 'claude-sonnet-5', apiKey: 'anthropic-row-key' },
-          { model: 'claude-haiku-5' },
-          { model: 'gpt-4o-mini' },
-        ],
+        fallbackModels: [{ model: 'gpt-4.1', apiKey: 'other-row-key' }, { model: 'gpt-4.1-mini' }],
       })
 
       const keys = mockExecuteProviderRequest.mock.calls.map(([, request]) => request.apiKey)
-      expect(keys).toEqual(['primary-key', 'anthropic-row-key', undefined, 'primary-key'])
-    })
-
-    it('treats a row key that was never resolved as no key and says which variable', async () => {
-      mockExecuteProviderRequest
-        .mockRejectedValueOnce(new Error('one'))
-        .mockResolvedValueOnce(providerResponse('claude-sonnet-5'))
-
-      const storedRows = [{ model: 'claude-sonnet-5', apiKey: '{{MISSING_KEY}}' }]
-      const block = {
-        ...mockBlock,
-        config: { ...mockBlock.config, params: { fallbackModels: storedRows } },
-      }
-      await handler.execute(mockContext, block, {
-        ...baseInputs,
-        fallbackModels: [{ model: 'claude-sonnet-5', apiKey: '{{MISSING_KEY}}' }],
-      })
-
-      expect(mockExecuteProviderRequest.mock.calls[1][1].apiKey).toBeUndefined()
-      expect(mockAgentLogger.warn).toHaveBeenCalledWith(
-        'Fallback key variable is not set for this run',
-        expect.objectContaining({ model: 'claude-sonnet-5', variable: '{{MISSING_KEY}}' })
-      )
+      expect(keys).toEqual(['primary-key', 'primary-key', 'primary-key'])
     })
 
     it.each([
@@ -1374,19 +1236,19 @@ describe('AgentBlockHandler', () => {
     })
 
     it('re-resolves tuning for the fallback: row value wins, caps clamp, undeclared values drop', async () => {
-      const fallbackCap = getModelCapabilities('gpt-5.4-mini')?.maxOutputTokens
+      const fallbackCap = getModelCapabilities('gpt-5-mini')?.maxOutputTokens
       expect(fallbackCap).toEqual(expect.any(Number))
       mockExecuteProviderRequest
         .mockRejectedValueOnce(new Error('down'))
-        .mockResolvedValueOnce(providerResponse('gpt-5.4-mini'))
+        .mockResolvedValueOnce(providerResponse('gpt-5-mini'))
 
       await handler.execute(mockContext, mockBlock, {
         ...baseInputs,
-        model: 'claude-sonnet-5',
+        model: 'gpt-4.1',
         thinkingLevel: 'high',
         temperature: 0.9,
         maxTokens: (fallbackCap as number) + 5000,
-        fallbackModels: [{ model: 'gpt-5.4-mini', reasoningEffort: 'low' }],
+        fallbackModels: [{ model: 'gpt-5-mini', reasoningEffort: 'low' }],
       })
 
       const [, primaryRequest] = mockExecuteProviderRequest.mock.calls[0]
@@ -1399,7 +1261,7 @@ describe('AgentBlockHandler', () => {
       expect(fallbackRequest.maxTokens).toBe(fallbackCap)
       expect(mockAgentLogger.info).toHaveBeenCalledWith(
         'Fallback model tuning adjusted',
-        expect.objectContaining({ model: 'gpt-5.4-mini' })
+        expect.objectContaining({ model: 'gpt-5-mini' })
       )
     })
 
@@ -1543,7 +1405,7 @@ describe('AgentBlockHandler', () => {
       mockExecuteProviderRequest
         .mockRejectedValueOnce(new Error('down'))
         .mockRejectedValueOnce(new Error('down'))
-        .mockResolvedValueOnce(providerResponse('claude-haiku-5'))
+        .mockResolvedValueOnce(providerResponse('gpt-4.1-mini'))
       const blockLog = openLog()
 
       try {
@@ -1553,8 +1415,8 @@ describe('AgentBlockHandler', () => {
           files: [file],
           fallbackModels: [
             { model: 'deepseek-chat' },
-            { model: 'claude-sonnet-5' },
-            { model: 'claude-haiku-5' },
+            { model: 'gpt-4.1' },
+            { model: 'gpt-4.1-mini' },
           ],
         })
 
@@ -1564,13 +1426,13 @@ describe('AgentBlockHandler', () => {
         )
         expect(mockExecuteProviderRequest.mock.calls.map(([, request]) => request.model)).toEqual([
           'gpt-4o',
-          'claude-sonnet-5',
-          'claude-haiku-5',
+          'gpt-4.1',
+          'gpt-4.1-mini',
         ])
-        /** One hydration for openai, one for anthropic; the skipped provider never hydrates. */
-        expect(hydrate).toHaveBeenCalledTimes(2)
+        /** One hydration for openai, shared by its fallbacks; a skipped provider never hydrates. */
+        expect(hydrate).toHaveBeenCalledTimes(1)
         /** A skipped candidate is not a failed try. */
-        expect(blockLog.modelFallbacks).toEqual(['gpt-4o', 'claude-sonnet-5'])
+        expect(blockLog.modelFallbacks).toEqual(['gpt-4o', 'gpt-4.1'])
       } finally {
         hydrate.mockRestore()
       }

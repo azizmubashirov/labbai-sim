@@ -216,7 +216,6 @@ describe('gated tools are askable', () => {
       'run_function',
       'run_workflow',
       'run_workflow_until_block',
-      'run_code',
     ])
   })
 })

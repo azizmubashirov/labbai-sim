@@ -19,6 +19,9 @@ const {
 vi.mock('@/lib/workspaces/permissions/utils', () => ({
   getWorkspaceById: mockGetWorkspaceById,
   getUserEntityPermissions: mockGetUserEntityPermissions,
+  // Access Control is always on: the capability check loads the workspace's
+  // organization. A personal workspace has none, so no permission group governs it.
+  getWorkspaceWithOwner: async () => ({ id: 'ws-1', organizationId: null }),
 }))
 
 const mockGetPersonalAndWorkspaceEnv = environmentUtilsMockFns.mockGetPersonalAndWorkspaceEnv

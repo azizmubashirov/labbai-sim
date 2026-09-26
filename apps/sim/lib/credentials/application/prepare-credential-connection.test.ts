@@ -189,7 +189,7 @@ describe('prepareCredentialConnection', () => {
 
   it('rejects a reconnect whose requested provider does not match the credential', async () => {
     mocks.resolveTarget.mockResolvedValue({
-      providerId: 'slack',
+      providerId: 'notion',
       credentialId: 'credential-1',
     })
 
@@ -272,26 +272,45 @@ describe('prepareCredentialConnection', () => {
     expect(mocks.resolveTarget).not.toHaveBeenCalled()
   })
 
-  it('does not offer Slack bot OAuth when connecting a personal Slack account', async () => {
+  it('connects a personal Notion account through canonical enrollment', async () => {
     mocks.listCatalog.mockResolvedValue([
       {
         ...gmailProvider,
-        serviceId: 'slack',
-        name: 'Slack',
-        authorizationOptions: [{ providerId: 'slack', label: 'Slack' }],
+        serviceId: 'notion',
+        name: 'Notion',
+        providerFamily: 'notion',
+        authorizationOptions: [{ providerId: 'notion', label: 'Notion' }],
       },
     ])
     const result = await prepareCredentialConnection.execute({
       principal,
-      input: { workspaceId: 'workspace-1', providerName: 'slack', personalOnly: true },
+      input: { workspaceId: 'workspace-1', providerName: 'notion', personalOnly: true },
     })
-    expect(result).toEqual({ kind: 'managed_oauth', providerId: 'slack', serviceName: 'Slack' })
+    expect(result).toEqual({ kind: 'managed_oauth', providerId: 'notion', serviceName: 'Notion' })
     expect(mocks.resolveTarget).not.toHaveBeenCalled()
+  })
+
+  it('rejects a personal connection for a provider Connected accounts does not collect', async () => {
+    mocks.listCatalog.mockResolvedValue([
+      {
+        ...gmailProvider,
+        serviceId: 'trello',
+        name: 'Trello',
+        providerFamily: 'trello',
+        authorizationOptions: [{ providerId: 'trello', label: 'Trello' }],
+      },
+    ])
+    await expect(
+      prepareCredentialConnection.execute({
+        principal,
+        input: { workspaceId: 'workspace-1', providerName: 'trello', personalOnly: true },
+      })
+    ).rejects.toMatchObject({ code: 'validation' })
   })
 
   it('rejects personal credentials from a different provider', async () => {
     mocks.personalCredentials.mockResolvedValue([
-      { id: 'own-account', providerId: 'slack', type: 'managed_oauth' },
+      { id: 'own-account', providerId: 'notion', type: 'managed_oauth' },
     ])
     await expect(
       prepareCredentialConnection.execute({

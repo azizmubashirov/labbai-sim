@@ -14,13 +14,17 @@ describe('createModelAccessGate', () => {
   it('denies a listed model case-insensitively', () => {
     const gate = createModelAccessGate({ deniedModels: ['GPT-4o'], allowedModelProviders: null })
     expect(gate('gpt-4o')).toBe(false)
-    expect(gate('claude-sonnet-4-5')).toBe(true)
+    expect(gate('gpt-4.1')).toBe(true)
   })
 
   it('denies a model whose provider is not allowlisted', () => {
     const gate = createModelAccessGate({ deniedModels: [], allowedModelProviders: ['anthropic'] })
-    expect(gate('gpt-4o')).toBe(false)
-    expect(gate('claude-sonnet-4-5')).toBe(true)
+    expect(gate('gpt-4.1')).toBe(false)
+    const openaiGate = createModelAccessGate({
+      deniedModels: [],
+      allowedModelProviders: ['openai'],
+    })
+    expect(openaiGate('gpt-4.1')).toBe(true)
   })
 
   it('leaves an id that resolves to no chat provider to the denylist alone', () => {

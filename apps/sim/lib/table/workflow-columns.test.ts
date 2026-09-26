@@ -250,11 +250,12 @@ describe('buildEnqueueItems billing attribution', () => {
     expect(mockResolveBillingAttribution).not.toHaveBeenCalled()
   })
 
-  it('caps the cascade carrier and serializes each workflow attempt budget', async () => {
+  it('leaves the cascade carrier untimed by default and serializes the budget', async () => {
     const [item] = await buildEnqueueItems([run])
 
-    expect(item.payload).toHaveProperty('executionTimeoutMs')
-    expect(item.options.maxDurationSeconds).toBe(5_700)
+    /** No plans: runs are untimed unless EXECUTION_TIMEOUT_ASYNC_FREE opts in. */
+    expect(item.payload).toHaveProperty('executionTimeoutMs', 0)
+    expect(item.options.maxDurationSeconds).toBeUndefined()
     expect(item.options.metadata?.correlation).toEqual({
       executionId: 'execution-1',
       requestId: 'wfgrp-execution-1',

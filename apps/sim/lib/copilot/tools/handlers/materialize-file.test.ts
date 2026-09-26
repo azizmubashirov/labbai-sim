@@ -17,7 +17,6 @@ const {
   mockHasCloudStorage,
   mockHeadObject,
   mockIncrementStorageUsageForBillingContextInTx,
-  mockMaybeNotifyStorageLimitForBillingContext,
   mockReadWorkspaceFileMetadata,
   mockResolveStorageBillingContext,
 } = vi.hoisted(() => ({
@@ -33,7 +32,6 @@ const {
   mockHasCloudStorage: vi.fn(),
   mockHeadObject: vi.fn(),
   mockIncrementStorageUsageForBillingContextInTx: vi.fn(),
-  mockMaybeNotifyStorageLimitForBillingContext: vi.fn(),
   mockReadWorkspaceFileMetadata: vi.fn(),
   mockResolveStorageBillingContext: vi.fn(),
 }))
@@ -95,7 +93,6 @@ vi.mock('@/lib/uploads/core/storage-service', () => ({
 vi.mock('@/lib/billing/storage', () => ({
   checkStorageQuotaForBillingContext: mockCheckStorageQuotaForBillingContext,
   incrementStorageUsageForBillingContextInTx: mockIncrementStorageUsageForBillingContextInTx,
-  maybeNotifyStorageLimitForBillingContext: mockMaybeNotifyStorageLimitForBillingContext,
   resolveStorageBillingContext: mockResolveStorageBillingContext,
 }))
 
@@ -334,7 +331,6 @@ describe('executeMaterializeFile - save storage transition', () => {
     mockResolveStorageBillingContext.mockResolvedValue(STORAGE_CONTEXT)
     mockCheckStorageQuotaForBillingContext.mockResolvedValue({ allowed: true })
     mockIncrementStorageUsageForBillingContextInTx.mockResolvedValue(1_250)
-    mockMaybeNotifyStorageLimitForBillingContext.mockResolvedValue(undefined)
     dbChainMockFns.returning.mockResolvedValue([{ id: 'file-1', originalName: 'report.txt' }])
   })
 
@@ -377,10 +373,6 @@ describe('executeMaterializeFile - save storage transition', () => {
     )
     expect(dbChainMockFns.set).toHaveBeenCalledWith(
       expect.objectContaining({ context: 'workspace', chatId: null, sizeBytes: 250 })
-    )
-    expect(mockMaybeNotifyStorageLimitForBillingContext).toHaveBeenCalledWith(
-      STORAGE_CONTEXT,
-      1_250
     )
   })
 
@@ -531,7 +523,6 @@ describe('executeMaterializeFile - save storage transition', () => {
     expect(mockAllocateUniqueWorkspaceFileName).toHaveBeenCalledTimes(8)
     expect(dbChainMockFns.transaction).toHaveBeenCalledTimes(8)
     expect(mockIncrementStorageUsageForBillingContextInTx).not.toHaveBeenCalled()
-    expect(mockMaybeNotifyStorageLimitForBillingContext).not.toHaveBeenCalled()
   })
 
   it('does not retry unique violations from a different constraint', async () => {
@@ -568,7 +559,6 @@ describe('executeMaterializeFile - save storage transition', () => {
     expect(result.output).toEqual({ succeeded: ['report (1).txt'], failed: [] })
     expect(result.resources).toEqual([{ type: 'file', id: 'file-1', title: 'report (1).txt' }])
     expect(mockIncrementStorageUsageForBillingContextInTx).not.toHaveBeenCalled()
-    expect(mockMaybeNotifyStorageLimitForBillingContext).not.toHaveBeenCalled()
   })
 
   it('fails a replay when the materialized workspace file no longer exists', async () => {
@@ -594,7 +584,6 @@ describe('executeMaterializeFile - save storage transition', () => {
       throwOnError: true,
     })
     expect(mockIncrementStorageUsageForBillingContextInTx).not.toHaveBeenCalled()
-    expect(mockMaybeNotifyStorageLimitForBillingContext).not.toHaveBeenCalled()
   })
 
   it('leaves the mothership row untouched when pre-admission rejects quota', async () => {
@@ -631,7 +620,6 @@ describe('executeMaterializeFile - save storage transition', () => {
       STORAGE_CONTEXT,
       250
     )
-    expect(mockMaybeNotifyStorageLimitForBillingContext).not.toHaveBeenCalled()
   })
 
   it('fails on a stale payer instead of charging a new payer', async () => {
@@ -646,7 +634,6 @@ describe('executeMaterializeFile - save storage transition', () => {
 
     expect(result.success).toBe(false)
     expect(result.error).toContain('report.txt')
-    expect(mockMaybeNotifyStorageLimitForBillingContext).not.toHaveBeenCalled()
   })
 })
 

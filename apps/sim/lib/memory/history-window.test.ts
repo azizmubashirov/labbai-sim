@@ -7,10 +7,7 @@ vi.mock('@/lib/tokenization/accurate', () => ({
 vi.mock('@/providers/models', () => ({
   PROVIDER_DEFINITIONS: {
     test: {
-      models: [
-        { id: 'small', contextWindow: 100 },
-        { id: 'bedrock/anthropic.claude-sonnet-4-5-20250929-v1:0', contextWindow: 100 },
-      ],
+      models: [{ id: 'small', contextWindow: 100 }],
     },
   },
   getMaxOutputTokensForModel: () => 10,
@@ -75,7 +72,7 @@ describe('conversation history windows', () => {
     expect(selectConversationContextWindow([...large, ...final], 'small')).toEqual(final)
   })
 
-  it.each(['SMALL', 'small-2026-09-19', 'bedrock/us.anthropic.claude-sonnet-4-5-20250929-v1:0'])(
+  it.each(['SMALL', 'small-2026-09-19', 'small-20260919'])(
     'uses normalized model limits for %s',
     (model) => {
       const groups = [user, exchange('batch'), final]

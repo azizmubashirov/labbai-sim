@@ -425,8 +425,8 @@ describe('connector access application boundary', () => {
 
   it('rejects separate content credentials for providers without the capability', async () => {
     mocks.meta.mockReturnValue({
-      name: 'Confluence',
-      auth: { mode: 'oauth', provider: 'confluence' },
+      name: 'Notion',
+      auth: { mode: 'oauth', provider: 'notion' },
     })
     await expect(
       updateKnowledgeConnectorAccess.execute({
@@ -489,17 +489,17 @@ describe('connector access application boundary', () => {
 
 describe('account and settings save', () => {
   it('validates the replacement with the edited configuration before passing a single mutation', async () => {
-    const sourceConfig = { domain: 'example.atlassian.net', spaceKey: ['ENG'] }
+    const sourceConfig = { scope: 'database', databaseId: 'database-1' }
     mocks.connector.mockResolvedValue({
       ...row,
       accessMode: 'admin',
-      connectorType: 'confluence',
+      connectorType: 'notion',
       credentialId: 'old',
       updatedAt: new Date('2026-09-01'),
     })
     mocks.meta.mockReturnValue({
-      name: 'Confluence',
-      auth: { mode: 'oauth', provider: 'confluence' },
+      name: 'Notion',
+      auth: { mode: 'oauth', provider: 'notion' },
       mirrorsSourceAcls: true,
     })
     await updateKnowledgeConnectorAccess.execute({

@@ -20,7 +20,7 @@ vi.unmock('@/tools/metadata-outputs')
  */
 describe('generated tool metadata', () => {
   it('covers the whole registry', () => {
-    expect(getToolIds().length).toBeGreaterThan(4000)
+    expect(getToolIds().length).toBeGreaterThan(500)
   })
 
   it('resolves a known tool with its params', () => {

@@ -205,6 +205,11 @@ describe('ModelFallbackList', () => {
 
   it('updates key visibility when hosted context arrives after mount, without rewriting the rows', async () => {
     seedDeploymentShape({ ...resolveDeploymentShape(), hosted: false })
+    /**
+     * Every catalog and legacy chat id resolves to OpenAI, so a row only asks for its own key
+     * when its provider differs from the primary's — here an uncatalogued primary (no provider).
+     */
+    subBlockValues.model = 'openrouter/x'
     subBlockValues.fallbackModels = [{ id: 'r1', model: 'gpt-5' }]
     const container = document.createElement('div')
     const root = createRoot(container)

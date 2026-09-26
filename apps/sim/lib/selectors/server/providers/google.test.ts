@@ -33,7 +33,7 @@ function driveDetailArgs(signal?: AbortSignal): ExecuteServerSelectorArgs {
 }
 
 function listArgs(
-  selectorKey: 'google.tasks.lists' | 'google.calendar' | 'google.drive',
+  selectorKey: 'google.calendar' | 'google.drive',
   cursor?: string
 ): ExecuteServerSelectorArgs {
   return {
@@ -328,24 +328,6 @@ describe('Google server selector adapters', () => {
     await expect(
       googleSelectorAttachments['google.drive'].execute(driveDetailArgs(controller.signal))
     ).rejects.toBe(abortError)
-  })
-
-  it('returns one task-list page and preserves the continuation token', async () => {
-    const items = Array.from({ length: 1_000 }, (_, index) => ({
-      id: `task-list-${index}`,
-      title: `Task list ${index}`,
-    }))
-    mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ items, nextPageToken: 'page-1' }), { status: 200 })
-    )
-
-    const result = await googleSelectorAttachments['google.tasks.lists'].execute(
-      listArgs('google.tasks.lists')
-    )
-
-    expect(result).toMatchObject({ kind: 'list', nextCursor: 'page-1' })
-    expect(result.kind === 'list' ? result.items : []).toHaveLength(1_000)
-    expect(mockFetch).toHaveBeenCalledTimes(1)
   })
 
   it('forwards a Google continuation token on demand', async () => {

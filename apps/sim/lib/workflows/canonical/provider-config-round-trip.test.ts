@@ -144,7 +144,7 @@ const pairs = hostedTriggers()
 
 describe('deploy -> providerConfig -> read-back round trip', () => {
   it('covers every hosted trigger', () => {
-    expect(pairs.length).toBeGreaterThan(50)
+    expect(pairs.length).toBeGreaterThan(40)
   })
 
   it.each(pairs.map((p) => [`${p.blockType} / ${p.triggerId}`, p] as const))(

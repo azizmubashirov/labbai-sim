@@ -280,7 +280,12 @@ it('disables bulk selection while searching and ignores a completion after the u
   const view = await renderBulkSelector()
   try {
     await act(async () => mocks.combobox.mock.lastCall![0].onSearchChange?.('Eng'))
-    expect(view.all().disabled).toBe(true)
+    // Drive searches server-side, so the searched page loads before All reappears.
+    await act(async () =>
+      vi.waitFor(() => expect(view.all().disabled).toBe(true), {
+        interval: 1,
+      })
+    )
     await act(async () => mocks.combobox.mock.lastCall![0].onSearchChange?.(''))
     await act(async () => view.all().onSelect?.())
     await act(async () => mocks.combobox.mock.lastCall![0].onMultiSelectChange?.([]))

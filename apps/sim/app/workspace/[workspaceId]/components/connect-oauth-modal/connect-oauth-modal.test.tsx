@@ -445,7 +445,7 @@ describe('ConnectOAuthModal reauthorization', () => {
     window.history.replaceState(
       {},
       '',
-      '/?keep=1&error=stale&error_description=stale-detail&quickbooks_connected=true'
+      '/?keep=1&error=stale&error_description=stale-detail'
     )
     renderReauthorizeModal()
 
@@ -473,102 +473,5 @@ describe('ConnectOAuthModal reauthorization', () => {
     expect(mocks.onConnect).toHaveBeenCalledOnce()
     expect(mocks.createDraft).not.toHaveBeenCalled()
     expect(mocks.connectOAuthService).not.toHaveBeenCalled()
-  })
-
-  it('collects QuickBooks app credentials inside the standard OAuth connection flow', async () => {
-    const onOpenChange = vi.fn()
-    mocks.getServiceConfigByProviderId.mockReturnValue({
-      clientConfiguration: {
-        redirectPath: '/api/auth/oauth2/callback/quickbooks',
-        fields: [
-          { id: 'clientId', label: 'Client ID', type: 'text' },
-          {
-            id: 'clientSecret',
-            label: 'Client secret',
-            type: 'secret',
-            secret: true,
-          },
-          {
-            id: 'webhookVerifierToken',
-            label: 'Webhook verifier token',
-            type: 'secret',
-            secret: true,
-          },
-          {
-            id: 'environment',
-            label: 'Environment',
-            type: 'select',
-            options: [
-              { label: 'Sandbox', value: 'sandbox' },
-              { label: 'Production', value: 'production' },
-            ],
-          },
-        ],
-      },
-    })
-
-    act(() => {
-      root.render(
-        <ConnectOAuthModal
-          mode='connect'
-          open={true}
-          onOpenChange={onOpenChange}
-          providerId='quickbooks'
-          workspaceId='workspace-1'
-          requiredScopes={[]}
-          origin='integrations'
-        />
-      )
-    })
-
-    const clientId = container.querySelector<HTMLInputElement>('input[aria-label="Client ID"]')
-    const clientSecret = container.querySelector<HTMLInputElement>(
-      'input[aria-label="Client secret"]'
-    )
-    const environment = container.querySelector<HTMLSelectElement>(
-      'select[aria-label="Environment"]'
-    )
-    const webhookVerifierToken = container.querySelector<HTMLInputElement>(
-      'input[aria-label="Webhook verifier token"]'
-    )
-    expect(clientSecret?.type).toBe('password')
-    expect(webhookVerifierToken?.type).toBe('password')
-    expect(container).toHaveTextContent('http://localhost:3000/api/auth/oauth2/callback/quickbooks')
-
-    act(() => {
-      if (clientId) {
-        setFormControlValue(clientId, 'client-id')
-      }
-      if (clientSecret) {
-        setFormControlValue(clientSecret, 'client-secret')
-      }
-      if (environment) {
-        setFormControlValue(environment, 'production')
-      }
-      if (webhookVerifierToken) {
-        setFormControlValue(webhookVerifierToken, 'verifier-token')
-      }
-    })
-
-    await clickConnect()
-
-    expect(mocks.createDraft).toHaveBeenCalledWith(
-      expect.objectContaining({
-        workspaceId: 'workspace-1',
-        providerId: 'quickbooks',
-        oauthClientConfig: {
-          clientId: 'client-id',
-          clientSecret: 'client-secret',
-          environment: 'production',
-          webhookVerifierToken: 'verifier-token',
-        },
-      })
-    )
-    expect(mocks.writeOAuthReturnContext).toHaveBeenCalledOnce()
-    expect(mocks.clearOAuthReturnContext).not.toHaveBeenCalled()
-    expect(onOpenChange).toHaveBeenCalledWith(false)
-    expect(mocks.writeOAuthReturnContext.mock.invocationCallOrder[0]).toBeLessThan(
-      onOpenChange.mock.invocationCallOrder[0]
-    )
   })
 })

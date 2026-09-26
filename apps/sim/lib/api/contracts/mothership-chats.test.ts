@@ -64,16 +64,20 @@ describe('addMothershipChatResourceBodySchema', () => {
 })
 
 describe('chat owner contract', () => {
-  it.each([{ workspaceId: 'ws-1' }, { organizationId: 'org-1' }])(
-    'accepts exactly one owner: %j',
-    (input) => {
-      expect(createMothershipChatBodySchema.parse(input)).toEqual(input)
-    }
-  )
-  it.each([{}, { workspaceId: 'ws-1', organizationId: 'org-1' }, { organizationId: '' }])(
-    'rejects missing or ambiguous owners: %j',
+  it('accepts a workspace owner', () => {
+    expect(createMothershipChatBodySchema.parse({ workspaceId: 'ws-1' })).toEqual({
+      workspaceId: 'ws-1',
+    })
+  })
+  it.each([{}, { organizationId: 'org-1' }, { workspaceId: '' }])(
+    'rejects a chat without a workspace owner: %j',
     (input) => {
       expect(createMothershipChatBodySchema.safeParse(input).success).toBe(false)
     }
   )
+  it('drops an organization owner now that organization chats are gone', () => {
+    expect(
+      createMothershipChatBodySchema.parse({ workspaceId: 'ws-1', organizationId: 'org-1' })
+    ).toEqual({ workspaceId: 'ws-1' })
+  })
 })

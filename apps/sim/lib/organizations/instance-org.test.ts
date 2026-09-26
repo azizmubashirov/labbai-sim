@@ -218,7 +218,6 @@ describe('instance organization', () => {
           userId: 'user-2',
           organizationId: 'org_existing',
           role: 'member',
-          skipBillingLogic: true,
           skipSeatValidation: true,
         })
       )

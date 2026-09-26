@@ -238,7 +238,7 @@ describe('tasks query boundary parsing', () => {
 
   it('waits for slower successful deletions before reconciling a failed batch', async () => {
     const pending = Promise.withResolvers<Response>()
-    const mutation = useDeleteMothershipChats({ organizationId: 'org-1' }) as unknown as {
+    const mutation = useDeleteMothershipChats('workspace-1') as unknown as {
       mutationFn: (chatIds: string[]) => Promise<void>
       onSettled: () => void
     }
@@ -266,7 +266,7 @@ describe('tasks query boundary parsing', () => {
     await observed
     await expect(result).rejects.toThrow()
     expect(queryClient.invalidateQueries).toHaveBeenCalledExactlyOnceWith({
-      queryKey: ['mothership-chats', 'list', 'organization', 'org-1'],
+      queryKey: ['mothership-chats', 'list', 'workspace-1'],
     })
     expect(clearChat).toHaveBeenCalledExactlyOnceWith('chat-slow')
     expect(queryClient.removeQueries).toHaveBeenCalledExactlyOnceWith({

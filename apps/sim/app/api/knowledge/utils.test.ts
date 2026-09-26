@@ -15,7 +15,6 @@ import {
 } from '@sim/testing'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as billingAttributionModule from '@/lib/billing/core/billing-attribution'
-import * as apiKeysModule from '@/lib/core/config/api-keys'
 import { env } from '@/lib/core/config/env'
 import * as documentsUtilsModule from '@/lib/knowledge/documents/utils'
 import * as workspacesUtilsModule from '@/lib/workspaces/utils'
@@ -307,18 +306,13 @@ describe('Knowledge Utils', () => {
 
     it('should throw error when no API configuration provided', async () => {
       Object.keys(env).forEach((key) => delete (env as Record<string, unknown>)[key])
-      const rotationSpy = vi.spyOn(apiKeysModule, 'getRotatingApiKey').mockImplementation(() => {
-        throw new Error('No rotation keys configured')
-      })
 
       try {
         await expect(generateEmbeddings(['test text'], DEFAULT_EMBEDDING_TARGET)).rejects.toThrow(
           'OPENAI_API_KEY is not configured'
         )
-        expect(rotationSpy).toHaveBeenCalledWith('openai')
         expect(fetch).not.toHaveBeenCalled()
       } finally {
-        rotationSpy.mockRestore()
         vi.unstubAllEnvs()
       }
     })

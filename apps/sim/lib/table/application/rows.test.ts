@@ -12,7 +12,6 @@ const {
   mockIsScopeCompatible,
   mockLoadSecretProvenance,
   mockAssertRowCapacity,
-  mockNotifyTableRowUsage,
   mockQueryRows,
   mockRecordAudit,
   mockReplaceRowsWithTx,
@@ -40,7 +39,6 @@ const {
   mockIsScopeCompatible: vi.fn(),
   mockLoadSecretProvenance: vi.fn(),
   mockAssertRowCapacity: vi.fn(),
-  mockNotifyTableRowUsage: vi.fn(),
   mockQueryRows: vi.fn(),
   mockRecordAudit: vi.fn(),
   mockReplaceRowsWithTx: vi.fn(),
@@ -123,7 +121,6 @@ vi.mock('@/lib/table', () => ({
 
 vi.mock('@/lib/table/billing', () => ({
   assertRowCapacity: mockAssertRowCapacity,
-  notifyTableRowUsage: mockNotifyTableRowUsage,
 }))
 
 vi.mock('@/lib/table/column-types', () => ({
@@ -350,12 +347,6 @@ describe('replaceProjectedWireRows application command', () => {
       })
     )
     expect(mockSignalRowsChanged).toHaveBeenCalledWith(TABLE.id)
-    expect(mockNotifyTableRowUsage).toHaveBeenCalledWith({
-      workspaceId: TABLE.workspaceId,
-      currentRowCount: 0,
-      addedRows: 1,
-      limit: 10_000,
-    })
   })
 
   it('rejects a projected row that only matched the stale pre-lock schema', async () => {
@@ -528,7 +519,6 @@ describe('replaceProjectedWireRows application command', () => {
 
     expect(mockRecordAudit).not.toHaveBeenCalled()
     expect(mockSignalRowsChanged).not.toHaveBeenCalled()
-    expect(mockNotifyTableRowUsage).not.toHaveBeenCalled()
   })
 })
 

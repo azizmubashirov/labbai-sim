@@ -28,6 +28,9 @@ vi.mock('@/lib/api-key/orchestration', () => ({
 vi.mock('@/lib/workspaces/permissions/utils', () => ({
   getUserEntityPermissions: mockGetUserEntityPermissions,
   getWorkspaceById: mockGetWorkspaceById,
+  // Access Control is always on: the capability check loads the workspace's
+  // organization. A personal workspace has none, so no permission group governs it.
+  getWorkspaceWithOwner: async () => ({ id: 'workspace-1', organizationId: null }),
 }))
 
 import { GET } from '@/app/api/workspaces/[id]/api-keys/route'

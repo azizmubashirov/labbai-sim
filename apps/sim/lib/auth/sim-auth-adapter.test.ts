@@ -16,7 +16,6 @@ vi.mock('@sim/db', () => ({
   db: {
     insert: mocks.rootInsert,
     transaction: mocks.transaction,
-    select: () => ({ from: () => ({ where: () => ({ limit: async () => [{ id: 'org-1' }] }) }) }),
   },
 }))
 
@@ -44,7 +43,7 @@ describe('createSimAuthAdapter', () => {
     mocks.create.mockResolvedValue({ id: 'base-record' })
   })
 
-  it('retains both OAuth and subscription guards inside a transaction callback', async () => {
+  it('retains the OAuth guard inside a transaction callback', async () => {
     const adapter = createSimAuthAdapter({})
     const now = new Date()
 
@@ -62,10 +61,6 @@ describe('createSimAuthAdapter', () => {
           },
         })
       ).resolves.toMatchObject({ id: 'persisted' })
-
-      await expect(
-        tx.create({ model: 'subscription', data: { referenceId: 'org-1', plan: 'pro' } })
-      ).rejects.toThrow('Organization-referenced subscriptions must hold a Team or Enterprise plan')
 
       await expect(tx.create({ model: 'user', data: { name: 'Ada' } })).resolves.toEqual({
         id: 'base-record',

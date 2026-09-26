@@ -1343,15 +1343,19 @@ describe('bare options JSON with no label at all', () => {
 })
 
 describe('bare question payload recovery', () => {
+  /**
+   * multi_select: a bare `single_select` blob is claimed first by the Labbai
+   * choice-block path and rendered as an options card (covered below).
+   */
   const bare =
-    '{"type": "single_select", "prompt": "Which channel should the bot post to?", "options": [{"id": "a", "label": "#general"}, {"id": "b", "label": "#alerts"}]}'
+    '{"type": "multi_select", "prompt": "Which channels should the bot post to?", "options": [{"id": "a", "label": "#general"}, {"id": "b", "label": "#alerts"}]}'
 
   it('renders an unwrapped question payload as a question card', () => {
     const { segments } = parseSpecialTags(bare, false)
     const question = segments.find((segment) => segment.type === 'question')
     expect(question).toBeDefined()
     expect((question as { data: Array<{ prompt: string }> }).data[0].prompt).toBe(
-      'Which channel should the bot post to?'
+      'Which channels should the bot post to?'
     )
     expect(segments.some((segment) => segment.type === 'text')).toBe(false)
   })
@@ -1370,6 +1374,19 @@ describe('bare question payload recovery', () => {
 
   it('does not fire mid-stream', () => {
     expect(parseSpecialTags(bare, true).segments.some((s) => s.type === 'question')).toBe(false)
+  })
+
+  it('renders a bare single_select payload as an options card instead', () => {
+    const singleSelect = bare.replace('"multi_select"', '"single_select"')
+    const { segments } = parseSpecialTags(singleSelect, false)
+    const options = segments.find((segment) => segment.type === 'options') as {
+      data: Record<string, { title: string }>
+    }
+    expect(Object.values(options.data).map((option) => option.title)).toEqual([
+      '#general',
+      '#alerts',
+    ])
+    expect(segments.some((segment) => segment.type === 'question')).toBe(false)
   })
 })
 

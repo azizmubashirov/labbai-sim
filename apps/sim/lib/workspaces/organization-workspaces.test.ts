@@ -8,25 +8,20 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 const {
   mockEnsureUserInOrganizationTx,
   mockSyncUsageLimitsFromSubscription,
-  mockReapplyPaidOrgJoinBillingForExistingMemberTx,
   mockAcquireOrganizationMutationLock,
   mockAcquireInvitationMutationLocks,
   mockChangeWorkspaceStoragePayersInTx,
-  mockInvalidateWorkspaceTableLimitsCache,
 } = vi.hoisted(() => ({
   mockEnsureUserInOrganizationTx: vi.fn(),
   mockSyncUsageLimitsFromSubscription: vi.fn(),
-  mockReapplyPaidOrgJoinBillingForExistingMemberTx: vi.fn(),
   mockAcquireOrganizationMutationLock: vi.fn(),
   mockAcquireInvitationMutationLocks: vi.fn(),
   mockChangeWorkspaceStoragePayersInTx: vi.fn(),
-  mockInvalidateWorkspaceTableLimitsCache: vi.fn(),
 }))
 
 vi.mock('@/lib/billing/organizations/membership', () => ({
   acquireOrganizationMutationLock: mockAcquireOrganizationMutationLock,
   ensureUserInOrganizationTx: mockEnsureUserInOrganizationTx,
-  reapplyPaidOrgJoinBillingForExistingMemberTx: mockReapplyPaidOrgJoinBillingForExistingMemberTx,
 }))
 
 vi.mock('@/lib/billing/storage/payer-transfer', () => ({
@@ -35,10 +30,6 @@ vi.mock('@/lib/billing/storage/payer-transfer', () => ({
 
 vi.mock('@/lib/invitations/locks', () => ({
   acquireInvitationMutationLocks: mockAcquireInvitationMutationLocks,
-}))
-
-vi.mock('@/lib/table/billing', () => ({
-  invalidateWorkspaceTableLimitsCache: mockInvalidateWorkspaceTableLimitsCache,
 }))
 
 vi.mock('@/lib/billing/core/usage', () => ({
@@ -64,10 +55,6 @@ describe('organization workspace helpers', () => {
     mockEnsureUserInOrganizationTx.mockReset()
     mockChangeWorkspaceStoragePayersInTx.mockReset()
     mockSyncUsageLimitsFromSubscription.mockResolvedValue(undefined)
-    mockReapplyPaidOrgJoinBillingForExistingMemberTx.mockResolvedValue({
-      proUsageSnapshotted: false,
-      proCancelledAtPeriodEnd: false,
-    })
   })
 
   afterAll(() => {
@@ -125,11 +112,6 @@ describe('organization workspace helpers', () => {
       skipSeatValidation: true,
     })
     expect(mockSyncUsageLimitsFromSubscription).toHaveBeenCalledWith('member-1')
-    expect(mockReapplyPaidOrgJoinBillingForExistingMemberTx).toHaveBeenCalledWith(
-      expect.anything(),
-      'owner-1',
-      'org-1'
-    )
     expect(mockAcquireInvitationMutationLocks.mock.invocationCallOrder[0]).toBeLessThan(
       mockAcquireOrganizationMutationLock.mock.invocationCallOrder[0]
     )
@@ -140,7 +122,6 @@ describe('organization workspace helpers', () => {
       expect.objectContaining({ organizationAssignedAt: expect.any(Date) })
     )
     expect(mockChangeWorkspaceStoragePayersInTx).toHaveBeenCalledTimes(1)
-    expect(mockInvalidateWorkspaceTableLimitsCache).toHaveBeenCalledTimes(2)
     expect(dbChainMockFns.for.mock.invocationCallOrder[0]).toBeLessThan(
       mockEnsureUserInOrganizationTx.mock.invocationCallOrder[0]
     )

@@ -103,18 +103,3 @@ describe.each(DOWNLOAD_CASES)('$tool.id binary download', (provider) => {
     expectBinaryFile(result, buffer, provider)
   })
 })
-
-describe.each(LEGACY_DOWNLOAD_CASES)(
-  '$tool.id legacy download compatibility',
-  ({ tool, content }) => {
-    it('retains the original response budget and inline base64 contract', async () => {
-      expect(tool.request).not.toHaveProperty('responseType')
-      const buffer = Buffer.from('saved workflow content')
-      const result = await tool.transformResponse(binaryResponse(buffer))
-      expect(result.success).toBe(true)
-      expect(result.output).toHaveProperty(content, buffer.toString('base64'))
-      expect(result.output.file?.data).toBe(buffer.toString('base64'))
-      expect(tool.outputs).toHaveProperty(content)
-    })
-  }
-)

@@ -102,7 +102,7 @@ describe('SelectorCombobox label hydration', () => {
       <SelectorCombobox
         blockId='block-1'
         subBlock={{ id: 'label', title: 'Label', type: 'combobox' }}
-        selectorKey='jira.issues'
+        selectorKey='notion.pages'
         selectorContext={{ workspaceId: 'workspace-1', oauthCredential: 'credential-1' }}
         disabled
       />
@@ -110,11 +110,11 @@ describe('SelectorCombobox label hydration', () => {
 
     expect(html).toContain('Hydrated label')
     expect(mockUseSelectorOptions).toHaveBeenCalledWith(
-      'jira.issues',
+      'notion.pages',
       expect.objectContaining({ enabled: false })
     )
     expect(mockUseSelectorOptionDetail).toHaveBeenCalledWith(
-      'jira.issues',
+      'notion.pages',
       expect.objectContaining({ detailId: 'stored-label', enabled: true })
     )
   })

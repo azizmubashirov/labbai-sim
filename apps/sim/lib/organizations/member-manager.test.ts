@@ -86,12 +86,11 @@ describe('organization member managers', () => {
     expect(dbChainMockFns.update).not.toHaveBeenCalled()
   })
 
-  it('preserves successful emergency removal after billing reconciliation fails', async () => {
+  it('removes an internal member without a SCIM check so emergency removal always works', async () => {
     queueTableRows(member, [target])
     await expect(removeOrganizationMemberRecord(input)).resolves.toMatchObject({
       membershipType: 'internal',
       removal: { success: true },
-      seatReduction: { changed: false },
     })
     expect(mocks.remove).toHaveBeenCalledWith(
       expect.objectContaining({ actorUserId: 'actor', memberId: 'membership', onError: 'throw' })

@@ -694,8 +694,8 @@ describe.concurrent('Blocks Module', () => {
     })
 
     it('should handle blocks with multiple tool access', () => {
-      const routerBlock = getBlock('router')
-      expect(routerBlock?.tools.access.length).toBeGreaterThan(1)
+      const gmailBlock = getBlock('gmail')
+      expect(gmailBlock?.tools.access.length).toBeGreaterThan(1)
     })
 
     it('should handle blocks with tools.config', () => {

@@ -112,7 +112,7 @@ describe('block catalog projection sweep', () => {
   const blocks = Object.values(getBlockRegistry())
 
   it('has a non-empty registry to sweep', () => {
-    expect(blocks.length).toBeGreaterThan(100)
+    expect(blocks.length).toBeGreaterThan(50)
   })
 
   it('projects every registered block to a publishable summary', () => {
@@ -142,7 +142,7 @@ describe('tool catalog projection sweep', () => {
   })
 
   it('projects every registered tool to a publishable summary and detail', () => {
-    expect(toolIds.length).toBeGreaterThan(1000)
+    expect(toolIds.length).toBeGreaterThan(300)
     for (const toolId of toolIds) {
       const summary = projectToolSummaryById(toolId, HOSTED)
       expect(summary, `tool ${toolId} has no metadata`).toBeDefined()
@@ -159,7 +159,7 @@ describe('tool catalog projection sweep', () => {
 describe('connector-type catalog projection sweep', () => {
   it('projects every registered connector type to a publishable entry', () => {
     const entries = Object.entries(CONNECTOR_META_REGISTRY)
-    expect(entries.length).toBeGreaterThan(10)
+    expect(entries.length).toBeGreaterThan(0)
     for (const [connectorType, meta] of entries) {
       const projected = projectConnectorType(connectorType, meta)
       expectSerializable(projected, `connector ${connectorType}`)

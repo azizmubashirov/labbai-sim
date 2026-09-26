@@ -98,8 +98,10 @@ describe('getCardSubBlocks', () => {
   })
 
   it('shows a trigger field whose canonical id is also an action pair', () => {
-    const onCard = triggerCardIds(BLOCK_REGISTRY.webflow)
-    expect(onCard).toEqual(expect.arrayContaining(['triggerCredentials', 'triggerSiteId']))
+    // HubSpot's trigger `triggerCredentials` shares `canonicalParamId: 'oauthCredential'` with
+    // the action surface's credential pair.
+    const onCard = triggerCardIds(BLOCK_REGISTRY.hubspot)
+    expect(onCard).toContain('triggerCredentials')
   })
 
   it('shows a trigger field whose id is also an action pair member', () => {

@@ -10,6 +10,8 @@ const { mockCheckWorkspaceAccess } = vi.hoisted(() => ({
 
 vi.mock('@/lib/workspaces/permissions/utils', () => ({
   checkWorkspaceAccess: mockCheckWorkspaceAccess,
+  /** Read by the model gate's permission-group lookup; no owning organization, no group. */
+  getWorkspaceWithOwner: vi.fn().mockResolvedValue(null),
 }))
 
 vi.mock('@/lib/oauth/credential-service', () => authOAuthUtilsMock)

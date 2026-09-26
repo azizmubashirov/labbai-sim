@@ -36,7 +36,8 @@ import { getApiKeyCondition } from '@/blocks/utils'
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
-const HOSTED_MODELS = ['gpt-5.6-sol', 'claude-sonnet-5']
+/** Every model runs on the server's OpenAI key, so no deployment shows an API key field. */
+const MODELS = ['gpt-5.5', 'gpt-5-mini', 'custom/model']
 
 const HOSTED: DeploymentShape = {
   ...resolveDeploymentShape(),
@@ -79,14 +80,14 @@ afterEach(() => {
 })
 
 describe('env fallback on a document without the root layout', () => {
-  it('resolves as self-hosted and shows API key fields for hosted models', () => {
+  it('resolves as self-hosted and keeps API key fields hidden', () => {
     expect(window.__ENV).toBeUndefined()
     expect(document.documentElement.getAttribute(PUBLIC_ENV_ATTRIBUTE)).toBeNull()
     expect(resolveDeploymentShape().hosted).toBe(false)
     expect(getDeploymentShape().hosted).toBe(false)
 
-    for (const model of HOSTED_MODELS) {
-      expect(apiKeyFieldShown(model)).toBe(true)
+    for (const model of MODELS) {
+      expect(apiKeyFieldShown(model)).toBe(false)
     }
   })
 })
@@ -96,10 +97,9 @@ describe('seeded server shape', () => {
     seedDeploymentShape(HOSTED)
 
     expect(getDeploymentShape()).toBe(HOSTED)
-    for (const model of HOSTED_MODELS) {
+    for (const model of MODELS) {
       expect(apiKeyFieldShown(model)).toBe(false)
     }
-    expect(apiKeyFieldShown('custom/model')).toBe(true)
   })
 
   it('keeps the seeded object when an equal shape is seeded again', () => {

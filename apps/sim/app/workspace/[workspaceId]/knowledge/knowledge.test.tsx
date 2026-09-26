@@ -37,6 +37,9 @@ vi.mock('@/hooks/use-permission-config', () => ({ usePermissionConfig: () => ({ 
 vi.mock('@/hooks/queries/permission-groups', () => ({
   useUserPermissionConfig: () => ({ data: { config: {} }, isPending: false }),
 }))
+vi.mock('@/components/access-requests/permission-access-boundary', () => ({
+  PermissionAccessBoundary: ({ children }: { children?: ReactNode }) => <>{children}</>,
+}))
 vi.mock('@/hooks/queries/access-requests', () => ({
   useDiscoverAccessRequests: () => ({ data: { enabled: false, entries: [] }, isPending: false }),
 }))

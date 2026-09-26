@@ -93,10 +93,6 @@ export const selectorManifest = {
   }),
   'calcom.eventTypes': providerSelector([], { detail: true }),
   'calcom.schedules': providerSelector([], { detail: true }),
-  'google.tasks.lists': providerSelector(['impersonateUserEmail'], {
-    listMode: 'paginated',
-    detail: true,
-  }),
   'gmail.labels': providerSelector(['impersonateUserEmail']),
   'google.calendar': providerSelector(['impersonateUserEmail'], {
     listMode: 'paginated',

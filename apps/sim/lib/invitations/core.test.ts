@@ -648,14 +648,6 @@ describe('acceptInvitation', () => {
       [{ name: 'Owner', email: 'owner@example.com' }],
       // Invitee-owned personal workspaces for the acceptance lock plan.
       [],
-      // Candidate personal workspaces covered by the acceptance lock set.
-      [],
-      // No billing-owner workspace escaped the conversion's locked sweep.
-      [],
-      // Post-join owned-set re-check under the billing-identity lock.
-      [],
-      // Grant-txn membership re-check under the lock: member still present.
-      [{ id: 'member-1' }],
     ])
 
     const result = await acceptInvitation({
@@ -670,26 +662,13 @@ describe('acceptInvitation', () => {
       executor: dbChainMock.db,
     })
     expect(mockGetUserOrganization).toHaveBeenCalledWith('invitee-user', dbChainMock.db)
-    expect(mockEnsureUserInOrganization).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        userId: 'invitee-user',
-        organizationId: 'org-new',
-        acceptingInvitationId: 'inv-1',
-        skipSeatValidation: true,
-      })
-    )
-    // Seats grow to match the new member; the Stripe charge is deferred to the
-    // seat-sync outbox.
-    expect(mockSetActiveOrganizationForCurrentSession).toHaveBeenCalledWith('org-new')
-    expect(auditMock.recordAudit).toHaveBeenCalledWith(
-      expect.objectContaining({
-        actorId: 'invitee-user',
-        action: auditMock.AuditAction.ORG_MEMBER_ADDED,
-        resourceType: auditMock.AuditResourceType.ORGANIZATION,
-        resourceId: 'org-new',
-        metadata: expect.objectContaining({ invitationId: 'inv-1', memberRole: 'member' }),
-      })
+    // The live workspace has no organization, so the stale stamped one is never
+    // joined: acceptance is a plain workspace grant.
+    expect(result).toMatchObject({ acceptedWorkspaceIds: ['workspace-1'] })
+    expect(mockEnsureUserInOrganization).not.toHaveBeenCalled()
+    expect(mockSetActiveOrganizationForCurrentSession).not.toHaveBeenCalled()
+    expect(auditMock.recordAudit).not.toHaveBeenCalledWith(
+      expect.objectContaining({ action: auditMock.AuditAction.ORG_MEMBER_ADDED })
     )
   })
 
@@ -749,9 +728,9 @@ describe('acceptInvitation', () => {
       [{ name: 'Owner', email: 'owner@example.com' }],
       // Invitee-owned personal workspaces for the acceptance lock plan.
       [],
-      [],
       // Post-join owned-set re-check under the billing-identity lock.
       [],
+      // Grant-txn membership re-check under the lock: member still present.
       [{ id: 'member-1' }],
       [],
       [{ variables: {} }],

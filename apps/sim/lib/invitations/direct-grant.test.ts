@@ -49,6 +49,11 @@ vi.mock('@/lib/invitations/locks', () => ({
   acquireInvitationMutationLocks: mockAcquireInvitationMutationLocks,
 }))
 
+/** SCIM management is its own query; these cases cover unmanaged members only. */
+vi.mock('@/lib/labbai/scim/managed-membership', () => ({
+  assertMembershipNotScimManaged: vi.fn(async () => undefined),
+}))
+
 vi.mock('@/lib/invitations/core', () => ({
   revokeInvitationWorkspaceGrantTx: mockRevokeInvitationWorkspaceGrantTx,
 }))

@@ -17,7 +17,6 @@ const {
   mockCheckStorageQuotaForBillingContext,
   mockDecrementStorageUsageForBillingContextInTx,
   mockIncrementStorageUsageForBillingContextInTx,
-  mockMaybeNotifyStorageLimitForBillingContext,
   mockResolveStorageBillingContext,
   mockGetFileMetadataByKeys,
   mockEnqueueKnowledgeDocumentProcessing,
@@ -27,7 +26,6 @@ const {
   mockCheckStorageQuotaForBillingContext: vi.fn(),
   mockDecrementStorageUsageForBillingContextInTx: vi.fn(),
   mockIncrementStorageUsageForBillingContextInTx: vi.fn(),
-  mockMaybeNotifyStorageLimitForBillingContext: vi.fn(),
   mockResolveStorageBillingContext: vi.fn(),
   mockGetFileMetadataByKeys: vi.fn(),
   mockEnqueueKnowledgeDocumentProcessing: vi.fn(),
@@ -39,7 +37,6 @@ vi.mock('@/lib/billing/storage', () => ({
   checkStorageQuotaForBillingContext: mockCheckStorageQuotaForBillingContext,
   decrementStorageUsageForBillingContextInTx: mockDecrementStorageUsageForBillingContextInTx,
   incrementStorageUsageForBillingContextInTx: mockIncrementStorageUsageForBillingContextInTx,
-  maybeNotifyStorageLimitForBillingContext: mockMaybeNotifyStorageLimitForBillingContext,
   resolveStorageBillingContext: mockResolveStorageBillingContext,
 }))
 
@@ -82,7 +79,6 @@ describe('knowledge document storage attribution', () => {
     mockCheckStorageQuotaForBillingContext.mockResolvedValue({ allowed: true })
     mockIncrementStorageUsageForBillingContextInTx.mockResolvedValue(5)
     mockApplyStorageUsageDeltasInTx.mockResolvedValue(undefined)
-    mockMaybeNotifyStorageLimitForBillingContext.mockResolvedValue(undefined)
     mockGetFileMetadataByKeys.mockResolvedValue([])
     mockEnqueueKnowledgeDocumentProcessing.mockResolvedValue('outbox-1')
   })
@@ -111,7 +107,6 @@ describe('knowledge document storage attribution', () => {
         STORAGE_CONTEXT,
         5
       )
-      expect(mockMaybeNotifyStorageLimitForBillingContext).toHaveBeenCalledWith(STORAGE_CONTEXT, 5)
       expect(mockCheckStorageQuota).not.toHaveBeenCalled()
       expect(dbChainMockFns.values).toHaveBeenCalledWith([
         expect.objectContaining({ uploadedBy: actorUserId }),
@@ -119,19 +114,7 @@ describe('knowledge document storage attribution', () => {
     }
   )
 
-  it('notifies the workspace payer after a single document transaction commits', async () => {
-    let transactionCommitted = false
-    dbChainMockFns.transaction.mockImplementationOnce(
-      async (callback: (tx: typeof dbChainMock.db) => unknown) => {
-        const result = await callback(dbChainMock.db)
-        transactionCommitted = true
-        return result
-      }
-    )
-    mockMaybeNotifyStorageLimitForBillingContext.mockImplementationOnce(() => {
-      expect(transactionCommitted).toBe(true)
-    })
-
+  it('charges the workspace payer for a single document', async () => {
     await createSingleDocument(
       {
         filename: 'note.txt',
@@ -149,7 +132,6 @@ describe('knowledge document storage attribution', () => {
       STORAGE_CONTEXT,
       5
     )
-    expect(mockMaybeNotifyStorageLimitForBillingContext).toHaveBeenCalledWith(STORAGE_CONTEXT, 5)
   })
 
   it('returns the pending processing state persisted for a new document', async () => {
@@ -279,8 +261,6 @@ describe('knowledge document storage attribution', () => {
         }
       )
     ).rejects.toBe(failure)
-
-    expect(mockMaybeNotifyStorageLimitForBillingContext).not.toHaveBeenCalled()
   })
 
   it.each(['kb', 'knowledge-base'])(

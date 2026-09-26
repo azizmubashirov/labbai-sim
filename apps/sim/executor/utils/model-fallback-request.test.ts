@@ -184,9 +184,9 @@ describe('executeModelRequestWithFallbacks', () => {
     expect(request).toHaveBeenCalledTimes(1)
   })
 
-  it('only sends a cross-provider key that was stored as a reference', async () => {
+  it('never sends a row key, even a stored reference, and applies the row tuning', async () => {
     const options = input()
-    const rows = [{ model: 'claude-sonnet-5', apiKey: '{{ANTHROPIC_KEY}}', thinkingLevel: 'high' }]
+    const rows = [{ model: 'gpt-5-mini', apiKey: '{{OTHER_KEY}}', reasoningEffort: 'low' }]
     options.block = { ...block, config: { ...block.config, params: { fallbackModels: rows } } }
     request.mockRejectedValueOnce(new Error('overloaded'))
     await executeModelRequestWithFallbacks({
@@ -199,10 +199,11 @@ describe('executeModelRequestWithFallbacks', () => {
     })
     const fallback = request.mock.calls[1][0]
     expect(fallback).toMatchObject({
-      providerId: 'anthropic',
+      providerId: 'openai',
       request: {
-        apiKey: 'resolved-key',
-        thinkingLevel: 'high',
+        model: 'gpt-5-mini',
+        apiKey: 'primary-key',
+        reasoningEffort: 'low',
         temperature: 0.3,
         responseFormat: { name: 'scores' },
       },

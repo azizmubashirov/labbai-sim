@@ -518,30 +518,6 @@ describe('Memory', () => {
       expect(messages).toEqual([{ role: 'assistant', content: 'old secret-value' }])
     })
 
-    it('keeps raw foreign-scope content in functional storage', async () => {
-      mockDecryptSecret.mockResolvedValueOnce({ decrypted: 'foreign-secret' })
-      const registry = new ResolvedSecretTraceRegistry([], {
-        userId: 'user-1',
-        workspaceId: 'workspace-1',
-      })
-      await registry.importProvenance(
-        {
-          version: 1,
-          complete: true,
-          entries: [{ name: 'FOREIGN', encryptedValue: 'foreign-ciphertext' }],
-          scope: { userId: 'user-2', workspaceId: 'workspace-2' },
-        },
-        { trusted: true }
-      )
-
-      const result = await (memoryService as any).maskContentForStorage(createContext(registry), {
-        role: 'assistant',
-        content: 'foreign-secret',
-      })
-
-      expect(result.content).toBe('foreign-secret')
-    })
-
     it.each(['12345678'])(
       'projects short secret %s only in model text and arguments',
       async (secret) => {

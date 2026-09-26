@@ -193,6 +193,7 @@ vi.mock('@/local-copilot/lib/access', async () => {
 import { chatOperations } from '@/lib/copilot/application/operations'
 import { COPILOT_ASSISTANT_MODE_UNAVAILABLE_MESSAGE } from '@/lib/copilot/constants'
 import { DEFAULT_PERMISSION_GROUP_CONFIG } from '@/lib/permission-groups/fields'
+import { DEFAULT_LOCAL_COPILOT_MODEL } from '@/local-copilot/lib/config'
 import { DEFAULT_LOCAL_COPILOT_CATALOG_ID } from '@/local-copilot/lib/model-catalog'
 import { handleUnifiedChatPost } from './post'
 
@@ -313,12 +314,12 @@ describe('handleUnifiedChatPost', () => {
     expect(generateWorkspaceSnapshot).toHaveBeenCalledWith('ws-1', 'user-1')
     expect(buildCopilotRequestPayload).toHaveBeenCalledWith(
       expect.objectContaining({
-        model: 'claude-opus-4-8',
+        model: DEFAULT_LOCAL_COPILOT_MODEL,
         workspaceContext: 'workspace context',
         // Regression guard: the branch must forward the typed snapshot, not drop it.
         vfs: expect.objectContaining({ workflows: expect.any(Array) }),
       }),
-      { selectedModel: 'claude-opus-4-8' }
+      { selectedModel: DEFAULT_LOCAL_COPILOT_MODEL }
     )
     expect(createSSEStream).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -448,7 +449,7 @@ describe('handleUnifiedChatPost', () => {
     expect(response.status).toBe(200)
     expect(buildCopilotRequestPayload).toHaveBeenCalledWith(
       expect.objectContaining({ mcpServerIds: ['mcp-server-1'] }),
-      { selectedModel: '' }
+      { selectedModel: DEFAULT_LOCAL_COPILOT_CATALOG_ID }
     )
   })
 
@@ -482,7 +483,7 @@ describe('handleUnifiedChatPost', () => {
     expect(response.status).toBe(200)
     expect(buildCopilotRequestPayload).toHaveBeenCalledWith(
       expect.objectContaining({ mcpServerIds: ['mcp-server-1'] }),
-      { selectedModel: '' }
+      { selectedModel: DEFAULT_LOCAL_COPILOT_CATALOG_ID }
     )
     // The tools ride the tool array every turn, so re-expanding the listing for
     // an inherited server would only duplicate what the model already sees.
@@ -523,7 +524,7 @@ describe('handleUnifiedChatPost', () => {
     expect(response.status).toBe(200)
     expect(buildCopilotRequestPayload).toHaveBeenCalledWith(
       expect.objectContaining({ mcpServerIds: ['mcp-server-1', 'mcp-server-2'] }),
-      { selectedModel: '' }
+      { selectedModel: DEFAULT_LOCAL_COPILOT_CATALOG_ID }
     )
   })
 
